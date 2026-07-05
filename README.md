@@ -9,6 +9,9 @@ Real JuChess application workspace.
 - `apps/mobile`: Flutter app for iPhone, Android, and tablet layouts.
 - `appwrite`: Appwrite CLI config and the first server Function.
 - `docs/appwrite-schema.md`: shared backend contract.
+- `docs/prototype-screen-checklist.md`: locked implementation checklist for
+  web, admin, mobile, and tablet screens.
+- `appwrite/schema.json`: machine-readable Appwrite table/function contract.
 
 ## Product Rule
 
@@ -71,3 +74,12 @@ Then update:
 - Flutter `--dart-define` values
 
 Admin-only mutations must go through Appwrite Functions, not browser API keys.
+
+## Current Implementation Slice
+
+- Web and admin apps now own routes instead of redirecting away from React.
+- Route screens render the approved prototype files exactly while each screen is
+  ported into native React in later slices.
+- The `admin-actions` Function has concrete admin mutation routes for
+  tournaments, registrations, games, profiles, and announcements.
+- The prototype checklist is the acceptance source for each future screen port.

@@ -1,0 +1,94 @@
+{
+  "databaseId": "juchess",
+  "teams": ["admins", "organizers", "members"],
+  "tables": {
+    "profiles": {
+      "fields": {
+        "accountId": "string|required|unique",
+        "displayName": "string|required",
+        "universityId": "string|unique",
+        "email": "email|required",
+        "rating": "integer|default:1200",
+        "role": "enum:member,organizer,admin",
+        "status": "enum:pending,active,suspended",
+        "avatarFileId": "string"
+      }
+    },
+    "tournaments": {
+      "fields": {
+        "slug": "string|required|unique",
+        "name": "string|required",
+        "status": "enum:draft,upcoming,active,completed,cancelled",
+        "format": "string|required",
+        "timeControl": "string|required",
+        "roundsTotal": "integer",
+        "currentRound": "integer",
+        "startsAt": "datetime",
+        "endsAt": "datetime",
+        "location": "string",
+        "capacity": "integer",
+        "description": "string",
+        "createdByProfileId": "string|required"
+      }
+    },
+    "registrations": {
+      "fields": {
+        "tournamentId": "string|required",
+        "profileId": "string|required",
+        "status": "enum:pending,confirmed,waitlisted,cancelled",
+        "seed": "integer",
+        "checkInCode": "string",
+        "checkedIn": "boolean|default:false"
+      }
+    },
+    "games": {
+      "fields": {
+        "tournamentId": "string|required",
+        "round": "integer|required",
+        "board": "integer|required",
+        "whiteProfileId": "string|required",
+        "blackProfileId": "string|required",
+        "status": "enum:scheduled,live,completed,forfeit",
+        "result": "enum:1-0,0-1,1/2-1/2,*",
+        "pgn": "string",
+        "startedAt": "datetime",
+        "finishedAt": "datetime"
+      }
+    },
+    "standings": {
+      "fields": {
+        "tournamentId": "string|required",
+        "profileId": "string|required",
+        "rank": "integer|required",
+        "points": "float|required",
+        "tieBreak": "float",
+        "played": "integer|default:0",
+        "wins": "integer|default:0",
+        "draws": "integer|default:0",
+        "losses": "integer|default:0"
+      }
+    },
+    "announcements": {
+      "fields": {
+        "title": "string|required",
+        "body": "string|required",
+        "audience": "enum:public,members,organizers,admins",
+        "status": "enum:draft,published,archived",
+        "publishedAt": "datetime",
+        "createdByProfileId": "string|required"
+      }
+    },
+    "admin_audit": {
+      "fields": {
+        "actorProfileId": "string|required",
+        "action": "string|required",
+        "targetTable": "string",
+        "targetRowId": "string",
+        "payload": "string",
+        "createdAt": "datetime|required"
+      }
+    }
+  },
+  "buckets": ["avatars", "tournament-assets"],
+  "functions": ["admin-actions"]
+}

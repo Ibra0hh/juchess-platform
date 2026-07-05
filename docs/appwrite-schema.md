@@ -22,6 +22,8 @@ This is the first backend contract for the real JuChess apps. The web app, admin
 
 Database ID: `juchess`
 
+Machine-readable contract: `appwrite/schema.json`
+
 ### `profiles`
 
 Member profile connected to Appwrite Auth user.
@@ -120,6 +122,39 @@ Permissions:
 - Members can read published standings.
 - Admin Function recalculates/writes standings.
 
+### `announcements`
+
+Club notices shown on the web, mobile, and admin dashboards.
+
+Fields:
+- `title` string, required.
+- `body` string, required.
+- `audience` enum: `public`, `members`, `organizers`, `admins`.
+- `status` enum: `draft`, `published`, `archived`.
+- `publishedAt` datetime, optional.
+- `createdByProfileId` string, required.
+
+Permissions:
+- Public can read published public announcements.
+- Members can read member announcements.
+- Admin Function writes.
+
+### `admin_audit`
+
+Append-only operational log for admin actions.
+
+Fields:
+- `actorProfileId` string, required.
+- `action` string, required.
+- `targetTable` string, optional.
+- `targetRowId` string, optional.
+- `payload` string, optional JSON string.
+- `createdAt` datetime, required.
+
+Permissions:
+- Admins can read.
+- Admin Function writes.
+
 ## Storage Buckets
 
 ### `avatars`
@@ -140,5 +175,16 @@ Responsibilities:
 - Confirm registrations and check-ins.
 - Publish pairings/results.
 - Recalculate standings.
+- Manage announcements.
+- Manage profile roles and status.
 
-The function currently has a health-check stub and should be expanded after the Appwrite project and tables exist.
+Implemented routes:
+- `GET /`
+- `POST /tournaments`
+- `PATCH /tournaments/:id`
+- `DELETE /tournaments/:id`
+- `POST /registrations/:id/confirm`
+- `POST /games/:id/result`
+- `POST /profiles/:id/role`
+- `POST /profiles/:id/status`
+- `POST /announcements`

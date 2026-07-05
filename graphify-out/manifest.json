@@ -10,9 +10,9 @@
     "semantic_hash": "37b64f280698bbbe2c68f38961414923"
   },
   "apps/admin/src/App.tsx": {
-    "mtime": 1783271122.7276525,
-    "ast_hash": "326a973ea174f22034b2120d313d0e9c",
-    "semantic_hash": "326a973ea174f22034b2120d313d0e9c"
+    "mtime": 1783272381.6740634,
+    "ast_hash": "3c0ee4967c470047e7e330c1b6e88fb9",
+    "semantic_hash": ""
   },
   "apps/admin/src/lib/appwrite.ts": {
     "mtime": 1783270013.2364874,
@@ -20,14 +20,14 @@
     "semantic_hash": "2067027fea7e91b30ecf4faa6fcd76b1"
   },
   "apps/admin/src/lib/juchess.ts": {
-    "mtime": 1783270013.2364874,
-    "ast_hash": "917780b08452dd9590b9e013972f49cb",
-    "semantic_hash": "917780b08452dd9590b9e013972f49cb"
+    "mtime": 1783272478.6197336,
+    "ast_hash": "ecad587cf2e34e1284e9e92dcff4065c",
+    "semantic_hash": ""
   },
   "apps/admin/src/main.tsx": {
-    "mtime": 1783269784.7592173,
-    "ast_hash": "787e5a07efeb2bf6209d5937195f2f68",
-    "semantic_hash": "787e5a07efeb2bf6209d5937195f2f68"
+    "mtime": 1783272381.6740634,
+    "ast_hash": "e87dac2e0c5bb4cd5a88ffbf82eb169c",
+    "semantic_hash": ""
   },
   "apps/admin/tsconfig.app.json": {
     "mtime": 1783269784.5333898,
@@ -260,9 +260,9 @@
     "semantic_hash": "bd2e1b043ca1416e26b907789a4522f6"
   },
   "apps/web/src/App.tsx": {
-    "mtime": 1783271122.7116964,
-    "ast_hash": "3493564a642bee3f05ebb8299e88c190",
-    "semantic_hash": "3493564a642bee3f05ebb8299e88c190"
+    "mtime": 1783272381.6704662,
+    "ast_hash": "48346e0741d6fc0c9694ca8c1492b56d",
+    "semantic_hash": ""
   },
   "apps/web/src/lib/appwrite.ts": {
     "mtime": 1783269964.6663978,
@@ -270,14 +270,14 @@
     "semantic_hash": "2067027fea7e91b30ecf4faa6fcd76b1"
   },
   "apps/web/src/lib/juchess.ts": {
-    "mtime": 1783269964.6673956,
-    "ast_hash": "5ed7c2d7801c5a453812461c142de1c9",
-    "semantic_hash": "5ed7c2d7801c5a453812461c142de1c9"
+    "mtime": 1783272478.6135006,
+    "ast_hash": "0cad743ed54ed1bcc6c071e29191b753",
+    "semantic_hash": ""
   },
   "apps/web/src/main.tsx": {
-    "mtime": 1783269784.7592173,
-    "ast_hash": "787e5a07efeb2bf6209d5937195f2f68",
-    "semantic_hash": "787e5a07efeb2bf6209d5937195f2f68"
+    "mtime": 1783272381.6704662,
+    "ast_hash": "e87dac2e0c5bb4cd5a88ffbf82eb169c",
+    "semantic_hash": ""
   },
   "apps/web/tsconfig.app.json": {
     "mtime": 1783269784.5333898,
@@ -295,9 +295,9 @@
     "semantic_hash": "f9cb81ddcea69ffdab672fc8c48dca66"
   },
   "apps/web/vite.config.ts": {
-    "mtime": 1783269784.7369843,
-    "ast_hash": "88439104b3c207f17d33ef3160e3b080",
-    "semantic_hash": "88439104b3c207f17d33ef3160e3b080"
+    "mtime": 1783271385.4726207,
+    "ast_hash": "b69447526aa82abbe0de5f07d3387ada",
+    "semantic_hash": ""
   },
   "appwrite.config.json": {
     "mtime": 1783270149.842895,
@@ -315,9 +315,9 @@
     "semantic_hash": "e358a68202bb051806d0f952698f0403"
   },
   "appwrite/functions/admin-actions/src/main.js": {
-    "mtime": 1783270149.853323,
-    "ast_hash": "e38fe91c33da7081f577203d065ab1ed",
-    "semantic_hash": "e38fe91c33da7081f577203d065ab1ed"
+    "mtime": 1783272434.790917,
+    "ast_hash": "7aef7a9eb40c7ee7c7a1c6177743acb5",
+    "semantic_hash": ""
   },
   "package.json": {
     "mtime": 1783270280.715495,
@@ -325,9 +325,9 @@
     "semantic_hash": "27ba97bc4241dea4c09d6430ace65430"
   },
   "README.md": {
-    "mtime": 1783270697.891291,
-    "ast_hash": "5481ee50c18cb570bd71fe530b3b2cba",
-    "semantic_hash": "5481ee50c18cb570bd71fe530b3b2cba"
+    "mtime": 1783272478.6197336,
+    "ast_hash": "0de126c4d313e1ed3afa4ee3a9469d87",
+    "semantic_hash": ""
   },
   "apps/admin/README.md": {
     "mtime": 1783269784.5657384,
@@ -410,9 +410,9 @@
     "semantic_hash": "83f0b3a2dae1e69d4368cec83c130f37"
   },
   "docs/appwrite-schema.md": {
-    "mtime": 1783270149.85789,
-    "ast_hash": "8017c166a6c782408b9f5053e176ecf8",
-    "semantic_hash": "8017c166a6c782408b9f5053e176ecf8"
+    "mtime": 1783272468.3968928,
+    "ast_hash": "76f0f8f961742461e74a06c45caee787",
+    "semantic_hash": ""
   },
   "docs/prototypes/admin/ChessJU Admin.dc.html": {
     "mtime": 1783266838.0292914,
@@ -773,5 +773,80 @@
     "mtime": 1783256622.0,
     "ast_hash": "740a076792e49c4db308dc8b2b53016b",
     "semantic_hash": "740a076792e49c4db308dc8b2b53016b"
+  },
+  "appwrite/schema.json": {
+    "mtime": 1783272468.3968928,
+    "ast_hash": "a3972ca287194938446cd30c955c58bb",
+    "semantic_hash": ""
+  },
+  "docs/index.html": {
+    "mtime": 1783271455.9693198,
+    "ast_hash": "5ed46c524b1c39482564891e11777d0d",
+    "semantic_hash": ""
+  },
+  "docs/prototype-screen-checklist.md": {
+    "mtime": 1783272468.384688,
+    "ast_hash": "dfe2a69d4acaa33c88916635ae2a71d6",
+    "semantic_hash": ""
+  },
+  "apps/admin/public/prototype/assets/chessju-logo.png": {
+    "mtime": 1782910859.9757333,
+    "ast_hash": "159534d70543e5f4a73798b531b61979",
+    "semantic_hash": ""
+  },
+  "apps/admin/public/prototype/assets/juchess-logo.png": {
+    "mtime": 1782910859.9757333,
+    "ast_hash": "159534d70543e5f4a73798b531b61979",
+    "semantic_hash": ""
+  },
+  "apps/web/public/prototype/assets/crest.png": {
+    "mtime": 1783161675.7033947,
+    "ast_hash": "beaab846e6786ee364300874eeb788b3",
+    "semantic_hash": ""
+  },
+  "apps/web/public/prototype/assets/knight-dark.png": {
+    "mtime": 1783161675.7024114,
+    "ast_hash": "c4ae095c904414b77434ca0c4088c75c",
+    "semantic_hash": ""
+  },
+  "apps/web/public/prototype/assets/knight-light.png": {
+    "mtime": 1783161675.7043946,
+    "ast_hash": "cb43926636e2bf8468600ef5c1a477ff",
+    "semantic_hash": ""
+  },
+  "docs/prototypes/admin/assets/chessju-logo.png": {
+    "mtime": 1782910859.9757333,
+    "ast_hash": "159534d70543e5f4a73798b531b61979",
+    "semantic_hash": ""
+  },
+  "docs/prototypes/admin/assets/juchess-logo.png": {
+    "mtime": 1782910859.9757333,
+    "ast_hash": "159534d70543e5f4a73798b531b61979",
+    "semantic_hash": ""
+  },
+  "docs/prototypes/mobile/assets/chessju-logo.png": {
+    "mtime": 1782910859.9757333,
+    "ast_hash": "159534d70543e5f4a73798b531b61979",
+    "semantic_hash": ""
+  },
+  "docs/prototypes/mobile/assets/juchess-logo.png": {
+    "mtime": 1782910859.9757333,
+    "ast_hash": "159534d70543e5f4a73798b531b61979",
+    "semantic_hash": ""
+  },
+  "docs/prototypes/web/assets/crest.png": {
+    "mtime": 1783161675.7033947,
+    "ast_hash": "beaab846e6786ee364300874eeb788b3",
+    "semantic_hash": ""
+  },
+  "docs/prototypes/web/assets/knight-dark.png": {
+    "mtime": 1783161675.7024114,
+    "ast_hash": "c4ae095c904414b77434ca0c4088c75c",
+    "semantic_hash": ""
+  },
+  "docs/prototypes/web/assets/knight-light.png": {
+    "mtime": 1783161675.7043946,
+    "ast_hash": "cb43926636e2bf8468600ef5c1a477ff",
+    "semantic_hash": ""
   }
 }

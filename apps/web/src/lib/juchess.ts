@@ -27,6 +27,8 @@ export const tableIds = {
   registrations: 'registrations',
   games: 'games',
   standings: 'standings',
+  announcements: 'announcements',
+  adminAudit: 'admin_audit',
 } as const
 
 export const tournaments: Tournament[] = [
