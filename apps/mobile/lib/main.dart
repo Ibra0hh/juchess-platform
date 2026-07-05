@@ -797,9 +797,11 @@ class FeaturedTournamentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final progress = _playerProgress(event.chips);
+
     return PrototypeCard(
       margin: EdgeInsets.zero,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -809,14 +811,14 @@ class FeaturedTournamentCard extends StatelessWidget {
                 'FEATURED TOURNAMENT',
                 style: TextStyle(
                   color: Color(0x8021304e),
-                  fontSize: 9.5,
+                  fontSize: 9.8,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
+                  letterSpacing: 0.6,
                 ),
               ),
               const Spacer(),
               if (event.status == 'active')
-                const LivePill(small: true)
+                const LivePill()
               else
                 StatusPill(event.status),
             ],
@@ -824,9 +826,9 @@ class FeaturedTournamentCard extends StatelessWidget {
           const SizedBox(height: 6),
           SerifText(
             event.name,
-            size: 16,
+            size: 16.2,
             weight: FontWeight.w700,
-            height: 1.18,
+            height: 1.2,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -835,54 +837,55 @@ class FeaturedTournamentCard extends StatelessWidget {
             event.meta,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0x9921304e), fontSize: 11.5),
+            style: const TextStyle(color: Color(0x9921304e), fontSize: 11.8),
           ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 5,
             runSpacing: 5,
-            children: [
-              if (event.chips.length > 1) CompactChipPill(event.chips[1]),
-              if (event.chips.length > 2) CompactGoldPill(event.chips[2]),
-            ],
+            children: event.chips
+                .asMap()
+                .entries
+                .map(
+                  (entry) => entry.key == 2
+                      ? GoldPill(entry.value)
+                      : ChipPill(entry.value),
+                )
+                .toList(),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  event.current,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: PrototypeColors.burgundy,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 11.5,
-                  ),
-                ),
+          const SizedBox(height: 9),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 3.5,
+              backgroundColor: const Color(0x1f21304e),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                PrototypeColors.gold,
               ),
-              FilledButton(
-                onPressed: onTap,
-                style: FilledButton.styleFrom(
-                  backgroundColor: PrototypeColors.burgundy,
-                  foregroundColor: PrototypeColors.cream,
-                  minimumSize: const Size(0, 34),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                child: const Text('View'),
-              ),
-            ],
+            ),
+          ),
+          const SizedBox(height: 9),
+          SizedBox(
+            width: double.infinity,
+            child: PrototypeButton(label: 'View Tournament', onTap: onTap),
           ),
         ],
       ),
     );
+  }
+
+  double _playerProgress(List<String> chips) {
+    for (final chip in chips) {
+      final match = RegExp(r'(\d+)\s*/\s*(\d+)').firstMatch(chip);
+      if (match == null) continue;
+      final players = int.tryParse(match.group(1) ?? '');
+      final capacity = int.tryParse(match.group(2) ?? '');
+      if (players == null || capacity == null || capacity == 0) return 0;
+      return (players / capacity).clamp(0, 1);
+    }
+
+    return 0.75;
   }
 }
 
@@ -1748,58 +1751,6 @@ class GoldPill extends StatelessWidget {
         style: const TextStyle(
           color: Color(0xff79622a),
           fontSize: 11.5,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class CompactChipPill extends StatelessWidget {
-  const CompactChipPill(this.label, {super.key});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0x0d21304e),
-        border: Border.all(color: const Color(0x2621304e)),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: PrototypeColors.navy,
-          fontSize: 10.5,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class CompactGoldPill extends StatelessWidget {
-  const CompactGoldPill(this.label, {super.key});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0x1fa98a3f),
-        border: Border.all(color: const Color(0x55a98a3f)),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xff79622a),
-          fontSize: 10.5,
           fontWeight: FontWeight.w800,
         ),
       ),
