@@ -35,6 +35,14 @@
   .ju-pulse { animation: ju-pulse 1.6s ease-in-out infinite; }
   .ju-hint { animation: ju-hint 2.2s ease-in-out infinite; }
   .ju-par { will-change: transform; }
+  .ju-nav-links { position: absolute; left: 50%; transform: translateX(-50%); margin: 0 !important; }
+  .ju-hero-copy { min-width: 0; }
+  .ju-hero-title-row { display: flex; align-items: center; gap: 18px; min-width: 0; }
+  .ju-hero-title-logo { width: clamp(52px, 6vw, 86px); height: auto; flex: none; filter: drop-shadow(0 12px 22px rgba(22,33,59,.14)); }
+  .ju-feature-card { position: relative; overflow: hidden; isolation: isolate; }
+  .ju-feature-card::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(135deg, rgba(122,36,49,.08), transparent 34%), linear-gradient(rgba(22,33,59,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(22,33,59,.04) 1px, transparent 1px); background-size: auto, 58px 58px, 58px 58px; }
+  .ju-feature-card::after { content: ""; position: absolute; right: 18px; top: 18px; z-index: 0; width: 118px; height: 118px; pointer-events: none; background: url("assets/crest.png") center/contain no-repeat; opacity: .055; }
+  .ju-feature-card > * { position: relative; z-index: 1; }
   [data-reveal] { opacity: 0; transform: translateY(26px); transition: opacity .8s cubic-bezier(.2,.75,.3,1), transform .8s cubic-bezier(.2,.75,.3,1); }
   [data-reveal].ju-in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) {
@@ -51,9 +59,23 @@
   }
   @media (max-width: 520px) {
     .ju-feature-card { padding: 26px !important; }
+    .ju-feature-card::after { width: 90px !important; height: 90px !important; right: 16px !important; top: 16px !important; opacity: .045 !important; }
+    .ju-feature-card h3 { font-size: 32px !important; line-height: 1.05 !important; }
     .ju-feature-eyebrow, .ju-feature-footer { align-items: flex-start !important; flex-direction: column !important; }
     .ju-feature-footer { gap: 16px !important; }
     .ju-feature-footer > span:last-child { align-self: stretch !important; justify-content: center !important; }
+    .ju-hero-grid { padding: 92px 20px 34px !important; }
+    .ju-hero-copy { max-width: 100% !important; }
+    .ju-hero-kicker { align-items: flex-start !important; flex-wrap: wrap !important; gap: 8px !important; }
+    .ju-hero-kicker span:last-child { max-width: 100% !important; line-height: 1.45 !important; letter-spacing: .1em !important; font-size: 10px !important; }
+    .ju-hero-title-row { gap: 12px !important; max-width: 100% !important; }
+    .ju-hero-title-logo { width: 46px !important; }
+    .ju-hero-title { font-size: clamp(44px, 13.5vw, 56px) !important; line-height: .92 !important; }
+    .ju-hero-tagline { font-size: 24px !important; line-height: 1.1 !important; }
+    .ju-hero-desc { max-width: 100% !important; font-size: 14.5px !important; line-height: 1.62 !important; }
+    .ju-hero-actions { width: 100% !important; gap: 10px !important; }
+    .ju-hero-actions a { flex: 1 1 100% !important; justify-content: center !important; padding: 15px 18px !important; }
+    .ju-brand-subtitle { display: none !important; }
   }
 </style>
 </helmet>
@@ -62,12 +84,12 @@
 
   <!-- fixed navbar -->
   <header style="position: fixed; top: 0; left: 0; right: 0; z-index: 60; background: rgba(247,239,226,.8); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(22,33,59,.1);">
-    <div style="max-width: 1280px; margin: 0 auto; padding: 0 26px; height: 64px; display: flex; align-items: center; gap: 22px;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 26px; height: 64px; display: flex; align-items: center; gap: 22px; position: relative;">
       <a href="Home.dc.html" style="display: flex; align-items: center; gap: 11px; text-decoration: none; color: #16213B;">
         <img src="assets/crest.png" alt="Chess Club JU crest" style="width: 40px; height: 40px; object-fit: contain;">
         <span style="display: flex; flex-direction: column; line-height: 1.1;">
           <span style="font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 700; letter-spacing: .02em;">JuChess</span>
-          <span style="font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: #7A2431; font-weight: 500;">University of Jordan Chess Club</span>
+          <span class="ju-brand-subtitle" style="font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: #7A2431; font-weight: 500;">University of Jordan Chess Club</span>
         </span>
       </a>
       <nav class="ju-nav-links" style="display: flex; align-items: center; gap: 2px; margin: 0 auto;">
@@ -77,7 +99,7 @@
         <a href="Leaderboard.dc.html" style="font-size: 13.5px; font-weight: 500; color: #16213B; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Leaderboard</a>
         <a href="Profile.dc.html" style="font-size: 13.5px; font-weight: 500; color: #16213B; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Profile</a>
       </nav>
-      <sc-if value="{{ signedIn }}" hint-placeholder-val="{{ false }}"><a href="Profile.dc.html" title="{{ authName }}" style="width: 38px; height: 38px; border-radius: 50%; background: #7A2431; color: #F5EFE3; display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 700; text-decoration: none;" style-hover="background: #5F1B26;">{{ authInitials }}</a></sc-if><sc-if value="{{ signedOut }}" hint-placeholder-val="{{ true }}"><a href="Sign In.dc.html" style="font-size: 13px; font-weight: 600; color: #F8F3E7; background: #7A2431; text-decoration: none; padding: 9px 20px; border-radius: 7px; white-space: nowrap; transition: background .18s ease, transform .18s ease;" style-hover="background: #5F1B26; transform: translateY(-1px);">Sign In</a></sc-if>
+      <sc-if value="{{ signedIn }}" hint-placeholder-val="{{ false }}"><a href="Profile.dc.html" title="{{ authName }}" style="margin-left: auto; width: 38px; height: 38px; border-radius: 50%; background: #7A2431; color: #F5EFE3; display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 700; text-decoration: none;" style-hover="background: #5F1B26;">{{ authInitials }}</a></sc-if><sc-if value="{{ signedOut }}" hint-placeholder-val="{{ true }}"><a href="Sign In.dc.html" style="margin-left: auto; font-size: 13px; font-weight: 600; color: #F8F3E7; background: #7A2431; text-decoration: none; padding: 9px 20px; border-radius: 7px; white-space: nowrap; transition: background .18s ease, transform .18s ease;" style-hover="background: #5F1B26; transform: translateY(-1px);">Sign In</a></sc-if>
     </div>
   </header>
 
@@ -97,27 +119,30 @@
     </div>
 
     <!-- hero content: text + featured card -->
-    <div class="ju-hero-grid" style="position: relative; z-index: 3; display: grid; grid-template-columns: 1fr 1.12fr; gap: 54px; align-items: center; max-width: 1220px; width: 100%; padding: 96px 26px 40px;">
+    <div class="ju-hero-grid" style="position: relative; z-index: 3; display: grid; grid-template-columns: minmax(0, .96fr) minmax(440px, 1.04fr); gap: 54px; align-items: center; max-width: 1220px; width: 100%; padding: 96px 26px 40px;">
 
     <!-- center text -->
-    <div style="text-align: left; max-width: 560px;">
-      <div class="ju-fade" style="animation-delay: .1s; display: inline-flex; align-items: center; gap: 10px; margin-bottom: 22px;">
+    <div class="ju-hero-copy" style="text-align: left; max-width: 560px;">
+      <div class="ju-fade ju-hero-kicker" style="animation-delay: .1s; display: inline-flex; align-items: center; gap: 10px; margin-bottom: 22px;">
         <span style="height: 1px; width: 34px; background: rgba(122,36,49,.5);"></span>
         <span style="font-size: 11px; letter-spacing: .26em; text-transform: uppercase; font-weight: 600; color: #7A2431;">Est. University of Jordan &middot; Amman</span>
       </div>
-      <h1 style="font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: clamp(64px, 11vw, 150px); line-height: .9; letter-spacing: -.02em; margin: 0;">
-        <span class="ju-word" style="display: inline-block; animation-delay: .2s;">Ju</span><span class="ju-word" style="display: inline-block; animation-delay: .34s; color: #7A2431;">Chess</span>
-      </h1>
-      <p class="ju-fade" style="animation-delay: .6s; font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(20px, 3vw, 30px); color: #16213B; margin: 18px 0 0;">The University of Jordan Chess Club.</p>
-      <p class="ju-fade" style="animation-delay: .74s; font-size: 15px; line-height: 1.65; color: rgba(22,33,59,.72); max-width: 480px; margin: 16px 0 0; text-wrap: pretty;">A student-run club bringing chess to campus life &mdash; we organise in-person tournaments for University of Jordan students, run weekly meetups, and help every player, from first-timers to veterans, sharpen their game across the board.</p>
-      <div class="ju-fade" style="animation-delay: .9s; display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px;">
+      <div class="ju-hero-title-row">
+        <img class="ju-fade ju-hero-title-logo" src="assets/crest.png" alt="Chess Club JU crest" style="animation-delay: .16s;">
+        <h1 class="ju-hero-title" style="font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: clamp(58px, 7.8vw, 108px); line-height: .9; letter-spacing: -.02em; margin: 0;">
+          <span class="ju-word" style="display: inline-block; animation-delay: .2s;">Ju</span><span class="ju-word" style="display: inline-block; animation-delay: .34s; color: #7A2431;">Chess</span>
+        </h1>
+      </div>
+      <p class="ju-fade ju-hero-tagline" style="animation-delay: .6s; font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(20px, 3vw, 30px); color: #16213B; margin: 18px 0 0;">The University of Jordan Chess Club.</p>
+      <p class="ju-fade ju-hero-desc" style="animation-delay: .74s; font-size: 15px; line-height: 1.65; color: rgba(22,33,59,.72); max-width: 480px; margin: 16px 0 0; text-wrap: pretty;">A student-run club bringing chess to campus life &mdash; we organise in-person tournaments for University of Jordan students, run weekly meetups, and help every player, from first-timers to veterans, sharpen their game across the board.</p>
+      <div class="ju-fade ju-hero-actions" style="animation-delay: .9s; display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px;">
         <a href="Sign Up.dc.html" style="display: inline-flex; align-items: center; gap: 10px; background: #7A2431; color: #F8F3E7; text-decoration: none; font-size: 14.5px; font-weight: 600; padding: 15px 30px; border-radius: 8px; box-shadow: 0 6px 20px rgba(122,36,49,.28); transition: transform .18s ease, background .18s ease;" style-hover="background: #5F1B26; transform: translateY(-2px);">&#9822; Join the Club</a>
         <a href="#vision" style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255,252,244,.65); color: #16213B; text-decoration: none; font-size: 14.5px; font-weight: 600; padding: 15px 28px; border-radius: 8px; border: 1px solid rgba(22,33,59,.28); transition: border-color .18s ease, background .18s ease, transform .18s ease;" style-hover="border-color: #A98A3F; background: rgba(169,138,63,.12); transform: translateY(-2px);">Our Vision &darr;</a>
       </div>
     </div>
 
     <!-- featured tournament card -->
-    <a class="ju-fade ju-feature-card" href="{{ feat.href }}" style="animation-delay: 1s; display: flex; flex-direction: column; justify-content: center; min-height: 360px; text-decoration: none; color: #16213B; background: rgba(255,252,244,.92); border: 1px solid rgba(22,33,59,.14); border-radius: 20px; padding: 32px; box-shadow: 0 24px 60px rgba(22,33,59,.14); backdrop-filter: blur(4px); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;" style-hover="transform: translateY(-4px); box-shadow: 0 30px 68px rgba(22,33,59,.2); border-color: #A98A3F;">
+    <a class="ju-fade ju-feature-card" href="{{ feat.href }}" style="animation-delay: 1s; display: flex; flex-direction: column; justify-content: center; min-height: 360px; text-decoration: none; color: #16213B; background: linear-gradient(135deg, rgba(255,252,244,.98), rgba(250,244,232,.92)); border: 1px solid rgba(122,36,49,.18); border-radius: 20px; padding: 32px; box-shadow: 0 24px 60px rgba(22,33,59,.14); backdrop-filter: blur(4px); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;" style-hover="transform: translateY(-4px); box-shadow: 0 30px 68px rgba(22,33,59,.2); border-color: #A98A3F;">
       <div class="ju-feature-eyebrow" style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
         <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; color: #7A2431;"><span class="ju-pulse" style="width: 8px; height: 8px; border-radius: 50%; background: #7A2431;"></span>{{ feat.statusLabel }}</span>
         <span style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: rgba(22,33,59,.5);">Featured tournament</span>

@@ -20,7 +20,8 @@
   height: 66px;
   margin: 0 auto;
   padding: 0 24px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(96px, 1fr);
   align-items: center;
   gap: 24px;
 }
@@ -66,7 +67,7 @@
   align-items: center;
   gap: 4px;
   justify-content: center;
-  flex: 1 1 auto;
+  justify-self: center;
   min-width: 0;
 }
 
@@ -90,7 +91,7 @@
 }
 
 .sign-in-link {
-  flex: 0 0 auto;
+  justify-self: end;
   font-size: 13px;
   font-weight: 600;
   color: #f5efe3;
@@ -508,6 +509,7 @@
   .site-header-inner {
     padding: 0 16px;
     gap: 14px;
+    display: flex;
   }
 
   .brand-link small {
