@@ -23,6 +23,16 @@ layer under the same UI, not a redesign trigger.
 - Appwrite config and functions: `appwrite`
 - Backend schema plan: `docs/appwrite-schema.md`
 
+## Deployment Boundary
+
+- GitHub Pages is only the public prototype/reference deployment from `docs`.
+- The real web app is `apps/web` and should deploy separately to the production
+  domain/app host.
+- The real admin app is `apps/admin` and should deploy separately or behind a
+  protected admin route.
+- Appwrite is the shared backend for auth, database reads/writes, functions, and
+  storage. GitHub Pages must not be treated as the real backend-connected web app.
+
 ## Current Technical State
 
 - Appwrite CLI is installed.
@@ -34,6 +44,10 @@ layer under the same UI, not a redesign trigger.
 - Web `/tournaments` is now a real React screen, not an iframe. It keeps the
   prototype content, filters, search, list/grid controls, loading state, empty
   state, and Appwrite-read fallback boundary.
+- Web `/tournament/:id` is now a real React screen, not an iframe. It keeps the
+  prototype detail structure: header, back action, status/title, overview,
+  registration prompt, live boards, games, standings/bracket, schedule preview,
+  and Appwrite-read fallback boundary.
 
 ## Verified So Far
 
@@ -47,12 +61,14 @@ layer under the same UI, not a redesign trigger.
   files under `apps/web/public/prototype`.
 - Local browser verification passed for `/tournaments`: desktop render,
   mobile breakpoint, search filter, and grid toggle.
+- Local browser verification passed for `/tournament/spring-open`: desktop
+  render, mobile breakpoint, tab switching, and game view toggle.
 
 ## Immediate Next Work
 
 1. Continue replacing the invented React web shell with faithful prototype
-   ports. Next web targets: Home, Tournament Detail, Games, Leaderboard,
-   Profile, Sign In, Sign Up, Forgot Password.
+   ports. Next web targets: Home, Games, Leaderboard, Profile, Sign In,
+   Sign Up, Forgot Password.
 2. Replace the invented React admin shell with a faithful port of the admin prototype.
 3. Continue expanding the Flutter app screen-by-screen from the mobile prototype.
 4. Create the real Appwrite project, tables, buckets, teams, and function deployment.

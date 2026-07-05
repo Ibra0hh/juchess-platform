@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
+import TournamentDetailPage from './screens/TournamentDetailPage'
 import TournamentsPage from './screens/TournamentsPage'
 
 type PrototypeScreen = {
@@ -10,7 +11,6 @@ type PrototypeScreen = {
 
 const prototypeScreens: PrototypeScreen[] = [
   { route: '/home', title: 'JuChess Home', file: 'Home.dc.html' },
-  { route: '/tournament/:id', title: 'JuChess Tournament', file: 'Tournament.dc.html' },
   { route: '/games', title: 'JuChess Games', file: 'Games.dc.html' },
   { route: '/leaderboard', title: 'JuChess Leaderboard', file: 'Leaderboard.dc.html' },
   { route: '/profile', title: 'JuChess Profile', file: 'Profile.dc.html' },
@@ -58,6 +58,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/home" replace />} />
       <Route path="/tournaments" element={<TournamentsPage />} />
+      <Route path="/tournament/:id" element={<TournamentDetailPage />} />
       {prototypeScreens.map((screen) => (
         <Route
           key={screen.route}

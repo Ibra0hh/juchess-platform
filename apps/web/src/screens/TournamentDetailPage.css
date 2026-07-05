@@ -1,0 +1,686 @@
+.detail-screen {
+  min-height: 100vh;
+  background: #f5efe3;
+  color: #1e2b45;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  overflow-x: clip;
+}
+
+.detail-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+
+.detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7a2431;
+  text-decoration: none;
+  background: #fffcf4;
+  border: 1px solid rgba(122, 36, 49, 0.3);
+  border-radius: 999px;
+  padding: 8px 18px 8px 12px;
+  box-shadow: 0 2px 8px rgba(30, 43, 69, 0.06);
+}
+
+.detail-back:hover {
+  background: #7a2431;
+  border-color: #7a2431;
+  color: #f8f3e7;
+}
+
+.detail-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.detail-title-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.detail-title-line h1 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 38px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.detail-hero p {
+  font-size: 13.5px;
+  color: rgba(30, 43, 69, 0.68);
+  margin: 8px 0 0;
+  line-height: 1.45;
+}
+
+.detail-round {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  color: #7a2431;
+  font-weight: 500;
+}
+
+.detail-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+.detail-status.live {
+  color: #f8f3e7;
+  background: #7a2431;
+}
+
+.detail-status.live span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f8f3e7;
+  animation: ju-pulse 1.6s ease-in-out infinite;
+}
+
+.detail-status.upcoming {
+  color: #a9852e;
+  border: 1px solid rgba(169, 138, 63, 0.5);
+}
+
+.detail-status.completed {
+  color: rgba(30, 43, 69, 0.6);
+  border: 1px solid rgba(30, 43, 69, 0.25);
+}
+
+.detail-note {
+  margin-top: 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(169, 138, 63, 0.32);
+  border-radius: 8px;
+  background: rgba(255, 252, 244, 0.68);
+  color: rgba(30, 43, 69, 0.72);
+  font-size: 12.5px;
+}
+
+.detail-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin-top: 26px;
+  border-bottom: 1px solid rgba(30, 43, 69, 0.18);
+}
+
+.detail-tabs button {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(30, 43, 69, 0.66);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 18px;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.detail-tabs button:hover,
+.detail-tabs button.active {
+  color: #7a2431;
+}
+
+.detail-tabs button.active {
+  border-bottom-color: #7a2431;
+  font-weight: 600;
+}
+
+.detail-tab-panel {
+  margin-top: 22px;
+}
+
+.overview-grid {
+  background: #fffcf4;
+  border: 1px solid rgba(30, 43, 69, 0.16);
+  border-radius: 10px;
+  padding: 18px 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.overview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.overview-item span {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(30, 43, 69, 0.5);
+  font-weight: 600;
+}
+
+.overview-item strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.overview-item strong.accent {
+  color: #7a2431;
+}
+
+.overview-item strong.gold {
+  color: #a9852e;
+}
+
+.detail-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(30, 43, 69, 0.72);
+  margin: 16px 0 0;
+  max-width: 720px;
+}
+
+.register-card {
+  margin-top: 26px;
+  background: #fffcf4;
+  border: 1px solid rgba(169, 138, 63, 0.4);
+  border-radius: 12px;
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  box-shadow: 0 2px 10px rgba(30, 43, 69, 0.05);
+}
+
+.register-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  background: rgba(122, 36, 49, 0.08);
+  border: 1px solid rgba(122, 36, 49, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7a2431;
+  flex: none;
+}
+
+.register-card h2 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 21px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.register-card p {
+  font-size: 13px;
+  color: rgba(30, 43, 69, 0.7);
+  margin: 3px 0 0;
+}
+
+.register-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.primary-action,
+.secondary-action {
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 11px 22px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.primary-action {
+  color: #f8f3e7;
+  background: #7a2431;
+}
+
+.primary-action:hover {
+  background: #5f1b26;
+}
+
+.secondary-action {
+  color: #1e2b45;
+  border: 1px solid rgba(30, 43, 69, 0.3);
+}
+
+.secondary-action:hover {
+  border-color: #a98a3f;
+  background: rgba(169, 138, 63, 0.08);
+}
+
+.home-section-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+  margin-top: 24px;
+}
+
+.detail-panel,
+.standings-panel,
+.bracket-panel {
+  background: #fffcf4;
+  border: 1px solid rgba(30, 43, 69, 0.16);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.panel-heading,
+.games-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(30, 43, 69, 0.1);
+}
+
+.panel-heading h2,
+.games-toolbar h2,
+.bracket-panel h2 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 23px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.panel-heading button {
+  border: 1px solid rgba(122, 36, 49, 0.32);
+  background: transparent;
+  color: #7a2431;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.live-board-list,
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.game-mini,
+.schedule-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(30, 43, 69, 0.08);
+}
+
+.game-mini {
+  color: #1e2b45;
+  text-decoration: none;
+}
+
+.game-mini:hover {
+  background: rgba(122, 36, 49, 0.04);
+}
+
+.game-mini strong,
+.schedule-row strong {
+  display: block;
+  font-size: 13.5px;
+  line-height: 1.25;
+}
+
+.game-mini small,
+.schedule-row small {
+  display: block;
+  color: rgba(30, 43, 69, 0.58);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.schedule-row > span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(30, 43, 69, 0.35);
+  flex: none;
+}
+
+.schedule-row.done > span {
+  background: rgba(30, 43, 69, 0.35);
+}
+
+.schedule-row.now {
+  background: rgba(122, 36, 49, 0.05);
+}
+
+.schedule-row.now > span {
+  background: #7a2431;
+  border-color: #7a2431;
+  animation: ju-pulse 1.6s ease-in-out infinite;
+}
+
+.board-preview {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(30, 43, 69, 0.18);
+  border-radius: 7px;
+  flex: none;
+}
+
+.board-preview span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  line-height: 1;
+}
+
+.board-preview .light {
+  background: #f4dfb9;
+  color: #7a2431;
+}
+
+.board-preview .dark {
+  background: #8b3040;
+  color: #f8f3e7;
+}
+
+.games-toolbar {
+  padding: 0 0 16px;
+  border-bottom: none;
+}
+
+.games-toolbar p {
+  margin: 4px 0 0;
+  color: rgba(30, 43, 69, 0.64);
+  font-size: 13px;
+}
+
+.game-card-wrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.game-card-wrap.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.game-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #1e2b45;
+  text-decoration: none;
+  background: #fffcf4;
+  border: 1px solid rgba(30, 43, 69, 0.15);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.game-card-wrap.list .game-card {
+  flex-direction: row;
+  align-items: center;
+}
+
+.game-card:hover {
+  border-color: #a98a3f;
+  box-shadow: 0 5px 18px rgba(30, 43, 69, 0.1);
+}
+
+.game-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.game-card-body span {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(30, 43, 69, 0.52);
+  font-weight: 600;
+}
+
+.game-card-body strong {
+  display: block;
+  color: #7a2431;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.game-card-body p {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.game-card-body small {
+  color: rgba(30, 43, 69, 0.6);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.standings-panel {
+  overflow-x: auto;
+}
+
+.standings-panel table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  min-width: 680px;
+}
+
+.standings-panel th {
+  background: #1e2b45;
+  color: #f5efe3;
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.standings-panel td {
+  padding: 11px 14px;
+  border-top: 1px solid rgba(30, 43, 69, 0.1);
+}
+
+.standings-panel tr:nth-child(1) {
+  background: rgba(169, 138, 63, 0.08);
+}
+
+.standings-panel td strong,
+.standings-panel td small {
+  display: block;
+}
+
+.standings-panel td small {
+  color: rgba(30, 43, 69, 0.55);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  margin-top: 2px;
+}
+
+.table-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(30, 43, 69, 0.06);
+  color: rgba(30, 43, 69, 0.62);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.table-status.playing,
+.table-status.qualified {
+  background: rgba(122, 36, 49, 0.1);
+  color: #7a2431;
+}
+
+.bracket-panel {
+  padding: 18px;
+}
+
+.bracket-scroll {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.bracket-column h3 {
+  margin: 0 0 10px;
+  color: rgba(30, 43, 69, 0.58);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bracket-match {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(30, 43, 69, 0.14);
+  border-radius: 9px;
+  background: rgba(255, 252, 244, 0.72);
+  margin-bottom: 10px;
+}
+
+.bracket-match span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bracket-match strong {
+  color: #7a2431;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.detail-loading,
+.detail-empty {
+  min-height: 360px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  text-align: center;
+  color: rgba(30, 43, 69, 0.7);
+}
+
+.detail-empty h1 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 30px;
+  margin: 0;
+}
+
+.detail-empty p {
+  margin: 0;
+}
+
+@keyframes ju-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-status.live span,
+  .schedule-row.now > span {
+    animation: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .home-section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .register-actions {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .detail-main {
+    padding: 24px 16px 56px;
+  }
+
+  .detail-title-line h1 {
+    font-size: 31px;
+  }
+
+  .detail-tabs {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .detail-tabs button {
+    flex: 0 0 auto;
+  }
+
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .register-card {
+    padding: 18px;
+  }
+
+  .primary-action,
+  .secondary-action {
+    width: 100%;
+    text-align: center;
+  }
+
+  .game-card-wrap.list .game-card {
+    align-items: flex-start;
+  }
+
+  .bracket-scroll {
+    grid-template-columns: repeat(3, 210px);
+  }
+}

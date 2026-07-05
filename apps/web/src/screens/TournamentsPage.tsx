@@ -13,13 +13,13 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import SiteHeader from '../components/SiteHeader'
 import { loadTournaments, prototypeTournaments, type Tournament, type TournamentStatus } from '../lib/juchess'
 import './TournamentsPage.css'
 
 type ViewMode = 'list' | 'grid'
 
 const filters: TournamentStatus[] = ['Upcoming', 'Active', 'Completed']
-const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 
 function TournamentsPage() {
   const [query, setQuery] = useState('')
@@ -65,7 +65,7 @@ function TournamentsPage() {
 
   return (
     <div className="tournaments-screen" data-screen-label="Tournaments">
-      <SiteHeader />
+      <SiteHeader active="tournaments" />
       <main className="tournaments-main">
         <section className="tournaments-heading" aria-labelledby="tournaments-title">
           <h1 id="tournaments-title">Tournaments</h1>
@@ -140,36 +140,6 @@ function TournamentsPage() {
         </section>
       </main>
     </div>
-  )
-}
-
-function SiteHeader() {
-  return (
-    <header className="site-header">
-      <div className="site-header-inner">
-        <Link to="/home" className="brand-link">
-          <img src={crestUrl} alt="Chess Club JU crest" />
-          <span>
-            <strong>JuChess</strong>
-            <small>University of Jordan Chess Club</small>
-          </span>
-        </Link>
-
-        <nav className="main-nav" aria-label="Primary navigation">
-          <Link to="/home">Home</Link>
-          <Link to="/tournaments" className="active">
-            Tournaments
-          </Link>
-          <Link to="/games">Games</Link>
-          <Link to="/leaderboard">Leaderboard</Link>
-          <Link to="/profile">Profile</Link>
-        </nav>
-
-        <Link to="/sign-in" className="sign-in-link">
-          Sign in
-        </Link>
-      </div>
-    </header>
   )
 }
 

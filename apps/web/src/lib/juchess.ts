@@ -167,6 +167,14 @@ export const members: Member[] = [
   { id: 'omar', name: 'Omar Saleh', rating: 1740, universityId: 'omar_saleh' },
   { id: 'leen', name: 'Leen Haddad', rating: 1685, universityId: 'leenh' },
   { id: 'yazan', name: 'Yazan Khaled', rating: 1602, universityId: 'ykhaled' },
+  { id: 'sara', name: 'Sara Nasser', rating: 1550, universityId: 'sara_n' },
+  { id: 'mohammad', name: 'Mohammad Al-Khatib', rating: 1490, universityId: 'mohammad_ak' },
+  { id: 'rania', name: 'Rania Odeh', rating: 1465, universityId: 'rania_o' },
+  { id: 'khaled', name: 'Khaled Mansour', rating: 1430, universityId: 'kmansour' },
+  { id: 'tala', name: 'Tala Suleiman', rating: 1395, universityId: 'tala_s' },
+  { id: 'hasan', name: 'Hasan Qasem', rating: 1370, universityId: 'hqasem' },
+  { id: 'noor', name: 'Noor Barakat', rating: 1340, universityId: 'noorb' },
+  { id: 'zaid', name: 'Zaid Hamdan', rating: 1310, universityId: 'zhamdan' },
 ]
 
 export const liveGames = [
