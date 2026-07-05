@@ -1,5 +1,7 @@
 {
-  "projectId": "REPLACE_WITH_APPWRITE_PROJECT_ID",
+  "organizationId": "6a11bf3c90fd189a8a37",
+  "projectId": "juchess-platform",
+  "projectName": "JuChess Platform",
   "endpoint": "https://cloud.appwrite.io/v1",
   "includes": {
     "functions": "./appwrite/functions.json"

@@ -54,29 +54,48 @@ Run Flutter with Appwrite config:
 ```bash
 flutter run \
   --dart-define=APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 \
-  --dart-define=APPWRITE_PROJECT_ID=YOUR_PROJECT_ID \
+  --dart-define=APPWRITE_PROJECT_ID=juchess-platform \
   --dart-define=APPWRITE_DATABASE_ID=juchess
 ```
 
 ## Appwrite Setup
 
-The CLI is installed on this machine.
-
-Next steps after you provide/login to an Appwrite account:
+The live Appwrite Cloud project is `juchess-platform` under the JuChess
+organization account. Local web/admin env files should use:
 
 ```bash
-appwrite login
-appwrite init project
+VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+VITE_APPWRITE_PROJECT_ID=juchess-platform
+VITE_APPWRITE_DATABASE_ID=juchess
 ```
 
-Then update:
+The admin app also needs:
 
-- `appwrite.config.json`
-- `apps/web/.env` from `apps/web/.env.example`
-- `apps/admin/.env` from `apps/admin/.env.example`
-- Flutter `--dart-define` values
+```bash
+VITE_APPWRITE_ADMIN_FUNCTION_ID=admin-actions
+```
+
+Provisioned resources:
+
+- Teams: `admins`, `organizers`, `members`.
+- Platforms: `localhost`, `127.0.0.1`, `ibra0hh.github.io`, Android
+  `edu.ju.chess.juchess_mobile`, and iOS `edu.ju.chess.juchessMobile`.
+- TablesDB database `juchess` with tables from `appwrite/schema.json`.
+- Storage buckets: `avatars`, `tournament-assets`.
+- Function: `admin-actions`, runtime `node-22`, deployed from
+  `appwrite/functions/admin-actions`.
 
 Admin-only mutations must go through Appwrite Functions, not browser API keys.
+To redeploy the function after edits:
+
+```bash
+appwrite functions create-deployment \
+  --function-id admin-actions \
+  --code appwrite/functions/admin-actions \
+  --activate true \
+  --entrypoint src/main.js \
+  --commands "npm install"
+```
 
 ## Current Implementation Slice
 

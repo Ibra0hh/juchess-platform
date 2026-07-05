@@ -6,7 +6,10 @@
     "path": "functions/admin-actions",
     "entrypoint": "src/main.js",
     "commands": "npm install",
-    "execute": [],
+    "execute": [
+      "team:admins",
+      "team:organizers"
+    ],
     "events": [],
     "schedule": "",
     "timeout": 15,
@@ -16,7 +19,10 @@
       "node_modules",
       ".git"
     ],
-    "scopes": [],
+    "scopes": [
+      "databases.read",
+      "databases.write"
+    ],
     "vars": [
       {
         "key": "JUCHESS_DATABASE_ID",

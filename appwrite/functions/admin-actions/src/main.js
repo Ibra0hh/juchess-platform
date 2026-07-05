@@ -11,8 +11,12 @@ const tableIds = {
 };
 
 function parseBody(req) {
-  if (req.bodyJson && typeof req.bodyJson === 'object') {
-    return req.bodyJson;
+  try {
+    if (req.bodyJson && typeof req.bodyJson === 'object') {
+      return req.bodyJson;
+    }
+  } catch {
+    // Appwrite's bodyJson getter throws when a request has no JSON body.
   }
 
   if (req.body && typeof req.body === 'object') {
