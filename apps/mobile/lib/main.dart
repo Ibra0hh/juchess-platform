@@ -25,6 +25,10 @@ class AppConfig {
     'APPWRITE_REGISTRATIONS_TABLE_ID',
     defaultValue: 'registrations',
   );
+  static const recoveryUrl = String.fromEnvironment(
+    'APPWRITE_RECOVERY_URL',
+    defaultValue: 'https://juchess.ju.edu.jo/reset-password',
+  );
 }
 
 class AppwriteService {
@@ -77,6 +81,10 @@ class AppwriteService {
 
   Future<void> signOut() async {
     await account.deleteSession(sessionId: 'current');
+  }
+
+  Future<void> sendPasswordRecovery(String email) async {
+    await account.createRecovery(email: email, url: AppConfig.recoveryUrl);
   }
 
   Future<List<TournamentSeed>> loadTournaments() async {
@@ -228,6 +236,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void clearError() {
+    error = null;
+    notifyListeners();
+  }
+
+  void setError(String message) {
+    error = message;
+    notifyListeners();
+  }
+
   Future<void> bootstrap() async {
     await Future.wait([loadCurrentUser(), loadTournaments()]);
   }
@@ -298,6 +316,29 @@ class AppState extends ChangeNotifier {
       );
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
+      return true;
+    } catch (caught) {
+      error = appwriteMessage(caught);
+      return false;
+    } finally {
+      authLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> sendPasswordRecovery(String email) async {
+    if (!service.ready) {
+      error = 'Appwrite is not configured yet.';
+      notifyListeners();
+      return false;
+    }
+
+    authLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      await service.sendPasswordRecovery(email);
       return true;
     } catch (caught) {
       error = appwriteMessage(caught);
@@ -1820,200 +1861,956 @@ class SerifText extends StatelessWidget {
   }
 }
 
+enum AuthMode { signIn, signUp, forgot }
+
 void showAuthSheet(BuildContext context, {bool createAccount = false}) {
-  final formKey = GlobalKey<FormState>();
-  final nameController = TextEditingController();
-  final universityController = TextEditingController();
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
-  var signup = createAccount;
-
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: PrototypeColors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+  context.read<AppState>().clearError();
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => AuthFlowScreen(
+        initialMode: createAccount ? AuthMode.signUp : AuthMode.signIn,
+      ),
     ),
-    builder: (sheetContext) {
-      return StatefulBuilder(
-        builder: (modalContext, setModalState) {
-          final state = modalContext.watch<AppState>();
+  );
+}
 
-          return SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                18,
-                18,
-                18,
-                MediaQuery.of(modalContext).viewInsets.bottom + 18,
-              ),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SerifText(
-                      signup ? 'Create account' : 'Sign in',
-                      size: 24,
-                      weight: FontWeight.w700,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      signup
-                          ? 'Create your club profile to register for tournaments.'
-                          : 'Use your JuChess Appwrite account.',
-                      style: const TextStyle(
-                        color: Color(0x9921304e),
-                        fontSize: 12.5,
-                      ),
-                    ),
-                    if (!state.appwriteReady) ...[
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Appwrite is not configured yet.',
-                        style: TextStyle(
-                          color: PrototypeColors.burgundy,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    if (signup) ...[
-                      AuthField(
-                        controller: nameController,
-                        label: 'Full name',
-                        validator: requiredValue,
-                      ),
-                      const SizedBox(height: 10),
-                      AuthField(
-                        controller: universityController,
-                        label: 'University ID',
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    AuthField(
-                      controller: emailController,
-                      label: 'Email',
-                      keyboardType: TextInputType.emailAddress,
-                      validator: requiredValue,
-                    ),
-                    const SizedBox(height: 10),
-                    AuthField(
-                      controller: passwordController,
-                      label: 'Password',
-                      obscureText: true,
-                      validator: passwordValue,
-                    ),
-                    if (state.error != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        state.error!,
-                        style: const TextStyle(
-                          color: PrototypeColors.burgundy,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    PrototypeButton(
-                      label: state.authLoading
-                          ? 'Working...'
-                          : signup
-                          ? 'Create account'
-                          : 'Sign in',
-                      onTap: state.authLoading || !state.appwriteReady
-                          ? () {}
-                          : () async {
-                              if (!(formKey.currentState?.validate() ??
-                                  false)) {
-                                return;
-                              }
+class AuthFlowScreen extends StatefulWidget {
+  const AuthFlowScreen({required this.initialMode, super.key});
 
-                              final appState = modalContext.read<AppState>();
-                              final success = signup
-                                  ? await appState.signUp(
-                                      nameController.text.trim(),
-                                      emailController.text.trim(),
-                                      passwordController.text,
-                                      universityController.text.trim(),
-                                    )
-                                  : await appState.signIn(
-                                      emailController.text.trim(),
-                                      passwordController.text,
-                                    );
+  final AuthMode initialMode;
 
-                              if (success && modalContext.mounted) {
-                                Navigator.of(modalContext).pop();
-                              }
-                            },
-                    ),
-                    TextButton(
-                      onPressed: () => setModalState(() => signup = !signup),
-                      child: Text(
-                        signup
-                            ? 'Do you have an account? Sign in'
-                            : 'New to the club? Sign up',
-                        style: const TextStyle(
-                          color: PrototypeColors.burgundy,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+  @override
+  State<AuthFlowScreen> createState() => _AuthFlowScreenState();
+}
+
+class _AuthFlowScreenState extends State<AuthFlowScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _universityController = TextEditingController();
+  final _chessComController = TextEditingController();
+  final _lichessController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _recoveryController = TextEditingController();
+
+  late AuthMode _mode = widget.initialMode;
+  bool _showSignInPassword = false;
+  bool _showSignUpPassword = false;
+  bool _showConfirmPassword = false;
+  String _recoveryNotice = '';
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _universityController.dispose();
+    _chessComController.dispose();
+    _lichessController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _recoveryController.dispose();
+    super.dispose();
+  }
+
+  void _setMode(AuthMode mode) {
+    context.read<AppState>().clearError();
+    setState(() {
+      _mode = mode;
+      _recoveryNotice = '';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: PrototypeColors.screen,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: _mode == AuthMode.signIn
+                    ? const EdgeInsets.fromLTRB(22, 28, 22, 40)
+                    : const EdgeInsets.fromLTRB(22, 24, 22, 40),
+                children: [
+                  if (_mode == AuthMode.signIn) _buildSignIn(),
+                  if (_mode == AuthMode.signUp) _buildSignUp(),
+                  if (_mode == AuthMode.forgot) _buildForgot(),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignIn() {
+    final state = context.watch<AppState>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const AuthBrandHeader(logoSize: 56, titleSize: 23),
+        const SizedBox(height: 30),
+        const SerifText(
+          'Sign into your Club player account',
+          size: 22,
+          weight: FontWeight.w700,
+          height: 1.3,
+        ),
+        const SizedBox(height: 22),
+        AuthField(
+          controller: _emailController,
+          label: 'Email',
+          hintText: 'Enter email',
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          validator: emailValue,
+        ),
+        const SizedBox(height: 16),
+        AuthField(
+          controller: _passwordController,
+          label: 'Password',
+          hintText: 'Enter password',
+          obscureText: !_showSignInPassword,
+          textInputAction: TextInputAction.done,
+          validator: passwordValue,
+          suffix: PasswordToggle(
+            visible: _showSignInPassword,
+            onPressed: () =>
+                setState(() => _showSignInPassword = !_showSignInPassword),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => _setMode(AuthMode.forgot),
+            style: TextButton.styleFrom(
+              foregroundColor: PrototypeColors.burgundy,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            child: const Text('Forgot password?'),
+          ),
+        ),
+        AuthErrorText(error: state.error),
+        PrototypeAuthButton(
+          label: state.authLoading ? 'Working...' : 'Sign in',
+          onTap: state.authLoading || !state.appwriteReady
+              ? null
+              : _submitSignIn,
+        ),
+        const AuthDivider(),
+        AuthSocialButton(
+          icon: const Icon(Icons.apple, size: 20, color: Colors.black),
+          label: 'Continue with Apple',
+          onTap: _showSocialUnavailable,
+        ),
+        const SizedBox(height: 10),
+        AuthSocialButton(
+          icon: const Text(
+            'G',
+            style: TextStyle(
+              color: PrototypeColors.burgundy,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          label: 'Continue with Google',
+          onTap: _showSocialUnavailable,
+        ),
+        AuthInlineSwitch(
+          prefix: 'New to the club?',
+          action: 'Sign up',
+          onTap: () => _setMode(AuthMode.signUp),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSignUp() {
+    final state = context.watch<AppState>();
+    final score = passwordScore(_passwordController.text);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AuthBrandHeader(
+          logoSize: 46,
+          titleSize: 20,
+          leading: RoundBackButton(onPressed: _backFromSignUp),
+        ),
+        const SizedBox(height: 24),
+        const SerifText(
+          'Create your player account',
+          size: 21,
+          weight: FontWeight.w700,
+        ),
+        const SizedBox(height: 20),
+        AuthField(
+          controller: _nameController,
+          label: 'Full name',
+          hintText: 'Enter full name',
+          textInputAction: TextInputAction.next,
+          validator: requiredValue,
+        ),
+        const SizedBox(height: 14),
+        AuthField(
+          controller: _emailController,
+          label: 'Email',
+          hintText: 'student@ju.edu.jo',
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          validator: emailValue,
+        ),
+        const SizedBox(height: 14),
+        AuthField(
+          controller: _phoneController,
+          label: 'Phone number',
+          hintText: '07** *** ***',
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 14),
+        AuthField(
+          controller: _universityController,
+          label: 'University ID',
+          hintText: 'Enter University ID',
+          helperText: 'Kept private - never shown on your public profile',
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 14),
+        AuthField(
+          controller: _chessComController,
+          label: 'Chess.com username',
+          optional: true,
+          hintText: 'Enter username',
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 14),
+        AuthField(
+          controller: _lichessController,
+          label: 'Lichess username',
+          optional: true,
+          hintText: 'Enter username',
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 14),
+        AuthField(
+          controller: _passwordController,
+          label: 'Password',
+          hintText: 'Example: JuChess@2026',
+          obscureText: !_showSignUpPassword,
+          textInputAction: TextInputAction.next,
+          validator: passwordValue,
+          onChanged: (_) => setState(() {}),
+          suffix: PasswordToggle(
+            visible: _showSignUpPassword,
+            onPressed: () =>
+                setState(() => _showSignUpPassword = !_showSignUpPassword),
+          ),
+        ),
+        const PasswordRequirements(),
+        if (_passwordController.text.isNotEmpty) PasswordStrength(score: score),
+        const SizedBox(height: 14),
+        AuthField(
+          controller: _confirmPasswordController,
+          label: 'Confirm password',
+          hintText: 'Re-enter password',
+          obscureText: !_showConfirmPassword,
+          textInputAction: TextInputAction.done,
+          validator: (value) {
+            final required = passwordValue(value);
+            if (required != null) return required;
+            if (value != _passwordController.text) {
+              return 'Passwords do not match';
+            }
+            return null;
+          },
+          suffix: PasswordToggle(
+            visible: _showConfirmPassword,
+            onPressed: () =>
+                setState(() => _showConfirmPassword = !_showConfirmPassword),
+          ),
+        ),
+        const SizedBox(height: 22),
+        AuthErrorText(error: state.error),
+        PrototypeAuthButton(
+          label: state.authLoading ? 'Working...' : 'Create account',
+          onTap: state.authLoading || !state.appwriteReady
+              ? null
+              : _submitSignUp,
+        ),
+        AuthInlineSwitch(
+          prefix: 'Already a member?',
+          action: 'Sign in',
+          onTap: () => _setMode(AuthMode.signIn),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildForgot() {
+    final state = context.watch<AppState>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SquareBackButton(onPressed: () => _setMode(AuthMode.signIn)),
+        const SizedBox(height: 24),
+        const AuthBrandHeader(logoSize: 50, titleSize: 21),
+        const SizedBox(height: 26),
+        const SerifText(
+          'Forgot your password?',
+          size: 21,
+          weight: FontWeight.w700,
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Enter your username, email, or University ID, then choose how you would like to receive your one-time code.',
+          style: TextStyle(
+            color: Color(0xa621304e),
+            fontSize: 13.5,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 20),
+        AuthField(
+          controller: _recoveryController,
+          label: 'Username, email, or University ID',
+          hintText: 'Enter username, email, or University ID',
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          validator: requiredValue,
+        ),
+        const SizedBox(height: 18),
+        const Text(
+          'Send code via',
+          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: const [
+            Expanded(
+              child: RecoveryMethodCard(
+                icon: Icons.mail_outline,
+                label: 'Email',
+                selected: true,
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: RecoveryMethodCard(
+                icon: Icons.phone_iphone,
+                label: 'SMS',
+                selected: false,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        AuthErrorText(error: state.error),
+        if (_recoveryNotice.isNotEmpty) ...[
+          Text(
+            _recoveryNotice,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: PrototypeColors.gold,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        PrototypeAuthButton(
+          label: state.authLoading ? 'Working...' : 'Continue',
+          onTap: state.authLoading || !state.appwriteReady
+              ? null
+              : _submitForgot,
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'If an account matches, a recovery link will be sent. Appwrite password recovery is email based.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0x8021304e),
+            fontSize: 11.5,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submitSignIn() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final success = await context.read<AppState>().signIn(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
+    if (success && mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _submitSignUp() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final success = await context.read<AppState>().signUp(
+      _nameController.text.trim(),
+      _emailController.text.trim(),
+      _passwordController.text,
+      _universityController.text.trim(),
+    );
+
+    if (success && mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _submitForgot() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final value = _recoveryController.text.trim();
+    if (!value.contains('@')) {
+      context.read<AppState>().setError(
+        'Appwrite recovery needs the email tied to your account.',
       );
-    },
-  ).whenComplete(() {
-    nameController.dispose();
-    universityController.dispose();
-    emailController.dispose();
-    passwordController.dispose();
+      return;
+    }
+
+    final success = await context.read<AppState>().sendPasswordRecovery(value);
+    if (success && mounted) {
+      setState(() {
+        _recoveryNotice = 'Recovery email sent. Check your inbox.';
+      });
+    }
+  }
+
+  void _showSocialUnavailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Social sign-in is not configured yet.')),
+    );
+  }
+
+  void _backFromSignUp() {
+    if (widget.initialMode == AuthMode.signUp) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    _setMode(AuthMode.signIn);
+  }
+}
+
+class AuthBrandHeader extends StatelessWidget {
+  const AuthBrandHeader({
+    required this.logoSize,
+    required this.titleSize,
+    this.leading,
+    super.key,
   });
+
+  final double logoSize;
+  final double titleSize;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        if (leading != null) ...[leading!, const SizedBox(width: 12)],
+        ClipOval(
+          child: Image.asset(
+            'assets/juchess-logo.png',
+            width: logoSize,
+            height: logoSize,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: _AuthBrandCopy(titleSize: titleSize)),
+      ],
+    );
+  }
+}
+
+class _AuthBrandCopy extends StatelessWidget {
+  const _AuthBrandCopy({required this.titleSize});
+
+  final double titleSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SerifText(
+          'JuChess',
+          size: titleSize,
+          weight: FontWeight.w700,
+          height: 1.1,
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'University of Jordan Chess Club',
+          style: TextStyle(color: Color(0x9e21304e), fontSize: 11.5),
+        ),
+      ],
+    );
+  }
+}
+
+class RoundBackButton extends StatelessWidget {
+  const RoundBackButton({required this.onPressed, super.key});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: const Icon(Icons.arrow_back, size: 20),
+      style: IconButton.styleFrom(
+        backgroundColor: PrototypeColors.surface,
+        foregroundColor: PrototypeColors.navy,
+        fixedSize: const Size(42, 42),
+        shape: const CircleBorder(side: BorderSide(color: Color(0x3821304e))),
+      ),
+    );
+  }
+}
+
+class SquareBackButton extends StatelessWidget {
+  const SquareBackButton({required this.onPressed, super.key});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: const Icon(Icons.chevron_left, size: 24),
+        style: IconButton.styleFrom(
+          backgroundColor: PrototypeColors.surface,
+          foregroundColor: PrototypeColors.navy,
+          fixedSize: const Size(42, 42),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: Color(0x2e21304e)),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class AuthField extends StatelessWidget {
   const AuthField({
     required this.controller,
     required this.label,
+    required this.hintText,
+    this.optional = false,
+    this.helperText,
     this.keyboardType,
+    this.textInputAction,
     this.obscureText = false,
     this.validator,
+    this.onChanged,
+    this.suffix,
     super.key,
   });
 
   final TextEditingController controller;
   final String label;
+  final String hintText;
+  final bool optional;
+  final String? helperText;
   final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
   final bool obscureText;
   final String? Function(String?)? validator;
+  final ValueChanged<String>? onChanged;
+  final Widget? suffix;
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Color(0x9921304e)),
-        filled: true,
-        fillColor: const Color(0xfffffaf0),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(11),
-          borderSide: const BorderSide(color: Color(0x2421304e)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+            children: [
+              TextSpan(text: label),
+              if (optional)
+                const TextSpan(
+                  text: ' (optional)',
+                  style: TextStyle(
+                    color: Color(0x8021304e),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+            ],
+          ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(11),
-          borderSide: const BorderSide(color: PrototypeColors.burgundy),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          obscureText: obscureText,
+          validator: validator,
+          onChanged: onChanged,
+          style: const TextStyle(
+            color: PrototypeColors.navy,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: const TextStyle(color: Color(0x6121304e)),
+            filled: true,
+            fillColor: PrototypeColors.surface,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 13,
+            ),
+            suffixIcon: suffix,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0x4721304e)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: PrototypeColors.burgundy),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: PrototypeColors.burgundy),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: PrototypeColors.burgundy),
+            ),
+          ),
+        ),
+        if (helperText != null) ...[
+          const SizedBox(height: 5),
+          Text(
+            helperText!,
+            style: const TextStyle(color: Color(0x8c21304e), fontSize: 11.5),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class PasswordToggle extends StatelessWidget {
+  const PasswordToggle({
+    required this.visible,
+    required this.onPressed,
+    super.key,
+  });
+
+  final bool visible;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(visible ? Icons.visibility_off_outlined : Icons.visibility),
+      color: const Color(0x9921304e),
+      tooltip: visible ? 'Hide password' : 'Show password',
+    );
+  }
+}
+
+class PasswordRequirements extends StatelessWidget {
+  const PasswordRequirements({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(top: 8, left: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '1. At least 8 characters',
+            style: TextStyle(
+              color: Color(0xa621304e),
+              fontSize: 12,
+              height: 1.7,
+            ),
+          ),
+          Text(
+            '2. Use a mix of letters, numbers, and a symbol',
+            style: TextStyle(
+              color: Color(0xa621304e),
+              fontSize: 12,
+              height: 1.7,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PasswordStrength extends StatelessWidget {
+  const PasswordStrength({required this.score, super.key});
+
+  final int score;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = score >= 3
+        ? PrototypeColors.gold
+        : score >= 2
+        ? PrototypeColors.burgundy
+        : const Color(0x8021304e);
+    final label = score >= 3
+        ? 'Strong'
+        : score >= 2
+        ? 'Medium'
+        : 'Weak';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: List.generate(
+              3,
+              (index) => Expanded(
+                child: Container(
+                  height: 5,
+                  margin: EdgeInsets.only(right: index == 2 ? 0 : 5),
+                  decoration: BoxDecoration(
+                    color: index < score ? color : const Color(0x1a21304e),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AuthDivider extends StatelessWidget {
+  const AuthDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 22),
+      child: Row(
+        children: const [
+          Expanded(child: Divider(color: Color(0x2921304e))),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              'or continue with',
+              style: TextStyle(color: Color(0x8021304e), fontSize: 12),
+            ),
+          ),
+          Expanded(child: Divider(color: Color(0x2921304e))),
+        ],
+      ),
+    );
+  }
+}
+
+class AuthSocialButton extends StatelessWidget {
+  const AuthSocialButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final Widget icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: PrototypeColors.navy,
+        backgroundColor: PrototypeColors.surface,
+        side: const BorderSide(color: Color(0x4021304e)),
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [icon, const SizedBox(width: 10), Text(label)],
+      ),
+    );
+  }
+}
+
+class AuthInlineSwitch extends StatelessWidget {
+  const AuthInlineSwitch({
+    required this.prefix,
+    required this.action,
+    required this.onTap,
+    super.key,
+  });
+
+  final String prefix;
+  final String action;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '$prefix ',
+            style: const TextStyle(color: Color(0xa621304e), fontSize: 13.5),
+          ),
+          TextButton(
+            onPressed: onTap,
+            style: TextButton.styleFrom(
+              foregroundColor: PrototypeColors.burgundy,
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+              textStyle: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            child: Text(action),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PrototypeAuthButton extends StatelessWidget {
+  const PrototypeAuthButton({
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      onPressed: onTap,
+      style: FilledButton.styleFrom(
+        backgroundColor: PrototypeColors.burgundy,
+        foregroundColor: PrototypeColors.cream,
+        disabledBackgroundColor: const Color(0x667d2434),
+        disabledForegroundColor: PrototypeColors.cream,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+      ),
+      child: Text(label),
+    );
+  }
+}
+
+class RecoveryMethodCard extends StatelessWidget {
+  const RecoveryMethodCard({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 82,
+      decoration: BoxDecoration(
+        color: selected ? const Color(0x147d2434) : PrototypeColors.surface,
+        border: Border.all(
+          color: selected ? PrototypeColors.burgundy : const Color(0x2e21304e),
+          width: 1.5,
+        ),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: PrototypeColors.burgundy, size: 24),
+          const SizedBox(height: 7),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AuthErrorText extends StatelessWidget {
+  const AuthErrorText({required this.error, super.key});
+
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    if (error == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        error!,
+        style: const TextStyle(
+          color: PrototypeColors.burgundy,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          height: 1.35,
         ),
       ),
     );
@@ -2025,9 +2822,27 @@ String? requiredValue(String? value) {
   return null;
 }
 
+String? emailValue(String? value) {
+  final required = requiredValue(value);
+  if (required != null) return required;
+  final email = value!.trim();
+  if (!email.contains('@') || !email.contains('.')) {
+    return 'Enter a valid email';
+  }
+  return null;
+}
+
 String? passwordValue(String? value) {
   if (value == null || value.length < 8) return 'Use at least 8 characters';
   return null;
+}
+
+int passwordScore(String value) {
+  var score = 0;
+  if (value.length >= 8) score++;
+  if (RegExp(r'[0-9]').hasMatch(value)) score++;
+  if (RegExp(r'[^A-Za-z0-9]').hasMatch(value)) score++;
+  return score;
 }
 
 class TournamentSeed {
