@@ -211,6 +211,13 @@ class AppState extends ChangeNotifier {
     return filtered.isEmpty ? tournamentItems : filtered;
   }
 
+  TournamentSeed get featuredTournament {
+    final active = tournamentItems.where((item) => item.status == 'active');
+    if (active.isNotEmpty) return active.first;
+    if (tournamentItems.isNotEmpty) return tournamentItems.first;
+    return fallbackTournaments.first;
+  }
+
   void selectTab(int value) {
     tab = value;
     notifyListeners();
@@ -536,48 +543,70 @@ class PrototypeShell extends StatelessWidget {
         return Scaffold(
           backgroundColor: PrototypeColors.screen,
           body: pages[state.tab],
-          bottomNavigationBar: NavigationBar(
-            height: 64,
-            backgroundColor: const Color(0xfffbf7ec),
-            indicatorColor: const Color(0x147d2434),
-            selectedIndex: state.tab,
-            onDestinationSelected: state.selectTab,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home, color: PrototypeColors.burgundy),
-                label: 'Home',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.emoji_events_outlined),
-                selectedIcon: Icon(
-                  Icons.emoji_events,
-                  color: PrototypeColors.burgundy,
+          bottomNavigationBar: NavigationBarTheme(
+            data: NavigationBarThemeData(
+              labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                return TextStyle(
+                  color: states.contains(WidgetState.selected)
+                      ? PrototypeColors.burgundy
+                      : const Color(0xcc4c4042),
+                  fontSize: 10,
+                  height: 1,
+                  fontWeight: states.contains(WidgetState.selected)
+                      ? FontWeight.w800
+                      : FontWeight.w700,
+                );
+              }),
+            ),
+            child: NavigationBar(
+              height: 68,
+              backgroundColor: const Color(0xfffbf7ec),
+              indicatorColor: const Color(0x147d2434),
+              selectedIndex: state.tab,
+              onDestinationSelected: state.selectTab,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(
+                    Icons.home,
+                    color: PrototypeColors.burgundy,
+                  ),
+                  label: 'Home',
                 ),
-                label: 'Tournaments',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.grid_view_outlined),
-                selectedIcon: Icon(
-                  Icons.grid_view,
-                  color: PrototypeColors.burgundy,
+                NavigationDestination(
+                  icon: Icon(Icons.emoji_events_outlined),
+                  selectedIcon: Icon(
+                    Icons.emoji_events,
+                    color: PrototypeColors.burgundy,
+                  ),
+                  label: 'Tournaments',
                 ),
-                label: 'Games',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.tune),
-                selectedIcon: Icon(Icons.tune, color: PrototypeColors.burgundy),
-                label: 'Tools',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(
-                  Icons.person,
-                  color: PrototypeColors.burgundy,
+                NavigationDestination(
+                  icon: Icon(Icons.grid_view_outlined),
+                  selectedIcon: Icon(
+                    Icons.grid_view,
+                    color: PrototypeColors.burgundy,
+                  ),
+                  label: 'Games',
                 ),
-                label: 'Profile',
-              ),
-            ],
+                NavigationDestination(
+                  icon: Icon(Icons.tune),
+                  selectedIcon: Icon(
+                    Icons.tune,
+                    color: PrototypeColors.burgundy,
+                  ),
+                  label: 'Tools',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(
+                    Icons.person,
+                    color: PrototypeColors.burgundy,
+                  ),
+                  label: 'Profile',
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -678,6 +707,7 @@ class HomeScreen extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: FeaturedTournamentCard(
+            event: context.watch<AppState>().featuredTournament,
             onTap: () => context.read<AppState>().selectTab(1),
           ),
         ),
@@ -756,70 +786,99 @@ class GuestCard extends StatelessWidget {
 }
 
 class FeaturedTournamentCard extends StatelessWidget {
-  const FeaturedTournamentCard({required this.onTap, super.key});
+  const FeaturedTournamentCard({
+    required this.event,
+    required this.onTap,
+    super.key,
+  });
 
+  final TournamentSeed event;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return PrototypeCard(
       margin: EdgeInsets.zero,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Text(
+              const Text(
                 'FEATURED TOURNAMENT',
                 style: TextStyle(
                   color: Color(0x8021304e),
-                  fontSize: 10.5,
+                  fontSize: 9.5,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 0.7,
+                  letterSpacing: 0.5,
                 ),
               ),
-              Spacer(),
-              LivePill(),
+              const Spacer(),
+              if (event.status == 'active')
+                const LivePill(small: true)
+              else
+                StatusPill(event.status),
             ],
+          ),
+          const SizedBox(height: 6),
+          SerifText(
+            event.name,
+            size: 16,
+            weight: FontWeight.w700,
+            height: 1.18,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            event.meta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0x9921304e), fontSize: 11.5),
           ),
           const SizedBox(height: 8),
-          const SerifText(
-            'University of Jordan Rapid Championship',
-            size: 17.5,
-            weight: FontWeight.w700,
-            height: 1.25,
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Sat, Jul 4 · 4:00 PM',
-            style: TextStyle(color: Color(0x9921304e), fontSize: 12.5),
-          ),
-          const SizedBox(height: 10),
-          const Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          Wrap(
+            spacing: 5,
+            runSpacing: 5,
             children: [
-              ChipPill('Main Campus · Hall B'),
-              ChipPill('15+10 Rapid'),
-              GoldPill('12/16 players'),
+              if (event.chips.length > 1) CompactChipPill(event.chips[1]),
+              if (event.chips.length > 2) CompactGoldPill(event.chips[2]),
             ],
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: 0.75,
-              minHeight: 4,
-              backgroundColor: const Color(0x1f21304e),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                PrototypeColors.gold,
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  event.current,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: PrototypeColors.burgundy,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11.5,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: PrototypeButton(label: 'View Tournament', onTap: onTap),
+              FilledButton(
+                onPressed: onTap,
+                style: FilledButton.styleFrom(
+                  backgroundColor: PrototypeColors.burgundy,
+                  foregroundColor: PrototypeColors.cream,
+                  minimumSize: const Size(0, 34),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                child: const Text('View'),
+              ),
+            ],
           ),
         ],
       ),
@@ -845,15 +904,15 @@ class QuickActionsGrid extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        childAspectRatio: 2.25,
+        childAspectRatio: 1.72,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         children: actions
             .map(
               (item) => Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
+                  horizontal: 12,
+                  vertical: 10,
                 ),
                 decoration: cardDecoration(radius: 13),
                 child: Column(
@@ -870,9 +929,11 @@ class QuickActionsGrid extends StatelessWidget {
                     const SizedBox(height: 5),
                     Text(
                       item.$2,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: PrototypeColors.navy,
-                        fontSize: 13.5,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1694,6 +1755,58 @@ class GoldPill extends StatelessWidget {
   }
 }
 
+class CompactChipPill extends StatelessWidget {
+  const CompactChipPill(this.label, {super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0x0d21304e),
+        border: Border.all(color: const Color(0x2621304e)),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: PrototypeColors.navy,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class CompactGoldPill extends StatelessWidget {
+  const CompactGoldPill(this.label, {super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0x1fa98a3f),
+        border: Border.all(color: const Color(0x55a98a3f)),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xff79622a),
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
 class TabPill extends StatelessWidget {
   const TabPill(this.label, {this.selected = false, super.key});
 
@@ -1727,6 +1840,8 @@ class SerifText extends StatelessWidget {
     required this.size,
     required this.weight,
     this.height,
+    this.maxLines,
+    this.overflow,
     super.key,
   });
 
@@ -1734,11 +1849,15 @@ class SerifText extends StatelessWidget {
   final double size;
   final FontWeight weight;
   final double? height;
+  final int? maxLines;
+  final TextOverflow? overflow;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       text,
+      maxLines: maxLines,
+      overflow: overflow,
       style: TextStyle(
         color: PrototypeColors.navy,
         fontFamily: 'Georgia',
