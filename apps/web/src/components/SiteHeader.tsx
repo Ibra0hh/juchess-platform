@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import './SiteHeader.css'
 
 type SiteHeaderProps = {
@@ -8,6 +9,17 @@ type SiteHeaderProps = {
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 
 function SiteHeader({ active }: SiteHeaderProps) {
+  const { loading, profile, signOut, user } = useAuth()
+  const displayName = profile?.displayName || user?.name || user?.email || ''
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+    || 'JU'
+
   return (
     <header className="site-header">
       <div className="site-header-inner">
@@ -37,9 +49,22 @@ function SiteHeader({ active }: SiteHeaderProps) {
           </Link>
         </nav>
 
-        <Link to="/sign-in" className="sign-in-link">
-          Sign in
-        </Link>
+        <div className="auth-nav">
+          {user ? (
+            <>
+              <Link to="/profile" className="profile-link" title={displayName}>
+                {initials}
+              </Link>
+              <button type="button" className="sign-out-link" onClick={() => void signOut()}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <Link to="/sign-in" className="sign-in-link" aria-disabled={loading}>
+              {loading ? 'Checking...' : 'Sign in'}
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   )

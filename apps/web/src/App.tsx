@@ -1,5 +1,8 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
+import { AuthProvider } from './context/AuthContext'
+import AuthPage from './screens/AuthPage'
+import ForgotPasswordPage from './screens/ForgotPasswordPage'
 import TournamentDetailPage from './screens/TournamentDetailPage'
 import TournamentsPage from './screens/TournamentsPage'
 
@@ -15,9 +18,6 @@ const prototypeScreens: PrototypeScreen[] = [
   { route: '/leaderboard', title: 'JuChess Leaderboard', file: 'Leaderboard.dc.html' },
   { route: '/profile', title: 'JuChess Profile', file: 'Profile.dc.html' },
   { route: '/tools', title: 'JuChess Tools', file: 'Tools.dc.html' },
-  { route: '/sign-in', title: 'JuChess Sign In', file: 'Sign In.dc.html' },
-  { route: '/sign-up', title: 'JuChess Sign Up', file: 'Sign Up.dc.html' },
-  { route: '/forgot-password', title: 'JuChess Forgot Password', file: 'Forgot Password.dc.html' },
 ]
 
 function PrototypeFrame({ screen }: { screen: PrototypeScreen }) {
@@ -55,19 +55,24 @@ function NotFound() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/home" replace />} />
-      <Route path="/tournaments" element={<TournamentsPage />} />
-      <Route path="/tournament/:id" element={<TournamentDetailPage />} />
-      {prototypeScreens.map((screen) => (
-        <Route
-          key={screen.route}
-          path={screen.route}
-          element={<PrototypeFrame screen={screen} />}
-        />
-      ))}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/tournaments" element={<TournamentsPage />} />
+        <Route path="/tournament/:id" element={<TournamentDetailPage />} />
+        <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
+        <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        {prototypeScreens.map((screen) => (
+          <Route
+            key={screen.route}
+            path={screen.route}
+            element={<PrototypeFrame screen={screen} />}
+          />
+        ))}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </AuthProvider>
   )
 }
 

@@ -52,7 +52,10 @@ flutter run
 Run Flutter with Appwrite config:
 
 ```bash
-flutter run --dart-define=APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 --dart-define=APPWRITE_PROJECT_ID=YOUR_PROJECT_ID --dart-define=APPWRITE_DATABASE_ID=juchess
+flutter run \
+  --dart-define=APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 \
+  --dart-define=APPWRITE_PROJECT_ID=YOUR_PROJECT_ID \
+  --dart-define=APPWRITE_DATABASE_ID=juchess
 ```
 
 ## Appwrite Setup
@@ -69,17 +72,21 @@ appwrite init project
 Then update:
 
 - `appwrite.config.json`
-- `apps/web/.env`
-- `apps/admin/.env`
+- `apps/web/.env` from `apps/web/.env.example`
+- `apps/admin/.env` from `apps/admin/.env.example`
 - Flutter `--dart-define` values
 
 Admin-only mutations must go through Appwrite Functions, not browser API keys.
 
 ## Current Implementation Slice
 
-- Web and admin apps now own routes instead of redirecting away from React.
-- Route screens render the approved prototype files exactly while each screen is
-  ported into native React in later slices.
+- Web sign-in, sign-up, password recovery, tournament reads, and profile
+  session state are wired to Appwrite with prototype fallback data.
+- Admin sign-in, admin/organizer role guard, tournament reads, and tournament
+  creation are wired to Appwrite. Writes go through the `admin-actions`
+  Function.
+- Flutter has Appwrite config, session detection, sign-in, sign-up, sign-out,
+  and tournament reads while preserving the prototype visual structure.
 - The `admin-actions` Function has concrete admin mutation routes for
   tournaments, registrations, games, profiles, and announcements.
 - The prototype checklist is the acceptance source for each future screen port.

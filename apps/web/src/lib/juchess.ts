@@ -32,6 +32,11 @@ type AppwriteTournamentRow = Models.Row & {
   description?: string
 }
 
+type AppwriteRegistrationRow = Models.Row & {
+  tournamentId?: string
+  status?: 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
+}
+
 export type Member = {
   id: string
   name: string
@@ -194,16 +199,19 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
   }
 
   try {
-    const response = await tablesDB.listRows<AppwriteTournamentRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.tournaments,
-      queries: [Query.limit(100)],
-      total: false,
-      ttl: 30,
-    })
+    const [response, participantCounts] = await Promise.all([
+      tablesDB.listRows<AppwriteTournamentRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.tournaments,
+        queries: [Query.limit(100)],
+        total: false,
+        ttl: 30,
+      }),
+      loadRegistrationCounts(),
+    ])
 
     const rows = response.rows
-      .map(mapAppwriteTournament)
+      .map((row) => mapAppwriteTournament(row, participantCounts))
       .filter((tournament): tournament is Tournament => Boolean(tournament))
       .sort(compareTournaments)
 
@@ -217,7 +225,33 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
   }
 }
 
-function mapAppwriteTournament(row: AppwriteTournamentRow): Tournament | null {
+async function loadRegistrationCounts() {
+  const counts = new Map<string, number>()
+
+  try {
+    const response = await tablesDB.listRows<AppwriteRegistrationRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.registrations,
+      queries: [Query.limit(500)],
+      total: false,
+      ttl: 30,
+    })
+
+    response.rows.forEach((row) => {
+      if (!row.tournamentId || row.status === 'cancelled') return
+      counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
+    })
+  } catch (error) {
+    console.warn('JuChess Appwrite registration count read failed.', error)
+  }
+
+  return counts
+}
+
+function mapAppwriteTournament(
+  row: AppwriteTournamentRow,
+  participantCounts: Map<string, number>,
+): Tournament | null {
   if (!row.name || !row.format || !row.timeControl) return null
 
   const status = mapStatus(row.status)
@@ -231,7 +265,7 @@ function mapAppwriteTournament(row: AppwriteTournamentRow): Tournament | null {
     location: row.location || 'University of Jordan',
     format: row.format,
     timeControl: row.timeControl,
-    participants: 0,
+    participants: participantCounts.get(row.$id) ?? 0,
     capacity: row.capacity,
     round: formatRound(row),
     desc: row.description || 'Club tournament details will be published by the organizers.',

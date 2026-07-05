@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:appwrite/appwrite.dart';
+import 'package:appwrite/models.dart' as models;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,6 +13,18 @@ class AppConfig {
   static const endpoint = String.fromEnvironment('APPWRITE_ENDPOINT');
   static const projectId = String.fromEnvironment('APPWRITE_PROJECT_ID');
   static const databaseId = String.fromEnvironment('APPWRITE_DATABASE_ID');
+  static const profilesTableId = String.fromEnvironment(
+    'APPWRITE_PROFILES_TABLE_ID',
+    defaultValue: 'profiles',
+  );
+  static const tournamentsTableId = String.fromEnvironment(
+    'APPWRITE_TOURNAMENTS_TABLE_ID',
+    defaultValue: 'tournaments',
+  );
+  static const registrationsTableId = String.fromEnvironment(
+    'APPWRITE_REGISTRATIONS_TABLE_ID',
+    defaultValue: 'registrations',
+  );
 }
 
 class AppwriteService {
@@ -24,15 +39,357 @@ class AppwriteService {
   late final TablesDB tablesDB = TablesDB(client);
   late final Storage storage = Storage(client);
   late final Functions functions = Functions(client);
+
+  bool get ready =>
+      AppConfig.endpoint.isNotEmpty &&
+      AppConfig.projectId.isNotEmpty &&
+      AppConfig.databaseId.isNotEmpty;
+
+  Future<models.User> currentUser() {
+    return account.get();
+  }
+
+  Future<models.User> signIn({
+    required String email,
+    required String password,
+  }) async {
+    await account.createEmailPasswordSession(email: email, password: password);
+    return account.get();
+  }
+
+  Future<models.User> signUp({
+    required String name,
+    required String email,
+    required String password,
+    String? universityId,
+  }) async {
+    final user = await account.create(
+      userId: ID.unique(),
+      email: email,
+      password: password,
+      name: name,
+    );
+
+    await account.createEmailPasswordSession(email: email, password: password);
+    await _createProfile(user, universityId: universityId);
+    return account.get();
+  }
+
+  Future<void> signOut() async {
+    await account.deleteSession(sessionId: 'current');
+  }
+
+  Future<List<TournamentSeed>> loadTournaments() async {
+    final counts = await _loadRegistrationCounts();
+    final response = await tablesDB.listRows(
+      databaseId: AppConfig.databaseId,
+      tableId: AppConfig.tournamentsTableId,
+      queries: [Query.limit(100)],
+      total: false,
+      ttl: 30,
+    );
+
+    final rows =
+        response.rows
+            .map((row) => _mapTournament(row, counts))
+            .whereType<TournamentSeed>()
+            .toList()
+          ..sort((a, b) {
+            final status = _statusOrder(
+              a.status,
+            ).compareTo(_statusOrder(b.status));
+            return status == 0 ? a.name.compareTo(b.name) : status;
+          });
+
+    return rows;
+  }
+
+  Future<void> _createProfile(models.User user, {String? universityId}) async {
+    try {
+      await tablesDB.createRow(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.profilesTableId,
+        rowId: ID.unique(),
+        data: {
+          'accountId': user.$id,
+          'displayName': user.name,
+          'email': user.email,
+          if (universityId != null && universityId.trim().isNotEmpty)
+            'universityId': universityId.trim(),
+          'rating': 1200,
+          'role': 'member',
+          'status': 'pending',
+        },
+        permissions: [
+          Permission.read(Role.user(user.$id)),
+          Permission.update(Role.user(user.$id)),
+        ],
+      );
+    } catch (_) {
+      // Account creation is still valid if the profile row is blocked by table permissions.
+    }
+  }
+
+  Future<Map<String, int>> _loadRegistrationCounts() async {
+    final counts = <String, int>{};
+
+    try {
+      final response = await tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.registrationsTableId,
+        queries: [Query.limit(500)],
+        total: false,
+        ttl: 30,
+      );
+
+      for (final row in response.rows) {
+        final tournamentId = row.data['tournamentId']?.toString();
+        final status = row.data['status']?.toString();
+        if (tournamentId == null || status == 'cancelled') continue;
+        counts[tournamentId] = (counts[tournamentId] ?? 0) + 1;
+      }
+    } catch (_) {
+      return counts;
+    }
+
+    return counts;
+  }
+
+  TournamentSeed? _mapTournament(models.Row row, Map<String, int> counts) {
+    final data = row.data;
+    final name = data['name']?.toString();
+    final format = data['format']?.toString();
+    final timeControl = data['timeControl']?.toString();
+    final rawStatus = data['status']?.toString() ?? 'upcoming';
+
+    if (name == null || format == null || timeControl == null) return null;
+    if (rawStatus == 'draft' || rawStatus == 'cancelled') return null;
+
+    final roundsTotal = _asInt(data['roundsTotal']);
+    final currentRound = _asInt(data['currentRound']);
+    final capacity = _asInt(data['capacity']);
+    final players = counts[row.$id] ?? 0;
+    final location = data['location']?.toString() ?? 'University of Jordan';
+    final startsAt = data['startsAt']?.toString();
+
+    return TournamentSeed(
+      name: name,
+      meta: '${_formatDate(startsAt)} · $location',
+      chips: [
+        roundsTotal == null ? format : '$format · $roundsTotal rounds',
+        timeControl,
+        capacity == null ? '$players players' : '$players/$capacity players',
+      ],
+      current: _roundLabel(rawStatus, currentRound, roundsTotal),
+      status: rawStatus,
+    );
+  }
 }
 
 class AppState extends ChangeNotifier {
+  AppState(this.service) {
+    unawaited(bootstrap());
+  }
+
+  final AppwriteService service;
   int tab = 0;
+  bool authLoading = false;
+  bool dataLoading = false;
+  String tournamentFilter = 'active';
+  String? userName;
+  String? userEmail;
+  String? error;
+  List<TournamentSeed> tournamentItems = fallbackTournaments;
+
+  bool get appwriteReady => service.ready;
+  bool get signedIn => userEmail != null;
+
+  List<TournamentSeed> get visibleTournaments {
+    final filtered = tournamentItems
+        .where((item) => item.status == tournamentFilter)
+        .toList();
+    return filtered.isEmpty ? tournamentItems : filtered;
+  }
 
   void selectTab(int value) {
     tab = value;
     notifyListeners();
   }
+
+  void selectTournamentFilter(String value) {
+    tournamentFilter = value;
+    notifyListeners();
+  }
+
+  Future<void> bootstrap() async {
+    await Future.wait([loadCurrentUser(), loadTournaments()]);
+  }
+
+  Future<void> loadCurrentUser() async {
+    if (!service.ready) return;
+
+    try {
+      final user = await service.currentUser();
+      userName = user.name.isNotEmpty ? user.name : user.email;
+      userEmail = user.email;
+      error = null;
+    } catch (_) {
+      userName = null;
+      userEmail = null;
+    }
+
+    notifyListeners();
+  }
+
+  Future<bool> signIn(String email, String password) async {
+    if (!service.ready) {
+      error = 'Appwrite is not configured yet.';
+      notifyListeners();
+      return false;
+    }
+
+    authLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final user = await service.signIn(email: email, password: password);
+      userName = user.name.isNotEmpty ? user.name : user.email;
+      userEmail = user.email;
+      return true;
+    } catch (caught) {
+      error = appwriteMessage(caught);
+      return false;
+    } finally {
+      authLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> signUp(
+    String name,
+    String email,
+    String password,
+    String universityId,
+  ) async {
+    if (!service.ready) {
+      error = 'Appwrite is not configured yet.';
+      notifyListeners();
+      return false;
+    }
+
+    authLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final user = await service.signUp(
+        name: name,
+        email: email,
+        password: password,
+        universityId: universityId,
+      );
+      userName = user.name.isNotEmpty ? user.name : user.email;
+      userEmail = user.email;
+      return true;
+    } catch (caught) {
+      error = appwriteMessage(caught);
+      return false;
+    } finally {
+      authLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> signOut() async {
+    if (service.ready) {
+      try {
+        await service.signOut();
+      } catch (_) {}
+    }
+
+    userName = null;
+    userEmail = null;
+    notifyListeners();
+  }
+
+  Future<void> loadTournaments() async {
+    if (!service.ready) {
+      tournamentItems = fallbackTournaments;
+      return;
+    }
+
+    dataLoading = true;
+    notifyListeners();
+
+    try {
+      final loaded = await service.loadTournaments();
+      tournamentItems = loaded.isEmpty ? fallbackTournaments : loaded;
+      error = null;
+    } catch (caught) {
+      tournamentItems = fallbackTournaments;
+      error = appwriteMessage(caught);
+    } finally {
+      dataLoading = false;
+      notifyListeners();
+    }
+  }
+}
+
+String appwriteMessage(Object error) {
+  if (error is AppwriteException && error.message != null) {
+    return error.message!;
+  }
+
+  return error.toString();
+}
+
+int? _asInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+int _statusOrder(String status) {
+  if (status == 'active') return 0;
+  if (status == 'upcoming') return 1;
+  return 2;
+}
+
+String _roundLabel(String status, int? currentRound, int? roundsTotal) {
+  if (currentRound != null && roundsTotal != null) {
+    return 'Round $currentRound of $roundsTotal';
+  }
+
+  if (currentRound != null) return 'Round $currentRound';
+  if (status == 'completed') return 'Final';
+  if (status == 'upcoming') return 'Registration';
+  return 'In progress';
+}
+
+String _formatDate(String? value) {
+  if (value == null || value.isEmpty) return 'Date TBA';
+
+  final date = DateTime.tryParse(value);
+  if (date == null) return value;
+
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  return '${months[date.month - 1]} ${date.day}, ${date.year}';
 }
 
 class JuChessApp extends StatelessWidget {
@@ -43,7 +400,9 @@ class JuChessApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider(create: (_) => AppwriteService()),
-        ChangeNotifierProvider(create: (_) => AppState()),
+        ChangeNotifierProvider(
+          create: (context) => AppState(context.read<AppwriteService>()),
+        ),
       ],
       child: MaterialApp(
         title: 'JuChess',
@@ -348,27 +707,48 @@ class GuestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+
     return PrototypeCard(
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "You're browsing as a guest",
-                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                  state.signedIn
+                      ? 'Signed in as ${state.userName}'
+                      : "You're browsing as a guest",
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Sign in to register and save analyses',
-                  style: TextStyle(color: Color(0x9921304e), fontSize: 12),
+                  state.signedIn
+                      ? 'Registrations and analyses will sync with Appwrite'
+                      : 'Sign in to register and save analyses',
+                  style: const TextStyle(
+                    color: Color(0x9921304e),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
           ),
-          PrototypeButton(label: 'Sign in', onTap: () {}),
+          PrototypeButton(
+            label: state.signedIn ? 'Sign out' : 'Sign in',
+            onTap: () {
+              if (state.signedIn) {
+                context.read<AppState>().signOut();
+              } else {
+                showAuthSheet(context);
+              }
+            },
+          ),
         ],
       ),
     );
@@ -511,21 +891,39 @@ class TournamentsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+
     return AppScroll(
       children: [
         const PrototypeHeader(title: 'Tournaments'),
         const TournamentTabs(),
+        if (!state.appwriteReady)
+          const AppNotice(
+            text:
+                'Appwrite is not configured yet. Showing prototype tournament data.',
+          ),
+        if (state.error != null && state.appwriteReady)
+          AppNotice(text: state.error!),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: Column(
-            children: tournaments
-                .map(
-                  (event) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: TournamentCard(event: event),
-                  ),
-                )
-                .toList(),
+            children: state.dataLoading
+                ? const [
+                    Padding(
+                      padding: EdgeInsets.only(top: 24),
+                      child: CircularProgressIndicator(
+                        color: PrototypeColors.burgundy,
+                      ),
+                    ),
+                  ]
+                : state.visibleTournaments
+                      .map(
+                        (event) => Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: TournamentCard(event: event),
+                        ),
+                      )
+                      .toList(),
           ),
         ),
       ],
@@ -538,6 +936,8 @@ class TournamentTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selected = context.watch<AppState>().tournamentFilter;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: const BoxDecoration(
@@ -552,10 +952,29 @@ class TournamentTabs extends StatelessWidget {
           border: Border.all(color: const Color(0x2021304e)),
         ),
         child: Row(
-          children: const [
-            Expanded(child: TabPill('Active', selected: true)),
-            Expanded(child: TabPill('Upcoming')),
-            Expanded(child: TabPill('Completed')),
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () =>
+                    context.read<AppState>().selectTournamentFilter('active'),
+                child: TabPill('Active', selected: selected == 'active'),
+              ),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () =>
+                    context.read<AppState>().selectTournamentFilter('upcoming'),
+                child: TabPill('Upcoming', selected: selected == 'upcoming'),
+              ),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => context.read<AppState>().selectTournamentFilter(
+                  'completed',
+                ),
+                child: TabPill('Completed', selected: selected == 'completed'),
+              ),
+            ),
           ],
         ),
       ),
@@ -586,7 +1005,10 @@ class TournamentCard extends StatelessWidget {
                   height: 1.3,
                 ),
               ),
-              const LivePill(small: true),
+              if (event.status == 'active')
+                const LivePill(small: true)
+              else
+                StatusPill(event.status),
             ],
           ),
           const SizedBox(height: 6),
@@ -669,6 +1091,8 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+
     return AppScroll(
       children: [
         const PrototypeHeader(title: 'Profile'),
@@ -692,35 +1116,46 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              const SerifText(
-                'Guest profile',
+              SerifText(
+                state.signedIn
+                    ? state.userName ?? 'Club profile'
+                    : 'Guest profile',
                 size: 22,
                 weight: FontWeight.w700,
               ),
               const SizedBox(height: 7),
-              const Text(
-                'Sign in to view your rating, registrations, saved analyses, and achievements.',
+              Text(
+                state.signedIn
+                    ? state.userEmail ??
+                          'Your JuChess account is active on this device.'
+                    : 'Sign in to view your rating, registrations, saved analyses, and achievements.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0x9921304e), height: 1.45),
+                style: const TextStyle(color: Color(0x9921304e), height: 1.45),
               ),
               const SizedBox(height: 18),
-              PrototypeButton(label: 'Sign in', onTap: () {}),
-              const SizedBox(height: 10),
-              const Text.rich(
-                TextSpan(
-                  text: 'New to the club? ',
-                  children: [
-                    TextSpan(
-                      text: 'Sign up',
-                      style: TextStyle(
-                        color: PrototypeColors.burgundy,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                style: TextStyle(color: Color(0x9921304e), fontSize: 13),
+              PrototypeButton(
+                label: state.signedIn ? 'Sign out' : 'Sign in',
+                onTap: () {
+                  if (state.signedIn) {
+                    context.read<AppState>().signOut();
+                  } else {
+                    showAuthSheet(context);
+                  }
+                },
               ),
+              if (!state.signedIn) ...[
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => showAuthSheet(context, createAccount: true),
+                  child: const Text(
+                    'New to the club? Sign up',
+                    style: TextStyle(
+                      color: PrototypeColors.burgundy,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1053,6 +1488,27 @@ class PrototypeCard extends StatelessWidget {
   }
 }
 
+class AppNotice extends StatelessWidget {
+  const AppNotice({required this.text, super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeCard(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xcc21304e),
+          fontSize: 12,
+          height: 1.35,
+        ),
+      ),
+    );
+  }
+}
+
 BoxDecoration cardDecoration({double radius = 14}) {
   return BoxDecoration(
     color: PrototypeColors.surface,
@@ -1091,17 +1547,21 @@ class GuestPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final signedIn = context.watch<AppState>().signedIn;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0x1021304e),
-        border: Border.all(color: const Color(0x2e21304e)),
+        color: signedIn ? const Color(0x147d2434) : const Color(0x1021304e),
+        border: Border.all(
+          color: signedIn ? const Color(0x337d2434) : const Color(0x2e21304e),
+        ),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Text(
-        'Guest Mode',
+      child: Text(
+        signedIn ? 'Signed In' : 'Guest Mode',
         style: TextStyle(
-          color: Color(0xcc21304e),
+          color: signedIn ? PrototypeColors.burgundy : const Color(0xcc21304e),
           fontSize: 11.5,
           fontWeight: FontWeight.w700,
         ),
@@ -1147,6 +1607,36 @@ class LivePill extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class StatusPill extends StatelessWidget {
+  const StatusPill(this.status, {super.key});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final upcoming = status == 'upcoming';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: upcoming ? const Color(0x1fa98a3f) : const Color(0x1021304e),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: upcoming ? const Color(0x55a98a3f) : const Color(0x2421304e),
+        ),
+      ),
+      child: Text(
+        upcoming ? 'Soon' : 'Done',
+        style: TextStyle(
+          color: upcoming ? const Color(0xff79622a) : const Color(0x9921304e),
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -1260,18 +1750,230 @@ class SerifText extends StatelessWidget {
   }
 }
 
+void showAuthSheet(BuildContext context, {bool createAccount = false}) {
+  final formKey = GlobalKey<FormState>();
+  final nameController = TextEditingController();
+  final universityController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  var signup = createAccount;
+
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: PrototypeColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+    ),
+    builder: (sheetContext) {
+      return StatefulBuilder(
+        builder: (modalContext, setModalState) {
+          final state = modalContext.watch<AppState>();
+
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                18,
+                18,
+                18,
+                MediaQuery.of(modalContext).viewInsets.bottom + 18,
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SerifText(
+                      signup ? 'Create account' : 'Sign in',
+                      size: 24,
+                      weight: FontWeight.w700,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      signup
+                          ? 'Create your club profile to register for tournaments.'
+                          : 'Use your JuChess Appwrite account.',
+                      style: const TextStyle(
+                        color: Color(0x9921304e),
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    if (!state.appwriteReady) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Appwrite is not configured yet.',
+                        style: TextStyle(
+                          color: PrototypeColors.burgundy,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    if (signup) ...[
+                      AuthField(
+                        controller: nameController,
+                        label: 'Full name',
+                        validator: requiredValue,
+                      ),
+                      const SizedBox(height: 10),
+                      AuthField(
+                        controller: universityController,
+                        label: 'University ID',
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    AuthField(
+                      controller: emailController,
+                      label: 'Email',
+                      keyboardType: TextInputType.emailAddress,
+                      validator: requiredValue,
+                    ),
+                    const SizedBox(height: 10),
+                    AuthField(
+                      controller: passwordController,
+                      label: 'Password',
+                      obscureText: true,
+                      validator: passwordValue,
+                    ),
+                    if (state.error != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        state.error!,
+                        style: const TextStyle(
+                          color: PrototypeColors.burgundy,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    PrototypeButton(
+                      label: state.authLoading
+                          ? 'Working...'
+                          : signup
+                          ? 'Create account'
+                          : 'Sign in',
+                      onTap: state.authLoading || !state.appwriteReady
+                          ? () {}
+                          : () async {
+                              if (!(formKey.currentState?.validate() ??
+                                  false)) {
+                                return;
+                              }
+
+                              final appState = modalContext.read<AppState>();
+                              final success = signup
+                                  ? await appState.signUp(
+                                      nameController.text.trim(),
+                                      emailController.text.trim(),
+                                      passwordController.text,
+                                      universityController.text.trim(),
+                                    )
+                                  : await appState.signIn(
+                                      emailController.text.trim(),
+                                      passwordController.text,
+                                    );
+
+                              if (success && modalContext.mounted) {
+                                Navigator.of(modalContext).pop();
+                              }
+                            },
+                    ),
+                    TextButton(
+                      onPressed: () => setModalState(() => signup = !signup),
+                      child: Text(
+                        signup
+                            ? 'Do you have an account? Sign in'
+                            : 'New to the club? Sign up',
+                        style: const TextStyle(
+                          color: PrototypeColors.burgundy,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  ).whenComplete(() {
+    nameController.dispose();
+    universityController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+  });
+}
+
+class AuthField extends StatelessWidget {
+  const AuthField({
+    required this.controller,
+    required this.label,
+    this.keyboardType,
+    this.obscureText = false,
+    this.validator,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final TextInputType? keyboardType;
+  final bool obscureText;
+  final String? Function(String?)? validator;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Color(0x9921304e)),
+        filled: true,
+        fillColor: const Color(0xfffffaf0),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(11),
+          borderSide: const BorderSide(color: Color(0x2421304e)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(11),
+          borderSide: const BorderSide(color: PrototypeColors.burgundy),
+        ),
+      ),
+    );
+  }
+}
+
+String? requiredValue(String? value) {
+  if (value == null || value.trim().isEmpty) return 'Required';
+  return null;
+}
+
+String? passwordValue(String? value) {
+  if (value == null || value.length < 8) return 'Use at least 8 characters';
+  return null;
+}
+
 class TournamentSeed {
   const TournamentSeed({
     required this.name,
     required this.meta,
     required this.chips,
     required this.current,
+    this.status = 'active',
   });
 
   final String name;
   final String meta;
   final List<String> chips;
   final String current;
+  final String status;
 }
 
 class PlayerSeed {
@@ -1282,7 +1984,7 @@ class PlayerSeed {
   final int rating;
 }
 
-const tournaments = [
+const fallbackTournaments = [
   TournamentSeed(
     name: 'University of Jordan Rapid Championship',
     meta: 'Sat, Jul 4 · 4:00 PM · Main Campus · Hall B',
@@ -1306,6 +2008,13 @@ const tournaments = [
     meta: 'Jul 1 – Jul 8 · 5:00 PM · JU Sports Complex · Hall 2',
     chips: ['Team · 4 boards', '10+0 Rapid', '4 teams'],
     current: 'Match Day 2 of 3',
+  ),
+  TournamentSeed(
+    name: 'Masters Six Invitational',
+    meta: 'Sun, Jul 12 · 10:00 AM · Library Seminar Room',
+    chips: ['Double round-robin', '25+10 Classical', '6 players'],
+    current: 'Registration',
+    status: 'upcoming',
   ),
 ];
 

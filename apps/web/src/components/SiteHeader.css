@@ -82,20 +82,62 @@
   border-bottom: 2px solid #a98a3f;
 }
 
-.sign-in-link {
+.auth-nav {
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.sign-in-link,
+.sign-out-link {
   font-size: 13px;
   font-weight: 600;
-  color: #f5efe3;
-  background: #1e2b45;
   text-decoration: none;
-  padding: 9px 18px;
   border-radius: 7px;
   white-space: nowrap;
 }
 
+.sign-in-link {
+  color: #f5efe3;
+  background: #1e2b45;
+  padding: 9px 18px;
+}
+
 .sign-in-link:hover {
   background: #7a2431;
+}
+
+.profile-link {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #7a2431;
+  color: #f5efe3;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.profile-link:hover {
+  background: #5f1b26;
+}
+
+.sign-out-link {
+  border: 1px solid rgba(30, 43, 69, 0.24);
+  background: transparent;
+  color: #1e2b45;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.sign-out-link:hover {
+  border-color: #7a2431;
+  color: #7a2431;
 }
 
 @media (max-width: 960px) {
@@ -112,6 +154,14 @@
   }
 
   .brand-link small {
+    display: none;
+  }
+
+  .auth-nav {
+    margin-left: auto;
+  }
+
+  .sign-out-link {
     display: none;
   }
 }
