@@ -1213,9 +1213,10 @@ class Component extends DCLogic {
     const prow=(content,bold)=>({content,style:`padding:11px 22px;border-bottom:1px solid #F4F0E8;font-size:${bold?'13px':'12.5px'};font-weight:${bold?'800':'600'};color:${bold?'#14213D':'#4A4F5A'}`});
 
     if(live){
-      stageNav=[R('Rounds',s.liveTab==='rounds',()=>this.setState({liveTab:'rounds'})),R('Procedure',s.liveTab==='procedure',()=>this.setState({liveTab:'procedure'})),R('Standings',s.liveTab==='standings',()=>this.setState({liveTab:'standings'}))];
+      stageNav=[R('Participants',s.liveTab==='participants',()=>this.setState({liveTab:'participants'})),R('Rounds',s.liveTab==='rounds',()=>this.setState({liveTab:'rounds'})),R('Procedure',s.liveTab==='procedure',()=>this.setState({liveTab:'procedure'})),R('Standings',s.liveTab==='standings',()=>this.setState({liveTab:'standings'}))];
       const elim=(t.format==='knockout'||t.format==='doubleelim');
-      if(s.liveTab==='procedure') body=panelBody('Tournament procedure',['Verify all boards are ready before starting the clock.','Confirm both players present; apply default win after 10 min absence.','Record results as they finish; resolve disputes before next round.','Publish standings after every completed round.'].map(x=>prow(x)));
+      if(s.liveTab==='participants') body=panelBody('Participants', this.buildParticipants(t));
+      else if(s.liveTab==='procedure') body=panelBody('Tournament procedure',['Verify all boards are ready before starting the clock.','Confirm both players present; apply default win after 10 min absence.','Record results as they finish; resolve disputes before next round.','Publish standings after every completed round.'].map(x=>prow(x)));
       else if(s.liveTab==='standings'){ body = elim ? this.buildBracket(t) : panelBody('Live standings', this.buildStandings()); }
       else { body = elim ? this.buildBracket(t) : pairingsBody(s.shuffleTick,'Live — current round'); }
     } else {
@@ -1250,8 +1251,9 @@ class Component extends DCLogic {
           stageNav=[R('Stage 1 · Swiss',s.manageStage===0,()=>this.setState({manageStage:0})),R('Stage 2 · Bracket',s.manageStage===1,()=>this.setState({manageStage:1}))];
           if(s.manageStage===0){
             body={multiStage1:true,
-              subNav:[R('Rounds',s.liveTab==='rounds',()=>this.setState({liveTab:'rounds'})),R('Standings',s.liveTab==='standings',()=>this.setState({liveTab:'standings'})),R('Procedure',s.liveTab==='procedure',()=>this.setState({liveTab:'procedure'}))]};
-            if(s.liveTab==='standings') Object.assign(body, panelBody('Stage 1 standings',this.buildStandings()));
+              subNav:[R('Participants',s.liveTab==='participants',()=>this.setState({liveTab:'participants'})),R('Rounds',s.liveTab==='rounds',()=>this.setState({liveTab:'rounds'})),R('Standings',s.liveTab==='standings',()=>this.setState({liveTab:'standings'})),R('Procedure',s.liveTab==='procedure',()=>this.setState({liveTab:'procedure'}))]};
+            if(s.liveTab==='participants') Object.assign(body, panelBody('Stage 1 participants',this.buildParticipants(t)));
+            else if(s.liveTab==='standings') Object.assign(body, panelBody('Stage 1 standings',this.buildStandings()));
             else if(s.liveTab==='procedure') Object.assign(body, panelBody('Stage 1 procedure',['Top 8 of the Swiss stage advance to Stage 2.','Four Swiss rounds decide seeding for the bracket.','Tiebreaks: Buchholz, then head-to-head.'].map(x=>prow(x))));
             else Object.assign(body, pairingsBody(s.shuffleTick,'Stage 1 · Round 1 pairings'));
           } else { body=this.buildBracket(t); }
@@ -1274,6 +1276,16 @@ class Component extends DCLogic {
     const pts=[7,6.5,6,5.5,5,4.5,4,3.5];
     return this.POOL.slice(0,8).map((n,i)=>({content:`${i+1}.  ${n}  ${pts[i]}  ${(pts[i]+2).toFixed(1)}`,
       style:`display:flex;gap:14px;padding:10px 22px;border-bottom:1px solid #F4F0E8;font-size:12.5px;font-weight:${i<3?'800':'600'};color:${i<3?'#7d2434':'#14213D'};font-family:'JetBrains Mono',monospace`}));
+  }
+
+  buildParticipants(t){
+    const total=Math.min((t&&t.participants)||this.POOL.length,this.POOL.length);
+    const ord=this.seededOrder(this.state.shuffleTick).slice(0,total);
+    const rows=[{content:'Seed  Player  Rating  Status',
+      style:'padding:9px 22px;background:#FAF7F1;border-bottom:1px solid #E6DFD3;font-size:10.5px;font-weight:800;color:#8B8577;text-transform:uppercase;letter-spacing:.4px;font-family:\'JetBrains Mono\',monospace'}];
+    ord.forEach((p,i)=>rows.push({content:`${String(i+1).padStart(2,'0')}    ${this.POOL[p]}    ${this.RATINGS[p]}    Confirmed`,
+      style:`padding:10px 22px;border-bottom:1px solid #F4F0E8;font-size:12.5px;font-weight:${i<4?'800':'600'};color:${i<4?'#14213D':'#4A4F5A'};font-family:'JetBrains Mono',monospace`}));
+    return rows;
   }
 
   buildBracket(t){
