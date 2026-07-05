@@ -717,16 +717,16 @@ class HomeScreen extends StatelessWidget {
         ),
         const QuickActionsGrid(),
         SectionHeading(
+          title: 'News',
+          margin: const EdgeInsets.fromLTRB(16, 22, 16, 10),
+        ),
+        const NewsList(),
+        SectionHeading(
           title: 'Club leaderboard',
           action: 'View all',
           margin: const EdgeInsets.fromLTRB(16, 22, 16, 10),
         ),
         const LeaderboardPreview(),
-        SectionHeading(
-          title: 'Upcoming',
-          margin: const EdgeInsets.fromLTRB(16, 22, 16, 10),
-        ),
-        const UpcomingList(),
       ],
     );
   }
@@ -1430,8 +1430,8 @@ class LeaderboardPreview extends StatelessWidget {
   }
 }
 
-class UpcomingList extends StatelessWidget {
-  const UpcomingList({super.key});
+class NewsList extends StatelessWidget {
+  const NewsList({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1439,20 +1439,23 @@ class UpcomingList extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          UpcomingTile(
-            'Masters Six · Double Round-Robin Invitational',
-            'Sun, Jul 12 · 10:00 AM',
+          NewsTile(
+            'Rapid Championship round 4 is live',
+            'Main Campus · Hall B',
           ),
           SizedBox(height: 10),
-          UpcomingTile('Autumn Swiss Open', 'Sat, Sep 19 · 3:00 PM'),
+          NewsTile(
+            'Masters Six registration opens soon',
+            'Round-robin invitational · 6 players',
+          ),
         ],
       ),
     );
   }
 }
 
-class UpcomingTile extends StatelessWidget {
-  const UpcomingTile(this.title, this.subtitle, {super.key});
+class NewsTile extends StatelessWidget {
+  const NewsTile(this.title, this.subtitle, {super.key});
 
   final String title;
   final String subtitle;
@@ -1464,10 +1467,7 @@ class UpcomingTile extends StatelessWidget {
       decoration: cardDecoration(radius: 13),
       child: Row(
         children: [
-          const Icon(
-            Icons.calendar_month_outlined,
-            color: PrototypeColors.burgundy,
-          ),
+          const Icon(Icons.campaign_outlined, color: PrototypeColors.burgundy),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
