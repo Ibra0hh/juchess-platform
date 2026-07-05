@@ -31,6 +31,9 @@ layer under the same UI, not a redesign trigger.
 - Appwrite client wrappers are present.
 - Admin Function stub exists at `appwrite/functions/admin-actions`.
 - Flutter app has been corrected to follow the mobile prototype direction.
+- Web `/tournaments` is now a real React screen, not an iframe. It keeps the
+  prototype content, filters, search, list/grid controls, loading state, empty
+  state, and Appwrite-read fallback boundary.
 
 ## Verified So Far
 
@@ -39,10 +42,17 @@ layer under the same UI, not a redesign trigger.
 - `npm run mobile:analyze` passes.
 - `npm run mobile:test` passes.
 - `node appwrite/functions/admin-actions/src/main.js` import check passed.
+- `npm run build:web` passes after the real React Tournaments screen.
+- `npm run lint:web` completes; remaining warnings are in generated prototype
+  files under `apps/web/public/prototype`.
+- Local browser verification passed for `/tournaments`: desktop render,
+  mobile breakpoint, search filter, and grid toggle.
 
 ## Immediate Next Work
 
-1. Replace the invented React web shell with a faithful port of the web prototype.
+1. Continue replacing the invented React web shell with faithful prototype
+   ports. Next web targets: Home, Tournament Detail, Games, Leaderboard,
+   Profile, Sign In, Sign Up, Forgot Password.
 2. Replace the invented React admin shell with a faithful port of the admin prototype.
 3. Continue expanding the Flutter app screen-by-screen from the mobile prototype.
 4. Create the real Appwrite project, tables, buckets, teams, and function deployment.

@@ -1,0 +1,273 @@
+import { useEffect, useMemo, useState } from 'react'
+import {
+  CalendarDays,
+  Clock3,
+  LayoutGrid,
+  List,
+  MapPin,
+  Search,
+  Swords,
+  Timer,
+  Trophy,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { loadTournaments, prototypeTournaments, type Tournament, type TournamentStatus } from '../lib/juchess'
+import './TournamentsPage.css'
+
+type ViewMode = 'list' | 'grid'
+
+const filters: TournamentStatus[] = ['Upcoming', 'Active', 'Completed']
+const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
+
+function TournamentsPage() {
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<TournamentStatus>('Active')
+  const [view, setView] = useState<ViewMode>('list')
+  const [tournaments, setTournaments] = useState<Tournament[]>(prototypeTournaments)
+  const [loading, setLoading] = useState(true)
+  const [hasFallbackError, setHasFallbackError] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+
+    loadTournaments().then((result) => {
+      if (!alive) return
+      setTournaments(result.tournaments)
+      setHasFallbackError(Boolean(result.error))
+      setLoading(false)
+    })
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const visibleTournaments = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+
+    return tournaments.filter((tournament) => {
+      const matchesStatus = tournament.status === filter
+      const haystack = [
+        tournament.name,
+        tournament.format,
+        tournament.location,
+        tournament.timeControl,
+        tournament.round,
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      return matchesStatus && (!needle || haystack.includes(needle))
+    })
+  }, [filter, query, tournaments])
+
+  return (
+    <div className="tournaments-screen" data-screen-label="Tournaments">
+      <SiteHeader />
+      <main className="tournaments-main">
+        <section className="tournaments-heading" aria-labelledby="tournaments-title">
+          <h1 id="tournaments-title">Tournaments</h1>
+          <p>Every club event - live boards, standings and brackets as they happen.</p>
+        </section>
+
+        <div className="tournament-search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search tournaments, formats, venues..."
+            aria-label="Search tournaments"
+          />
+        </div>
+
+        <div className="tournament-controls">
+          <div className="tournament-filters" aria-label="Tournament status filters">
+            {filters.map((label) => (
+              <button
+                key={label}
+                type="button"
+                className={filter === label ? 'active' : undefined}
+                onClick={() => setFilter(label)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="view-toggle" aria-label="Tournament view">
+            <button
+              type="button"
+              className={view === 'list' ? 'active' : undefined}
+              onClick={() => setView('list')}
+              aria-label="List view"
+              title="List view"
+            >
+              <List size={14} aria-hidden="true" />
+              <span>List</span>
+            </button>
+            <button
+              type="button"
+              className={view === 'grid' ? 'active' : undefined}
+              onClick={() => setView('grid')}
+              aria-label="Grid view"
+              title="Grid view"
+            >
+              <LayoutGrid size={14} aria-hidden="true" />
+              <span>Grid</span>
+            </button>
+          </div>
+        </div>
+
+        {hasFallbackError ? (
+          <div className="data-note" role="status">
+            Appwrite data is unavailable right now. Showing the locked prototype data.
+          </div>
+        ) : null}
+
+        <section className={`tournament-list ${view}`} aria-live="polite">
+          {loading ? (
+            <LoadingState />
+          ) : visibleTournaments.length ? (
+            visibleTournaments.map((tournament) => (
+              <TournamentCard key={tournament.id} tournament={tournament} />
+            ))
+          ) : (
+            <EmptyState />
+          )}
+        </section>
+      </main>
+    </div>
+  )
+}
+
+function SiteHeader() {
+  return (
+    <header className="site-header">
+      <div className="site-header-inner">
+        <Link to="/home" className="brand-link">
+          <img src={crestUrl} alt="Chess Club JU crest" />
+          <span>
+            <strong>JuChess</strong>
+            <small>University of Jordan Chess Club</small>
+          </span>
+        </Link>
+
+        <nav className="main-nav" aria-label="Primary navigation">
+          <Link to="/home">Home</Link>
+          <Link to="/tournaments" className="active">
+            Tournaments
+          </Link>
+          <Link to="/games">Games</Link>
+          <Link to="/leaderboard">Leaderboard</Link>
+          <Link to="/profile">Profile</Link>
+        </nav>
+
+        <Link to="/sign-in" className="sign-in-link">
+          Sign in
+        </Link>
+      </div>
+    </header>
+  )
+}
+
+function TournamentCard({ tournament }: { tournament: Tournament }) {
+  const Icon = getTournamentIcon(tournament)
+
+  return (
+    <Link to={`/tournament/${tournament.id}`} className="tournament-card">
+      <span className={`tournament-icon ${statusClass(tournament.status)}`}>
+        <Icon size={24} aria-hidden="true" />
+      </span>
+
+      <span className="tournament-card-main">
+        <span className="tournament-title-line">
+          <span className="tournament-name">{tournament.name}</span>
+          <StatusBadge status={tournament.status} />
+        </span>
+        <span className="tournament-summary">
+          {tournament.format} · {tournament.timeControl} · {tournament.round}
+        </span>
+      </span>
+
+      <span className="tournament-meta">
+        <span>
+          <CalendarDays size={13} aria-hidden="true" />
+          {tournament.date}
+        </span>
+        <span>
+          <MapPin size={13} aria-hidden="true" />
+          {tournament.location} · {playerLabel(tournament)}
+        </span>
+      </span>
+    </Link>
+  )
+}
+
+function StatusBadge({ status }: { status: TournamentStatus }) {
+  if (status === 'Active') {
+    return (
+      <span className="status-badge live">
+        <span aria-hidden="true" />
+        Live
+      </span>
+    )
+  }
+
+  return <span className={`status-badge ${statusClass(status)}`}>{status}</span>
+}
+
+function LoadingState() {
+  return (
+    <>
+      {[0, 1, 2].map((item) => (
+        <div className="tournament-card skeleton" key={item}>
+          <span className="tournament-icon" />
+          <span className="tournament-card-main">
+            <span />
+            <span />
+          </span>
+          <span className="tournament-meta">
+            <span />
+            <span />
+          </span>
+        </div>
+      ))}
+    </>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className="empty-state">
+      <Trophy size={34} aria-hidden="true" />
+      <h2>No tournaments match</h2>
+      <p>Try a different search or filter.</p>
+    </div>
+  )
+}
+
+function getTournamentIcon(tournament: Tournament): LucideIcon {
+  if (/bullet|blitz/i.test(tournament.timeControl)) return Zap
+  if (/rapid/i.test(tournament.timeControl)) return Timer
+  if (/classical/i.test(tournament.timeControl)) return Clock3
+  if (/team|elimination|stage/i.test(tournament.format)) return Swords
+  if (/arena/i.test(tournament.format)) return Trophy
+  return Trophy
+}
+
+function statusClass(status: TournamentStatus) {
+  return status.toLowerCase()
+}
+
+function playerLabel(tournament: Tournament) {
+  if (tournament.capacity && tournament.capacity > 0) {
+    return `${tournament.participants}/${tournament.capacity} players`
+  }
+
+  return `${tournament.participants} players`
+}
+
+export default TournamentsPage
