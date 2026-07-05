@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="data.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #F5EFE3; }
+  @keyframes ju-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  .ju-pulse { animation: ju-pulse 1.6s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .ju-pulse { animation: none; } }
+  .ju-bracket-scroll { scrollbar-width: thin; scrollbar-color: rgba(30,43,69,.3) transparent; }
+  .ju-bracket-scroll::-webkit-scrollbar { height: 8px; }
+  .ju-bracket-scroll::-webkit-scrollbar-thumb { background: rgba(30,43,69,.25); border-radius: 4px; }
+  @media (max-width: 960px) { .ju-nav-links { display: none !important; } }
+  .ju-gwrap { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 218px)); gap: 14px; }
+  .ju-gwrap.list { display: flex; flex-direction: column; gap: 8px; }
+  .ju-gwrap.list .ju-gcard { flex-direction: row !important; align-items: center; gap: 14px; padding: 9px 14px !important; }
+  .ju-gwrap.list .ju-gboard { width: 52px; height: 52px; flex: none; order: 0; }
+  .ju-gwrap.list .ju-gtop { order: 1; flex: 1; min-width: 0; justify-content: flex-start !important; gap: 8px; }
+  .ju-gwrap.list .ju-gbot { order: 2; flex: 1; min-width: 0; justify-content: flex-start !important; gap: 8px; }
+  .ju-gwrap.list .ju-gact { order: 3; border-top: none !important; padding-top: 0 !important; white-space: nowrap; flex: none; }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #F5EFE3; color: #1E2B45; font-family: 'IBM Plex Sans', sans-serif;" data-screen-label="Tournament Detail">
+
+  <header style="position: sticky; top: 0; z-index: 50; background: rgba(245,239,227,.92); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(30,43,69,.14);">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 66px; display: flex; align-items: center; gap: 24px;">
+      <a href="Home.dc.html" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #1E2B45;">
+        <img src="assets/crest.png" alt="Chess Club JU crest" style="width: 42px; height: 42px; object-fit: contain;">
+        <span style="display: flex; flex-direction: column; line-height: 1.1;">
+          <span style="font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 700; letter-spacing: .02em;">JuChess</span>
+          <span style="font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #7A2431; font-weight: 500;">University of Jordan Chess Club</span>
+        </span>
+      </a>
+      <nav class="ju-nav-links" style="display: flex; align-items: center; gap: 4px; margin: 0 auto;">
+        <a href="Home.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Home</a>
+        <a href="Tournaments.dc.html" style="font-size: 13.5px; font-weight: 600; color: #7A2431; text-decoration: none; padding: 8px 12px; border-radius: 6px; border-bottom: 2px solid #A98A3F;">Tournaments</a>
+        <a href="Games.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Games</a>
+        <a href="Leaderboard.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Leaderboard</a>
+        <a href="Profile.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Profile</a>
+      </nav>
+      <sc-if value="{{ signedIn }}" hint-placeholder-val="{{ false }}"><a href="Profile.dc.html" title="{{ authName }}" style="margin-left: 8px; width: 38px; height: 38px; border-radius: 50%; background: #1E2B45; color: #C9AE6B; display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 700; text-decoration: none;" style-hover="background: #7A2431;">{{ authInitials }}</a></sc-if><sc-if value="{{ signedOut }}" hint-placeholder-val="{{ true }}"><a href="Sign In.dc.html" style="margin-left: 8px; font-size: 13px; font-weight: 600; color: #F5EFE3; background: #1E2B45; text-decoration: none; padding: 9px 18px; border-radius: 7px; white-space: nowrap;" style-hover="background: #7A2431;">Sign in</a></sc-if>
+    </div>
+  </header>
+
+  <main style="max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px;">
+
+    <!-- back button -->
+    <a href="Tournaments.dc.html" style="display: inline-flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; color: #7A2431; text-decoration: none; background: #FFFCF4; border: 1px solid rgba(122,36,49,.3); border-radius: 999px; padding: 8px 18px 8px 12px; box-shadow: 0 2px 8px rgba(30,43,69,.06); transition: background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;" style-hover="background: #7A2431; border-color: #7A2431; color: #F8F3E7; transform: translateX(-2px); box-shadow: 0 6px 16px rgba(122,36,49,.25);">
+      <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(122,36,49,.1); font-size: 13px; line-height: 1;">&larr;</span>
+      <span style="letter-spacing: .02em;">All tournaments</span>
+    </a>
+
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-top: 12px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <h1 style="font-family: 'Cormorant Garamond', serif; font-size: 38px; font-weight: 600; margin: 0; line-height: 1.05;">{{ t.name }}</h1>
+          <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #F8F3E7; background: #7A2431; border-radius: 999px; padding: 5px 12px;"><span class="ju-pulse" style="width: 6px; height: 6px; border-radius: 50%; background: #F8F3E7;"></span>Live</span>
+          </sc-if>
+          <sc-if value="{{ isUpcoming }}" hint-placeholder-val="{{ false }}">
+            <span style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #A9852E; border: 1px solid rgba(169,138,63,.5); border-radius: 999px; padding: 5px 12px;">Upcoming</span>
+          </sc-if>
+          <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+            <span style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: rgba(30,43,69,.6); border: 1px solid rgba(30,43,69,.25); border-radius: 999px; padding: 5px 12px;">Completed</span>
+          </sc-if>
+        </div>
+        <div style="font-size: 13.5px; color: rgba(30,43,69,.68); margin-top: 8px;">{{ t.format }} &middot; {{ t.timeControl }} &middot; {{ t.date }} &middot; {{ t.location }} &middot; {{ t.participants }} players</div>
+      </div>
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #7A2431; font-weight: 500;">{{ t.round }}</div>
+    </div>
+
+    <!-- tabs -->
+    <div role="tablist" style="display: flex; justify-content: center; gap: 2px; margin-top: 26px; border-bottom: 1px solid rgba(30,43,69,.18);">
+      <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="5">
+        <button type="button" role="tab" onClick="{{ tab.on }}" style="background: none; border: none; border-bottom: 2px solid {{ tab.line }}; color: {{ tab.col }}; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; font-weight: {{ tab.wt }}; padding: 10px 18px; cursor: pointer; margin-bottom: -1px; transition: color .15s ease;" style-hover="color: #7A2431;" style-focus="outline: 2px solid #A98A3F; outline-offset: -2px;">{{ tab.label }}</button>
+      </sc-for>
+    </div>
+
+    <!-- =================== HOME TAB =================== -->
+    <sc-if value="{{ tabHome }}" hint-placeholder-val="{{ true }}">
+
+      <!-- compact overview card -->
+      <div style="margin-top: 22px; background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; padding: 18px 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: rgba(30,43,69,.5); font-weight: 600;">Format</span><span style="font-size: 14px; font-weight: 600;">{{ t.format }}</span></div>
+        <div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: rgba(30,43,69,.5); font-weight: 600;">Time control</span><span style="font-size: 14px; font-weight: 600;">{{ t.timeControl }}</span></div>
+        <div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: rgba(30,43,69,.5); font-weight: 600;">Stage</span><span style="font-size: 14px; font-weight: 600; color: #7A2431;">{{ t.round }}</span></div>
+        <div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: rgba(30,43,69,.5); font-weight: 600;">Venue</span><span style="font-size: 14px; font-weight: 600;">{{ t.location }}</span></div>
+        <sc-if value="{{ leaderLine }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: rgba(30,43,69,.5); font-weight: 600;">Leading</span><span style="font-size: 14px; font-weight: 600; color: #A9852E;">{{ leaderLine }}</span></div>
+        </sc-if>
+      </div>
+      <p style="font-size: 14px; line-height: 1.6; color: rgba(30,43,69,.72); margin: 16px 0 0; max-width: 720px; text-wrap: pretty;">{{ t.desc }}</p>
+
+      <!-- arena: countdown -->
+      <sc-if value="{{ isArena }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 22px; display: flex; align-items: center; gap: 18px; background: #1E2B45; color: #F5EFE3; border-radius: 10px; padding: 16px 22px; flex-wrap: wrap;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: rgba(245,239,227,.6); font-weight: 600;">Arena ends in</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 600; color: #C9AE6B;">{{ arenaClock }}</span>
+          </div>
+          <div style="flex: 1; min-width: 200px; font-size: 13px; line-height: 1.55; color: rgba(245,239,227,.75);">Unlimited 3+2 games until the clock hits zero. Win streaks double your points.</div>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: rgba(245,239,227,.75);">{{ arenaLeaderLine }}</span>
+        </div>
+      </sc-if>
+
+      <!-- team home: match dashboard -->
+      <sc-if value="{{ isTeam }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 24px; background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 12px; overflow: hidden;">
+          <div style="background: #1E2B45; color: #F5EFE3; padding: 20px 24px; display: flex; align-items: center; justify-content: center; gap: 28px;">
+            <span style="font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 700;">{{ teamHome }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 34px; font-weight: 600; color: #C9AE6B;">{{ teamScoreLine }}</span>
+            <span style="font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 700;">{{ teamAway }}</span>
+          </div>
+          <div>
+            <sc-for list="{{ teamBoards }}" as="b" hint-placeholder-count="4">
+              <div style="display: grid; grid-template-columns: 60px 1fr auto 1fr; align-items: center; gap: 14px; padding: 12px 24px; border-top: 1px solid rgba(30,43,69,.1);">
+                <span style="font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: rgba(30,43,69,.55); font-weight: 600;">Board {{ b.bd }}</span>
+                <span style="text-align: right;"><span style="font-size: 14px; font-weight: {{ b.hw }};">{{ b.home }}</span> <span style="font-size: 12px; color: rgba(30,43,69,.55); font-family: 'IBM Plex Mono', monospace;">{{ b.hr }}</span></span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; color: #7A2431; min-width: 52px; text-align: center;">{{ b.res }}</span>
+                <span><span style="font-size: 12px; color: rgba(30,43,69,.55); font-family: 'IBM Plex Mono', monospace;">{{ b.ar }}</span> <span style="font-size: 14px; font-weight: {{ b.aw }};">{{ b.away }}</span></span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- register / sign-in card -->
+      <div style="margin-top: 26px; background: #FFFCF4; border: 1px solid rgba(169,138,63,.4); border-radius: 12px; padding: 22px 24px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; box-shadow: 0 2px 10px rgba(30,43,69,.05);">
+        <div style="width: 46px; height: 46px; border-radius: 10px; background: rgba(122,36,49,.08); border: 1px solid rgba(122,36,49,.25); display: flex; align-items: center; justify-content: center; font-size: 22px; color: #7A2431; flex: none;">&#9812;</div>
+        <sc-if value="{{ signedOut }}" hint-placeholder-val="{{ true }}">
+          <div style="flex: 1; min-width: 220px;">
+            <div style="font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 700;">Play in this tournament</div>
+            <div style="font-size: 13px; color: rgba(30,43,69,.7); margin-top: 3px;">Sign in to your player club account to register for {{ t.name }}.</div>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="Sign In.dc.html" style="font-size: 13.5px; font-weight: 600; color: #F8F3E7; background: #7A2431; text-decoration: none; padding: 11px 22px; border-radius: 8px; white-space: nowrap;" style-hover="background: #5F1B26;">Sign in to register</a>
+            <a href="Sign Up.dc.html" style="font-size: 13.5px; font-weight: 600; color: #1E2B45; background: transparent; text-decoration: none; padding: 11px 20px; border-radius: 8px; border: 1px solid rgba(30,43,69,.3); white-space: nowrap;" style-hover="border-color: #A98A3F; background: rgba(169,138,63,.08);">Create account</a>
+          </div>
+        </sc-if>
+        <sc-if value="{{ signedIn }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: 1; min-width: 220px;">
+            <div style="font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 700;">Register for {{ t.name }}</div>
+            <div style="font-size: 13px; color: rgba(30,43,69,.7); margin-top: 3px;">Signed in as {{ authName }} &middot; secure your seat at the board.</div>
+          </div>
+          <button type="button" onClick="{{ openRegister }}" style="font-size: 13.5px; font-weight: 600; color: {{ regCol }}; background: {{ regBg }}; border: 1px solid {{ regBd }}; padding: 11px 24px; border-radius: 8px; white-space: nowrap; cursor: pointer;" style-hover="opacity: .9;">{{ regLabel }}</button>
+        </sc-if>
+      </div>
+
+      <!-- register modal: 6-digit code + QR -->
+      <sc-if value="{{ regModal }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 14px; width: 100%; max-width: 420px; background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 14px; box-shadow: 0 6px 22px rgba(20,26,40,.10); overflow: hidden;">
+            <div style="background: #1E2B45; color: #F5EFE3; padding: 18px 22px; display: flex; align-items: center; gap: 12px;">
+              <img src="assets/crest.png" alt="" style="width: 34px; height: 34px; object-fit: contain;">
+              <div style="display: flex; flex-direction: column; line-height: 1.2;">
+                <span style="font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 700;">Registration pass</span>
+                <span style="font-size: 11px; color: rgba(245,239,227,.7);">{{ t.name }}</span>
+              </div>
+            </div>
+            <div style="padding: 24px 24px 22px; text-align: center;">
+              <div style="font-size: 12.5px; color: rgba(30,43,69,.65); line-height: 1.5;">Show this at the check-in desk, or enter the code to confirm your seat.</div>
+
+              <!-- QR code -->
+              <div style="margin: 16px auto 0; width: 148px; height: 148px; border: 1px solid rgba(30,43,69,.15); border-radius: 12px; padding: 9px; background: #FFFFFF;">
+                <div style="display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(11, 1fr); width: 100%; height: 100%;">
+                  <sc-for list="{{ qrCells }}" as="q" hint-placeholder-count="121">
+                    <div style="background: {{ q.c }};"></div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <!-- 6-digit code -->
+              <div style="font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; color: rgba(30,43,69,.5); margin-top: 20px;">Your 6-digit code</div>
+              <div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">
+                <sc-for list="{{ codeDigits }}" as="d" hint-placeholder-count="6">
+                  <span style="width: 38px; height: 48px; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; color: #7A2431; background: rgba(122,36,49,.06); border: 1px solid rgba(122,36,49,.22); border-radius: 8px;">{{ d.n }}</span>
+                </sc-for>
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 16px; font-size: 12px; color: #3F6B36; font-weight: 600;">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: #3F6B36;"></span>Seat reserved for {{ authName }}
+              </div>
+
+              <button type="button" onClick="{{ cancelRegister }}" style="width: 100%; height: 44px; margin-top: 20px; background: transparent; color: #7A2431; border: 1px solid rgba(122,36,49,.4); border-radius: 8px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer;" style-hover="background: #7A2431; color: #F8F3E7; border-color: #7A2431;">Cancel registration</button>
+              <button type="button" onClick="{{ closeRegister }}" style="width: 100%; height: 38px; margin-top: 8px; background: transparent; color: rgba(30,43,69,.6); border: none; border-radius: 8px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer;" style-hover="color: #1E2B45;">Hide pass</button>
+            </div>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <!-- =================== STANDINGS / BRACKET TAB =================== -->
+    <sc-if value="{{ tabTable }}" hint-placeholder-val="{{ false }}">
+
+      <!-- multi-stage: stage selector -->
+      <sc-if value="{{ isMulti }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; gap: 8px; margin: 22px 0 6px;">
+          <sc-for list="{{ stageBtns }}" as="s" hint-placeholder-count="2">
+            <button type="button" onClick="{{ s.on }}" style="height: 38px; padding: 0 20px; border-radius: 8px; border: 1px solid {{ s.bd }}; background: {{ s.bg }}; color: {{ s.col }}; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer;" style-hover="border-color: #7A2431;">{{ s.label }}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- league table -->
+      <sc-if value="{{ isLeague }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 22px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 20px; align-items: start;" class="ju-league-grid">
+          <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; overflow: hidden;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+              <thead><tr>
+                <th style="position: sticky; top: 0; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">#</th>
+                <th style="position: sticky; top: 0; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Team</th>
+                <th style="position: sticky; top: 0; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">P</th>
+                <th style="position: sticky; top: 0; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">W</th>
+                <th style="position: sticky; top: 0; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">D</th>
+                <th style="position: sticky; top: 0; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">L</th>
+                <th style="position: sticky; top: 0; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Game pts</th>
+                <th style="position: sticky; top: 0; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Pts</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ leagueRows }}" as="r" hint-placeholder-count="8">
+                  <tr style="border-top: 1px solid rgba(30,43,69,.09); background: {{ r.bg }};">
+                    <td style="padding: 10px 14px; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.6);">{{ r.rank }}</td>
+                    <td style="padding: 10px 14px; font-weight: {{ r.wt }};">{{ r.team }}</td>
+                    <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace;">{{ r.pl }}</td>
+                    <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace;">{{ r.w }}</td>
+                    <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace;">{{ r.d }}</td>
+                    <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace;">{{ r.l }}</td>
+                    <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.65);">{{ r.gf }}</td>
+                    <td style="padding: 10px 14px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: #7A2431;">{{ r.pts }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <sc-for list="{{ leagueFixtures }}" as="fx" hint-placeholder-count="3">
+              <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.15); border-radius: 10px; padding: 14px 16px;">
+                <div style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #7A2431;">{{ fx.week }}</div>
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                  <sc-for list="{{ fx.rows }}" as="row" hint-placeholder-count="4">
+                    <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; font-size: 13px;">
+                      <span style="text-align: right; font-weight: 500;">{{ row.h }}</span>
+                      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #7A2431; font-weight: 600; white-space: nowrap;">{{ row.s }}</span>
+                      <span style="font-weight: 500;">{{ row.a }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- team standings -->
+      <sc-if value="{{ isTeam }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 22px; max-width: 640px; background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; overflow: hidden;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+            <thead><tr>
+              <th style="background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">#</th>
+              <th style="background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Team</th>
+              <th style="background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Matches</th>
+              <th style="background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">W-D-L</th>
+              <th style="background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Board pts</th>
+              <th style="background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Pts</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ teamRows }}" as="r" hint-placeholder-count="4">
+                <tr style="border-top: 1px solid rgba(30,43,69,.09); background: {{ r.bg }};">
+                  <td style="padding: 10px 14px; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.6);">{{ r.rank }}</td>
+                  <td style="padding: 10px 14px; font-weight: {{ r.wt }};">{{ r.team }}</td>
+                  <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace;">{{ r.mp }}</td>
+                  <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace;">{{ r.wdl }}</td>
+                  <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.65);">{{ r.bp }}</td>
+                  <td style="padding: 10px 14px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: #7A2431;">{{ r.pts }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </sc-if>
+
+      <!-- arena leaderboard -->
+      <sc-if value="{{ isArena }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 22px; max-width: 720px; background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; overflow: hidden; max-height: 480px; overflow-y: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+            <thead><tr>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">#</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Player</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Games</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Streak</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Score</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ arenaRows }}" as="r" hint-placeholder-count="12">
+                <tr style="border-top: 1px solid rgba(30,43,69,.09); background: {{ r.bg }};">
+                  <td style="padding: 10px 14px; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.6);">{{ r.rank }}</td>
+                  <td style="padding: 10px 14px; font-weight: {{ r.wt }};">{{ r.name }} <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: rgba(30,43,69,.5);">{{ r.rating }}</span></td>
+                  <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace;">{{ r.games }}</td>
+                  <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace; color: #A9852E; font-weight: 600;">{{ r.streak }}</td>
+                  <td style="padding: 10px 14px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: #7A2431;">{{ r.score }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </sc-if>
+
+      <!-- player standings table (swiss / rr / drr / multi) -->
+      <sc-if value="{{ showPlayerTable }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 22px; background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; overflow: hidden; max-height: 560px; overflow-y: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+            <thead><tr>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">#</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Player</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Rating</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Points</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">W / D / L</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Tie-break</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Opponent</th>
+              <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Status</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ standRows }}" as="r" hint-placeholder-count="12">
+                <tr style="border-top: 1px solid rgba(30,43,69,.09); background: {{ r.bg }};">
+                  <td style="padding: 10px 14px; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.6);">{{ r.rank }}</td>
+                  <td style="padding: 10px 14px; font-weight: {{ r.wt }};">{{ r.name }}</td>
+                  <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.7);">{{ r.rating }}</td>
+                  <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: #7A2431;">{{ r.pts }}</td>
+                  <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.7);">{{ r.wdl }}</td>
+                  <td style="padding: 10px 8px; text-align: center; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.7);">{{ r.tb }}</td>
+                  <td style="padding: 10px 8px; font-size: 13px; color: rgba(30,43,69,.75);">{{ r.opp }}</td>
+                  <td style="padding: 10px 14px;"><span style="font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: {{ r.stCol }}; background: {{ r.stBg }}; border-radius: 999px; padding: 3px 10px;">{{ r.st }}</span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </sc-if>
+
+      <!-- crosstable for RR / DRR -->
+      <sc-if value="{{ crossRows }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 26px;">
+          <h3 style="font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 700; margin: 0 0 6px;">{{ crossTitle }}</h3>
+          <p style="font-size: 12.5px; color: rgba(30,43,69,.6); margin: 0 0 12px;">{{ crossNote }}</p>
+          <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; overflow-x: auto;">
+            <table style="border-collapse: collapse; font-size: 13px; min-width: 100%;">
+              <thead><tr>
+                <th style="background: #1E2B45; color: #F5EFE3; text-align: left; padding: 9px 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Player</th>
+                <sc-for list="{{ crossHead }}" as="h" hint-placeholder-count="6">
+                  <th style="background: #1E2B45; color: #F5EFE3; text-align: center; padding: 9px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600;">{{ h }}</th>
+                </sc-for>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ crossRows }}" as="r" hint-placeholder-count="6">
+                  <tr style="border-top: 1px solid rgba(30,43,69,.09);">
+                    <td style="padding: 9px 14px; font-weight: 500; white-space: nowrap;">{{ r.label }}</td>
+                    <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6">
+                      <td style="padding: 9px 10px; text-align: center; font-family: 'IBM Plex Mono', monospace; color: {{ c.col }}; background: {{ c.bg }};">{{ c.v }}</td>
+                    </sc-for>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <!-- =================== GAMES TAB =================== -->
+    <sc-if value="{{ tabGames }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 22px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <h2 style="font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 700; margin: 0;">Broadcast boards</h2>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span class="ju-t-meta" style="font-size: 12.5px; color: rgba(30,43,69,.6);">Click any board to open it</span>
+          <div style="display: inline-flex; background: rgba(30,43,69,.06); border: 1px solid rgba(30,43,69,.12); border-radius: 999px; padding: 3px;">
+            <button type="button" onClick="{{ setGGrid }}" aria-label="Grid view" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 13px; border: none; border-radius: 999px; background: {{ gGridBg }}; color: {{ gGridCol }}; box-shadow: {{ gGridSh }}; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.4"></rect><rect x="9" y="1" width="6" height="6" rx="1.4"></rect><rect x="1" y="9" width="6" height="6" rx="1.4"></rect><rect x="9" y="9" width="6" height="6" rx="1.4"></rect></svg>Grid
+            </button>
+            <button type="button" onClick="{{ setGList }}" aria-label="List view" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 13px; border: none; border-radius: 999px; background: {{ gListBg }}; color: {{ gListCol }}; box-shadow: {{ gListSh }}; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 4h9M5 8h9M5 12h9"></path><circle cx="2" cy="4" r="1" fill="currentColor" stroke="none"></circle><circle cx="2" cy="8" r="1" fill="currentColor" stroke="none"></circle><circle cx="2" cy="12" r="1" fill="currentColor" stroke="none"></circle></svg>List
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <sc-if value="{{ hasNoGames }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 18px; text-align: center; padding: 48px 20px; border: 1px dashed rgba(30,43,69,.25); border-radius: 10px; background: rgba(255,252,244,.6); max-width: 560px;">
+          <div style="font-size: 30px; color: rgba(30,43,69,.35);">&#9816;</div>
+          <div style="font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 700; margin-top: 8px;">No games yet</div>
+          <div style="font-size: 13px; color: rgba(30,43,69,.6); margin-top: 4px;">Boards appear here once the first round begins.</div>
+        </div>
+      </sc-if>
+
+      <sc-for list="{{ gameGroups }}" as="grp" hint-placeholder-count="3">
+        <div style="margin-top: 24px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+            <h3 style="font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 700; margin: 0;">{{ grp.label }}</h3>
+            <sc-if value="{{ grp.live }}" hint-placeholder-val="{{ false }}">
+              <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; color: #7A2431; border: 1px solid rgba(122,36,49,.35); border-radius: 999px; padding: 2px 8px;"><span class="ju-pulse" style="width: 5px; height: 5px; border-radius: 50%; background: #7A2431;"></span>Live</span>
+            </sc-if>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: rgba(30,43,69,.5);">{{ grp.count }} boards</span>
+          </div>
+          <div class="ju-gwrap {{ gViewClass }}">
+            <sc-for list="{{ grp.cards }}" as="g" hint-placeholder-count="4">
+              <a href="{{ g.href }}" class="ju-gcard" style="text-decoration: none; color: #1E2B45; background: #FFFCF4; border: 1px solid {{ g.bd }}; border-radius: 10px; padding: 11px; display: flex; flex-direction: column; gap: 8px; transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;" style-hover="box-shadow: 0 6px 18px rgba(30,43,69,.14); transform: translateY(-2px); border-color: #A98A3F;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">
+                <div class="ju-gtop" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                  <span style="font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">&#9675; {{ g.white }}</span>
+                  <sc-if value="{{ g.live }}" hint-placeholder-val="{{ false }}">
+                    <span style="display: inline-flex; align-items: center; gap: 4px; flex: none;"><span class="ju-pulse" style="width: 5px; height: 5px; border-radius: 50%; background: #7A2431;"></span><span style="font-size: 9.5px; letter-spacing: .1em; font-weight: 600; color: #7A2431;">LIVE</span></span>
+                  </sc-if>
+                  <sc-if value="{{ g.resTag }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: rgba(30,43,69,.65); flex: none;">{{ g.resTag }}</span>
+                  </sc-if>
+                </div>
+                <div class="ju-gboard" style="display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1; border: 2px solid #1E2B45; border-radius: 3px; overflow: hidden;">
+                  <sc-for list="{{ g.cells }}" as="c" hint-placeholder-count="64">
+                    <div style="background: {{ c.bg }}; display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; color: {{ c.col }};">{{ c.g }}</div>
+                  </sc-for>
+                </div>
+                <div class="ju-gbot" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                  <span style="font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">&#9679; {{ g.black }}</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: rgba(30,43,69,.55); flex: none;">Board {{ g.board }}</span>
+                </div>
+                <span class="ju-gact" style="display: block; text-align: center; font-size: 12px; font-weight: 600; color: #7A2431; border-top: 1px solid rgba(30,43,69,.1); padding-top: 8px;">{{ g.action }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </sc-if>
+
+    <!-- =================== BRACKET (part of Standings/Bracket tab) =================== -->
+    <sc-if value="{{ tabTable }}" hint-placeholder-val="{{ false }}">
+
+      <!-- double-elim: winners / losers / final nav -->
+      <sc-if value="{{ isDoubleElim }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; gap: 8px; margin-top: 22px;">
+          <sc-for list="{{ deBtns }}" as="b" hint-placeholder-count="3">
+            <button type="button" onClick="{{ b.on }}" style="height: 38px; padding: 0 20px; border-radius: 8px; border: 1px solid {{ b.bd }}; background: {{ b.bg }}; color: {{ b.col }}; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer;" style-hover="border-color: #7A2431;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">{{ b.label }}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- results bracket (single elim results view + DE selected bracket) -->
+      <sc-if value="{{ resultsBracket }}" hint-placeholder-val="{{ false }}">
+        <div class="ju-bracket-scroll" data-bracket="results" onMouseDown="{{ dragStart }}" style="margin-top: 20px; overflow-x: auto; cursor: grab; padding-bottom: 10px; user-select: none;">
+          <div style="display: flex; gap: 34px; min-width: max-content; align-items: stretch; position: relative;">
+            <svg data-brk-svg style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible;"></svg>
+            <sc-for list="{{ resultsBracket }}" as="col" hint-placeholder-count="4">
+              <div data-col="{{ col.idx }}" style="display: flex; flex-direction: column; width: 220px; flex: none;">
+                <div style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: rgba(30,43,69,.6); padding: 0 4px 10px; text-align: center;">{{ col.name }}</div>
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 12px;">
+                  <sc-for list="{{ col.matches }}" as="m" hint-placeholder-count="2">
+                    <div data-brk-card="{{ m.cid }}" data-win="{{ m.win }}" style="position: relative; z-index: 1; background: {{ m.bg }}; border: 1px solid {{ m.bd }}; border-left: 3px solid {{ m.accent }}; border-radius: 8px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(30,43,69,.06);">
+                      <sc-if value="{{ m.tag }}" hint-placeholder-val="{{ false }}">
+                        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 6px;"><span class="ju-pulse" style="width: 5px; height: 5px; border-radius: 50%; background: #7A2431;"></span><span style="font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #7A2431;">{{ m.tag }}</span></div>
+                      </sc-if>
+                      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                        <span style="font-size: 13px; font-weight: {{ m.aw }}; color: {{ m.ac }};">{{ m.a }}</span>
+                        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; color: {{ m.ac }};">{{ m.sa }}</span>
+                      </div>
+                      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(30,43,69,.08);">
+                        <span style="font-size: 13px; font-weight: {{ m.bw }}; color: {{ m.bc }};">{{ m.b }}</span>
+                        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; color: {{ m.bc }};">{{ m.sb }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </sc-if>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: 'home', stage: 1, deView: 'winners', arenaLeft: 47 * 60, registered: false, gView: 'grid' };
+
+  getT() {
+    if (!window.JU) return null;
+    var id = new URLSearchParams(window.location.search).get('id') || 'spring-open';
+    return window.JU.getTournament(id);
+  }
+
+  boardCells(fen) {
+    var raw = window.JU.fenBoard(fen);
+    return raw.map(function (c) {
+      return { key: c.key, g: c.g, bg: c.dark ? '#8A6A4A' : '#EFE3C8', col: c.w ? '#FBF6E8' : '#22304C' };
+    });
+  }
+
+  bracketCols(br, self) {
+    if (!br) return null;
+    return br.rounds.map(function (name, ri) {
+      return {
+        name: name, idx: ri,
+        matches: (br.matches[ri] || []).map(function (m, mi) {
+          var aWin = m.w === 'a', bWin = m.w === 'b';
+          var tbd = m.a === 'TBD' || m.b === 'TBD' || m.a === 'Winners champion';
+          return {
+            mi: mi, cid: ri + '-' + mi, win: m.w || (m.live ? 'live' : ''),
+            a: m.a, b: m.b,
+            sa: m.live ? '\u2022' : (m.sa === undefined ? '' : m.sa),
+            sb: m.live ? '\u2022' : (m.sb === undefined ? '' : m.sb),
+            aw: aWin ? 600 : 400, bw: bWin ? 600 : 400,
+            ac: aWin ? '#1E2B45' : (bWin ? 'rgba(30,43,69,.45)' : '#1E2B45'),
+            bc: bWin ? '#1E2B45' : (aWin ? 'rgba(30,43,69,.45)' : '#1E2B45'),
+            tag: m.live ? 'Live' : false,
+            bg: m.live ? '#FFF7EE' : (tbd ? 'rgba(255,252,244,.55)' : '#FFFCF4'),
+            bd: m.live ? 'rgba(122,36,49,.4)' : 'rgba(30,43,69,.15)',
+            accent: m.live ? '#7A2431' : (m.w ? '#A98A3F' : 'rgba(30,43,69,.2)')
+          };
+        })
+      };
+    });
+  }
+
+  renderVals() {
+    var self = this;
+    var t = this.getT();
+    if (!t) return { t: { name: 'Loading\u2026' }, tabs: [], tabHome: true };
+
+    var isBracketFmt = t.format === 'Single elimination' || t.format === 'Double elimination';
+    var isMulti = t.format === 'Multi-stage';
+    var isRR = t.format === 'Round-robin' || t.format === 'Double round-robin';
+    var isLeague = t.format === 'League';
+    var isTeam = t.format === 'Team';
+    var isArena = t.format === 'Arena';
+    var isDoubleElim = t.format === 'Double elimination';
+
+    var thirdLabel = isBracketFmt ? 'Bracket' : 'Standings';
+    var tabDefs = [['home', 'Home'], ['games', 'Games'], ['table', thirdLabel]];
+    var tabs = tabDefs.map(function (d) {
+      var key = d[0], label = d[1];
+      var on = self.state.tab === key;
+      return {
+        label: label,
+        on: function () { self.setState({ tab: key }); },
+        line: on ? '#7A2431' : 'transparent',
+        col: on ? '#7A2431' : 'rgba(30,43,69,.75)',
+        wt: on ? 600 : 500
+      };
+    });
+
+    /* leader line */
+    var leaderLine = false;
+    if (t.standings && t.standings.length) {
+      var top = t.standings[0];
+      leaderLine = window.JU.players[top.p].name + ' \u00B7 ' + top.pts + ' pts';
+    } else if (isLeague) { leaderLine = t.league[0].team + ' \u00B7 ' + t.league[0].pts + ' pts'; }
+    else if (isTeam) { leaderLine = t.teamScore.home + ' ' + t.teamScore.hs + ' \u2013 ' + t.teamScore.as + ' ' + t.teamScore.away; }
+    else if (isArena) { leaderLine = window.JU.players[t.arena.board[0].p].name + ' \u00B7 ' + t.arena.board[0].score + ' pts'; }
+    else if (t.id === 'knockout-cup') { leaderLine = 'Semifinals in progress'; }
+    else if (isDoubleElim) { leaderLine = 'Winners Final live'; }
+
+    /* home leaders (standings formats) */
+    var homeLeaders = false;
+    if (!isBracketFmt && !isTeam && t.standings && t.standings.length) {
+      var medals = ['#A9852E', 'rgba(30,43,69,.55)', '#8A6A4A'];
+      homeLeaders = t.standings.slice(0, 3).map(function (r, i) {
+        return { rank: r.rank, name: window.JU.players[r.p].name, sub: r.w + 'W \u00B7 ' + r.d + 'D \u00B7 ' + r.l + 'L', pts: r.pts, medal: medals[i] };
+      });
+    } else if (isLeague) {
+      homeLeaders = t.league.slice(0, 3).map(function (r, i) {
+        return { rank: r.rank, team: r.team, name: r.team, sub: r.w + 'W \u00B7 ' + r.d + 'D \u00B7 ' + r.l + 'L', pts: r.pts, medal: ['#A9852E', 'rgba(30,43,69,.55)', '#8A6A4A'][i] };
+      });
+    } else if (isArena) {
+      homeLeaders = t.arena.board.slice(0, 3).map(function (r, i) {
+        return { rank: r.rank, name: window.JU.players[r.p].name, sub: r.games + ' games \u00B7 streak ' + r.streak, pts: r.score, medal: ['#A9852E', 'rgba(30,43,69,.55)', '#8A6A4A'][i] };
+      });
+    }
+
+    /* stage selection for multi */
+    var stageBtns = false;
+    if (isMulti) {
+      stageBtns = t.stages.map(function (label, i) {
+        var on = self.state.stage === i + 1;
+        return {
+          label: label,
+          on: function () { self.setState({ stage: i + 1 }); },
+          bg: on ? '#1E2B45' : 'transparent', col: on ? '#F5EFE3' : '#1E2B45', bd: on ? '#1E2B45' : 'rgba(30,43,69,.28)'
+        };
+      });
+    }
+
+    /* home bracket */
+    var showHomeBracket = false, homeBracket = null, homeBracketTitle = '', homeRoundBtns = [];
+    var mainBr = null;
+    if (t.format === 'Single elimination') { mainBr = t.bracket; homeBracketTitle = 'The bracket'; }
+    if (isDoubleElim) { mainBr = t.winners; homeBracketTitle = 'Winners bracket'; }
+    if (isMulti && this.state.stage === 2) { mainBr = t.bracket; homeBracketTitle = 'Stage 2 \u00B7 Knockout bracket'; }
+    if (mainBr) {
+      showHomeBracket = true;
+      homeBracket = this.bracketCols(mainBr, self);
+      homeRoundBtns = mainBr.rounds.map(function (name, i) {
+        return {
+          label: name,
+          on: function () {
+            var wrap = document.querySelector('[data-bracket="home"]');
+            var col = wrap && wrap.querySelector('[data-round="' + i + '"]');
+            if (wrap && col) wrap.scrollTo({ left: col.offsetLeft - 20, behavior: 'smooth' });
+          }
+        };
+      });
+    }
+
+    /* standings tables */
+    var showPlayerTable = !isBracketFmt && !isLeague && !isTeam && !isArena && t.standings && t.standings.length > 0 && !(isMulti && this.state.stage === 2);
+    var standRows = [];
+    if (showPlayerTable) {
+      standRows = t.standings.map(function (r) {
+        var stMap = {
+          'Playing': { c: '#7A2431', b: 'rgba(122,36,49,.1)' },
+          'Finished': { c: 'rgba(30,43,69,.6)', b: 'rgba(30,43,69,.06)' },
+          'Qualified': { c: '#7d6420', b: 'rgba(169,138,63,.16)' },
+          'Eliminated': { c: 'rgba(30,43,69,.45)', b: 'rgba(30,43,69,.05)' },
+          'Bye': { c: 'rgba(30,43,69,.5)', b: 'rgba(30,43,69,.05)' },
+          'Final': { c: 'rgba(30,43,69,.6)', b: 'rgba(30,43,69,.06)' }
+        };
+        var sm = stMap[r.st] || stMap['Finished'];
+        return {
+          rank: r.rank, name: window.JU.players[r.p].name, rating: window.JU.players[r.p].rating,
+          pts: r.pts, wdl: r.w + ' / ' + r.d + ' / ' + r.l, tb: r.tb, opp: r.opp, st: r.st,
+          stCol: sm.c, stBg: sm.b,
+          wt: r.rank <= 3 ? 600 : 400,
+          bg: r.rank === 1 ? 'rgba(169,138,63,.08)' : 'transparent'
+        };
+      });
+    }
+
+    /* crosstable */
+    var crossRows = false, crossHead = [], crossTitle = '', crossNote = '';
+    if (isRR) {
+      crossHead = t.rrPlayers.map(function (pi, i) { return (i + 1); });
+      crossRows = t.rrPlayers.map(function (pi, i) {
+        return {
+          label: (i + 1) + '. ' + window.JU.players[pi].name,
+          cells: t.rrGrid[i].map(function (v, j) {
+            return { v: v, col: v === '\u2014' ? 'rgba(30,43,69,.3)' : '#1E2B45', bg: i === j ? 'rgba(30,43,69,.06)' : 'transparent' };
+          })
+        };
+      });
+      crossTitle = t.drr ? 'Crosstable \u00B7 both cycles' : 'Crosstable \u00B7 who played whom';
+      crossNote = t.drr ? 'Each cell shows both meetings: score with White first, then with Black. \u2026 = not yet played.' : 'Row player\u2019s score against each column player.';
+    }
+
+    /* league */
+    var leagueRows = false, leagueFixtures = false;
+    if (isLeague) {
+      leagueRows = t.league.map(function (r) {
+        return { rank: r.rank, team: r.team, pl: r.pl, w: r.w, d: r.d, l: r.l, gf: r.gf, pts: r.pts, wt: r.rank <= 2 ? 600 : 400, bg: r.rank === 1 ? 'rgba(169,138,63,.08)' : (r.team === 'JU Knights' ? 'rgba(122,36,49,.05)' : 'transparent') };
+      });
+      leagueFixtures = t.fixtures;
+    }
+
+    /* team */
+    var teamRows = false, teamBoards = false, teamHome = '', teamAway = '', teamScoreLine = '';
+    if (isTeam) {
+      teamHome = t.teamScore.home; teamAway = t.teamScore.away;
+      teamScoreLine = t.teamScore.hs + ' \u2013 ' + t.teamScore.as;
+      teamBoards = t.boards.map(function (b) {
+        var hWin = b.res.charAt(0) === '1', aWin = b.res.charAt(0) === '0';
+        return { bd: b.bd, home: b.home, hr: b.hr, away: b.away, ar: b.ar, res: b.res, hw: hWin ? 600 : 400, aw: aWin ? 600 : 400 };
+      });
+      teamRows = t.teamStandings.map(function (r) {
+        return { rank: r.rank, team: r.team, mp: r.mp, wdl: r.w + '-' + r.d + '-' + r.l, bp: r.bp, pts: r.pts, wt: r.rank === 1 ? 600 : 400, bg: r.rank === 1 ? 'rgba(169,138,63,.08)' : 'transparent' };
+      });
+    }
+
+    /* arena */
+    var arenaRows = false, arenaFeed = false, arenaClock = '', arenaLeaderLine = '';
+    if (isArena) {
+      var s = this.state.arenaLeft;
+      var mm = Math.floor(s / 60), ss = s % 60;
+      arenaClock = (mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss;
+      arenaLeaderLine = window.JU.players[t.arena.board[0].p].name + ' leads \u00B7 ' + t.arena.board[0].score + ' pts';
+      arenaRows = t.arena.board.map(function (r) {
+        return { rank: r.rank, name: window.JU.players[r.p].name, rating: window.JU.players[r.p].rating, games: r.games, streak: r.streak > 0 ? '\u2726 ' + r.streak : '\u2014', score: r.score, wt: r.rank <= 3 ? 600 : 400, bg: r.rank === 1 ? 'rgba(169,138,63,.08)' : 'transparent' };
+      });
+      arenaFeed = t.arena.feed;
+    }
+
+    /* games tab — grouped by round, newest/live round first */
+    var gameGroups = (t.gameRounds || []).slice().reverse().map(function (rd) {
+      return {
+        label: rd.label, live: rd.live, count: rd.games.length,
+        cards: rd.games.map(function (g) {
+          return {
+            href: 'Games.dc.html?game=' + g.id, white: g.white, black: g.black, board: g.board,
+            live: g.live, resTag: g.live ? false : g.result,
+            cells: self.boardCells(g.fen),
+            bd: g.live ? 'rgba(122,36,49,.35)' : 'rgba(30,43,69,.15)',
+            action: 'Watch the game \u2192'
+          };
+        })
+      };
+    });
+
+    /* results */
+    var deBtns = false, resultsBracket = null;
+    if (isDoubleElim) {
+      deBtns = [
+        { key: 'winners', label: 'Winners Bracket' },
+        { key: 'losers', label: 'Losers Bracket' },
+        { key: 'final', label: 'Final' }
+      ].map(function (b) {
+        var on = self.state.deView === b.key;
+        return { label: b.label, on: function () { self.setState({ deView: b.key }); }, bg: on ? '#1E2B45' : 'transparent', col: on ? '#F5EFE3' : '#1E2B45', bd: on ? '#1E2B45' : 'rgba(30,43,69,.28)' };
+      });
+      var brMap = { winners: t.winners, losers: t.losers, final: t.finals };
+      resultsBracket = this.bracketCols(brMap[this.state.deView], self);
+    } else if (t.format === 'Single elimination') {
+      resultsBracket = this.bracketCols(t.bracket, self);
+    } else if (isMulti && this.state.tab === 'table' && this.state.stage === 2) {
+      resultsBracket = this.bracketCols(t.bracket, self);
+    }
+
+    /* schedule */
+    var schedRows = (t.schedule || []).map(function (srow) {
+      return {
+        when: srow.when, what: srow.what, where: srow.where,
+        dot: srow.done ? 'rgba(30,43,69,.35)' : (srow.now ? '#7A2431' : 'transparent'),
+        dotBd: srow.done ? 'rgba(30,43,69,.35)' : (srow.now ? '#7A2431' : 'rgba(30,43,69,.35)'),
+        pulseCls: srow.now ? 'ju-pulse' : '',
+        bg: srow.now ? 'rgba(122,36,49,.05)' : 'transparent',
+        wt: srow.now ? 600 : 500,
+        whenCol: srow.now ? '#7A2431' : 'rgba(30,43,69,.6)'
+      };
+    });
+
+    var _a = (window.JU && window.JU.auth) ? window.JU.auth.get() : null;
+    return {
+      signedIn: !!_a, signedOut: !_a, authName: _a ? _a.name : '', authInitials: _a ? window.JU.auth.initials(_a.name) : '',
+      t: t,
+      isLive: t.status === 'Active', isUpcoming: t.status === 'Upcoming', isDone: t.status === 'Completed',
+      tabs: tabs,
+      tabHome: this.state.tab === 'home',
+      tabTable: this.state.tab === 'table',
+      tabGames: this.state.tab === 'games',
+      leaderLine: leaderLine,
+      openRegister: function () { self.setState({ registered: true, regModal: true }); },
+      closeRegister: function () { self.setState({ regModal: false }); },
+      stop: function (e) { e.stopPropagation(); },
+      cancelRegister: function () { self.setState({ registered: false, regModal: false }); },
+      regModal: !!this.state.regModal && this.state.registered,
+      codeDigits: (function () {
+        var code = self._regCode || (self._regCode = String(Math.floor(100000 + Math.random() * 900000)));
+        return code.split('').map(function (n) { return { n: n }; });
+      })(),
+      qrCells: (function () {
+        var code = self._regCode || (self._regCode = String(Math.floor(100000 + Math.random() * 900000)));
+        var seed = 7; for (var i = 0; i < code.length; i++) seed += code.charCodeAt(i) * (i + 3);
+        function inFinder(x, y) {
+          /* three 3x3 finder squares in the corners (top-left, top-right, bottom-left) */
+          var fx = [[0, 2], [8, 10], [0, 2]], fy = [[0, 2], [0, 2], [8, 10]];
+          for (var k = 0; k < 3; k++) {
+            if (x >= fx[k][0] && x <= fx[k][1] && y >= fy[k][0] && y <= fy[k][1]) {
+              var lx = x - fx[k][0], ly = y - fy[k][0];
+              var edge = (lx === 0 || lx === 2 || ly === 0 || ly === 2);
+              var center = (lx === 1 && ly === 1);
+              return { hit: true, on: edge || center };
+            }
+          }
+          return { hit: false };
+        }
+        var cells = [];
+        for (var y = 0; y < 11; y++) for (var x = 0; x < 11; x++) {
+          var f = inFinder(x, y), on;
+          if (f.hit) on = f.on;
+          else { seed = (seed * 1103515245 + 12345) & 0x7fffffff; on = (seed % 100) < 46; }
+          cells.push({ c: on ? '#1E2B45' : 'transparent' });
+        }
+        return cells;
+      })(),
+      regLabel: this.state.registered ? 'View pass \u2713' : 'Register now',
+      regBg: this.state.registered ? 'rgba(63,107,54,.12)' : '#7A2431',
+      regCol: this.state.registered ? '#3F6B36' : '#F8F3E7',
+      regBd: this.state.registered ? 'rgba(63,107,54,.5)' : '#7A2431',
+      isMulti: isMulti, isTeam: isTeam, isArena: isArena, isLeague: isLeague, isDoubleElim: isDoubleElim,
+      stageBtns: stageBtns,
+      stage1Note: isMulti && this.state.stage === 1,
+      goStandings: function () { self.setState({ tab: 'standings' }); },
+      homeLeaders: (isMulti && this.state.stage === 2) ? false : homeLeaders,
+      showHomeBracket: showHomeBracket, homeBracket: homeBracket, homeBracketTitle: homeBracketTitle, homeRoundBtns: homeRoundBtns,
+      homeLive: (t.liveGames && t.liveGames.length) ? t.liveGames.slice(0, 4).map(function (g) {
+        return { href: 'Games.dc.html?game=' + g.id, white: g.white, black: g.black, round: g.round + ' \u00B7 Bd ' + g.board, cells: self.boardCells(g.fen) };
+      }) : false,
+      goGames: function () { self.setState({ tab: 'games' }); },
+      showPlayerTable: showPlayerTable, standRows: standRows,
+      crossRows: crossRows, crossHead: crossHead, crossTitle: crossTitle, crossNote: crossNote,
+      leagueRows: leagueRows, leagueFixtures: leagueFixtures,
+      teamRows: teamRows, teamBoards: teamBoards, teamHome: teamHome, teamAway: teamAway, teamScoreLine: teamScoreLine,
+      arenaRows: arenaRows,
+      arenaClock: arenaClock, arenaLeaderLine: arenaLeaderLine,
+      gameGroups: gameGroups, hasNoGames: gameGroups.length === 0,
+      gViewClass: this.state.gView === 'list' ? 'list' : '',
+      setGGrid: function () { self.setState({ gView: 'grid' }); },
+      setGList: function () { self.setState({ gView: 'list' }); },
+      gGridBg: this.state.gView === 'grid' ? '#7A2431' : 'transparent',
+      gGridCol: this.state.gView === 'grid' ? '#F8F3E7' : 'rgba(30,43,69,.6)',
+      gGridSh: this.state.gView === 'grid' ? '0 1px 4px rgba(122,36,49,.3)' : 'none',
+      gListBg: this.state.gView === 'list' ? '#7A2431' : 'transparent',
+      gListCol: this.state.gView === 'list' ? '#F8F3E7' : 'rgba(30,43,69,.6)',
+      gListSh: this.state.gView === 'list' ? '0 1px 4px rgba(122,36,49,.3)' : 'none',
+      deBtns: deBtns, resultsBracket: resultsBracket,
+      resultBlocks: (isDoubleElim || t.format === 'Single elimination') ? (t.results || []) : (t.results || []),
+      schedRows: schedRows,
+      dragStart: function (e) {
+        var el = e.currentTarget;
+        var startX = e.pageX, startScroll = el.scrollLeft;
+        el.style.cursor = 'grabbing';
+        function move(ev) { el.scrollLeft = startScroll - (ev.pageX - startX); }
+        function up() { el.style.cursor = 'grab'; document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); }
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+      }
+    };
+  }
+
+  drawBracketLines() {
+    var wrap = document.querySelector('[data-bracket="results"]');
+    if (!wrap) return;
+    var svg = wrap.querySelector('[data-brk-svg]');
+    var inner = svg && svg.parentElement;
+    if (!svg || !inner) return;
+    var cards = Array.prototype.slice.call(inner.querySelectorAll('[data-brk-card]'));
+    var byCol = {};
+    cards.forEach(function (el) {
+      var p = el.getAttribute('data-brk-card').split('-');
+      var c = +p[0], i = +p[1];
+      (byCol[c] = byCol[c] || []).push({ el: el, i: i, win: el.getAttribute('data-win') });
+    });
+    var cols = Object.keys(byCol).map(Number).sort(function (a, b) { return a - b; });
+    var base = inner.getBoundingClientRect();
+    svg.setAttribute('width', inner.scrollWidth);
+    svg.setAttribute('height', inner.clientHeight);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var ns = 'http://www.w3.org/2000/svg';
+    cols.forEach(function (c) {
+      var next = byCol[c + 1];
+      if (!next) return;
+      byCol[c].forEach(function (m) {
+        var target = null;
+        for (var k = 0; k < next.length; k++) if (next[k].i === Math.floor(m.i / 2)) { target = next[k]; break; }
+        if (!target) return;
+        var r1 = m.el.getBoundingClientRect(), r2 = target.el.getBoundingClientRect();
+        var x1 = r1.right - base.left, y1 = r1.top - base.top + r1.height / 2;
+        var x2 = r2.left - base.left, y2 = r2.top - base.top + r2.height / 2;
+        var midx = (x1 + x2) / 2;
+        var decided = m.win === 'a' || m.win === 'b';
+        var live = m.win === 'live';
+        var path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', 'M' + x1 + ' ' + y1 + ' H' + midx + ' V' + y2 + ' H' + x2);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', decided ? '#7A2431' : (live ? '#A98A3F' : 'rgba(30,43,69,.22)'));
+        path.setAttribute('stroke-width', decided ? '2.25' : '1.5');
+        path.setAttribute('stroke-linejoin', 'round');
+        if (live) path.setAttribute('stroke-dasharray', '5 3');
+        svg.appendChild(path);
+      });
+    });
+  }
+  _scheduleBracket() {
+    var self = this;
+    if (self._brkRaf) cancelAnimationFrame(self._brkRaf);
+    self._brkRaf = requestAnimationFrame(function () {
+      requestAnimationFrame(function () { self.drawBracketLines(); });
+    });
+  }
+  componentDidMount() {
+    var self = this;
+    if (!window.JU) { var t = setInterval(function () { if (window.JU) { clearInterval(t); self.forceUpdate(); self._scheduleBracket(); } }, 60); }
+    this._timer = setInterval(function () {
+      var tt = self.getT();
+      if (tt && tt.format === 'Arena' && tt.status === 'Active' && self.state.arenaLeft > 0) {
+        self.setState({ arenaLeft: self.state.arenaLeft - 1 });
+      }
+    }, 1000);
+    this._onResize = function () { self._scheduleBracket(); };
+    window.addEventListener('resize', this._onResize);
+    this._scheduleBracket();
+  }
+  componentDidUpdate() { if (this.state.tab === 'table') this._scheduleBracket(); }
+  componentWillUnmount() { if (this._timer) clearInterval(this._timer); if (this._onResize) window.removeEventListener('resize', this._onResize); }
+}
+</script>
+</body>
+</html>

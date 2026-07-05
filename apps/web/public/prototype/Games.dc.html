@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="data.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #F5EFE3; }
+  @keyframes ju-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  .ju-pulse { animation: ju-pulse 1.6s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .ju-pulse { animation: none; } }
+  .ju-scroll { scrollbar-width: thin; scrollbar-color: rgba(30,43,69,.3) transparent; }
+  .ju-scroll::-webkit-scrollbar { width: 8px; }
+  .ju-scroll::-webkit-scrollbar-thumb { background: rgba(30,43,69,.25); border-radius: 4px; }
+  @media (max-width: 960px) { .ju-nav-links { display: none !important; } .ju-ws { grid-template-columns: 1fr !important; } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #F5EFE3; color: #1E2B45; font-family: 'IBM Plex Sans', sans-serif;" data-screen-label="Games Workspace">
+
+  <header style="position: sticky; top: 0; z-index: 50; background: rgba(245,239,227,.92); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(30,43,69,.14);">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 0 24px; height: 66px; display: flex; align-items: center; gap: 24px;">
+      <a href="Home.dc.html" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #1E2B45;">
+        <img src="assets/crest.png" alt="Chess Club JU crest" style="width: 42px; height: 42px; object-fit: contain;">
+        <span style="display: flex; flex-direction: column; line-height: 1.1;">
+          <span style="font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 700; letter-spacing: .02em;">JuChess</span>
+          <span style="font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #7A2431; font-weight: 500;">University of Jordan Chess Club</span>
+        </span>
+      </a>
+      <nav class="ju-nav-links" style="display: flex; align-items: center; gap: 4px; margin: 0 auto;">
+        <a href="Home.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Home</a>
+        <a href="Tournaments.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Tournaments</a>
+        <a href="Games.dc.html" style="font-size: 13.5px; font-weight: 600; color: #7A2431; text-decoration: none; padding: 8px 12px; border-radius: 6px; border-bottom: 2px solid #A98A3F;">Games</a>
+        <a href="Leaderboard.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Leaderboard</a>
+        <a href="Profile.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Profile</a>
+      </nav>
+      <sc-if value="{{ signedIn }}" hint-placeholder-val="{{ false }}"><a href="Profile.dc.html" title="{{ authName }}" style="margin-left: 8px; width: 38px; height: 38px; border-radius: 50%; background: #1E2B45; color: #C9AE6B; display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 700; text-decoration: none;" style-hover="background: #7A2431;">{{ authInitials }}</a></sc-if><sc-if value="{{ signedOut }}" hint-placeholder-val="{{ true }}"><a href="Sign In.dc.html" style="margin-left: 8px; font-size: 13px; font-weight: 600; color: #F5EFE3; background: #1E2B45; text-decoration: none; padding: 9px 18px; border-radius: 7px; white-space: nowrap;" style-hover="background: #7A2431;">Sign in</a></sc-if>
+    </div>
+  </header>
+
+  <main class="ju-ws" style="max-width: 1240px; margin: 0 auto; padding: 28px 24px 64px; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 26px; align-items: start;">
+
+    <!-- ============ BOARD AREA ============ -->
+    <div style="min-width: 0;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <h1 style="font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 600; margin: 0;">{{ boardTitle }}</h1>
+        <span style="font-size: 12.5px; color: rgba(30,43,69,.6); font-family: 'IBM Plex Mono', monospace;">{{ boardSub }}</span>
+      </div>
+
+      <!-- players bar (top = black) -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 0 2px;">
+        <span style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #22304C; border: 1px solid #22304C;"></span>{{ blackName }} <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: rgba(30,43,69,.55); font-weight: 400;">{{ blackRating }}</span></span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #7A2431; font-weight: 600;">{{ resultBadge }}</span>
+      </div>
+
+      <!-- eval bar + board -->
+      <div style="display: flex; gap: 12px; margin-top: 10px; align-items: stretch;">
+        <div style="width: 18px; flex: none; border-radius: 5px; overflow: hidden; border: 1px solid rgba(30,43,69,.25); background: #22304C; display: flex; flex-direction: column; justify-content: flex-end;" title="Engine evaluation">
+          <div style="width: 100%; height: {{ evalPct }}%; background: #F6F0E0; transition: height .4s ease;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1; width: 100%; border: 6px solid #1E2B45; border-radius: 6px; overflow: hidden; box-shadow: 0 8px 28px rgba(30,43,69,.14), 0 0 0 1px rgba(169,138,63,.5);">
+            <sc-for list="{{ bigCells }}" as="c" hint-placeholder-count="64">
+              <div style="background: {{ c.bg }}; display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 4.2vw, 46px); line-height: 1; color: {{ c.col }}; text-shadow: {{ c.sh }};">{{ c.g }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 0 2px;">
+        <span style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #F6F0E0; border: 1px solid rgba(30,43,69,.4);"></span>{{ whiteName }} <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: rgba(30,43,69,.55); font-weight: 400;">{{ whiteRating }}</span></span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: rgba(30,43,69,.65);">{{ evalLabel }}</span>
+      </div>
+
+      <!-- move controls (review mode) -->
+      <sc-if value="{{ inReview }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 18px;">
+          <button type="button" onClick="{{ goStart }}" aria-label="Go to start" style="width: 44px; height: 40px; border-radius: 8px; border: 1px solid rgba(30,43,69,.28); background: #FFFCF4; color: #1E2B45; font-size: 15px; cursor: pointer;" style-hover="border-color: #7A2431; color: #7A2431;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">&#171;</button>
+          <button type="button" onClick="{{ prevMove }}" aria-label="Previous move" style="width: 58px; height: 40px; border-radius: 8px; border: 1px solid rgba(30,43,69,.28); background: #FFFCF4; color: #1E2B45; font-size: 15px; cursor: pointer;" style-hover="border-color: #7A2431; color: #7A2431;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">&#8249;</button>
+          <span style="min-width: 110px; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: rgba(30,43,69,.7); border: 1px solid rgba(30,43,69,.14); border-radius: 8px; background: rgba(255,252,244,.6);">{{ moveCounter }}</span>
+          <button type="button" onClick="{{ nextMove }}" aria-label="Next move" style="width: 58px; height: 40px; border-radius: 8px; border: 1px solid rgba(30,43,69,.28); background: #FFFCF4; color: #1E2B45; font-size: 15px; cursor: pointer;" style-hover="border-color: #7A2431; color: #7A2431;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">&#8250;</button>
+          <button type="button" onClick="{{ goEnd }}" aria-label="Go to end" style="width: 44px; height: 40px; border-radius: 8px; border: 1px solid rgba(30,43,69,.28); background: #FFFCF4; color: #1E2B45; font-size: 15px; cursor: pointer;" style-hover="border-color: #7A2431; color: #7A2431;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">&#187;</button>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- ============ RIGHT RAIL ============ -->
+    <div style="display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+
+      <!-- mode toggle -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; background: rgba(30,43,69,.07); border-radius: 9px; padding: 4px; gap: 4px;">
+        <button type="button" onClick="{{ setModeReview }}" style="height: 38px; border: none; border-radius: 7px; background: {{ revBg }}; color: {{ revCol }}; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: {{ revSh }};" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">Game Review</button>
+        <button type="button" onClick="{{ setModeAnalysis }}" style="height: 38px; border: none; border-radius: 7px; background: {{ anaBg }}; color: {{ anaCol }}; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: {{ anaSh }};" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">New Analysis</button>
+      </div>
+
+      <!-- ===== STEP: SOURCE ===== -->
+      <sc-if value="{{ stepSource }}" hint-placeholder-val="{{ true }}">
+
+        <sc-if value="{{ isAnalysis }}" hint-placeholder-val="{{ false }}">
+          <button type="button" onClick="{{ openBlank }}" style="text-align: left; background: #1E2B45; border: 1px solid #1E2B45; border-radius: 10px; padding: 16px 18px; cursor: pointer; display: flex; align-items: center; gap: 14px; transition: background .15s ease;" style-hover="background: #17233a;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">
+            <span style="font-size: 22px; color: #C9AE6B;">&#9812;</span>
+            <span style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 14.5px; font-weight: 600; color: #F5EFE3; font-family: 'IBM Plex Sans', sans-serif;">New Analysis</span>
+              <span style="font-size: 12px; color: rgba(245,239,227,.65); font-family: 'IBM Plex Sans', sans-serif;">Open a blank board workspace</span>
+            </span>
+            <span style="margin-left: auto; color: #C9AE6B; font-size: 16px;">&rarr;</span>
+          </button>
+          <div style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: rgba(30,43,69,.5); font-weight: 600; margin-top: 4px;">Or import from</div>
+        </sc-if>
+        <sc-if value="{{ isReview }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size: 13px; line-height: 1.55; color: rgba(30,43,69,.7); background: rgba(255,252,244,.7); border: 1px solid rgba(30,43,69,.12); border-radius: 10px; padding: 12px 16px;">Pick where the game was played, find it, and get a full engine-style review.</div>
+        </sc-if>
+
+        <sc-for list="{{ sources }}" as="s" hint-placeholder-count="3">
+          <button type="button" onClick="{{ s.on }}" style="text-align: left; background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; padding: 15px 18px; cursor: pointer; display: flex; align-items: center; gap: 14px; transition: border-color .15s ease, box-shadow .15s ease;" style-hover="border-color: #A98A3F; box-shadow: 0 4px 14px rgba(30,43,69,.09);" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">
+            <span style="width: 38px; height: 38px; border-radius: 8px; background: {{ s.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 17px; color: {{ s.iconCol }}; font-weight: 700; font-family: 'IBM Plex Sans', sans-serif;">{{ s.icon }}</span>
+            <span style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 14.5px; font-weight: 600; color: #1E2B45; font-family: 'IBM Plex Sans', sans-serif;">{{ s.name }}</span>
+              <span style="font-size: 12px; color: rgba(30,43,69,.6); font-family: 'IBM Plex Sans', sans-serif;">{{ s.sub }}</span>
+            </span>
+            <span style="margin-left: auto; color: rgba(30,43,69,.4); font-size: 16px;">&rarr;</span>
+          </button>
+        </sc-for>
+      </sc-if>
+
+      <!-- ===== STEP: SEARCH ===== -->
+      <sc-if value="{{ stepSearch }}" hint-placeholder-val="{{ false }}">
+        <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; padding: 18px;">
+          <button type="button" onClick="{{ backToSource }}" style="background: none; border: none; padding: 0; color: rgba(30,43,69,.6); font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; font-weight: 500; cursor: pointer;" style-hover="color: #7A2431;">&larr; Back</button>
+          <div style="font-size: 15px; font-weight: 600; margin-top: 10px;">{{ searchTitle }}</div>
+          <div style="font-size: 12.5px; color: rgba(30,43,69,.6); margin-top: 3px;">{{ searchSub }}</div>
+          <input type="text" value="{{ searchText }}" onChange="{{ setSearchText }}" onKeyDown="{{ searchKey }}" placeholder="{{ searchPh }}" style="width: 100%; height: 42px; margin-top: 14px; padding: 0 13px; border: 1px solid rgba(30,43,69,.26); border-radius: 8px; background: #FFFFFF; font-family: 'IBM Plex Sans', sans-serif; font-size: 13.5px; color: #1E2B45; outline: none; box-sizing: border-box;" style-focus="border-color: #7A2431; box-shadow: 0 0 0 3px rgba(122,36,49,.10);">
+          <button type="button" onClick="{{ doSearch }}" style="width: 100%; height: 42px; margin-top: 10px; background: #7A2431; color: #F8F3E7; border: none; border-radius: 8px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer;" style-hover="background: #5F1B26;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">Search games</button>
+        </div>
+      </sc-if>
+
+      <!-- ===== STEP: LIST ===== -->
+      <sc-if value="{{ stepList }}" hint-placeholder-val="{{ false }}">
+        <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;">
+          <div style="padding: 13px 16px; border-bottom: 1px solid rgba(30,43,69,.12); display: flex; align-items: center; gap: 10px;">
+            <button type="button" onClick="{{ backToSearch }}" style="background: none; border: none; padding: 0; color: rgba(30,43,69,.6); font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; font-weight: 500; cursor: pointer;" style-hover="color: #7A2431;">&larr;</button>
+            <span style="font-size: 13px; font-weight: 600;">{{ listTitle }}</span>
+            <span style="margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: rgba(30,43,69,.55);">{{ listCount }} games</span>
+          </div>
+          <div class="ju-scroll" style="max-height: 380px; overflow-y: auto;">
+            <sc-for list="{{ gameList }}" as="g" hint-placeholder-count="6">
+              <button type="button" onClick="{{ g.on }}" style="display: block; width: 100%; text-align: left; background: {{ g.bg }}; border: none; border-top: 1px solid rgba(30,43,69,.07); border-left: 3px solid {{ g.accent }}; padding: 11px 15px; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif;" style-hover="background: rgba(169,138,63,.08);" style-focus="outline: 2px solid #A98A3F; outline-offset: -2px;">
+                <span style="display: flex; justify-content: space-between; gap: 8px;">
+                  <span style="font-size: 13px; font-weight: 600; color: #1E2B45;">{{ g.title }}</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: #7A2431; flex: none;">{{ g.result }}</span>
+                </span>
+                <span style="display: block; font-size: 11.5px; color: rgba(30,43,69,.6); margin-top: 3px;">{{ g.sub }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 13px 15px; border-top: 1px solid rgba(30,43,69,.12); background: rgba(255,252,244,.9);">
+              <button type="button" onClick="{{ startSelected }}" style="width: 100%; height: 44px; background: #7A2431; color: #F8F3E7; border: none; border-radius: 8px; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #5F1B26;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">{{ startLabel }}</button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ===== STEP: REVIEW PANEL ===== -->
+      <sc-if value="{{ stepReview }}" hint-placeholder-val="{{ false }}">
+        <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; padding: 16px 18px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #7A2431;">Game review</span>
+            <button type="button" onClick="{{ exitReview }}" style="background: none; border: none; padding: 0; color: rgba(30,43,69,.55); font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer;" style-hover="color: #7A2431;">New review</button>
+          </div>
+
+          <!-- eval graph -->
+          <svg viewBox="0 0 300 80" style="width: 100%; height: 80px; margin-top: 12px; background: #22304C; border-radius: 6px; display: block;" preserveAspectRatio="none" aria-label="Evaluation graph">
+            <path d="{{ evalArea }}" fill="#F6F0E0"></path>
+            <line x1="0" y1="40" x2="300" y2="40" stroke="rgba(169,138,63,.7)" stroke-width="1" stroke-dasharray="3 3"></line>
+            <line x1="{{ evalCursorX }}" y1="0" x2="{{ evalCursorX }}" y2="80" stroke="#B4485A" stroke-width="1.5"></line>
+          </svg>
+
+          <!-- accuracies -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
+            <div style="border: 1px solid rgba(30,43,69,.15); border-radius: 8px; padding: 10px 12px; background: #FBF6E8;">
+              <div style="font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: rgba(30,43,69,.55); font-weight: 600;">White accuracy</div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; margin-top: 2px;">{{ wAcc }}</div>
+            </div>
+            <div style="border: 1px solid rgba(30,43,69,.15); border-radius: 8px; padding: 10px 12px; background: #22304C;">
+              <div style="font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: rgba(245,239,227,.6); font-weight: 600;">Black accuracy</div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; color: #F5EFE3; margin-top: 2px;">{{ bAcc }}</div>
+            </div>
+          </div>
+
+          <!-- classification counts -->
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 14px;">
+            <sc-for list="{{ classCounts }}" as="cc" hint-placeholder-count="6">
+              <div style="display: grid; grid-template-columns: 90px 30px 30px 1fr; align-items: center; gap: 8px;">
+                <span style="font-size: 12px; font-weight: 600; color: {{ cc.col }};">{{ cc.label }}</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; text-align: center; color: rgba(30,43,69,.8);">{{ cc.w }}</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; text-align: center; color: rgba(30,43,69,.8);">{{ cc.b }}</span>
+                <span style="height: 5px; border-radius: 3px; background: rgba(30,43,69,.08); overflow: hidden; display: block;"><span style="display: block; height: 100%; width: {{ cc.pct }}%; background: {{ cc.col }};"></span></span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- move list -->
+        <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; overflow: hidden;">
+          <div style="padding: 11px 16px; border-bottom: 1px solid rgba(30,43,69,.12); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: rgba(30,43,69,.6);">Moves &middot; {{ openingName }}</div>
+          <div class="ju-scroll" style="max-height: 260px; overflow-y: auto; padding: 6px 8px;">
+            <sc-for list="{{ moveRows }}" as="mr" hint-placeholder-count="10">
+              <div style="display: grid; grid-template-columns: 34px 1fr 1fr; gap: 4px; align-items: stretch;">
+                <span style="display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: rgba(30,43,69,.45);">{{ mr.n }}.</span>
+                <button type="button" onClick="{{ mr.wOn }}" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; background: {{ mr.wBg }}; border: none; border-radius: 6px; padding: 5px 9px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: #1E2B45;" style-hover="background: rgba(169,138,63,.14);">
+                  <span style="font-weight: 500;">{{ mr.wm }}</span><span style="font-size: 10px; font-weight: 600; color: {{ mr.wCol }};">{{ mr.wTag }}</span>
+                </button>
+                <sc-if value="{{ mr.hasB }}" hint-placeholder-val="{{ true }}">
+                  <button type="button" onClick="{{ mr.bOn }}" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; background: {{ mr.bBg }}; border: none; border-radius: 6px; padding: 5px 9px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: #1E2B45;" style-hover="background: rgba(169,138,63,.14);">
+                    <span style="font-weight: 500;">{{ mr.bm }}</span><span style="font-size: 10px; font-weight: 600; color: {{ mr.bCol }};">{{ mr.bTag }}</span>
+                  </button>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===== STEP: ANALYSIS WORKSPACE ===== -->
+      <sc-if value="{{ stepWorkspace }}" hint-placeholder-val="{{ false }}">
+        <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; padding: 16px 18px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #7A2431;">Analysis workspace</span>
+            <button type="button" onClick="{{ exitWorkspace }}" style="background: none; border: none; padding: 0; color: rgba(30,43,69,.55); font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer;" style-hover="color: #7A2431;">Close</button>
+          </div>
+
+          <!-- engine line -->
+          <div style="margin-top: 12px; background: #22304C; border-radius: 8px; padding: 11px 13px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; color: #C9AE6B;">{{ engineEval }}</span>
+              <span style="font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: rgba(245,239,227,.55); font-weight: 600;">depth 22</span>
+            </div>
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: rgba(245,239,227,.85); margin-top: 5px; line-height: 1.5;">{{ engineLine }}</div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px;">
+            <span style="font-size: 13px; font-weight: 600;">{{ openingName }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: rgba(30,43,69,.55);">ECO C50</span>
+          </div>
+
+          <!-- controls -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px;">
+            <button type="button" onClick="{{ wsNew }}" style="height: 38px; border-radius: 7px; border: 1px solid rgba(30,43,69,.26); background: #FFFCF4; color: #1E2B45; font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer;" style-hover="border-color: #7A2431; color: #7A2431;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">New</button>
+            <button type="button" onClick="{{ wsSave }}" style="height: 38px; border-radius: 7px; border: 1px solid rgba(30,43,69,.26); background: #FFFCF4; color: #1E2B45; font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer;" style-hover="border-color: #7A2431; color: #7A2431;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">{{ saveLabel }}</button>
+            <button type="button" onClick="{{ wsReview }}" style="height: 38px; border-radius: 7px; border: 1px solid rgba(30,43,69,.26); background: #FFFCF4; color: #1E2B45; font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer;" style-hover="border-color: #7A2431; color: #7A2431;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">Review</button>
+            <button type="button" onClick="{{ wsRun }}" style="height: 38px; border-radius: 7px; border: none; background: #7A2431; color: #F8F3E7; font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer;" style-hover="background: #5F1B26;" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">{{ runLabel }}</button>
+          </div>
+        </div>
+
+        <!-- move table -->
+        <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; overflow: hidden;">
+          <div style="padding: 11px 16px; border-bottom: 1px solid rgba(30,43,69,.12); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: rgba(30,43,69,.6);">Move table</div>
+          <sc-if value="{{ wsEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 22px 16px; text-align: center; font-size: 12.5px; color: rgba(30,43,69,.55);">Blank board &mdash; paste a PGN or FEN below, or Run the engine on the start position.</div>
+          </sc-if>
+          <sc-if value="{{ wsMoves }}" hint-placeholder-val="{{ false }}">
+            <div class="ju-scroll" style="max-height: 190px; overflow-y: auto; padding: 6px 8px;">
+              <sc-for list="{{ wsMoves }}" as="mr" hint-placeholder-count="8">
+                <div style="display: grid; grid-template-columns: 34px 1fr 1fr; gap: 4px;">
+                  <span style="display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: rgba(30,43,69,.45);">{{ mr.n }}.</span>
+                  <span style="padding: 5px 9px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;">{{ mr.wm }}</span>
+                  <span style="padding: 5px 9px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;">{{ mr.bm }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- PGN/FEN import -->
+        <div style="background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; padding: 14px 16px;">
+          <div style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: rgba(30,43,69,.6);">Paste PGN or FEN</div>
+          <textarea value="{{ pgnText }}" onChange="{{ setPgnText }}" placeholder="1. e4 e5 2. Nf3 &hellip;  or  rnbqkbnr/pppppppp/8/&hellip;" style="width: 100%; height: 74px; margin-top: 10px; padding: 10px 12px; border: 1px solid rgba(30,43,69,.24); border-radius: 8px; background: #FFFFFF; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1E2B45; outline: none; box-sizing: border-box; resize: vertical;" style-focus="border-color: #7A2431; box-shadow: 0 0 0 3px rgba(122,36,49,.10);"></textarea>
+          <button type="button" onClick="{{ loadPgn }}" style="width: 100%; height: 40px; margin-top: 10px; border-radius: 8px; border: 1px solid rgba(30,43,69,.28); background: transparent; color: #1E2B45; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer;" style-hover="border-color: #A98A3F; background: rgba(169,138,63,.08);" style-focus="outline: 2px solid #A98A3F; outline-offset: 2px;">Load into board</button>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    mode: 'review',          /* review | analysis */
+    step: 'source',          /* source | search | list | review | workspace */
+    source: null,
+    searchText: '',
+    selectedId: null,
+    game: null,
+    moveIdx: 0,
+    pgnText: '',
+    wsLoaded: false,
+    saved: false,
+    ran: false
+  };
+
+  componentDidMount() {
+    var self = this;
+    function boot() {
+      var gid = new URLSearchParams(window.location.search).get('game');
+      if (gid && window.JU) {
+        var g = window.JU.findGame(gid);
+        if (g) self.setState({ mode: 'review', step: 'review', game: g, moveIdx: g.moves.length - 1 });
+        else self.forceUpdate();
+      } else self.forceUpdate();
+    }
+    if (window.JU) boot();
+    else { var t = setInterval(function () { if (window.JU) { clearInterval(t); boot(); } }, 60); }
+
+    this._keys = function (e) {
+      if (self.state.step !== 'review') return;
+      if (e.key === 'ArrowLeft') self.setState({ moveIdx: Math.max(0, self.state.moveIdx - 1) });
+      if (e.key === 'ArrowRight' && self.state.game) self.setState({ moveIdx: Math.min(self.state.game.moves.length - 1, self.state.moveIdx + 1) });
+    };
+    document.addEventListener('keydown', this._keys);
+  }
+  componentWillUnmount() { document.removeEventListener('keydown', this._keys); }
+
+  cells(fen) {
+    if (!window.JU) return [];
+    return window.JU.fenBoard(fen).map(function (c) {
+      return { key: c.key, g: c.g, bg: c.dark ? '#8A6A4A' : '#EFE3C8', col: c.w ? '#FBF6E8' : '#22304C', sh: c.w ? '0 1px 2px rgba(30,43,69,.5)' : '0 1px 2px rgba(255,255,255,.2)' };
+    });
+  }
+
+  clsColor(cls) {
+    return { 'Brilliant': '#1F7A70', 'Great': '#2A5DB0', 'Book': '#8A7B5C', 'Best': '#3F6B36', 'Mistake': '#B0742A', 'Blunder': '#7A2431' }[cls] || '#8A7B5C';
+  }
+
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var g = st.game;
+    var inReview = st.step === 'review' && !!g;
+    var inWs = st.step === 'workspace';
+
+    /* board */
+    var startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
+    var fen = g ? g.fen : startFen;
+    if (inWs && !st.wsLoaded) fen = startFen;
+    var bigCells = this.cells(fen);
+
+    /* eval */
+    var evalNow = 0.2;
+    if (inReview && g) evalNow = g.evals[Math.min(st.moveIdx, g.evals.length - 1)];
+    if (inWs) evalNow = st.wsLoaded ? 0.4 : 0.2;
+    var evalPct = Math.max(6, Math.min(94, 50 + evalNow * 7));
+    var evalLabel = (evalNow >= 0 ? '+' : '') + evalNow.toFixed(1);
+
+    /* sources */
+    var srcDefs = [
+      { key: 'chess.com', name: 'Chess.com', sub: 'Import by username', icon: 'C', iconBg: '#69923e', iconCol: '#fff' },
+      { key: 'lichess', name: 'Lichess', sub: 'Import by username', icon: 'L', iconBg: '#1E2B45', iconCol: '#F5EFE3' },
+      { key: 'tournament', name: 'Tournament Games', sub: 'Search the club archive', icon: '\u2655', iconBg: '#7A2431', iconCol: '#F5EFE3' }
+    ];
+    var sources = srcDefs.map(function (s) {
+      return {
+        name: s.name, sub: s.sub, icon: s.icon, iconBg: s.iconBg, iconCol: s.iconCol,
+        on: function () { self.setState({ step: 'search', source: s.key, searchText: '' }); }
+      };
+    });
+
+    /* search step labels */
+    var srcName = st.source === 'chess.com' ? 'Chess.com' : st.source === 'lichess' ? 'Lichess' : 'Tournament Games';
+    var searchTitle = srcName;
+    var searchSub = st.source === 'tournament' ? 'Search by player, event, or round' : 'Enter a ' + srcName + ' username';
+    var searchPh = st.source === 'tournament' ? 'e.g. Ibrahim, Spring Open, QF\u2026' : 'e.g. ibrahim_ju';
+
+    /* list */
+    var pool = (window.JU && st.source) ? window.JU.gamesBySource[st.source] : [];
+    var q = st.searchText.trim().toLowerCase();
+    if (st.source === 'tournament' && q) {
+      pool = pool.filter(function (gg) { return (gg.white + ' ' + gg.black + ' ' + gg.round + ' ' + gg.opening).toLowerCase().includes(q); });
+      if (pool.length === 0) pool = window.JU.gamesBySource[st.source];
+    }
+    var gameList = pool.map(function (gg) {
+      var sel = st.selectedId === gg.id;
+      return {
+        title: gg.white + ' \u2013 ' + gg.black,
+        result: gg.result, sub: gg.opening + ' \u00B7 ' + gg.date + (gg.round ? ' \u00B7 ' + gg.round : ''),
+        bg: sel ? 'rgba(122,36,49,.09)' : 'transparent',
+        accent: sel ? '#7A2431' : 'transparent',
+        on: function () { self.setState({ selectedId: gg.id }); }
+      };
+    });
+
+    /* review data */
+    var evalArea = '', evalCursorX = 0, wAcc = '', bAcc = '', classCounts = [], moveRows = [], openingName = '';
+    if (g) {
+      openingName = g.opening;
+      var n = g.evals.length;
+      var pts = ['M0,40'];
+      for (var i = 0; i < n; i++) {
+        var x = (i / (n - 1)) * 300;
+        var y = 40 - Math.max(-38, Math.min(38, g.evals[i] * 6.5));
+        pts.push('L' + x.toFixed(1) + ',' + y.toFixed(1));
+      }
+      pts.push('L300,80 L0,80 Z');
+      evalArea = pts.join(' ');
+      evalCursorX = ((Math.min(st.moveIdx, n - 1) / (n - 1)) * 300).toFixed(1);
+      wAcc = g.wAcc.toFixed(1) + '%'; bAcc = g.bAcc.toFixed(1) + '%';
+
+      var order = ['Brilliant', 'Great', 'Best', 'Book', 'Mistake', 'Blunder'];
+      classCounts = order.map(function (cls) {
+        var w = 0, b = 0;
+        g.classes.forEach(function (c, idx) { if (c === cls) { if (idx % 2 === 0) w++; else b++; } });
+        return { label: cls, w: w, b: b, col: self.clsColor(cls), pct: Math.min(100, (w + b) * 9) };
+      });
+
+      for (var mi = 0; mi < g.moves.length; mi += 2) {
+        (function (mi) {
+          var wSel = st.moveIdx === mi, bSel = st.moveIdx === mi + 1;
+          var wCls = g.classes[mi], bCls = g.classes[mi + 1];
+          moveRows.push({
+            n: mi / 2 + 1,
+            wm: g.moves[mi], wTag: wCls === 'Best' || wCls === 'Book' ? '' : wCls,
+            wCol: self.clsColor(wCls),
+            wBg: wSel ? 'rgba(169,138,63,.22)' : 'transparent',
+            wOn: function () { self.setState({ moveIdx: mi }); },
+            hasB: mi + 1 < g.moves.length,
+            bm: g.moves[mi + 1] || '', bTag: bCls === 'Best' || bCls === 'Book' ? '' : (bCls || ''),
+            bCol: self.clsColor(bCls),
+            bBg: bSel ? 'rgba(169,138,63,.22)' : 'transparent',
+            bOn: function () { self.setState({ moveIdx: mi + 1 }); }
+          });
+        })(mi);
+      }
+    }
+
+    /* workspace */
+    var wsMoves = false;
+    if (inWs && st.wsLoaded && window.JU) {
+      var wm = window.JU.gamesBySource['chess.com'][0].moves;
+      wsMoves = [];
+      for (var wi = 0; wi < wm.length; wi += 2) wsMoves.push({ n: wi / 2 + 1, wm: wm[wi], bm: wm[wi + 1] || '' });
+    }
+
+    var isReview = st.mode === 'review';
+    var _a = (window.JU && window.JU.auth) ? window.JU.auth.get() : null;
+    return {
+      signedIn: !!_a, signedOut: !_a, authName: _a ? _a.name : '', authInitials: _a ? window.JU.auth.initials(_a.name) : '',
+      /* board area */
+      boardTitle: inReview ? 'Game review' : inWs ? 'Analysis board' : isReview ? 'Review room' : 'Analysis room',
+      boardSub: g ? (g.round || g.date || '') : 'Standard position',
+      whiteName: g ? g.white : 'White', blackName: g ? g.black : 'Black',
+      whiteRating: g ? g.wRating : '', blackRating: g ? g.bRating : '',
+      resultBadge: g ? (g.live ? '\u25CF LIVE' : g.result) : '',
+      bigCells: bigCells,
+      evalPct: evalPct, evalLabel: evalLabel,
+      inReview: inReview,
+      moveCounter: g ? ('Move ' + (st.moveIdx + 1) + ' / ' + g.moves.length) : '',
+      prevMove: function () { self.setState({ moveIdx: Math.max(0, st.moveIdx - 1) }); },
+      nextMove: function () { if (g) self.setState({ moveIdx: Math.min(g.moves.length - 1, st.moveIdx + 1) }); },
+      goStart: function () { self.setState({ moveIdx: 0 }); },
+      goEnd: function () { if (g) self.setState({ moveIdx: g.moves.length - 1 }); },
+
+      /* rail mode */
+      isReview: isReview, isAnalysis: !isReview,
+      revBg: isReview ? '#1E2B45' : 'transparent', revCol: isReview ? '#F5EFE3' : '#1E2B45', revSh: isReview ? '0 1px 3px rgba(30,43,69,.25)' : 'none',
+      anaBg: !isReview ? '#1E2B45' : 'transparent', anaCol: !isReview ? '#F5EFE3' : '#1E2B45', anaSh: !isReview ? '0 1px 3px rgba(30,43,69,.25)' : 'none',
+      setModeReview: function () { self.setState({ mode: 'review', step: 'source', selectedId: null, source: null }); },
+      setModeAnalysis: function () { self.setState({ mode: 'analysis', step: 'source', selectedId: null, source: null }); },
+
+      /* steps */
+      stepSource: st.step === 'source',
+      stepSearch: st.step === 'search',
+      stepList: st.step === 'list',
+      stepReview: st.step === 'review' && !!g,
+      stepWorkspace: inWs,
+
+      sources: sources,
+      openBlank: function () { self.setState({ step: 'workspace', game: null, wsLoaded: false, saved: false, ran: false }); },
+
+      searchTitle: searchTitle, searchSub: searchSub, searchPh: searchPh,
+      searchText: st.searchText,
+      setSearchText: function (e) { self.setState({ searchText: e.target.value }); },
+      searchKey: function (e) { if (e.key === 'Enter') self.setState({ step: 'list', selectedId: null }); },
+      doSearch: function () { self.setState({ step: 'list', selectedId: null }); },
+      backToSource: function () { self.setState({ step: 'source', source: null }); },
+      backToSearch: function () { self.setState({ step: 'search', selectedId: null }); },
+
+      listTitle: srcName + (st.searchText && st.source !== 'tournament' ? ' \u00B7 ' + st.searchText : ''),
+      listCount: gameList.length,
+      gameList: gameList,
+      hasSelection: !!st.selectedId,
+      startLabel: isReview ? 'Start Review' : 'Start Analysis',
+      startSelected: function () {
+        var gg = window.JU.findGame(st.selectedId);
+        if (!gg) return;
+        if (isReview) self.setState({ step: 'review', game: gg, moveIdx: gg.moves.length - 1 });
+        else self.setState({ step: 'workspace', game: gg, wsLoaded: true, saved: false, ran: true });
+      },
+
+      exitReview: function () { self.setState({ step: 'source', game: null, selectedId: null, source: null }); },
+
+      /* review panel */
+      evalArea: evalArea, evalCursorX: evalCursorX,
+      wAcc: wAcc, bAcc: bAcc, classCounts: classCounts, moveRows: moveRows,
+      openingName: (inWs && !st.wsLoaded) ? 'Starting position' : (openingName || 'Italian Game: Giuoco Piano'),
+
+      /* workspace */
+      exitWorkspace: function () { self.setState({ step: 'source', game: null, wsLoaded: false }); },
+      engineEval: st.ran ? (st.wsLoaded ? '+0.4' : '+0.2') : '\u2014',
+      engineLine: st.ran ? (st.wsLoaded ? '18. Qb3 Qd7 19. Rae1 Rhe8 20. Rxe8 Rxe8' : '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3') : 'Press Run to start the engine',
+      wsEmpty: !st.wsLoaded,
+      wsMoves: wsMoves,
+      pgnText: st.pgnText,
+      setPgnText: function (e) { self.setState({ pgnText: e.target.value }); },
+      loadPgn: function () { if (st.pgnText.trim()) self.setState({ wsLoaded: true, game: window.JU ? window.JU.gamesBySource['chess.com'][0] : null, ran: false }); },
+      wsNew: function () { self.setState({ wsLoaded: false, game: null, pgnText: '', saved: false, ran: false }); },
+      wsSave: function () { self.setState({ saved: true }); },
+      saveLabel: st.saved ? 'Saved \u2713' : 'Save',
+      wsReview: function () {
+        var gg = st.game || (window.JU && window.JU.gamesBySource['chess.com'][0]);
+        if (gg) self.setState({ mode: 'review', step: 'review', game: gg, moveIdx: gg.moves.length - 1 });
+      },
+      wsRun: function () { self.setState({ ran: true }); },
+      runLabel: st.ran ? 'Running\u2026' : 'Run'
+    };
+  }
+}
+</script>
+</body>
+</html>

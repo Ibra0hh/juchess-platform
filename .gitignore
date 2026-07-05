@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.vite/
+.env
+.env.local
+.DS_Store
+
+# Flutter
+apps/mobile/.dart_tool/
+apps/mobile/build/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+
+# Appwrite local secrets
+.appwrite/
+appwrite/.env
+
+# Graphify machine-local extraction state
+graphify-out/.graphify_*
+graphify-out/cache/

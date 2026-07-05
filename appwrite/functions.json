@@ -1,0 +1,27 @@
+[
+  {
+    "$id": "admin-actions",
+    "name": "JuChess Admin Actions",
+    "runtime": "node-22",
+    "path": "functions/admin-actions",
+    "entrypoint": "src/main.js",
+    "commands": "npm install",
+    "execute": [],
+    "events": [],
+    "schedule": "",
+    "timeout": 15,
+    "enabled": true,
+    "logging": true,
+    "ignore": [
+      "node_modules",
+      ".git"
+    ],
+    "scopes": [],
+    "vars": [
+      {
+        "key": "JUCHESS_DATABASE_ID",
+        "value": "juchess"
+      }
+    ]
+  }
+]

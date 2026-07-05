@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#e9e1cf}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+button{font-family:inherit;cursor:pointer}
+input{font-family:inherit}
+::placeholder{color:rgba(33,48,78,.38)}
+@keyframes jcPulse{0%,100%{opacity:1}50%{opacity:.3}}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d2434;outline-offset:2px}
+[data-jc-scroll]::-webkit-scrollbar{width:0;height:0;display:none}
+</style>
+</helmet>
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#7d2434"/><g transform="translate(50 52)" fill="#f6f0e2"><circle cx="0" cy="-16" r="7"/><path d="M-13 20 C-13 2 -7 -6 0 -6 C7 -6 13 2 13 20 Z"/><rect x="-16" y="20" width="32" height="6" rx="2"/></g><text x="50" y="88" text-anchor="middle" font-family="Georgia,serif" font-size="12" font-weight="700" fill="#f6f0e2">JuChess</text></svg></template>
+<div style="min-height:100dvh;background:#d7cfbd;display:flex;flex-direction:column;align-items:center;padding:14px 12px 26px;font-family:-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif;color:#21304e">
+  <div ref="{{switcherRef}}" role="group" aria-label="Device preview" style="display:flex;gap:5px;margin-bottom:14px;background:#fbf7ec;border:1px solid rgba(33,48,78,.18);border-radius:999px;padding:4px;box-shadow:0 1px 3px rgba(33,48,78,.12)">
+    <sc-for list="{{devices}}" as="dv" hint-placeholder-count="3">
+      <button onClick="{{dv.on}}" aria-pressed="{{dv.on2}}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:none;border-radius:999px;background:{{dv.bg}};color:{{dv.fg}};font-size:12.5px;font-weight:600;min-height:38px" style-active="transform:scale(.97)">{{dv.label}}</button>
+    </sc-for>
+  </div>
+  <div style="display:flex;align-items:flex-start;gap:14px">
+  <div style="flex:none;width:{{fitW}}px;height:{{fitH}}px">
+  <div style="position:relative;width:{{devBoxW}}px;height:{{devBoxH}}px;background:{{devBezel}};border-radius:{{devOuterR}};padding:{{devPad}};overflow:hidden;box-shadow:0 24px 60px rgba(33,48,78,.32),0 6px 16px rgba(0,0,0,.24);transform:scale({{fit}});transform-origin:top left">
+    <div style="position:relative;width:{{devW}};height:{{devH}};background:#f6f0e2;border-radius:{{devInnerR}};overflow:hidden;display:flex;flex-direction:column">
+      <div aria-hidden="true" style="position:absolute;top:0;left:0;right:0;height:{{islandZone}};z-index:6;display:flex;align-items:center;justify-content:center;pointer-events:none">
+        <span style="width:{{camW}};height:{{camH}};border-radius:999px;background:#0b0c0f"></span>
+      </div>
+      <div style="flex:none;height:{{statusH}};display:flex;align-items:center;justify-content:space-between;padding:0 {{statusPad}};position:relative;z-index:4">
+        <span style="font-size:{{statusFs}};font-weight:700;letter-spacing:.02em;color:#21304e">{{statusTime}}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;color:#21304e">
+          <svg width="17" height="12" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"></rect><rect x="5" y="5" width="3" height="7" rx="1"></rect><rect x="10" y="2.5" width="3" height="9.5" rx="1"></rect><rect x="15" y="0" width="3" height="12" rx="1" opacity=".35"></rect></svg>
+          <span style="display:inline-flex;align-items:center;gap:2px"><span style="width:22px;height:11px;border:1.5px solid #21304e;border-radius:3px;padding:1.5px;display:inline-flex"><span style="flex:1;background:#21304e;border-radius:1px"></span></span><span style="width:1.5px;height:4px;background:#21304e;border-radius:1px"></span></span>
+        </span>
+      </div>
+      <div ref="{{scrollRef}}" onScroll="{{onScroll}}" data-jc-scroll="1" style="flex:1;overflow-y:auto;overflow-x:hidden;position:relative;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+        <div style="max-width:{{contentMax}};margin:0 auto;position:relative">
+
+<sc-if value="{{isHome}}" hint-placeholder-val="{{true}}">
+<div data-screen-label="Home" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:42px;height:42px;border-radius:50%;display:block;flex:none">
+    <div style="flex:1;min-width:0">
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700;line-height:1.15">JuChess</div>
+      <div style="font-size:11px;color:rgba(33,48,78,.6)">University of Jordan Chess Club</div>
+    </div>
+    <sc-if value="{{isGuest}}" hint-placeholder-val="{{true}}">
+      <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.18);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">Guest Mode</span>
+    </sc-if>
+    <sc-if value="{{isMember}}" hint-placeholder-val="{{false}}">
+      <button onClick="{{goProfile}}" aria-label="Open your profile" style="flex:none;width:38px;height:38px;border-radius:50%;background:rgba(169,138,63,.16);border:1.5px solid rgba(169,138,63,.55);font-family:'Source Serif 4',Georgia,serif;font-size:14px;font-weight:700;color:#79622a;display:flex;align-items:center;justify-content:center" style-active="transform:scale(.95)">{{pInit}}</button>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{isGuest}}" hint-placeholder-val="{{true}}">
+    <div style="margin:14px 16px 0;padding:12px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;display:flex;align-items:center;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:600">You're browsing as a guest</div>
+        <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:2px">Sign in to register and save analyses</div>
+      </div>
+      <button onClick="{{goSignin}}" style="flex:none;padding:10px 16px;border:none;border-radius:10px;background:#7d2434;color:#f7f1e3;font-size:13px;font-weight:600">Sign in</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{isMember}}" hint-placeholder-val="{{false}}">
+    <div style="margin:14px 16px 0;padding:13px 16px;background:rgba(169,138,63,.13);border:1px solid rgba(169,138,63,.42);border-radius:14px">
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:16.5px;font-weight:700;line-height:1.2;color:#6d5623">Welcome back, {{userFirst}}</div>
+      <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:3px">Club rank {{pRank}} · Rating {{pRating}}</div>
+    </div>
+  </sc-if>
+
+  <div style="margin:14px 16px 0;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(33,48,78,.05)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:11px;font-weight:600;color:rgba(33,48,78,.55);letter-spacing:.06em;text-transform:uppercase">Featured tournament</span>
+      <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:#7d2434;color:#f7f1e3;font-size:10.5px;font-weight:700;letter-spacing:.04em"><span style="width:6px;height:6px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>LIVE</span>
+    </div>
+    <div style="font-family:'Source Serif 4',Georgia,serif;font-size:17.5px;font-weight:700;line-height:1.25">University of Jordan Rapid Championship</div>
+    <div style="font-size:12.5px;color:rgba(33,48,78,.65);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sat, Jul 4 · 4:00 PM</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+      <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">Main Campus · Hall B</span>
+      <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">15+10 Rapid</span>
+      <span style="padding:4px 9px;border-radius:999px;background:rgba(169,138,63,.13);border:1px solid rgba(169,138,63,.35);font-size:11.5px;font-weight:600;color:#79622a;white-space:nowrap">12/16 players</span>
+    </div>
+    <div style="margin-top:10px" aria-label="12 of 16 places filled">
+      <div style="height:5px;border-radius:3px;background:rgba(33,48,78,.1);overflow:hidden"><div style="width:75%;height:100%;background:#a98a3f;border-radius:3px"></div></div>
+    </div>
+    <button onClick="{{goFeatured}}" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:11px;background:#7d2434;color:#f7f1e3;font-size:14.5px;font-weight:600" style-active="transform:scale(.985)">View Tournament</button>
+  </div>
+
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin:20px 16px 10px">
+    <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:16px;font-weight:700">Quick actions</h2>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px">
+    <button onClick="{{goGameReview}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="font-size:17px;color:#7d2434">♞</span><span style="font-size:13.5px;font-weight:600;color:#21304e">Game Review</span>
+    </button>
+    <button onClick="{{goBoardStart}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="font-size:17px;color:#7d2434">♟</span><span style="font-size:13.5px;font-weight:600;color:#21304e">Analysis Board</span>
+    </button>
+    <button onClick="{{goClock}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;color:#7d2434">5:00</span><span style="font-size:13.5px;font-weight:600;color:#21304e">Chess Clock</span>
+    </button>
+    <button onClick="{{goLeaderboard}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="font-size:17px;color:#7d2434">♛</span><span style="font-size:13.5px;font-weight:600;color:#21304e">Leaderboard</span>
+    </button>
+  </div>
+
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin:22px 16px 10px">
+    <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:16px;font-weight:700">Club leaderboard</h2>
+    <button onClick="{{goLeaderboard}}" style="background:none;border:none;padding:4px;font-size:12.5px;font-weight:600;color:#7d2434">View all</button>
+  </div>
+  <div style="margin:0 16px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+    <sc-for list="{{top4}}" as="p" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
+        <span style="flex:none;width:24px;height:24px;border-radius:50%;background:rgba(169,138,63,.16);color:#79622a;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center">{{p.rank}}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.name}}</div>
+          <div style="font-size:11px;color:rgba(33,48,78,.55)">@{{p.cc}}</div>
+        </div>
+        <span style="font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:700;color:#21304e">{{p.rating}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin:22px 16px 10px">
+    <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:16px;font-weight:700">Announcements</h2>
+  </div>
+  <div style="margin:0 16px;display:flex;flex-direction:column;gap:10px">
+    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;padding:12px 14px">
+      <div style="font-size:13.5px;font-weight:600">Summer training camp registration opens July 10</div>
+      <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:3px">Coached sessions every Sunday · limited to 20 members</div>
+      <div style="font-size:11px;color:#a98a3f;font-weight:600;margin-top:6px">Jul 1, 2026</div>
+    </div>
+    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;padding:12px 14px">
+      <div style="font-size:13.5px;font-weight:600">Club general assembly &amp; board elections</div>
+      <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:3px">Jul 20 · 5:00 PM · Main Campus, Hall C</div>
+      <div style="font-size:11px;color:#a98a3f;font-weight:600;margin-top:6px">Jun 28, 2026</div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isSignin}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Sign in" style="background:#f6f0e2;padding:28px 22px 40px">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:30px">
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:56px;height:56px;border-radius:50%;display:block;flex:none">
+    <div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:23px;font-weight:700;line-height:1.1">JuChess</div>
+      <div style="font-size:12px;color:rgba(33,48,78,.62);margin-top:2px">University of Jordan Chess Club</div>
+    </div>
+  </div>
+  <h1 style="margin:0 0 22px;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:700;line-height:1.3">Sign into your Club player account</h1>
+  <label for="si-email" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Email</label>
+  <input id="si-email" type="email" placeholder="Enter email" autocomplete="email" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+  <label for="si-pw" style="display:block;font-size:12.5px;font-weight:600;margin:16px 0 6px">Password</label>
+  <div style="position:relative">
+    <input id="si-pw" type="{{pwaType}}" placeholder="Enter password" autocomplete="current-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <button onClick="{{togglePwa}}" aria-label="Show or hide password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pwaSlash}}"></path></svg>
+    </button>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:10px">
+    <button onClick="{{goForgot}}" style="background:none;border:none;padding:4px 0;font-size:13px;font-weight:600;color:#7d2434">Forgot password?</button>
+  </div>
+  <button onClick="{{doSignIn}}" style="width:100%;margin-top:18px;padding:14px;border:none;border-radius:12px;background:#7d2434;color:#f7f1e3;font-size:15px;font-weight:600" style-active="transform:scale(.985)">Sign in</button>
+  <div style="display:flex;align-items:center;gap:12px;margin:22px 0">
+    <div style="flex:1;height:1px;background:rgba(33,48,78,.16)"></div>
+    <span style="font-size:12px;color:rgba(33,48,78,.5)">or continue with</span>
+    <div style="flex:1;height:1px;background:rgba(33,48,78,.16)"></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <button onClick="{{doSignIn}}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border:1px solid rgba(33,48,78,.25);border-radius:12px;background:#fffdf6;font-size:14.5px;font-weight:600;color:#21304e" style-active="background:#f4ecd9">
+      <svg width="18" height="18" viewBox="0 0 384 512" aria-hidden="true"><path fill="#111111" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"></path></svg>
+      Continue with Apple
+    </button>
+    <button onClick="{{doSignIn}}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border:1px solid rgba(33,48,78,.25);border-radius:12px;background:#fffdf6;font-size:14.5px;font-weight:600;color:#21304e" style-active="background:#f4ecd9">
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path></svg>
+      Continue with Google
+    </button>
+  </div>
+  <div style="text-align:center;margin-top:26px;font-size:13.5px;color:rgba(33,48,78,.65)">
+    New to the club? <button onClick="{{goSignup}}" style="background:none;border:none;padding:4px 2px;font-size:13.5px;font-weight:700;color:#7d2434">Sign up</button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isSignup}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Sign up" style="background:#f6f0e2;padding:24px 22px 40px">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+    <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:50%;border:1px solid rgba(33,48,78,.22);background:#fffdf6;font-size:18px;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center">←</button>
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:46px;height:46px;border-radius:50%;display:block;flex:none">
+    <div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:20px;font-weight:700;line-height:1.1">JuChess</div>
+      <div style="font-size:11.5px;color:rgba(33,48,78,.62);margin-top:1px">University of Jordan Chess Club</div>
+    </div>
+  </div>
+  <h1 style="margin:0 0 20px;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700">Create your player account</h1>
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div><label for="su-name" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Full name</label>
+      <input id="su-name" type="text" placeholder="Enter full name" autocomplete="name" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+    <div><label for="su-email" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Email</label>
+      <input id="su-email" type="email" placeholder="student@ju.edu.jo" autocomplete="email" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+    <div><label for="su-phone" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Phone number</label>
+      <input id="su-phone" type="tel" placeholder="07** *** ***" autocomplete="tel" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+    <div><label for="su-uid" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">University ID</label>
+      <input id="su-uid" type="text" placeholder="Enter University ID" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+      <div style="font-size:11.5px;color:rgba(33,48,78,.55);margin-top:5px">Kept private — never shown on your public profile</div></div>
+    <div><label for="su-cc" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Chess.com username <span style="font-weight:400;color:rgba(33,48,78,.5)">(optional)</span></label>
+      <input id="su-cc" type="text" placeholder="Enter username" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+    <div><label for="su-li" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Lichess username <span style="font-weight:400;color:rgba(33,48,78,.5)">(optional)</span></label>
+      <input id="su-li" type="text" placeholder="Enter username" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+    <div><label for="su-pw" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Password</label>
+      <div style="position:relative">
+        <input id="su-pw" type="{{pwbType}}" onInput="{{onSuPw}}" placeholder="Example: JuChess@2026" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+        <button onClick="{{togglePwb}}" aria-label="Show or hide password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pwbSlash}}"></path></svg>
+        </button>
+      </div>
+      <ol style="margin:8px 0 0;padding-left:18px;font-size:12px;color:rgba(33,48,78,.65);line-height:1.7">
+        <li>At least 8 characters</li>
+        <li>Use a mix of letters, numbers, and a symbol</li>
+      </ol>
+      <sc-if value="{{suStrShow}}" hint-placeholder-val="{{false}}">
+        <div aria-live="polite" style="margin-top:10px">
+          <div style="display:flex;gap:5px">
+            <sc-for list="{{suSeg}}" as="sg" hint-placeholder-count="3">
+              <span style="flex:1;height:5px;border-radius:3px;background:{{sg.bg}};transition:background-color .35s ease"></span>
+            </sc-for>
+          </div>
+          <div style="font-size:11.5px;font-weight:600;margin-top:6px;color:{{suStrColor}};transition:color .35s ease">{{suStrLabel}}</div>
+        </div>
+      </sc-if></div>
+    <div><label for="su-pw2" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Confirm password</label>
+      <div style="position:relative">
+        <input id="su-pw2" type="{{pwcType}}" placeholder="Re-enter password" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+        <button onClick="{{togglePwc}}" aria-label="Show or hide confirm password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pwcSlash}}"></path></svg>
+        </button>
+      </div></div>
+  </div>
+  <button onClick="{{doSignUp}}" style="width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:#7d2434;color:#f7f1e3;font-size:15px;font-weight:600" style-active="transform:scale(.985)">Create account</button>
+  <div style="text-align:center;margin-top:18px;font-size:13.5px;color:rgba(33,48,78,.65)">
+    Already a member? <button onClick="{{goSignin}}" style="background:none;border:none;padding:4px 2px;font-size:13.5px;font-weight:700;color:#7d2434">Sign in</button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isForgot}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Forgot password" style="background:#f6f0e2;padding:24px 22px 40px">
+  <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;display:flex;align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:26px">
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:50px;height:50px;border-radius:50%;display:block;flex:none">
+    <div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700;line-height:1.1">JuChess</div>
+      <div style="font-size:11.5px;color:rgba(33,48,78,.62);margin-top:1px">University of Jordan Chess Club</div>
+    </div>
+  </div>
+  <h1 style="margin:0 0 8px;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700">Forgot your password?</h1>
+  <p style="margin:0 0 20px;font-size:13.5px;color:rgba(33,48,78,.65);line-height:1.5">Enter your username, email, or University ID, then choose how you'd like to receive your one-time code.</p>
+  <label for="fp-id" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Username, email, or University ID</label>
+  <input id="fp-id" type="text" placeholder="Enter username, email, or University ID" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+  <div style="font-size:12.5px;font-weight:600;margin:18px 0 8px">Send code via</div>
+  <div style="display:flex;gap:10px">
+    <button onClick="{{setEmail}}" aria-pressed="{{methodEmail}}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 8px;border:1.5px solid {{emBd}};border-radius:13px;background:{{emBg}};color:#21304e;min-height:82px;transition:border-color .2s ease,background-color .2s ease" style-active="transform:scale(.98)">
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#7d2434" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3.5 6.5L12 12.5l8.5-6"></path></svg>
+      <span style="font-size:13.5px;font-weight:700">Email</span>
+    </button>
+    <button onClick="{{setSms}}" aria-pressed="{{methodSms}}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 8px;border:1.5px solid {{smBd}};border-radius:13px;background:{{smBg}};color:#21304e;min-height:82px;transition:border-color .2s ease,background-color .2s ease" style-active="transform:scale(.98)">
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#7d2434" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"></rect><path d="M10.5 18.5h3"></path></svg>
+      <span style="font-size:13.5px;font-weight:700">SMS</span>
+    </button>
+  </div>
+  <button onClick="{{sendOtp}}" style="width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:#7d2434;color:#f7f1e3;font-size:15px;font-weight:600" style-active="transform:scale(.985)">Continue</button>
+  <p style="margin:14px 0 0;font-size:11.5px;color:rgba(33,48,78,.5);text-align:center;line-height:1.5">If an account matches, a 6-digit code will be sent. Mock only — no code is actually sent.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{isOtp}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="OTP" style="background:#f6f0e2;padding:24px 22px 40px">
+  <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;display:flex;align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:26px">
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:50px;height:50px;border-radius:50%;display:block;flex:none">
+    <div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700;line-height:1.1">JuChess</div>
+      <div style="font-size:11.5px;color:rgba(33,48,78,.62);margin-top:1px">University of Jordan Chess Club</div>
+    </div>
+  </div>
+  <h1 style="margin:0 0 8px;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700">Enter the code</h1>
+  <p style="margin:0 0 22px;font-size:13.5px;color:rgba(33,48,78,.65);line-height:1.5">We sent a 6-digit code to {{otpDest}}.</p>
+  <div style="display:flex;gap:8px;justify-content:space-between" aria-label="One-time code">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 1" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 2" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 3" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 4" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 5" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 6" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+  </div>
+  <button onClick="{{verifyOtp}}" style="width:100%;margin-top:24px;padding:14px;border:none;border-radius:12px;background:#7d2434;color:#f7f1e3;font-size:15px;font-weight:600" style-active="transform:scale(.985)">Verify code</button>
+  <div style="text-align:center;margin-top:16px;font-size:13px;color:rgba(33,48,78,.6)">Didn't get it? <button onClick="{{sendOtp}}" style="background:none;border:none;padding:4px 2px;font-size:13px;font-weight:700;color:#7d2434">Resend code</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{isReset}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Reset password" style="background:#f6f0e2;padding:24px 22px 40px">
+  <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;display:flex;align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:26px">
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:50px;height:50px;border-radius:50%;display:block;flex:none">
+    <div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700;line-height:1.1">JuChess</div>
+      <div style="font-size:11.5px;color:rgba(33,48,78,.62);margin-top:1px">University of Jordan Chess Club</div>
+    </div>
+  </div>
+  <h1 style="margin:0 0 8px;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700">Set a new password</h1>
+  <p style="margin:0 0 20px;font-size:13.5px;color:rgba(33,48,78,.65);line-height:1.5">Choose a new password for your club account.</p>
+  <label for="rp-pw" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">New password</label>
+  <div style="position:relative">
+    <input id="rp-pw" type="{{pwdType}}" onInput="{{onRpPw}}" placeholder="Example: JuChess@2026" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <button onClick="{{togglePwd}}" aria-label="Show or hide new password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pwdSlash}}"></path></svg>
+    </button>
+  </div>
+  <label for="rp-pw2" style="display:block;font-size:12.5px;font-weight:600;margin:16px 0 6px">Confirm new password</label>
+  <div style="position:relative">
+    <input id="rp-pw2" type="{{pweType}}" placeholder="Re-enter new password" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <button onClick="{{togglePwe}}" aria-label="Show or hide confirm password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pweSlash}}"></path></svg>
+    </button>
+  </div>
+  <ol style="margin:10px 0 0;padding-left:18px;font-size:12px;color:rgba(33,48,78,.65);line-height:1.7">
+    <li>At least 8 characters</li>
+    <li>Use a mix of letters, numbers, and a symbol</li>
+  </ol>
+  <sc-if value="{{rpStrShow}}" hint-placeholder-val="{{false}}">
+    <div aria-live="polite" style="margin-top:12px">
+      <div style="display:flex;gap:5px">
+        <sc-for list="{{rpSeg}}" as="sg" hint-placeholder-count="3">
+          <span style="flex:1;height:5px;border-radius:3px;background:{{sg.bg}};transition:background-color .35s ease"></span>
+        </sc-for>
+      </div>
+      <div style="font-size:11.5px;font-weight:600;margin-top:6px;color:{{rpStrColor}};transition:color .35s ease">{{rpStrLabel}}</div>
+    </div>
+  </sc-if>
+  <button onClick="{{doReset}}" style="width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:#7d2434;color:#f7f1e3;font-size:15px;font-weight:600" style-active="transform:scale(.985)">Reset password</button>
+</div>
+</sc-if>
+
+<sc-if value="{{isTournaments}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Tournaments" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:36px;height:36px;border-radius:50%;display:block;flex:none">
+    <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700">Tournaments</h1>
+  </div>
+  <div role="tablist" aria-label="Tournament status" style="padding:12px 16px;position:sticky;top:0;background:#f6f0e2;z-index:5;border-bottom:1px solid rgba(33,48,78,.08)">
+    <div style="display:flex;gap:4px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.14);border-radius:999px;padding:4px">
+      <sc-for list="{{tTabs}}" as="tb" hint-placeholder-count="3">
+        <button role="tab" onClick="{{tb.on}}" style="flex:1;padding:9px 0;border-radius:999px;border:none;background:{{tb.bg}};color:{{tb.fg}};font-size:13px;font-weight:600;min-height:40px;transition:background-color .25s ease">{{tb.label}}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px 0">
+    <sc-for list="{{tList}}" as="t" hint-placeholder-count="3">
+      <button onClick="{{t.on}}" style="display:block;width:100%;text-align:left;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(33,48,78,.05)" style-active="background:#f4ecd9">
+        <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px">
+          <div style="flex:1;min-width:200px;font-family:'Source Serif 4',Georgia,serif;font-size:16.5px;font-weight:700;line-height:1.3;color:#21304e;overflow-wrap:break-word">{{t.name}}</div>
+          <span style="flex:none;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:{{t.bBg}};color:{{t.bFg}};border:1px solid {{t.bBd}};font-size:10.5px;font-weight:700;letter-spacing:.03em">
+            <sc-if value="{{t.bLive}}" hint-placeholder-val="{{false}}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;animation:jcPulse 1.4s infinite"></span></sc-if>{{t.bT}}
+          </span>
+        </div>
+        <div style="font-size:12.5px;color:rgba(33,48,78,.65);margin-top:4px">{{t.date}} · {{t.loc}}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+          <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">{{t.fmt}}</span>
+          <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">{{t.tc}}</span>
+          <span style="padding:4px 9px;border-radius:999px;background:rgba(169,138,63,.13);border:1px solid rgba(169,138,63,.35);font-size:11.5px;font-weight:600;color:#79622a;white-space:nowrap">{{t.cap}}</span>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:#7d2434;margin-top:9px">{{t.cur}}</div>
+      </button>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isTournament}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Tournament detail" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:32px;height:32px;border-radius:50%;display:block;flex:none">
+    <span style="flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:15px;font-weight:700">JuChess</span>
+    <span style="flex:none;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:{{tdBBg}};color:{{tdBFg}};border:1px solid {{tdBBd}};font-size:10.5px;font-weight:700;letter-spacing:.03em">
+      <sc-if value="{{tdBLive}}" hint-placeholder-val="{{false}}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;animation:jcPulse 1.4s infinite"></span></sc-if>{{tdBadge}}
+    </span>
+  </div>
+  <div style="padding:16px 16px 12px">
+    <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:20px;font-weight:700;line-height:1.3;overflow-wrap:break-word">{{tdName}}</h1>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+      <sc-for list="{{tdChips}}" as="c" hint-placeholder-count="4">
+        <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">{{c.x}}</span>
+      </sc-for>
+    </div>
+  </div>
+  <div role="tablist" aria-label="Tournament sections" style="display:flex;gap:7px;padding:10px 16px;position:sticky;top:0;background:#f6f0e2;z-index:5;border-bottom:1px solid rgba(33,48,78,.1);overflow-x:auto;scrollbar-width:none">
+    <sc-for list="{{tdTabs}}" as="tb" hint-placeholder-count="5">
+      <button role="tab" onClick="{{tb.on}}" style="flex:none;display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:999px;border:1px solid rgba(33,48,78,.25);background:{{tb.bg}};color:{{tb.fg}};font-size:12.5px;font-weight:600;min-height:38px;white-space:nowrap">
+        <sc-if value="{{tb.live}}" hint-placeholder-val="{{false}}"><span style="width:6px;height:6px;border-radius:50%;background:#7d2434;animation:jcPulse 1.4s infinite"></span></sc-if>{{tb.label}}
+      </button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{tdOverview}}" hint-placeholder-val="{{true}}">
+    <div style="padding:14px 16px 0">
+      <sc-if value="{{tdShowWinner}}" hint-placeholder-val="{{false}}">
+        <div style="background:rgba(169,138,63,.12);border:1px solid rgba(169,138,63,.4);border-radius:13px;padding:13px 14px;margin-bottom:12px;display:flex;align-items:center;gap:11px">
+          <span aria-hidden="true" style="font-size:21px;color:#a98a3f">♛</span>
+          <div><div style="font-size:11px;font-weight:700;color:#79622a;letter-spacing:.06em;text-transform:uppercase">Champion</div>
+          <div style="font-size:15px;font-weight:700;color:#21304e">{{tdWinner}}</div></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{tdShowFacts}}" hint-placeholder-val="{{false}}">
+        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+          <sc-for list="{{tdFacts}}" as="f" hint-placeholder-count="7">
+            <div style="display:flex;justify-content:space-between;gap:14px;padding:11px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
+              <span style="font-size:12.5px;color:rgba(33,48,78,.6);flex:none">{{f.k}}</span>
+              <span style="font-size:13px;font-weight:600;text-align:right;min-width:0;overflow-wrap:break-word">{{f.x}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{tdRegistered}}" hint-placeholder-val="{{false}}">
+        <div style="background:#fdfaf1;border:1px solid rgba(169,138,63,.4);border-radius:16px;padding:18px 16px;text-align:center">
+          <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;background:rgba(31,138,91,.12);border:1px solid rgba(31,138,91,.4);font-size:11px;font-weight:700;color:#1f8a5b"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>You're registered</div>
+          <div style="font-size:12.5px;color:rgba(33,48,78,.6);margin-top:8px;line-height:1.4">Show this at check-in — it stays here anytime.</div>
+          <img src="{{tdQrSrc}}" alt="Registration QR code" style="width:168px;height:168px;margin:14px auto 0;display:block;border:1px solid rgba(33,48,78,.14);border-radius:12px;padding:8px;background:#fffdf6">
+          <div style="margin-top:14px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(33,48,78,.5)">Check-in code</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:6px">
+            <span style="font-family:ui-monospace,Menlo,monospace;font-size:27px;font-weight:700;letter-spacing:.16em;color:#21304e">{{tdRegCodeSpaced}}</span>
+            <button onClick="{{tdCopyCode}}" aria-label="Copy check-in code" style="flex:none;width:40px;height:40px;border-radius:10px;border:1px solid rgba(33,48,78,.2);background:#fffdf6;color:#7d2434;display:flex;align-items:center;justify-content:center" style-active="background:#f4ecd9"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg></button>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{tdGuestWarn}}" hint-placeholder-val="{{false}}">
+        <div style="margin-top:12px;padding:11px 14px;background:rgba(125,36,52,.06);border:1px solid rgba(125,36,52,.25);border-radius:12px;font-size:12.5px;color:#7d2434;font-weight:600">Registration requires a club player account.</div>
+      </sc-if>
+      <button onClick="{{tdCtaOn}}" style="width:100%;margin-top:14px;padding:14px;border:{{tdCtaBd}};border-radius:12px;background:{{tdCtaBg}};color:{{tdCtaFg}};font-size:14.5px;font-weight:600" style-active="transform:scale(.985)">{{tdCtaLabel}}</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{tdLiveTab}}" hint-placeholder-val="{{false}}">
+    <div style="display:flex;flex-direction:column;gap:10px;padding:14px 16px 0">
+      <sc-for list="{{tdLive}}" as="g" hint-placeholder-count="3">
+        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;padding:12px 14px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;font-weight:700;color:rgba(33,48,78,.55)">{{g.board}}</span>
+            <span style="font-size:11px;color:rgba(33,48,78,.45)">{{g.note}}</span>
+            <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:#7d2434;color:#f7f1e3;font-size:10px;font-weight:700"><span style="width:5px;height:5px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>LIVE</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:9px">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600"><span aria-hidden="true" style="width:11px;height:11px;border-radius:3px;background:#fbf7ee;border:1px solid rgba(33,48,78,.4);flex:none"></span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.white}}</span></div>
+              <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;margin-top:5px"><span aria-hidden="true" style="width:11px;height:11px;border-radius:3px;background:#232a36;flex:none"></span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.black}}</span></div>
+            </div>
+            <button onClick="{{g.watch}}" style="flex:none;padding:10px 16px;border:1.5px solid #7d2434;border-radius:10px;background:transparent;color:#7d2434;font-size:13px;font-weight:700;min-height:42px" style-active="background:rgba(125,36,52,.08)">Watch</button>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{tdMainTab}}" hint-placeholder-val="{{false}}">
+    <div style="padding:14px 16px 0">
+      <sc-if value="{{tdShowStages}}" hint-placeholder-val="{{false}}">
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <sc-for list="{{tdStageBtns}}" as="sb" hint-placeholder-count="2">
+            <button onClick="{{sb.on}}" style="flex:1;padding:9px 6px;border-radius:11px;border:1px solid rgba(33,48,78,.25);background:{{sb.bg}};color:{{sb.fg}};font-size:11.5px;font-weight:600;min-height:44px;line-height:1.3">{{sb.label}}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{tdShowSeg}}" hint-placeholder-val="{{false}}">
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <sc-for list="{{tdSeg}}" as="sg" hint-placeholder-count="3">
+            <button onClick="{{sg.on}}" style="flex:1;padding:9px 0;border-radius:999px;border:1px solid rgba(33,48,78,.25);background:{{sg.bg}};color:{{sg.fg}};font-size:12.5px;font-weight:600;min-height:40px">{{sg.label}}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{tdShowStand}}" hint-placeholder-val="{{false}}">
+        <sc-if value="{{tdShowRoundCard}}" hint-placeholder-val="{{false}}">
+          <div style="background:#21304e;color:#f7f1e3;border-radius:13px;padding:13px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+            <div><div style="font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;opacity:.7">Now playing</div>
+            <div style="font-family:'Source Serif 4',Georgia,serif;font-size:17px;font-weight:700;margin-top:2px">{{tdRoundCard}}</div></div>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:#7d2434;font-size:10.5px;font-weight:700"><span style="width:6px;height:6px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>LIVE</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{tdStandEmpty}}" hint-placeholder-val="{{false}}">
+          <div style="background:#fdfaf1;border:1px dashed rgba(33,48,78,.3);border-radius:14px;padding:28px 20px;text-align:center">
+            <div aria-hidden="true" style="font-size:26px;color:rgba(33,48,78,.35)">♟</div>
+            <div style="font-size:13.5px;font-weight:600;margin-top:8px">No standings yet</div>
+            <div style="font-size:12.5px;color:rgba(33,48,78,.6);margin-top:3px">{{tdStandEmptyMsg}}</div>
+          </div>
+        </sc-if>
+        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:34px 1fr 44px 62px;gap:6px;align-items:center;padding:9px 14px;background:rgba(33,48,78,.05);font-size:10.5px;font-weight:700;letter-spacing:.05em;color:rgba(33,48,78,.55);text-transform:uppercase">
+            <span>#</span><span>Player</span><span style="text-align:right">Pts</span><span style="text-align:right">W–D–L</span>
+          </div>
+          <sc-for list="{{tdStand}}" as="row" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:34px 1fr 44px 62px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.08);background:{{row.hlBg}}">
+              <span style="font-size:12.5px;font-weight:700;color:rgba(33,48,78,.6)">{{row.rank}}</span>
+              <div style="min-width:0;display:flex;align-items:center;gap:6px">
+                <div style="min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{row.name}}</div>
+                <div style="font-size:10.5px;color:rgba(33,48,78,.5)">{{row.rating}}</div></div>
+                <sc-if value="{{row.q}}" hint-placeholder-val="{{false}}"><span title="Qualified" style="flex:none;font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:6px;background:rgba(169,138,63,.18);color:#79622a;border:1px solid rgba(169,138,63,.4)">Q</span></sc-if>
+              </div>
+              <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:700">{{row.pts}}</span>
+              <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:rgba(33,48,78,.6)">{{row.rec}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{tdStandNote}}" hint-placeholder-val="{{false}}">
+          <div style="font-size:11.5px;color:rgba(33,48,78,.55);margin-top:8px;padding:0 2px">{{tdStandNote}}</div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{tdShowBracket}}" hint-placeholder-val="{{false}}">
+        <sc-if value="{{tdShowBrNav}}" hint-placeholder-val="{{true}}">
+          <div role="tablist" aria-label="Jump to round" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin:0 -16px 10px;padding:0 16px">
+            <sc-for list="{{tdBrChips}}" as="bc" hint-placeholder-count="4">
+              <button onClick="{{bc.on}}" style="flex:none;padding:7px 13px;border-radius:999px;border:1px solid rgba(33,48,78,.22);background:{{bc.bg}};color:{{bc.fg}};font-size:11.5px;font-weight:600;white-space:nowrap;min-height:36px" style-active="transform:scale(.97)">{{bc.label}}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <div ref="{{brRef}}" style="overflow-x:auto;padding-bottom:6px;margin:0 -16px;padding-left:16px;padding-right:16px">
+          <div style="display:flex;gap:14px;align-items:stretch;min-height:200px">
+            <sc-for list="{{tdBracket}}" as="col" hint-placeholder-count="3">
+              <div style="flex:none;width:172px;display:flex;flex-direction:column">
+                <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:8px">{{col.label}}</div>
+                <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;gap:10px">
+                  <sc-for list="{{col.matches}}" as="m" hint-placeholder-count="2">
+                    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.18);border-radius:10px;overflow:hidden">
+                      <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid rgba(33,48,78,.08);opacity:{{m.op1}}">
+                        <sc-if value="{{m.w1}}" hint-placeholder-val="{{false}}"><span aria-label="Winner" style="flex:none;color:#a98a3f;font-size:11px;font-weight:800">✓</span></sc-if>
+                        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:{{m.fw1}};font-style:{{m.it1}}">{{m.n1}}</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;opacity:{{m.op2}}">
+                        <sc-if value="{{m.w2}}" hint-placeholder-val="{{false}}"><span aria-label="Winner" style="flex:none;color:#a98a3f;font-size:11px;font-weight:800">✓</span></sc-if>
+                        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:{{m.fw2}};font-style:{{m.it2}}">{{m.n2}}</span>
+                      </div>
+                      <sc-if value="{{m.live}}" hint-placeholder-val="{{false}}">
+                        <div style="display:flex;align-items:center;gap:5px;padding:5px 10px;background:rgba(125,36,52,.07);border-top:1px solid rgba(125,36,52,.2)">
+                          <span style="width:5px;height:5px;border-radius:50%;background:#7d2434;animation:jcPulse 1.4s infinite"></span>
+                          <span style="font-size:9.5px;font-weight:800;color:#7d2434;letter-spacing:.05em">LIVE</span>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="font-size:11px;color:rgba(33,48,78,.5);margin-top:6px">Scroll sideways to follow the bracket · ✓ marks the winner</div>
+      </sc-if>
+
+      <sc-if value="{{tdShowArena}}" hint-placeholder-val="{{false}}">
+        <div style="background:#21304e;color:#f7f1e3;border-radius:14px;padding:16px;text-align:center;margin-bottom:12px">
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.7">Arena ends in</div>
+          <div style="font-family:ui-monospace,Menlo,monospace;font-size:40px;font-weight:700;letter-spacing:.02em;margin-top:2px">{{tdArenaClock}}</div>
+          <div style="display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:4px 10px;border-radius:999px;background:#7d2434;font-size:10.5px;font-weight:700"><span style="width:6px;height:6px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>ARENA LIVE</div>
+        </div>
+        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:34px 1fr 40px 80px;gap:6px;align-items:center;padding:9px 14px;background:rgba(33,48,78,.05);font-size:10.5px;font-weight:700;letter-spacing:.05em;color:rgba(33,48,78,.55);text-transform:uppercase">
+            <span>#</span><span>Player</span><span style="text-align:right">Pts</span><span style="text-align:right">Streak</span>
+          </div>
+          <sc-for list="{{tdArenaRows}}" as="row" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:34px 1fr 40px 80px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
+              <span style="font-size:12.5px;font-weight:700;color:rgba(33,48,78,.6)">{{row.rank}}</span>
+              <div style="min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{row.name}}</div>
+              <div style="font-size:10.5px;color:rgba(33,48,78,.5)">{{row.g}}</div></div>
+              <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:14px;font-weight:700">{{row.pts}}</span>
+              <span style="text-align:right;font-size:11px;color:#79622a;font-weight:600">{{row.stk}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{tdShowTeam}}" hint-placeholder-val="{{false}}">
+        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden;margin-bottom:14px">
+          <div style="display:grid;grid-template-columns:34px 1fr 50px 60px;gap:6px;align-items:center;padding:9px 14px;background:rgba(33,48,78,.05);font-size:10.5px;font-weight:700;letter-spacing:.05em;color:rgba(33,48,78,.55);text-transform:uppercase">
+            <span>#</span><span>Team</span><span style="text-align:right">Match</span><span style="text-align:right">Game</span>
+          </div>
+          <sc-for list="{{tdTeamStand}}" as="row" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:34px 1fr 50px 60px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
+              <span style="font-size:12.5px;font-weight:700;color:rgba(33,48,78,.6)">{{row.rank}}</span>
+              <span style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{row.team}}</span>
+              <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:700">{{row.mp}}</span>
+              <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:rgba(33,48,78,.6)">{{row.gp}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:8px">{{tdTeamDayLabel}}</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{tdTeamMatches}}" as="tm" hint-placeholder-count="2">
+            <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:13px 14px;border-bottom:1px solid rgba(33,48,78,.1)">
+                <span style="font-size:15px;font-weight:800">{{tm.a}}</span>
+                <span style="font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;color:#7d2434">{{tm.as}} – {{tm.bs}}</span>
+                <span style="font-size:15px;font-weight:800">{{tm.b}}</span>
+                <sc-if value="{{tm.live}}" hint-placeholder-val="{{false}}">
+                  <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:#7d2434;color:#f7f1e3;font-size:9.5px;font-weight:700"><span style="width:5px;height:5px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>LIVE</span>
+                </sc-if>
+              </div>
+              <sc-for list="{{tm.boards}}" as="g" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(33,48,78,.06)">
+                  <span style="flex:none;font-size:10.5px;font-weight:700;color:rgba(33,48,78,.5);width:44px">Board {{g.bn}}</span>
+                  <span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.white}} <span style="color:rgba(33,48,78,.45);font-weight:400">vs</span> {{g.black}}</span>
+                  <span style="flex:none;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:{{g.cBg}};color:{{g.cFg}};font-size:10px;font-weight:700">
+                    <sc-if value="{{g.live}}" hint-placeholder-val="{{false}}"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;animation:jcPulse 1.4s infinite"></span></sc-if>{{g.chip}}
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{tdRoundsTab}}" hint-placeholder-val="{{false}}">
+    <div style="padding:14px 16px 0">
+      <sc-if value="{{tdRoundsEmpty}}" hint-placeholder-val="{{false}}">
+        <div style="background:#fdfaf1;border:1px dashed rgba(33,48,78,.3);border-radius:14px;padding:28px 20px;text-align:center">
+          <div aria-hidden="true" style="font-size:26px;color:rgba(33,48,78,.35)">♞</div>
+          <div style="font-size:13.5px;font-weight:600;margin-top:8px">No pairings yet</div>
+          <div style="font-size:12.5px;color:rgba(33,48,78,.6);margin-top:3px">{{tdRoundsEmptyMsg}}</div>
+        </div>
+      </sc-if>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <sc-for list="{{tdRoundGroups}}" as="rd" hint-placeholder-count="3">
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:7px">{{rd.label}}</div>
+            <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;overflow:hidden">
+              <sc-for list="{{rd.games}}" as="g" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.07)">
+                  <span style="flex:none;width:22px;height:22px;border-radius:6px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.12);font-size:10.5px;font-weight:700;color:rgba(33,48,78,.6);display:flex;align-items:center;justify-content:center">{{g.bn}}</span>
+                  <span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.white}} <span style="color:rgba(33,48,78,.45);font-weight:400">vs</span> {{g.black}}</span>
+                  <span style="flex:none;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:{{g.cBg}};color:{{g.cFg}};font-size:10px;font-weight:700">
+                    <sc-if value="{{g.live}}" hint-placeholder-val="{{false}}"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;animation:jcPulse 1.4s infinite"></span></sc-if>{{g.chip}}
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{tdShowUpNote}}" hint-placeholder-val="{{false}}">
+        <div style="margin-top:12px;padding:11px 14px;background:rgba(33,48,78,.04);border:1px dashed rgba(33,48,78,.25);border-radius:12px;font-size:12px;color:rgba(33,48,78,.6)">{{tdUpNote}}</div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{tdPlayersTab}}" hint-placeholder-val="{{false}}">
+    <div style="padding:14px 16px 0;display:flex;flex-direction:column;gap:14px">
+      <sc-for list="{{tdPlayerGroups}}" as="pg" hint-placeholder-count="1">
+        <div>
+          <sc-if value="{{pg.label}}" hint-placeholder-val="{{false}}">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:7px">{{pg.label}}</div>
+          </sc-if>
+          <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;overflow:hidden">
+            <sc-for list="{{pg.rows}}" as="p" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.07)">
+                <span style="flex:none;width:26px;height:26px;border-radius:50%;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:10.5px;font-weight:700;color:rgba(33,48,78,.6);display:flex;align-items:center;justify-content:center">{{p.seed}}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.name}}</div>
+                  <div style="font-size:10.5px;color:rgba(33,48,78,.5)">{{p.cc}}</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:700">{{p.rating}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{isLeaderboard}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Leaderboard" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Club leaderboard</h1>
+  </div>
+  <div style="margin:14px 16px 0;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+    <sc-for list="{{clubBoard}}" as="p" hint-placeholder-count="10">
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
+        <span style="flex:none;width:26px;height:26px;border-radius:50%;background:rgba(169,138,63,.14);color:#79622a;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">{{p.rank}}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.name}}</div>
+          <div style="font-size:11px;color:rgba(33,48,78,.55)">{{p.cc}}</div>
+        </div>
+        <span style="font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:700">{{p.rating}}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="font-size:11.5px;color:rgba(33,48,78,.5);margin:10px 18px 0">Club rapid ratings · updated after every rated event</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isGames}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Games" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:36px;height:36px;border-radius:50%;display:block;flex:none">
+    <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700">Review games</h1>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px;padding:22px 16px 0">
+    <button onClick="{{goGameReview}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:20px 18px;border:none;border-radius:14px;background:#7d2434;color:#f7f1e3;text-align:left" style-active="transform:scale(.99)">
+      <span aria-hidden="true" style="font-size:24px">♞</span>
+      <span style="flex:1"><span style="display:block;font-size:16px;font-weight:700">Game Review</span>
+      <span style="display:block;font-size:12.5px;opacity:.75;margin-top:2px">Review a finished game move by move</span></span>
+      <span aria-hidden="true" style="font-size:18px;opacity:.7">›</span>
+    </button>
+    <button onClick="{{goNewAnalysis}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:20px 18px;border:1.5px solid #21304e;border-radius:14px;background:#fdfaf1;color:#21304e;text-align:left" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="font-size:24px;color:#7d2434">♝</span>
+      <span style="flex:1"><span style="display:block;font-size:16px;font-weight:700">New Analysis</span>
+      <span style="display:block;font-size:12.5px;color:rgba(33,48,78,.6);margin-top:2px">Fresh analysis from any starting point</span></span>
+      <span aria-hidden="true" style="font-size:18px;color:rgba(33,48,78,.5)">›</span>
+    </button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isGameReview}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Game Review" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Game Review</h1>
+  </div>
+  <div style="padding:16px 16px 0">
+    <p style="margin:0 0 14px;font-size:13px;color:rgba(33,48,78,.6)">Pick where the game comes from.</p>
+    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+      <sc-for list="{{optReview}}" as="o" hint-placeholder-count="5">
+        <button onClick="{{o.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:15px 16px;background:none;border:none;border-bottom:1px solid rgba(33,48,78,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
+          <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:#21304e">{{o.t}}</span>
+          <span style="display:block;font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">{{o.sub}}</span></span>
+          <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isNewAnalysis}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="New Analysis" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">New Analysis</h1>
+  </div>
+  <div style="padding:16px 16px 0">
+    <p style="margin:0 0 14px;font-size:13px;color:rgba(33,48,78,.6)">Start a fresh analysis from zero.</p>
+    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+      <sc-for list="{{optAnalysis}}" as="o" hint-placeholder-count="6">
+        <button onClick="{{o.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:15px 16px;background:none;border:none;border-bottom:1px solid rgba(33,48,78,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
+          <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:#21304e">{{o.t}}</span>
+          <span style="display:block;font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">{{o.sub}}</span></span>
+          <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+        </button>
+      </sc-for>
+    </div>
+    <div style="margin-top:12px;font-size:11.5px;color:rgba(33,48,78,.5)">Mock only — no engine connected in this prototype.</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isPicklist}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Pick a game" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">{{pickTitle}}</h1>
+  </div>
+  <div style="padding:16px 16px 0">
+    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+      <sc-for list="{{pickRows}}" as="g" hint-placeholder-count="4">
+        <button onClick="{{g.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;background:none;border:none;border-bottom:1px solid rgba(33,48,78,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
+          <span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;color:#21304e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{g.t}}</span>
+          <span style="display:block;font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">{{g.sub}}</span></span>
+          <span style="flex:none;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;color:#21304e;padding:3px 8px;border-radius:8px;background:rgba(33,48,78,.07)">{{g.res}}</span>
+        </button>
+      </sc-for>
+    </div>
+    <div style="margin-top:12px;font-size:11.5px;color:rgba(33,48,78,.5)">Sample games (mock) — tap one to open the analysis board.</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isTools}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Tools" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:36px;height:36px;border-radius:50%;display:block;flex:none">
+    <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700">Tools</h1>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px;padding:16px 16px 0">
+    <button onClick="{{goClock}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:17px 16px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;text-align:left" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="flex:none;width:44px;height:44px;border-radius:11px;background:rgba(125,36,52,.08);border:1px solid rgba(125,36,52,.2);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:700;color:#7d2434">5:00</span>
+      <span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#21304e">Chess Clock</span>
+      <span style="display:block;font-size:12px;color:rgba(33,48,78,.6);margin-top:2px">Over-the-board timer with presets</span></span>
+      <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+    </button>
+    <button onClick="{{goSaved}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:17px 16px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;text-align:left" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="flex:none;width:44px;height:44px;border-radius:11px;background:rgba(125,36,52,.08);border:1px solid rgba(125,36,52,.2);display:flex;align-items:center;justify-content:center;font-size:21px;color:#7d2434">♜</span>
+      <span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#21304e">Saved Analyses</span>
+      <span style="display:block;font-size:12px;color:rgba(33,48,78,.6);margin-top:2px">Your stored positions and lines</span></span>
+      <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+    </button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isBoard}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Analysis Board" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Analysis Board</h1>
+  </div>
+  <div style="padding:14px 16px 0">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span aria-hidden="true" style="width:14px;height:14px;border-radius:50%;background:{{bStatusDot}};border:1px solid rgba(33,48,78,.35);flex:none"></span>
+      <span aria-live="polite" style="font-size:13.5px;font-weight:700;color:{{bStatusColor}}">{{bStatus}}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);border:2px solid #21304e;border-radius:8px;overflow:hidden;aspect-ratio:1;box-shadow:0 4px 14px rgba(33,48,78,.18)" role="grid" aria-label="Chessboard">
+      <sc-for list="{{sq}}" as="c" hint-placeholder-count="64">
+        <button onClick="{{c.tap}}" role="gridcell" style="position:relative;aspect-ratio:1;border:none;padding:0;background:{{c.bg}};display:flex;align-items:center;justify-content:center;font-size:clamp(22px,7.6vw,35px);line-height:1;color:{{c.col}};text-shadow:{{c.sh}}">
+          <sc-if value="{{c.dot}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="position:absolute;width:28%;height:28%;border-radius:50%;background:rgba(33,48,78,.34)"></span></sc-if>
+          <sc-if value="{{c.ring}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="position:absolute;inset:7%;border:3px solid rgba(125,36,52,.5);border-radius:50%"></span></sc-if>
+          <span style="position:relative;z-index:1">{{c.ch}}</span>
+        </button>
+      </sc-for>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onClick="{{doFlip}}" style="flex:1;padding:11px 0;border:1px solid rgba(33,48,78,.3);border-radius:10px;background:#fdfaf1;font-size:12.5px;font-weight:600;color:#21304e;min-height:44px" style-active="background:#f4ecd9">Flip</button>
+      <button onClick="{{doUndo}}" style="flex:1;padding:11px 0;border:1px solid rgba(33,48,78,.3);border-radius:10px;background:#fdfaf1;font-size:12.5px;font-weight:600;color:#21304e;min-height:44px" style-active="background:#f4ecd9">Undo</button>
+      <button onClick="{{doResetBoard}}" style="flex:1;padding:11px 0;border:1px solid rgba(33,48,78,.3);border-radius:10px;background:#fdfaf1;font-size:12.5px;font-weight:600;color:#21304e;min-height:44px" style-active="background:#f4ecd9">Reset</button>
+    </div>
+    <div style="margin-top:12px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:12px;padding:12px 14px;min-height:60px">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:6px">Move list</div>
+      <sc-if value="{{hasMoves}}" hint-placeholder-val="{{false}}">
+        <div style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.8;color:#21304e;overflow-wrap:break-word">{{movesText}}</div>
+      </sc-if>
+      <sc-if value="{{noMoves}}" hint-placeholder-val="{{true}}">
+        <div style="font-size:12.5px;color:rgba(33,48,78,.5)">Tap a piece to see its legal moves, then tap a highlighted square.</div>
+      </sc-if>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onClick="{{doSave}}" style="flex:1;padding:13px 0;border:none;border-radius:11px;background:#7d2434;color:#f7f1e3;font-size:13.5px;font-weight:600;min-height:48px" style-active="transform:scale(.985)">Save Analysis</button>
+      <button onClick="{{doExport}}" style="flex:1;padding:13px 0;border:1.5px solid #21304e;border-radius:11px;background:transparent;color:#21304e;font-size:13.5px;font-weight:600;min-height:48px" style-active="background:#f4ecd9">Export PGN</button>
+    </div>
+    <div style="margin-top:10px;font-size:11.5px;color:rgba(33,48,78,.55);text-align:center">{{saveCue}}</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isClock}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Chess Clock" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Chess Clock</h1>
+  </div>
+  <div style="padding:14px 16px 0">
+    <div role="group" aria-label="Time presets" style="display:flex;gap:7px;margin-bottom:14px">
+      <sc-for list="{{presets}}" as="p" hint-placeholder-count="5">
+        <button onClick="{{p.on}}" style="flex:1;padding:10px 0;border-radius:10px;border:1px solid rgba(33,48,78,.28);background:{{p.bg}};color:{{p.fg}};font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;min-height:44px">{{p.label}}</button>
+      </sc-for>
+    </div>
+    <button onClick="{{tapB}}" aria-label="Black clock" style="width:100%;border:1px solid {{bPan.bd}};border-radius:16px;background:{{bPan.bg}};color:{{bPan.fg}};padding:26px 20px;text-align:center;animation:{{bPan.anim}}">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.65">Black</div>
+      <div style="font-family:ui-monospace,Menlo,monospace;font-size:56px;font-weight:700;line-height:1.1">{{bPan.time}}</div>
+      <div style="font-size:11.5px;font-weight:600;opacity:.7;margin-top:2px">{{bPan.sub}}</div>
+    </button>
+    <div style="height:10px"></div>
+    <button onClick="{{tapW}}" aria-label="White clock" style="width:100%;border:1px solid {{wPan.bd}};border-radius:16px;background:{{wPan.bg}};color:{{wPan.fg}};padding:26px 20px;text-align:center;animation:{{wPan.anim}}">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.65">White</div>
+      <div style="font-family:ui-monospace,Menlo,monospace;font-size:56px;font-weight:700;line-height:1.1">{{wPan.time}}</div>
+      <div style="font-size:11.5px;font-weight:600;opacity:.7;margin-top:2px">{{wPan.sub}}</div>
+    </button>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onClick="{{togglePause}}" style="flex:1;padding:13px 0;border:none;border-radius:11px;background:#7d2434;color:#f7f1e3;font-size:13.5px;font-weight:600;min-height:48px" style-active="transform:scale(.985)">{{pauseLabel}}</button>
+      <button onClick="{{resetClock}}" style="flex:1;padding:13px 0;border:1.5px solid #21304e;border-radius:11px;background:transparent;color:#21304e;font-size:13.5px;font-weight:600;min-height:48px" style-active="background:#f4ecd9">Reset</button>
+    </div>
+    <div style="margin-top:10px;font-size:11.5px;color:rgba(33,48,78,.55);text-align:center">Tap your own clock after moving to start your opponent's time.</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isSaved}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Saved Analyses" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Saved Analyses</h1>
+  </div>
+  <div style="padding:16px 16px 0">
+    <sc-if value="{{savedEmpty}}" hint-placeholder-val="{{false}}">
+      <div style="background:#fdfaf1;border:1px dashed rgba(33,48,78,.3);border-radius:14px;padding:30px 20px;text-align:center">
+        <div aria-hidden="true" style="font-size:26px;color:rgba(33,48,78,.35)">♜</div>
+        <div style="font-size:13.5px;font-weight:600;margin-top:8px">Nothing saved yet</div>
+        <div style="font-size:12.5px;color:rgba(33,48,78,.6);margin-top:3px">Sign in to keep analyses across sessions.</div>
+        <button onClick="{{goSignin}}" style="margin-top:14px;padding:11px 22px;border:none;border-radius:10px;background:#7d2434;color:#f7f1e3;font-size:13px;font-weight:600">Sign in</button>
+      </div>
+    </sc-if>
+    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+      <sc-for list="{{savedRows}}" as="a" hint-placeholder-count="2">
+        <button onClick="{{a.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;background:none;border:none;border-bottom:1px solid rgba(33,48,78,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
+          <span aria-hidden="true" style="flex:none;width:34px;height:34px;border-radius:9px;background:rgba(125,36,52,.08);border:1px solid rgba(125,36,52,.2);display:flex;align-items:center;justify-content:center;font-size:15px;color:#7d2434">♟</span>
+          <span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;color:#21304e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{a.t}}</span>
+          <span style="display:block;font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">{{a.sub}}</span></span>
+          <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isProfile}}" hint-placeholder-val="{{false}}">
+<div data-screen-label="Profile" style="padding:0 0 118px">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+    <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:36px;height:36px;border-radius:50%;display:block;flex:none">
+    <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700">Profile</h1>
+  </div>
+
+  <sc-if value="{{isGuest}}" hint-placeholder-val="{{false}}">
+    <div style="padding:26px 16px 0;text-align:center">
+      <div aria-hidden="true" style="width:76px;height:76px;border-radius:50%;background:rgba(33,48,78,.07);border:1px solid rgba(33,48,78,.2);margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:30px;color:rgba(33,48,78,.4)">♟</div>
+      <div style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700;margin-top:14px">You're in Guest Mode</div>
+      <div style="font-size:13px;color:rgba(33,48,78,.6);margin-top:5px;line-height:1.5">Sign in to see your club rating, rank,<br>tournament history and achievements.</div>
+      <button onClick="{{goSignin}}" style="margin-top:18px;padding:13px 34px;border:none;border-radius:11px;background:#7d2434;color:#f7f1e3;font-size:14.5px;font-weight:600" style-active="transform:scale(.985)">Sign in</button>
+      <div style="margin-top:12px;font-size:13px;color:rgba(33,48,78,.6)">New to the club? <button onClick="{{goSignup}}" style="background:none;border:none;padding:4px 2px;font-size:13px;font-weight:700;color:#7d2434">Sign up</button></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isMember}}" hint-placeholder-val="{{false}}">
+    <div style="padding:16px 16px 0">
+      <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px">
+        <div aria-hidden="true" style="flex:none;width:62px;height:62px;border-radius:50%;background:rgba(169,138,63,.16);border:1px solid rgba(169,138,63,.4);display:flex;align-items:center;justify-content:center;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700;color:#79622a">{{pInit}}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700;overflow-wrap:break-word">{{pName}}</div>
+          <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:2px">Chess.com: {{pCc}}</div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <span style="padding:3px 9px;border-radius:999px;background:rgba(169,138,63,.14);border:1px solid rgba(169,138,63,.4);font-size:11px;font-weight:700;color:#79622a">Rating {{pRating}}</span>
+            <span style="padding:3px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.15);font-size:11px;font-weight:700;color:#33415f">Club rank {{pRank}}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
+        <sc-for list="{{pStats}}" as="st" hint-placeholder-count="3">
+          <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:12px;padding:12px 8px;text-align:center">
+            <div style="font-family:ui-monospace,Menlo,monospace;font-size:20px;font-weight:700">{{st.x}}</div>
+            <div style="font-size:11px;color:rgba(33,48,78,.55);font-weight:600;margin-top:2px">{{st.k}}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin:20px 0 8px;font-family:'Source Serif 4',Georgia,serif;font-size:15.5px;font-weight:700">Achievements</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px">
+        <sc-for list="{{pAch}}" as="a" hint-placeholder-count="3">
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:rgba(169,138,63,.12);border:1px solid rgba(169,138,63,.38);font-size:12px;font-weight:600;color:#79622a"><span aria-hidden="true">♛</span>{{a.x}}</span>
+        </sc-for>
+      </div>
+
+      <div style="margin:20px 0 8px;font-family:'Source Serif 4',Georgia,serif;font-size:15.5px;font-weight:700">Recent tournament games</div>
+      <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+        <sc-for list="{{pGames}}" as="g" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{g.t}}</div>
+              <div style="font-size:11px;color:rgba(33,48,78,.55);margin-top:2px">{{g.sub}}</div>
+            </div>
+            <span style="flex:none;padding:4px 10px;border-radius:999px;background:{{g.cBg}};color:{{g.cFg}};font-size:11px;font-weight:700">{{g.chip}}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:14px;padding:13px 14px;background:rgba(33,48,78,.04);border:1px solid rgba(33,48,78,.14);border-radius:13px;display:flex;align-items:center;gap:12px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">Sync Chess.com games</div>
+          <div style="font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">Pull your latest online games (mock)</div>
+        </div>
+        <button onClick="{{syncCc}}" style="flex:none;padding:10px 16px;border:1.5px solid #21304e;border-radius:10px;background:transparent;color:#21304e;font-size:12.5px;font-weight:700;min-height:42px" style-active="background:#f4ecd9">Sync</button>
+      </div>
+
+      <button onClick="{{signOut}}" style="width:100%;margin-top:14px;padding:13px;border:1px solid rgba(125,36,52,.4);border-radius:11px;background:transparent;color:#7d2434;font-size:13.5px;font-weight:600" style-active="background:rgba(125,36,52,.06)">Sign out</button>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+
+        </div>
+      </div>
+
+<sc-if value="{{showToast}}" hint-placeholder-val="{{false}}">
+  <div role="status" style="position:absolute;bottom:96px;left:50%;transform:translateX(-50%);background:#21304e;color:#f7f1e3;padding:10px 16px;border-radius:10px;font-size:13px;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:360px;width:max-content;text-align:center">{{toastText}}</div>
+</sc-if>
+
+<sc-if value="{{showNav}}" hint-placeholder-val="{{true}}">
+<nav aria-label="Primary" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:{{contentMax}};background:#fbf7ec;border-top:1px solid rgba(33,48,78,.15);display:flex;padding:5px 4px 10px;z-index:40">
+  <button onClick="{{goHome}}" aria-label="Home" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;padding:6px 0;min-height:48px;color:{{cHome}}">
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"></path><path d="M5 9.5V21h14V9.5"></path></svg>
+    <span style="font-size:10px;font-weight:600">Home</span>
+  </button>
+  <button onClick="{{goTournaments}}" aria-label="Tournaments" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;padding:6px 0;min-height:48px;color:{{cTour}}">
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"></path><path d="M8 5H4.5c0 3 1.5 4.5 3.5 4.5"></path><path d="M16 5h3.5c0 3-1.5 4.5-3.5 4.5"></path><path d="M12 13v4"></path><path d="M8 21h8"></path><path d="M9.5 21c0-2.5 1-4 2.5-4s2.5 1.5 2.5 4"></path></svg>
+    <span style="font-size:10px;font-weight:600">Tournaments</span>
+  </button>
+  <button onClick="{{goGames}}" aria-label="Games" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;padding:6px 0;min-height:48px;color:{{cGames}}">
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M4 12h16M12 4v16" stroke-width="1.4"></path><rect x="4.8" y="4.8" width="6.4" height="6.4" fill="currentColor" stroke="none" opacity=".35"></rect><rect x="12.8" y="12.8" width="6.4" height="6.4" fill="currentColor" stroke="none" opacity=".35"></rect></svg>
+    <span style="font-size:10px;font-weight:600">Games</span>
+  </button>
+  <button onClick="{{goTools}}" aria-label="Tools" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;padding:6px 0;min-height:48px;color:{{cTools}}">
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"></path><circle cx="9" cy="7" r="2.2" fill="#f6f0e2"></circle><path d="M4 17h16"></path><circle cx="15" cy="17" r="2.2" fill="#f6f0e2"></circle></svg>
+    <span style="font-size:10px;font-weight:600">Tools</span>
+  </button>
+  <button onClick="{{goProfile}}" aria-label="Profile" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;padding:6px 0;min-height:48px;color:{{cProfile}}">
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c1.2-3.2 3.8-5 7-5s5.8 1.8 7 5"></path></svg>
+    <span style="font-size:10px;font-weight:600">Profile</span>
+  </button>
+</nav>
+</sc-if>
+
+    </div>
+  </div>
+  </div>
+  <sc-if value="{{sbShow}}" hint-placeholder-val="{{false}}">
+    <div ref="{{trackRef}}" aria-hidden="true" style="flex:none;position:relative;width:7px;height:{{fitH}}px;border-radius:5px;background:rgba(33,48,78,.12)">
+      <div onMouseDown="{{sbDown}}" style="position:absolute;left:0;right:0;height:{{sbThumbH}};top:{{sbThumbT}};background:rgba(33,48,78,.4);border-radius:5px;cursor:grab"></div>
+    </div>
+  </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:430,&quot;height&quot;:900},&quot;signedIn&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;State&quot;},&quot;clockWarnSecs&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:20,&quot;min&quot;:5,&quot;max&quot;:60,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Chess clock&quot;}}">
+class Component extends DCLogic {
+  P = [
+    ['Ibrahim Ahmad',1810,'ibrahim_ju'],['Omar Saleh',1740,'omar_saleh'],['Leen Haddad',1685,'leenh'],
+    ['Yazan Khaled',1602,'ykhaled'],['Sara Nasser',1550,'sara_n'],['Mohammad Al-Khatib',1490,'mohammad_ak'],
+    ['Rania Odeh',1465,'rania_o'],['Khaled Mansour',1438,'kmansour'],['Tala Amer',1410,'tala_amer'],
+    ['Hussein Darwish',1385,'hdarwish'],['Noor Aziz',1360,'noor_az'],['Faris Hijazi',1332,'faris_h'],
+    ['Zaid Qasem',1305,'zaid_q'],['Lina Shahin',1288,'lina_sh'],['Anas Jaber',1260,'anas_j'],
+    ['Dana Suleiman',1236,'dana_s'],['Majd Awad',1210,'majd_a'],['Aya Barakat',1188,'aya_b'],
+    ['Karim Nofal',1160,'karim_n'],['Salma Tahat',1132,'salma_t'],
+    ['Hamza Arar',1720,'hamza_gju'],['Rand Melhem',1610,'rand_m'],['Tariq Bakri',1540,'tariq_b'],['Dua Sami',1470,'dua_s'],
+    ['Waleed Zoubi',1690,'waleed_z'],['Hala Murad',1580,'hala_m'],['Sami Freij',1500,'sami_f'],['Reem Ayed',1420,'reem_a'],
+    ['Nizar Hilal',1660,'nizar_h'],['Batool Asfour',1560,'batool_a'],['Adel Rifai',1480,'adel_r'],['Jude Kanaan',1400,'jude_k']
+  ];
+  seed = 987654321;
+  PRESETS = [['1+0',60,0],['3+2',180,2],['5+0',300,0],['10+0',600,0],['10+5',600,5]];
+  DEVS = {
+    ios:{bezel:'#0f1013',outerR:'50px',pad:'12px',w:'390px',h:'800px',innerR:'40px',contentMax:'100%',statusH:'46px',statusFs:'15px',statusPad:'26px',islandZone:'46px',camW:'96px',camH:'27px'},
+    android:{bezel:'#17181c',outerR:'34px',pad:'10px',w:'400px',h:'810px',innerR:'26px',contentMax:'100%',statusH:'32px',statusFs:'13px',statusPad:'18px',islandZone:'32px',camW:'9px',camH:'9px'},
+    tablet:{bezel:'#202127',outerR:'30px',pad:'16px',w:'660px',h:'900px',innerR:'16px',contentMax:'460px',statusH:'34px',statusFs:'13px',statusPad:'26px',islandZone:'34px',camW:'8px',camH:'8px'}
+  };
+
+  rnd(){ this.seed = (Math.imul(this.seed,1664525)+1013904223)>>>0; return this.seed/4294967296; }
+  res(w,b){ const pa=1/(1+Math.pow(10,(this.P[b][1]-this.P[w][1])/400)); if(this.rnd()<0.2) return '½-½'; return this.rnd()<pa?'1-0':'0-1'; }
+  koWin(a,b){ const pa=1/(1+Math.pow(10,(this.P[b][1]-this.P[a][1])/400)); return this.rnd()<pa?a:b; }
+
+  swiss(idxs,done,liveFinished){
+    const pts={},met={}; idxs.forEach(i=>{pts[i]=0;met[i]={};});
+    const rounds=[]; const total=done+(liveFinished!=null?1:0);
+    for(let r=1;r<=total;r++){
+      const isLive=liveFinished!=null&&r===total;
+      const un=[...idxs].sort((a,b)=>pts[b]-pts[a]||this.P[b][1]-this.P[a][1]);
+      const games=[];
+      while(un.length){
+        const w=un.shift();
+        let j=un.findIndex(o=>!met[w][o]); if(j<0)j=0;
+        const b=un.splice(j,1)[0]; met[w][b]=1; met[b][w]=1;
+        const bd=games.length+1;
+        let res;
+        if(isLive&&bd>liveFinished){ res='live'; }
+        else{ res=this.res(w,b); if(res==='1-0')pts[w]+=1; else if(res==='0-1')pts[b]+=1; else {pts[w]+=.5;pts[b]+=.5;} }
+        games.push({board:bd,w,b,res});
+      }
+      rounds.push({label:'Round '+r,games});
+    }
+    return rounds;
+  }
+
+  rrSched(idxs){
+    const a=[...idxs],n=a.length,rs=[];
+    for(let r=0;r<n-1;r++){
+      const gs=[];
+      for(let i=0;i<n/2;i++){ let w=a[i],b=a[n-1-i]; if(r%2){const t=w;w=b;b=t;} gs.push([w,b]); }
+      rs.push(gs); a.splice(1,0,a.pop());
+    }
+    return rs;
+  }
+  rrRounds(idxs,lab,done,liveSpec,dbl){
+    let sch=this.rrSched(idxs);
+    if(dbl) sch=sch.concat(sch.map(gs=>gs.map(g=>[g[1],g[0]])));
+    return sch.map((gs,ri)=>{
+      const rn=ri+1,isLive=liveSpec&&rn===done+1;
+      return {label:lab(rn),games:gs.map((g,gi)=>{
+        let res='–';
+        if(rn<=done) res=this.res(g[0],g[1]);
+        else if(isLive){ if(gi<liveSpec.done) res=this.res(g[0],g[1]); else if(gi<liveSpec.done+liveSpec.live) res='live'; }
+        return {board:gi+1,w:g[0],b:g[1],res};
+      })};
+    });
+  }
+
+  stand(idxs,rounds){
+    const s={}; idxs.forEach(i=>s[i]={i,pts:0,w:0,d:0,l:0});
+    rounds.forEach(r=>r.games.forEach(g=>{
+      if(g.res==='1-0'){s[g.w].pts+=1;s[g.w].w++;s[g.b].l++;}
+      else if(g.res==='0-1'){s[g.b].pts+=1;s[g.b].w++;s[g.w].l++;}
+      else if(g.res==='½-½'){s[g.w].pts+=.5;s[g.b].pts+=.5;s[g.w].d++;s[g.b].d++;}
+    }));
+    return Object.values(s).sort((a,b)=>b.pts-a.pts||this.P[b.i][1]-this.P[a.i][1]).map((x,k)=>Object.assign({},x,{rank:k+1}));
+  }
+
+  koRounds(seeds,labels,st){
+    let cur=seeds; const out=[];
+    labels.forEach((lab,r)=>{
+      const ms=[],next=[];
+      for(let m=0;m<cur.length/2;m++){
+        const p1=cur[2*m],p2=cur[2*m+1];
+        let winner=null,live=false;
+        if(p1!=null&&p2!=null){
+          if(r<st.done) winner=this.koWin(p1,p2);
+          else if(r===st.done&&m<st.live) live=true;
+        }
+        ms.push({p1,p2,winner,live}); next.push(winner);
+      }
+      out.push({label:lab,matches:ms}); cur=next;
+    });
+    return out;
+  }
+
+  de8(idxs){
+    const s=[idxs[0],idxs[7],idxs[3],idxs[4],idxs[1],idxs[6],idxs[2],idxs[5]];
+    const m=(a,b)=>{const w=this.koWin(a,b);return {p1:a,p2:b,winner:w,live:false};};
+    const lose=x=>x.winner===x.p1?x.p2:x.p1;
+    const wqf=[m(s[0],s[1]),m(s[2],s[3]),m(s[4],s[5]),m(s[6],s[7])];
+    const wsf=[m(wqf[0].winner,wqf[1].winner),m(wqf[2].winner,wqf[3].winner)];
+    const wf=[m(wsf[0].winner,wsf[1].winner)];
+    const l1=[m(lose(wqf[0]),lose(wqf[1])),m(lose(wqf[2]),lose(wqf[3]))];
+    const l2=[m(l1[0].winner,lose(wsf[1])),m(l1[1].winner,lose(wsf[0]))];
+    const lsf=[m(l2[0].winner,l2[1].winner)];
+    const lf=[m(lsf[0].winner,lose(wf[0]))];
+    const f1=m(wf[0].winner,lf[0].winner);
+    const fin=[{label:'Final 1',matches:[f1]}];
+    if(f1.winner===lf[0].winner) fin.push({label:'Final 2',matches:[m(wf[0].winner,lf[0].winner)]});
+    return {
+      wb:[{label:'Winners Quarterfinal',matches:wqf},{label:'Winners Semifinal',matches:wsf},{label:'Winners Final',matches:wf}],
+      lb:[{label:'Losers Round 1',matches:l1},{label:'Losers Round 2',matches:l2},{label:'Losers Semifinal',matches:lsf},{label:'Losers Final',matches:lf}],
+      fin, champ: fin[fin.length-1].matches[0].winner
+    };
+  }
+
+  buildTeam(){
+    const T=[{n:'University of Jordan',s:'JU',r:[0,1,2,3]},{n:'German Jordanian University',s:'GJU',r:[20,21,22,23]},{n:'Princess Sumaya University',s:'PSUT',r:[24,25,26,27]},{n:'Yarmouk University',s:'YU',r:[28,29,30,31]}];
+    const pair=[[[0,3],[1,2]],[[0,2],[3,1]],[[0,1],[2,3]]];
+    const days=pair.map((dm,di)=>({label:'Match Day '+(di+1),matches:dm.map((ab,mi)=>{
+      const a=ab[0],b=ab[1];
+      const boards=[0,1,2,3].map(bi=>{
+        const aw=bi%2===0;
+        const w=aw?T[a].r[bi]:T[b].r[bi], bl=aw?T[b].r[bi]:T[a].r[bi];
+        let res='–';
+        if(di===0) res=this.res(w,bl);
+        else if(di===1){ const dn=mi===0?2:1; res = bi<dn? this.res(w,bl):'live'; }
+        return {board:bi+1,w,b:bl,res,aWhite:aw};
+      });
+      let as=0,bs=0;
+      boards.forEach(g=>{
+        if(g.res==='1-0'){ if(g.aWhite)as+=1; else bs+=1; }
+        else if(g.res==='0-1'){ if(g.aWhite)bs+=1; else as+=1; }
+        else if(g.res==='½-½'){ as+=.5; bs+=.5; }
+      });
+      return {a,b,boards,as,bs,live:di===1,upcoming:di===2};
+    })}));
+    const st=T.map((t,i)=>({i,mp:0,gp:0}));
+    days[0].matches.forEach(mm=>{
+      st[mm.a].gp+=mm.as; st[mm.b].gp+=mm.bs;
+      if(mm.as>mm.bs)st[mm.a].mp+=2; else if(mm.bs>mm.as)st[mm.b].mp+=2; else {st[mm.a].mp+=1;st[mm.b].mp+=1;}
+    });
+    return {T,days,st:[...st].sort((a,b)=>b.mp-a.mp||b.gp-a.gp)};
+  }
+
+  buildAll(){
+    const r=(a,b)=>Array.from({length:b-a},(_,k)=>a+k);
+    const o16=[0,15,7,8,4,11,3,12,5,10,2,13,6,9,1,14];
+    const o8=[0,7,3,4,1,6,2,5];
+    const D={byId:{},list:[]};
+    const add=t=>{D.byId[t.id]=t;D.list.push(t);};
+
+    add({id:'rapid',name:'University of Jordan Rapid Championship',fk:'swiss',status:'active',fmt:'Swiss · 7 rounds',tc:'15+10 Rapid',date:'Sat, Jul 4 · 4:00 PM',dates:'Jul 4 – Jul 5, 2026',loc:'Main Campus · Hall B',org:'JU Chess Club',reg:'Closed',capText:'12/16 players',idxs:r(0,12),rounds:this.swiss(r(0,12),3,2),cur:'Round 4 of 7',upNote:'Rounds 5–7 · pairings are published after Round 4'});
+    add({id:'koblitz',name:'JU Blitz Knockout Cup',fk:'ko',status:'active',fmt:'Single elimination',tc:'3+2 Blitz',date:'Thu, Jul 2 · 6:00 PM',dates:'Jul 2, 2026',loc:'Student Union · Room 12',org:'JU Chess Club',reg:'Closed',capText:'16 players',idxs:r(0,16),bracket:this.koRounds(o16,['Round of 16','Quarterfinal','Semifinal','Final'],{done:2,live:2}),cur:'Semifinal'});
+    add({id:'arena',name:'Summer Bullet Arena',fk:'arena',status:'active',fmt:'Arena · 60 min',tc:'1+0 Bullet',date:'Today · 8:00 PM',dates:'Jul 2, 2026',loc:'Online · Club server',org:'JU Chess Club',reg:'Open during arena',capText:'10 players',idxs:[1,3,4,6,8,10,12,13,15,17],cur:'In progress'});
+    add({id:'team',name:'Amman Universities Team Battle',fk:'team',status:'active',fmt:'Team · 4 boards',tc:'10+0 Rapid',date:'Jul 1 – Jul 8 · 5:00 PM',dates:'Jul 1 – Jul 8, 2026',loc:'JU Sports Complex · Hall 2',org:'JU Chess Club',reg:'Closed',capText:'4 teams',idxs:[0,1,2,3,20,21,22,23,24,25,26,27,28,29,30,31],cur:'Match Day 2 of 3'});
+    add({id:'league',name:'JU Chess League 2026',fk:'league',status:'active',fmt:'League · 7 weeks',tc:'10+5 Rapid',date:'Tuesdays · 5:30 PM',dates:'Jun 9 – Jul 21, 2026',loc:'Main Campus · Hall B',org:'JU Chess Club',reg:'Closed',capText:'8 players',idxs:[0,2,4,5,7,9,11,14],rounds:this.rrRounds([0,2,4,5,7,9,11,14],n=>'Week '+n,3,{done:1,live:2},false),cur:'Week 4 of 7'});
+
+    const mi=r(6,18);
+    const st1=this.swiss(mi,5,null);
+    const st1stand=this.stand(mi,st1);
+    const qual=st1stand.slice(0,8).map(x=>x.i);
+    add({id:'multi',name:'JU Club Championship 2026',fk:'multi',status:'active',fmt:'Multi-stage · Swiss + Knockout',tc:'15+10 / 10+5',date:'Jun 20 – Jul 11',dates:'Jun 20 – Jul 11, 2026',loc:'Main Campus · Hall A',org:'JU Chess Club',reg:'Closed',capText:'12 players',idxs:mi,st1rounds:st1,st1stand,qual,st2:this.koRounds(o8.map(k=>qual[k]),['Quarterfinal','Semifinal','Final'],{done:0,live:2}),cur:'Stage 2 · Quarterfinal'});
+
+    add({id:'masters',name:'Masters Six · Double Round-Robin Invitational',fk:'drr',status:'upcoming',fmt:'Double round-robin',tc:'90+30 Classical',date:'Sun, Jul 12 · 10:00 AM',dates:'Jul 12 – Aug 2, 2026',loc:'Main Campus · Hall A',org:'JU Chess Club',reg:'Invitation only',capText:'6 players',idxs:r(0,6),rounds:this.rrRounds(r(0,6),n=>'Round '+n,0,null,true),cur:'Starts Jul 12'});
+    add({id:'autumn',name:'Autumn Swiss Open',fk:'swiss',status:'upcoming',fmt:'Swiss · 6 rounds',tc:'10+5 Rapid',date:'Sat, Sep 19 · 3:00 PM',dates:'Sep 19 – 20, 2026',loc:'Student Union · Main Hall',org:'JU Chess Club',reg:'Open',capText:'9/24 registered',idxs:[0,2,5,7,9,11,13,16,18],rounds:[],cur:'Registration open'});
+
+    const ri=[4,5,6,7,8,9];
+    add({id:'spring',name:'Spring Invitational',fk:'rr',status:'completed',fmt:'Round-robin',tc:'25+10 Rapid',date:'May 16 – May 17',dates:'May 16 – 17, 2026',loc:'Main Campus · Hall A',org:'JU Chess Club',reg:'Closed',capText:'6 players',idxs:ri,rounds:this.rrRounds(ri,n=>'Round '+n,5,null,false),cur:'Finished'});
+    const di=[2,3,5,6,8,10,12,14];
+    add({id:'winter',name:'Winter Blitz Cup',fk:'de',status:'completed',fmt:'Double elimination',tc:'5+3 Blitz',date:'Dec 13, 2025',dates:'Dec 13, 2025',loc:'Student Union · Room 12',org:'JU Chess Club',reg:'Closed',capText:'8 players',idxs:di,de:this.de8(di),cur:'Finished'});
+
+    const ai=D.byId.arena.idxs;
+    D.arena={
+      rows:ai.map((i,k)=>{const g=9+Math.floor(this.rnd()*5);const wr=Math.max(.2,.78-k*.055+this.rnd()*.12);return {i,g,pts:Math.round(g*2*wr),stk:this.rnd()<.45?Math.floor(this.rnd()*4)+2:0};}).sort((a,b)=>b.pts-a.pts),
+      act:[[ai[0],ai[4]],[ai[2],ai[7]],[ai[5],ai[9]]].map((p,k)=>({board:k+1,w:p[0],b:p[1],res:'live'})),
+      rec:[[ai[1],ai[3],'1-0'],[ai[6],ai[0],'0-1'],[ai[8],ai[2],'½-½'],[ai[4],ai[6],'1-0'],[ai[9],ai[1],'0-1']].map((g,k)=>({board:k+1,w:g[0],b:g[1],res:g[2]})),
+      endsAt:Date.now()+23*60000+14000
+    };
+    D.team=this.buildTeam();
+    return D;
+  }
+
+  D = this.buildAll();
+
+  startPos(){
+    const bk=['r','n','b','q','k','b','n','r'];
+    return [...bk.map(p=>'b'+p),...Array(8).fill('bp'),...Array(32).fill(null),...Array(8).fill('wp'),...bk.map(p=>'w'+p)];
+  }
+
+  state = {
+    route:{name:'home',params:{}},stack:[],user:null,
+    tTab:'active',dTab:'overview',brSeg:'w',stageSel:1,brFocus:0,device:'ios',otpMethod:'email',suStr:0,rpStr:0,fit:1,sbVis:0,sbFrac:0,
+    pwa:false,pwb:false,pwc:false,pwd:false,pwe:false,
+    cells:this.startPos(),sel:-1,flip:false,hist:[],moves:[],
+    bTurn:'w',bcastle:{wK:true,wQ:true,bK:true,bQ:true},bep:-1,legal:[],bLast:null,bGameOver:null,bCheckIdx:-1,
+    saved:[],reg:{},
+    preset:'10+0',wT:600,bT:600,inc:0,running:false,turn:'w',flag:null,
+    toast:null,now:Date.now()
+  };
+
+  fit(){
+    const d=this.DEVS[this.state.device]||this.DEVS.ios;
+    const nh=parseInt(d.h)+2*parseInt(d.pad), nw=parseInt(d.w)+2*parseInt(d.pad);
+    const switchBottom=this.switcherEl?this.switcherEl.getBoundingClientRect().bottom:60;
+    const availH=window.innerHeight-switchBottom-26, availW=window.innerWidth-28;
+    let s=Math.min(availH/nh, availW/nw, 2.2);
+    if(!isFinite(s)||s<=0) s=1;
+    this.setState({fit:s});
+  }
+  componentDidMount(){
+    this.fit(); this._onR=()=>this.fit(); window.addEventListener('resize',this._onR);
+    requestAnimationFrame(()=>this.updateSb());
+    this.iv=setInterval(()=>{
+      const s=this.state; const up={now:Date.now()};
+      if(s.running&&!s.flag){
+        const k=s.turn==='w'?'wT':'bT';
+        const nv=Math.max(0,s[k]-1);
+        up[k]=nv;
+        if(nv===0){ up.running=false; up.flag=s.turn; }
+      }
+      this.setState(up);
+    },1000);
+  }
+  componentWillUnmount(){ clearInterval(this.iv); if(this._onR) window.removeEventListener('resize',this._onR); }
+
+  user(){ return this.state.user || (this.props.signedIn?{name:'Ibrahim Ahmad',cc:'ibrahim_ju',rating:1810,rank:1}:null); }
+
+  go(name,params){
+    this.setState({route:{name,params:params||{}},stack:[...this.state.stack,this.state.route],dTab:name==='tournament'?'overview':this.state.dTab,brSeg:'w',sel:-1,stageSel:name==='tournament'?1:this.state.stageSel,brFocus:0});
+    if(this.scrollEl) this.scrollEl.scrollTo(0,0);
+    requestAnimationFrame(()=>this.updateSb());
+  }
+  back(){
+    const st=[...this.state.stack]; const prev=st.pop()||{name:'home',params:{}};
+    this.setState({route:prev,stack:st}); if(this.scrollEl) this.scrollEl.scrollTo(0,0);
+    requestAnimationFrame(()=>this.updateSb());
+  }
+  notify(msg){
+    this.setState({toast:msg});
+    clearTimeout(this._tt);
+    this._tt=setTimeout(()=>this.setState({toast:null}),2400);
+  }
+  openBoard(mode){
+    const cells=mode==='empty'?Array(64).fill(null):this.startPos();
+    this.go('board');
+    this.setState({cells,moves:[],hist:[],sel:-1,flip:false,bTurn:'w',bcastle:{wK:true,wQ:true,bK:true,bQ:true},bep:-1,legal:[],bLast:null,bGameOver:null,bCheckIdx:-1});
+    if(mode==='mock') this.notify('Board ready — play out any line (mock, no engine)');
+  }
+  inb(r,c){ return r>=0&&r<8&&c>=0&&c<8; }
+  ix(r,c){ return r*8+c; }
+  rc(i){ return [Math.floor(i/8), i%8]; }
+  pseudo(cells,i,st){
+    const p=cells[i]; if(!p) return [];
+    const col=p[0],type=p[1],[r,c]=this.rc(i),out=[];
+    if(type==='p'){
+      const dir=col==='w'?-1:1, sr=col==='w'?6:1;
+      if(this.inb(r+dir,c)&&!cells[this.ix(r+dir,c)]){ out.push(this.ix(r+dir,c)); if(r===sr&&!cells[this.ix(r+2*dir,c)]) out.push(this.ix(r+2*dir,c)); }
+      for(const dc of [-1,1]){ const rr=r+dir,cc=c+dc; if(!this.inb(rr,cc))continue; const ti=this.ix(rr,cc); if(cells[ti]&&cells[ti][0]!==col) out.push(ti); else if(ti===st.ep) out.push(ti); }
+    } else if(type==='n'){
+      for(const [dr,dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){ const rr=r+dr,cc=c+dc; if(this.inb(rr,cc)){const t=cells[this.ix(rr,cc)]; if(!t||t[0]!==col)out.push(this.ix(rr,cc));} }
+    } else if(type==='k'){
+      for(const dr of [-1,0,1])for(const dc of [-1,0,1]){ if(!dr&&!dc)continue; const rr=r+dr,cc=c+dc; if(this.inb(rr,cc)){const t=cells[this.ix(rr,cc)]; if(!t||t[0]!==col)out.push(this.ix(rr,cc));} }
+    } else {
+      const dirs=type==='b'?[[-1,-1],[-1,1],[1,-1],[1,1]]:type==='r'?[[-1,0],[1,0],[0,-1],[0,1]]:[[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]];
+      for(const [dr,dc] of dirs){ let rr=r+dr,cc=c+dc; while(this.inb(rr,cc)){ const ti=this.ix(rr,cc); if(!cells[ti]){out.push(ti);} else { if(cells[ti][0]!==col)out.push(ti); break; } rr+=dr;cc+=dc; } }
+    }
+    return out;
+  }
+  attacked(cells,i,by){
+    const [r,c]=this.rc(i), pd=by==='w'?1:-1;
+    for(const dc of [-1,1]){ const rr=r+pd,cc=c+dc; if(this.inb(rr,cc)&&cells[this.ix(rr,cc)]===by+'p')return true; }
+    for(const [dr,dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){ const rr=r+dr,cc=c+dc; if(this.inb(rr,cc)&&cells[this.ix(rr,cc)]===by+'n')return true; }
+    for(const dr of [-1,0,1])for(const dc of [-1,0,1]){ if(!dr&&!dc)continue; const rr=r+dr,cc=c+dc; if(this.inb(rr,cc)&&cells[this.ix(rr,cc)]===by+'k')return true; }
+    for(const [dr,dc] of [[-1,-1],[-1,1],[1,-1],[1,1]]){ let rr=r+dr,cc=c+dc; while(this.inb(rr,cc)){ const p=cells[this.ix(rr,cc)]; if(p){ if(p[0]===by&&(p[1]==='b'||p[1]==='q'))return true; break; } rr+=dr;cc+=dc; } }
+    for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){ let rr=r+dr,cc=c+dc; while(this.inb(rr,cc)){ const p=cells[this.ix(rr,cc)]; if(p){ if(p[0]===by&&(p[1]==='r'||p[1]==='q'))return true; break; } rr+=dr;cc+=dc; } }
+    return false;
+  }
+  kingIx(cells,col){ return cells.indexOf(col+'k'); }
+  applyMove(cells,from,to,st){
+    const nc=[...cells],p=nc[from],col=p[0],type=p[1];
+    const [fr,fc]=this.rc(from),[tr,tc]=this.rc(to);
+    let ep=-1,capture=!!nc[to],castleSide=null,promo=false; const castle={...st.castle};
+    if(type==='p'&&to===st.ep&&!nc[to]){ nc[this.ix(fr,tc)]=null; capture=true; }
+    nc[to]=p; nc[from]=null;
+    if(type==='p'&&Math.abs(tr-fr)===2) ep=this.ix((fr+tr)/2,fc);
+    if(type==='p'&&(tr===0||tr===7)){ nc[to]=col+'q'; promo=true; }
+    if(type==='k'&&Math.abs(tc-fc)===2){
+      if(tc===6){ const rk=this.ix(fr,7); nc[this.ix(fr,5)]=nc[rk]; nc[rk]=null; castleSide='K'; }
+      else { const rk=this.ix(fr,0); nc[this.ix(fr,3)]=nc[rk]; nc[rk]=null; castleSide='Q'; }
+    }
+    if(type==='k'){ if(col==='w'){castle.wK=false;castle.wQ=false;} else {castle.bK=false;castle.bQ=false;} }
+    if(from===this.ix(7,0)||to===this.ix(7,0)) castle.wQ=false;
+    if(from===this.ix(7,7)||to===this.ix(7,7)) castle.wK=false;
+    if(from===this.ix(0,0)||to===this.ix(0,0)) castle.bQ=false;
+    if(from===this.ix(0,7)||to===this.ix(0,7)) castle.bK=false;
+    return {cells:nc,ep,castle,capture,castleSide,promo};
+  }
+  legalMoves(cells,from,st){
+    const p=cells[from]; if(!p) return [];
+    const col=p[0],opp=col==='w'?'b':'w';
+    let moves=this.pseudo(cells,from,st);
+    if(p[1]==='k'){
+      const [r,c]=this.rc(from),home=col==='w'?7:0;
+      if(r===home&&c===4&&!this.attacked(cells,from,opp)){
+        const kS=col==='w'?st.castle.wK:st.castle.bK, qS=col==='w'?st.castle.wQ:st.castle.bQ;
+        if(kS&&!cells[this.ix(home,5)]&&!cells[this.ix(home,6)]&&!this.attacked(cells,this.ix(home,5),opp)&&!this.attacked(cells,this.ix(home,6),opp)) moves.push(this.ix(home,6));
+        if(qS&&!cells[this.ix(home,1)]&&!cells[this.ix(home,2)]&&!cells[this.ix(home,3)]&&!this.attacked(cells,this.ix(home,3),opp)&&!this.attacked(cells,this.ix(home,2),opp)) moves.push(this.ix(home,2));
+      }
+    }
+    return moves.filter(to=>{ const r=this.applyMove(cells,from,to,st); const ki=this.kingIx(r.cells,col); return ki>=0&&!this.attacked(r.cells,ki,opp); });
+  }
+  anyLegal(cells,col,st){
+    for(let i=0;i<64;i++){ if(cells[i]&&cells[i][0]===col&&this.legalMoves(cells,i,st).length) return true; }
+    return false;
+  }
+  san(from,to,piece,r,suffix){
+    const files='abcdefgh',[fr,fc]=this.rc(from),[tr,tc]=this.rc(to),dest=files[tc]+(8-tr),type=piece[1];
+    if(r.castleSide==='K') return 'O-O'+suffix;
+    if(r.castleSide==='Q') return 'O-O-O'+suffix;
+    if(type==='p'){ let x=r.capture?files[fc]+'x'+dest:dest; if(r.promo)x+='=Q'; return x+suffix; }
+    return {n:'N',b:'B',r:'R',q:'Q',k:'K'}[type]+(r.capture?'x':'')+dest+suffix;
+  }
+  bTap(i){
+    const s=this.state; if(s.bGameOver) return;
+    const st={ep:s.bep,castle:s.bcastle}, p=s.cells[i];
+    if(s.sel<0){ if(p&&p[0]===s.bTurn) this.setState({sel:i,legal:this.legalMoves(s.cells,i,st)}); return; }
+    if(i===s.sel){ this.setState({sel:-1,legal:[]}); return; }
+    if(p&&p[0]===s.bTurn){ this.setState({sel:i,legal:this.legalMoves(s.cells,i,st)}); return; }
+    if(s.legal.includes(i)) this.doMove(s.sel,i);
+    else this.setState({sel:-1,legal:[]});
+  }
+  doMove(from,to){
+    const s=this.state,st={ep:s.bep,castle:s.bcastle},piece=s.cells[from];
+    const r=this.applyMove(s.cells,from,to,st),mover=s.bTurn,opp=mover==='w'?'b':'w';
+    const oppKing=this.kingIx(r.cells,opp),inChk=oppKing>=0&&this.attacked(r.cells,oppKing,mover);
+    const oppMoves=this.anyLegal(r.cells,opp,{ep:r.ep,castle:r.castle});
+    let over=null,suffix='';
+    if(inChk&&!oppMoves){ over={type:'checkmate',winner:mover}; suffix='#'; }
+    else if(!inChk&&!oppMoves){ over={type:'stalemate'}; }
+    else if(inChk) suffix='+';
+    const snap={cells:s.cells,bTurn:s.bTurn,bcastle:s.bcastle,bep:s.bep,bLast:s.bLast,moves:s.moves,bGameOver:s.bGameOver,bCheckIdx:s.bCheckIdx};
+    this.setState({ cells:r.cells,bTurn:opp,bcastle:r.castle,bep:r.ep,sel:-1,legal:[],bLast:{from,to},
+      hist:[...s.hist,snap],moves:[...s.moves,this.san(from,to,piece,r,suffix)],bGameOver:over,bCheckIdx:inChk?oppKing:-1 });
+  }
+  signInMock(){
+    this.setState({user:{name:'Ibrahim Ahmad',cc:'ibrahim_ju',rating:1810,rank:1},route:{name:'home',params:{}},stack:[]});
+    this.notify('Signed in as Ibrahim Ahmad (mock)');
+  }
+  tap(i){
+    const s=this.state;
+    if(s.sel<0){ if(s.cells[i]) this.setState({sel:i}); return; }
+    if(s.sel===i){ this.setState({sel:-1}); return; }
+    const pc=s.cells[s.sel];
+    if(s.cells[i]&&s.cells[i][0]===pc[0]){ this.setState({sel:i}); return; }
+    const nc=[...s.cells]; nc[i]=pc; nc[s.sel]=null;
+    const co=x=>'abcdefgh'[x%8]+(8-Math.floor(x/8));
+    const L={k:'K',q:'Q',r:'R',b:'B',n:'N',p:''}[pc[1]];
+    this.setState({cells:nc,sel:-1,hist:[...s.hist,s.cells],moves:[...s.moves,L+co(s.sel)+'–'+co(i)]});
+  }
+  tapClock(side){
+    const s=this.state; if(s.flag) return;
+    if(!s.running){ this.setState({running:true,turn:side==='w'?'b':'w'}); return; }
+    if(s.turn===side){
+      const k=side==='w'?'wT':'bT';
+      this.setState({turn:side==='w'?'b':'w',[k]:s[k]+s.inc});
+    }
+  }
+  fmtT(t){ const m=Math.floor(t/60),x=Math.floor(t%60); return m+':'+(x<10?'0':'')+x; }
+  qrMatrix(seed){
+    const N=21, m=Array.from({length:N},()=>Array(N).fill(0));
+    const place=(r,c)=>{ for(let i=-1;i<=7;i++)for(let j=-1;j<=7;j++){const rr=r+i,cc=c+j; if(rr<0||cc<0||rr>=N||cc>=N)continue; const b=(i===0||i===6||j===0||j===6),n=(i>=2&&i<=4&&j>=2&&j<=4); m[rr][cc]=(b||n)?1:0;} };
+    place(0,0); place(0,N-7); place(N-7,0);
+    for(let i=8;i<N-8;i++){ m[6][i]=i%2===0?1:0; m[i][6]=i%2===0?1:0; }
+    let s=0; for(const ch of String(seed)) s=(Math.imul(s,31)+ch.charCodeAt(0))>>>0; s=(s^0x9e3779b9)>>>0;
+    const rsv=(r,c)=>((r<8&&c<8)||(r<8&&c>=N-8)||(r>=N-8&&c<8)||r===6||c===6);
+    for(let r=0;r<N;r++)for(let c=0;c<N;c++){ if(rsv(r,c))continue; s=(Math.imul(s,1664525)+1013904223)>>>0; m[r][c]=(s>>>15)&1; }
+    return m;
+  }
+  qrDataUri(code){
+    const m=this.qrMatrix(code),N=m.length,cell=4,pad=2,size=(N+pad*2)*cell; let rects='';
+    for(let r=0;r<N;r++)for(let c=0;c<N;c++) if(m[r][c]) rects+="<rect x='"+((c+pad)*cell)+"' y='"+((r+pad)*cell)+"' width='"+cell+"' height='"+cell+"'/>";
+    const svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 "+size+" "+size+"'><rect width='"+size+"' height='"+size+"' fill='#fffdf6'/><g fill='#21304e'>"+rects+"</g></svg>";
+    return 'data:image/svg+xml,'+encodeURIComponent(svg);
+  }
+  toggleReg(t){
+    if(!this.user()){ this.go('signin'); return; }
+    const reg={...this.state.reg};
+    if(reg[t.id]){ delete reg[t.id]; this.setState({reg}); this.notify('Registration cancelled'); }
+    else{ reg[t.id]={code:String(Math.floor(100000+Math.random()*900000))}; this.setState({reg}); this.notify('Registered — your check-in code is ready'); }
+  }
+  copyCode(code){ try{navigator.clipboard&&navigator.clipboard.writeText(code);}catch(e){} this.notify('Check-in code copied'); }
+  fmtPts(p){ const f=Math.floor(p),h=p%1?'½':''; return (f===0&&h)?'½':f+h; }
+  strength(v){ if(!v) return 0; let n=0; if(v.length>=8)n++; if(/[A-Za-z]/.test(v)&&/[0-9]/.test(v))n++; if(/[^A-Za-z0-9]/.test(v))n++; return n; }
+  focusRound(i){ this.setState({brFocus:i}); const el=this.brScrollEl; if(el) requestAnimationFrame(()=>el.scrollTo({left:i*186,behavior:'smooth'})); }
+  updateSb(){ const el=this.scrollEl; if(!el) return; const vv=el.clientHeight/el.scrollHeight; const ff=el.scrollHeight>el.clientHeight?el.scrollTop/(el.scrollHeight-el.clientHeight):0; if(Math.abs(vv-this.state.sbVis)>0.001||Math.abs(ff-this.state.sbFrac)>0.001) this.setState({sbVis:vv,sbFrac:ff}); }
+  sbDown(e){ e.preventDefault(); const mv=ev=>{ if(!this.scrollEl||!this.trackEl) return; const th=this.trackEl.clientHeight||1; const range=this.scrollEl.scrollHeight-this.scrollEl.clientHeight; this.scrollEl.scrollTop += (ev.movementY/th)*range; }; const up=()=>{ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); }; window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up); }
+
+  gRow(g){
+    const nm=i=>this.P[i][0]; const live=g.res==='live';
+    return {bn:g.board,white:nm(g.w),black:nm(g.b),live,
+      chip:live?'LIVE':(g.res==='–'?'Upcoming':g.res),
+      cBg:live?'#7d2434':(g.res==='–'?'rgba(33,48,78,.05)':'rgba(33,48,78,.08)'),
+      cFg:live?'#f7f1e3':(g.res==='–'?'rgba(33,48,78,.5)':'#21304e')};
+  }
+  mapBr(rounds){
+    const nm=i=>this.P[i][0];
+    return rounds.map(rd=>({label:rd.label,matches:rd.matches.map(m=>{
+      const done=m.winner!=null;
+      return {
+        n1:m.p1!=null?nm(m.p1):'TBD', n2:m.p2!=null?nm(m.p2):'TBD',
+        live:!!m.live,
+        fw1:done&&m.winner===m.p1?'700':'400', fw2:done&&m.winner===m.p2?'700':'400',
+        op1:m.p1==null?'.45':(done&&m.winner!==m.p1?'.42':'1'),
+        op2:m.p2==null?'.45':(done&&m.winner!==m.p2?'.42':'1'),
+        w1:done&&m.winner===m.p1, w2:done&&m.winner===m.p2,
+        it1:m.p1==null?'italic':'normal', it2:m.p2==null?'italic':'normal'
+      };
+    })}));
+  }
+  brToGames(rounds){
+    return rounds.filter(rd=>rd.matches.some(m=>m.p1!=null&&m.p2!=null)).map(rd=>({
+      label:rd.label,
+      games:rd.matches.filter(m=>m.p1!=null&&m.p2!=null).map((m,i)=>this.gRow({board:i+1,w:m.p1,b:m.p2,res:m.live?'live':(m.winner!=null?(m.winner===m.p1?'1-0':'0-1'):'–')}))
+    }));
+  }
+  liveGames(t){
+    const L=[];
+    if(t.rounds) t.rounds.forEach(rd=>rd.games.forEach(g=>{ if(g.res==='live') L.push({board:g.board,w:g.w,b:g.b,note:rd.label}); }));
+    if(t.bracket) t.bracket.forEach(rd=>rd.matches.forEach((m,i)=>{ if(m.live) L.push({board:i+1,w:m.p1,b:m.p2,note:rd.label}); }));
+    if(t.st2) t.st2.forEach(rd=>rd.matches.forEach((m,i)=>{ if(m.live) L.push({board:i+1,w:m.p1,b:m.p2,note:'Stage 2 · '+rd.label}); }));
+    if(t.fk==='arena') this.D.arena.act.forEach(g=>L.push({board:g.board,w:g.w,b:g.b,note:'Arena'}));
+    if(t.fk==='team'){
+      const TD=this.D.team;
+      TD.days.forEach(d=>d.matches.forEach(m=>m.boards.forEach(g=>{ if(g.res==='live') L.push({board:g.board,w:g.w,b:g.b,note:TD.T[m.a].s+' vs '+TD.T[m.b].s}); })));
+    }
+    return L;
+  }
+
+  tdVals(user){
+    const s=this.state, t=this.D.byId[s.route.params.id], P=this.P, nm=i=>P[i][0];
+    const v={};
+    if(!t) return v;
+    const N='#21304e',BU='#7d2434',CREAM='#f7f1e3';
+    v.tdName=t.name;
+    if(t.status==='active'){ v.tdBadge='Live'; v.tdBBg=BU; v.tdBFg=CREAM; v.tdBBd=BU; v.tdBLive=true; }
+    else if(t.status==='upcoming'){ v.tdBadge='Upcoming'; v.tdBBg='rgba(33,48,78,.07)'; v.tdBFg=N; v.tdBBd='rgba(33,48,78,.28)'; v.tdBLive=false; }
+    else { v.tdBadge='Finished'; v.tdBBg='rgba(169,138,63,.14)'; v.tdBFg='#79622a'; v.tdBBd='rgba(169,138,63,.4)'; v.tdBLive=false; }
+    v.tdChips=[t.date,t.loc,t.tc,t.capText].map(x=>({x}));
+
+    const live=this.liveGames(t);
+    const hasLive=t.status==='active'&&live.length>0;
+    const mainLab={swiss:'Standings',rr:'Standings',drr:'Standings',league:'Standings',ko:'Bracket',de:'Bracket',arena:'Leaderboard',team:'Teams',multi:'Stages'}[t.fk];
+    const roundsLab={ko:'Matches',de:'Matches',team:'Matches',arena:'Games'}[t.fk]||'Rounds';
+    const tabs=[{key:'overview',label:t.status==='completed'?'Overview':'Registration'}];
+    if(hasLive) tabs.push({key:'live',label:'Live'});
+    tabs.push({key:'main',label:mainLab},{key:'rounds',label:roundsLab},{key:'players',label:'Players'});
+    let cur=s.dTab;
+    if(!tabs.some(x=>x.key===cur)) cur='overview';
+    v.tdTabs=tabs.map(x=>({label:x.label,on:()=>this.setState({dTab:x.key,brFocus:0}),bg:cur===x.key?N:'transparent',fg:cur===x.key?CREAM:N,live:x.key==='live'}));
+    v.tdOverview=cur==='overview'; v.tdLiveTab=cur==='live'; v.tdMainTab=cur==='main'; v.tdRoundsTab=cur==='rounds'; v.tdPlayersTab=cur==='players';
+
+    v.tdLive=live.map(g=>({board:'Board '+g.board,white:nm(g.w),black:nm(g.b),note:g.note,watch:()=>this.notify('Live board viewer is a mock in this prototype')}));
+
+    const facts=[['Format',t.fmt],['Time control',t.tc],['Players',t.capText],['Current stage',t.cur],['Organizer',t.org],['Dates',t.dates],['Registration',t.reg]];
+    v.tdFacts=facts.map(f=>({k:f[0],x:f[1]}));
+    let champ=null;
+    if(t.status==='completed'){ champ = t.de? t.de.champ : this.stand(t.idxs,t.rounds)[0].i; }
+    v.tdShowWinner=champ!=null; v.tdWinner=champ!=null?nm(champ):'';
+    v.tdShowFacts=t.status==='completed';
+    v.tdGuestWarn=false; v.tdRegistered=false;
+    const BD='1.5px solid rgba(125,36,52,.5)';
+    if(t.status==='completed'){
+      v.tdCtaLabel='View final '+mainLab.toLowerCase(); v.tdCtaOn=()=>this.setState({dTab:'main'});
+      v.tdCtaBg=BU; v.tdCtaFg=CREAM; v.tdCtaBd='none';
+    } else {
+      const entry=s.reg[t.id];
+      if(!user){
+        v.tdCtaLabel='Sign in to register'; v.tdCtaOn=()=>this.go('signin'); v.tdGuestWarn=true;
+        v.tdCtaBg=BU; v.tdCtaFg=CREAM; v.tdCtaBd='none';
+      } else if(entry){
+        v.tdRegistered=true; v.tdRegCode=entry.code; v.tdRegCodeSpaced=entry.code.split('').join(' '); v.tdQrSrc=this.qrDataUri(entry.code+'-'+t.id);
+        v.tdCopyCode=()=>this.copyCode(entry.code);
+        v.tdCtaLabel='Cancel registration'; v.tdCtaOn=()=>this.toggleReg(t);
+        v.tdCtaBg='transparent'; v.tdCtaFg=BU; v.tdCtaBd=BD;
+      } else {
+        v.tdCtaLabel='Register'; v.tdCtaOn=()=>this.toggleReg(t);
+        v.tdCtaBg=BU; v.tdCtaFg=CREAM; v.tdCtaBd='none';
+      }
+    }
+
+    v.tdShowStand=false; v.tdShowBracket=false; v.tdShowArena=false; v.tdShowTeam=false; v.tdShowSeg=false; v.tdShowStages=false; v.tdStandEmpty=false; v.tdShowRoundCard=false;
+    const mkStand=(idxs,rounds,qCut,hlChamp)=>this.stand(idxs,rounds).map(x=>({
+      rank:x.rank,name:nm(x.i),rating:P[x.i][1],pts:this.fmtPts(x.pts),rec:x.w+'–'+x.d+'–'+x.l,
+      q:qCut?x.rank<=qCut:false,
+      hlBg:(hlChamp&&x.rank===1)?'rgba(169,138,63,.14)':'transparent'
+    }));
+
+    if(['swiss','rr','drr','league'].includes(t.fk)){
+      v.tdShowStand=true;
+      if(t.status==='upcoming'){ v.tdStandEmpty=true; v.tdStand=[]; v.tdStandEmptyMsg='Standings will appear once Round 1 begins.'; }
+      else{
+        v.tdStand=mkStand(t.idxs,t.rounds,0,t.status==='completed');
+        if(t.status==='active'){ v.tdShowRoundCard=true; v.tdRoundCard=t.cur; }
+      }
+    } else if(t.fk==='ko'){
+      v.tdShowBracket=true; v.tdBracket=this.mapBr(t.bracket);
+    } else if(t.fk==='de'){
+      v.tdShowBracket=true; v.tdShowSeg=true;
+      v.tdSeg=[['w','Winners'],['l','Losers'],['f','Final']].map(x=>({label:x[1],on:()=>this.setState({brSeg:x[0],brFocus:0}),bg:s.brSeg===x[0]?N:'transparent',fg:s.brSeg===x[0]?CREAM:N}));
+      v.tdBracket=this.mapBr(s.brSeg==='w'?t.de.wb:(s.brSeg==='l'?t.de.lb:t.de.fin));
+    } else if(t.fk==='arena'){
+      v.tdShowArena=true;
+      const rem=Math.max(0,Math.floor((this.D.arena.endsAt-s.now)/1000));
+      v.tdArenaClock=this.fmtT(rem);
+      v.tdArenaRows=this.D.arena.rows.map((x,k)=>({rank:k+1,name:nm(x.i),pts:x.pts,g:x.g+' games',stk:x.stk?x.stk+'-win streak':'—'}));
+    } else if(t.fk==='team'){
+      v.tdShowTeam=true;
+      const TD=this.D.team;
+      v.tdTeamStand=TD.st.map((x,k)=>({rank:k+1,team:TD.T[x.i].n,mp:x.mp,gp:this.fmtPts(x.gp)}));
+      const mapDay=d=>d.matches.map(m=>({
+        a:TD.T[m.a].s,b:TD.T[m.b].s,an:TD.T[m.a].n,bn:TD.T[m.b].n,
+        as:this.fmtPts(m.as),bs:this.fmtPts(m.bs),live:m.live&&m.boards.some(g=>g.res==='live'),
+        boards:m.boards.map(g=>this.gRow(g))
+      }));
+      v.tdTeamDayLabel=TD.days[1].label+' · in progress';
+      v.tdTeamMatches=mapDay(TD.days[1]);
+    } else if(t.fk==='multi'){
+      v.tdShowStages=true;
+      v.tdStageBtns=[{label:'Stage 1 · Swiss Qualifier'},{label:'Stage 2 · Knockout Finals'}].map((x,k)=>({label:x.label,on:()=>this.setState({stageSel:k,brFocus:0}),bg:s.stageSel===k?N:'transparent',fg:s.stageSel===k?CREAM:N}));
+      if(s.stageSel===0){
+        v.tdShowStand=true;
+        v.tdStand=t.st1stand.map(x=>({rank:x.rank,name:nm(x.i),rating:P[x.i][1],pts:this.fmtPts(x.pts),rec:x.w+'–'+x.d+'–'+x.l,q:x.rank<=8,hlBg:x.rank<=8?'rgba(169,138,63,.08)':'transparent'}));
+        v.tdStandNote='Top 8 qualified for the knockout finals';
+      } else {
+        v.tdShowBracket=true; v.tdBracket=this.mapBr(t.st2);
+      }
+    }
+
+    if(v.tdShowBracket&&v.tdBracket){ v.tdBrChips=v.tdBracket.map((c,i)=>({label:c.label,on:()=>this.focusRound(i),bg:s.brFocus===i?N:'transparent',fg:s.brFocus===i?CREAM:N})); v.tdShowBrNav=v.tdBracket.length>1; } else { v.tdBrChips=[]; v.tdShowBrNav=false; }
+    v.tdRoundsEmpty=false;
+    if(t.fk==='ko'){ v.tdRoundGroups=this.brToGames(t.bracket); }
+    else if(t.fk==='de'){ v.tdRoundGroups=this.brToGames([...t.de.wb,...t.de.lb,...t.de.fin]); }
+    else if(t.fk==='multi'){
+      v.tdRoundGroups=[...t.st1rounds.map(rd=>({label:'Stage 1 · '+rd.label,games:rd.games.map(g=>this.gRow(g))})),...this.brToGames(t.st2).map(g=>({label:'Stage 2 · '+g.label,games:g.games}))];
+    }
+    else if(t.fk==='team'){
+      const TD=this.D.team;
+      v.tdRoundGroups=TD.days.map(d=>d.matches.map(m=>({
+        label:d.label+' · '+TD.T[m.a].s+' '+(m.upcoming?'vs':this.fmtPts(m.as)+' – '+this.fmtPts(m.bs))+' '+TD.T[m.b].s,
+        games:m.boards.map(g=>this.gRow(g))
+      }))).flat();
+    }
+    else if(t.fk==='arena'){ v.tdRoundGroups=[{label:'Recent results',games:this.D.arena.rec.map(g=>this.gRow(g))}]; }
+    else if(!t.rounds||!t.rounds.length){ v.tdRoundsEmpty=true; v.tdRoundGroups=[]; v.tdRoundsEmptyMsg='Pairings will be published when Round 1 starts.'; }
+    else { v.tdRoundGroups=t.rounds.map(rd=>({label:rd.label,games:rd.games.map(g=>this.gRow(g))})); }
+    v.tdUpNote=t.upNote||''; v.tdShowUpNote=!!t.upNote;
+
+    if(t.fk==='team'){
+      const TD=this.D.team;
+      v.tdPlayerGroups=TD.T.map(tm=>({label:tm.n+' ('+tm.s+')',rows:tm.r.map((i,k)=>({seed:'B'+(k+1),name:nm(i),rating:P[i][1],cc:'@'+P[i][2]}))}));
+    } else {
+      const sorted=[...t.idxs].sort((a,b)=>P[b][1]-P[a][1]);
+      v.tdPlayerGroups=[{label:'',rows:sorted.map((i,k)=>({seed:k+1,name:nm(i),rating:P[i][1],cc:'@'+P[i][2]}))}];
+    }
+    return v;
+  }
+
+  renderVals(){
+    const s=this.state, r=s.route, P=this.P;
+    const user=this.user();
+    const N='#21304e',BU='#7d2434',CREAM='#f7f1e3',MUT='rgba(33,48,78,.5)';
+    const v={};
+    const d=this.DEVS[s.device]||this.DEVS.ios;
+    const nat={w:parseInt(d.w)+2*parseInt(d.pad),h:parseInt(d.h)+2*parseInt(d.pad)};
+    v.fit=s.fit||1; v.fitW=Math.round(nat.w*v.fit); v.fitH=Math.round(nat.h*v.fit); v.devBoxW=nat.w; v.devBoxH=nat.h;
+    v.devBezel=d.bezel; v.devOuterR=d.outerR; v.devPad=d.pad; v.devW=d.w; v.devH=d.h; v.devInnerR=d.innerR; v.contentMax=d.contentMax;
+    v.statusH=d.statusH; v.statusFs=d.statusFs; v.statusPad=d.statusPad; v.islandZone=d.islandZone; v.camW=d.camW; v.camH=d.camH; v.statusTime='9:41';
+    v.devices=[['ios','iPhone'],['android','Android'],['tablet','Tablet']].map(x=>({label:x[1],on:()=>this.setState({device:x[0]},()=>this.fit()),on2:s.device===x[0],bg:s.device===x[0]?'#21304e':'transparent',fg:s.device===x[0]?'#f7f1e3':'#21304e'}));
+    v.scrollRef=el=>{this.scrollEl=el;}; v.brRef=el=>{this.brScrollEl=el;}; v.trackRef=el=>{this.trackEl=el;};
+    v.switcherRef=el=>{ const first=!this.switcherEl; this.switcherEl=el; if(first&&el) requestAnimationFrame(()=>this.fit()); };
+    v.onScroll=()=>this.updateSb(); v.sbDown=e=>this.sbDown(e);
+    const vis=s.sbVis||0, frac=s.sbFrac||0, vh=Math.max(vis,0.08);
+    v.sbShow=vis>0&&vis<0.995; v.sbThumbH=(vh*100).toFixed(1)+'%'; v.sbThumbT=(frac*(1-vh)*100).toFixed(1)+'%';
+    const strColor=['transparent','#7d2434','#a98a3f','#1f8a5b'];
+    const strLabel=['','Weak password','Fair password','Strong password'];
+    const mkSeg=n=>[0,1,2].map(i=>({bg:i<n?strColor[n]:'rgba(33,48,78,.12)'}));
+    v.onSuPw=e=>this.setState({suStr:this.strength(e.target.value)});
+    v.onRpPw=e=>this.setState({rpStr:this.strength(e.target.value)});
+    v.suStrShow=s.suStr>0; v.suSeg=mkSeg(s.suStr); v.suStrColor=strColor[s.suStr]; v.suStrLabel=strLabel[s.suStr];
+    v.rpStrShow=s.rpStr>0; v.rpSeg=mkSeg(s.rpStr); v.rpStrColor=strColor[s.rpStr]; v.rpStrLabel=strLabel[s.rpStr];
+    v.methodEmail=s.otpMethod==='email'; v.methodSms=s.otpMethod==='sms';
+    v.setEmail=()=>this.setState({otpMethod:'email'}); v.setSms=()=>this.setState({otpMethod:'sms'});
+    v.emBg=s.otpMethod==='email'?'rgba(125,36,52,.07)':'#fffdf6'; v.emBd=s.otpMethod==='email'?'#7d2434':'rgba(33,48,78,.22)';
+    v.smBg=s.otpMethod==='sms'?'rgba(125,36,52,.07)':'#fffdf6'; v.smBd=s.otpMethod==='sms'?'#7d2434':'rgba(33,48,78,.22)';
+    v.otpDest=s.otpMethod==='sms'?'your phone via SMS':'your registered email';
+    v.isHome=r.name==='home'; v.isTournaments=r.name==='tournaments'; v.isTournament=r.name==='tournament';
+    v.isGames=r.name==='games'; v.isGameReview=r.name==='gamereview'; v.isNewAnalysis=r.name==='newanalysis'; v.isPicklist=r.name==='picklist';
+    v.isTools=r.name==='tools'; v.isBoard=r.name==='board'; v.isClock=r.name==='clock'; v.isSaved=r.name==='saved';
+    v.isProfile=r.name==='profile'; v.isLeaderboard=r.name==='leaderboard';
+    v.isSignin=r.name==='signin'; v.isSignup=r.name==='signup'; v.isForgot=r.name==='forgot'; v.isOtp=r.name==='otp'; v.isReset=r.name==='reset';
+    const isAuth=['signin','signup','forgot','otp','reset'].includes(r.name);
+    v.showNav=!isAuth;
+    const grp={home:['home','leaderboard'],tour:['tournaments','tournament'],games:['games','gamereview','newanalysis','picklist'],tools:['tools','board','clock','saved'],profile:['profile']};
+    v.cHome=grp.home.includes(r.name)?BU:MUT; v.cTour=grp.tour.includes(r.name)?BU:MUT;
+    v.cGames=grp.games.includes(r.name)?BU:MUT; v.cTools=grp.tools.includes(r.name)?BU:MUT; v.cProfile=grp.profile.includes(r.name)?BU:MUT;
+
+    v.isGuest=!user; v.isMember=!!user; v.userFirst=user?user.name.split(' ')[0]:'';
+    v.back=()=>this.back();
+    v.goHome=()=>this.go('home'); v.goTournaments=()=>this.go('tournaments'); v.goGames=()=>this.go('games');
+    v.goTools=()=>this.go('tools'); v.goProfile=()=>this.go('profile'); v.goLeaderboard=()=>this.go('leaderboard');
+    v.goSignin=()=>this.go('signin'); v.goSignup=()=>this.go('signup'); v.goForgot=()=>this.go('forgot');
+    v.goGameReview=()=>this.go('gamereview'); v.goNewAnalysis=()=>this.go('newanalysis');
+    v.goClock=()=>this.go('clock'); v.goSaved=()=>this.go('saved');
+    v.goBoardStart=()=>this.openBoard('start'); v.goBoardEmpty=()=>this.openBoard('empty'); v.goBoardMock=()=>this.openBoard('mock');
+    v.goFeatured=()=>this.go('tournament',{id:'rapid'});
+    v.doSignIn=()=>this.signInMock(); v.doSignUp=()=>this.signInMock();
+    v.sendOtp=()=>this.go('otp'); v.verifyOtp=()=>this.go('reset');
+    v.doReset=()=>{ this.setState({route:{name:'signin',params:{}},stack:[]}); this.notify('Password updated (mock) — sign in below'); };
+    v.pwaType=s.pwa?'text':'password'; v.pwbType=s.pwb?'text':'password'; v.pwcType=s.pwc?'text':'password'; v.pwdType=s.pwd?'text':'password'; v.pweType=s.pwe?'text':'password';
+    v.togglePwa=()=>this.setState({pwa:!s.pwa}); v.togglePwb=()=>this.setState({pwb:!s.pwb}); v.togglePwc=()=>this.setState({pwc:!s.pwc}); v.togglePwd=()=>this.setState({pwd:!s.pwd}); v.togglePwe=()=>this.setState({pwe:!s.pwe});
+    v.pwaSlash=s.pwa?1:0; v.pwbSlash=s.pwb?1:0; v.pwcSlash=s.pwc?1:0; v.pwdSlash=s.pwd?1:0; v.pweSlash=s.pwe?1:0;
+    v.otpInput=e=>{ const el=e.target; el.value=el.value.replace(/[^0-9]/g,'').slice(-1); if(el.value&&el.nextElementSibling) el.nextElementSibling.focus(); };
+
+    v.showToast=!!s.toast; v.toastText=s.toast||'';
+    v.top4=P.slice(0,4).map((p,k)=>({rank:k+1,name:p[0],rating:p[1],cc:p[2]}));
+    v.clubBoard=P.slice(0,20).map((p,k)=>({rank:k+1,name:p[0],rating:p[1],cc:'@'+p[2]}));
+
+    v.tTabs=[['active','Active'],['upcoming','Upcoming'],['completed','Completed']].map(x=>({label:x[1],on:()=>this.setState({tTab:x[0]}),bg:s.tTab===x[0]?BU:'transparent',fg:s.tTab===x[0]?CREAM:N}));
+    v.tList=this.D.list.filter(t=>t.status===s.tTab).map(t=>{
+      const b=t.status==='active'?{bT:'Live',bBg:BU,bFg:CREAM,bBd:BU,bLive:true}:(t.status==='upcoming'?{bT:'Upcoming',bBg:'rgba(33,48,78,.07)',bFg:N,bBd:'rgba(33,48,78,.28)',bLive:false}:{bT:'Finished',bBg:'rgba(169,138,63,.14)',bFg:'#79622a',bBd:'rgba(169,138,63,.4)',bLive:false});
+      return Object.assign({name:t.name,date:t.date,loc:t.loc,fmt:t.fmt,tc:t.tc,cap:t.capText,cur:t.cur,on:()=>this.go('tournament',{id:t.id})},b);
+    });
+
+    v.pickTitle=(r.params&&r.params.src)||'Import games';
+    const pk=[['Ibrahim Ahmad','Rania Odeh','1-0','Blitz 3+2 · Jun 29'],['Omar Saleh','Ibrahim Ahmad','½-½','Rapid 10+0 · Jun 27'],['Ibrahim Ahmad','Yazan Khaled','1-0','Blitz 5+0 · Jun 25'],['Leen Haddad','Ibrahim Ahmad','1-0','Rapid 15+10 · Jun 21']];
+    v.pickRows=pk.map(g=>({t:g[0]+' vs '+g[1],res:g[2],sub:g[3],on:()=>this.openBoard('mock')}));
+
+    const GL={k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
+    const lastF=s.bLast?s.bLast.from:-1, lastT=s.bLast?s.bLast.to:-1, legalSet=new Set(s.legal||[]);
+    v.sq=Array.from({length:64},(_,di)=>{
+      const i=s.flip?63-di:di, pc=s.cells[i], row=Math.floor(di/8), col=di%8, dark=(row+col)%2===1;
+      let bg=dark?'#9a7b53':'#ecdcbb';
+      if(i===lastF||i===lastT) bg=dark?'#bfa657':'#e6cf87';
+      if(s.sel===i) bg=dark?'#caa74d':'#e7c96a';
+      if(i===s.bCheckIdx) bg='#d17b70';
+      return {k:i,bg,ch:pc?GL[pc[1]]:'',col:pc?(pc[0]==='w'?'#f8f1e0':'#1f252e'):'inherit',
+        sh:pc?(pc[0]==='w'?'0 1.5px 1px rgba(0,0,0,.45)':'0 1px 1px rgba(255,255,255,.12)'):'none',
+        dot:legalSet.has(i)&&!pc, ring:legalSet.has(i)&&!!pc, tap:()=>this.bTap(i)};
+    });
+    v.movesText=s.moves.length?s.moves.map((m,i)=>(i%2===0?((i/2)+1)+'. ':'')+m).join('  '):'';
+    v.hasMoves=s.moves.length>0; v.noMoves=s.moves.length===0;
+    if(s.bGameOver){
+      v.bStatus = s.bGameOver.type==='checkmate' ? ('Checkmate — '+(s.bGameOver.winner==='w'?'White':'Black')+' wins') : 'Stalemate — draw';
+      v.bStatusColor='#7d2434'; v.bStatusDot=s.bGameOver.winner?'#7d2434':'#79622a';
+    } else {
+      v.bStatus=(s.bTurn==='w'?'White':'Black')+' to move'+(s.bCheckIdx>=0?' · Check':'');
+      v.bStatusColor=s.bCheckIdx>=0?'#7d2434':'rgba(33,48,78,.72)'; v.bStatusDot=s.bTurn==='w'?'#f4ecd6':'#2a3140';
+    }
+    v.doFlip=()=>this.setState({flip:!s.flip});
+    v.doUndo=()=>{ if(!s.hist.length) return; const h=[...s.hist]; const snap=h.pop(); this.setState({cells:snap.cells,bTurn:snap.bTurn,bcastle:snap.bcastle,bep:snap.bep,bLast:snap.bLast,moves:snap.moves,bGameOver:snap.bGameOver,bCheckIdx:snap.bCheckIdx,hist:h,sel:-1,legal:[]}); };
+    v.doResetBoard=()=>this.setState({cells:this.startPos(),bTurn:'w',bcastle:{wK:true,wQ:true,bK:true,bQ:true},bep:-1,hist:[],moves:[],sel:-1,legal:[],bLast:null,bGameOver:null,bCheckIdx:-1});
+    v.doSave=()=>{
+      if(!user){ this.notify('Sign in to save analyses'); return; }
+      this.setState({saved:[...s.saved,{t:'Analysis '+(s.saved.length+3),sub:s.moves.length+' moves · Today',on:()=>this.openBoard('mock')}]});
+      this.notify('Analysis saved to your account (mock)');
+    };
+    v.doExport=()=>this.notify('PGN exported to clipboard (mock)');
+    v.saveCue=user?'Analyses save to your club account · mock only':'Guest mode — sign in to keep saved analyses';
+
+    v.presets=this.PRESETS.map(p=>({label:p[0],on:()=>this.setState({preset:p[0],wT:p[1],bT:p[1],inc:p[2],running:false,flag:null,turn:'w'}),bg:s.preset===p[0]?N:'transparent',fg:s.preset===p[0]?CREAM:N}));
+    const warn=this.props.clockWarnSecs??20;
+    const pan=side=>{
+      const t=side==='w'?s.wT:s.bT; const active=s.running&&s.turn===side; const low=t<=warn&&t>0; const flag=s.flag===side;
+      return {time:this.fmtT(t),
+        bg:flag?'#3a1119':(active?(low?BU:N):'#fdfaf1'),
+        fg:(active||flag)?CREAM:N,
+        bd:(active||flag)?'transparent':'rgba(33,48,78,.22)',
+        anim:(active&&low)?'jcPulse 1s infinite':'none',
+        sub:flag?'⚑ Flag fell — out of time':(active?'Running…':(s.running?'Waiting':'Tap to start opponent'))};
+    };
+    v.wPan=pan('w'); v.bPan=pan('b');
+    v.tapW=()=>this.tapClock('w'); v.tapB=()=>this.tapClock('b');
+    v.pauseLabel=s.running?'Pause':'Resume';
+    v.togglePause=()=>{ if(s.flag) return; this.setState({running:!s.running}); };
+    v.resetClock=()=>{ const p=this.PRESETS.find(x=>x[0]===s.preset); this.setState({wT:p[1],bT:p[1],inc:p[2],running:false,flag:null,turn:'w'}); };
+
+    const seedSaved=user?[{t:"King's Indian prep vs Omar",sub:'32 moves · Jun 25',on:()=>this.openBoard('mock')},{t:'Rapid Ch. Round 2 endgame',sub:'18 moves · Jun 28',on:()=>this.openBoard('mock')}]:[];
+    v.savedRows=[...seedSaved,...s.saved];
+    v.savedEmpty=v.savedRows.length===0;
+
+    if(user){
+      v.pName=user.name; v.pCc='@'+user.cc; v.pRating=user.rating; v.pRank='#'+user.rank;
+      v.pInit=user.name.split(' ').map(x=>x[0]).join('').slice(0,2);
+      v.pStats=[{k:'Wins',x:'24'},{k:'Draws',x:'6'},{k:'Losses',x:'9'}];
+      v.pAch=[{x:'Club Champion 2025'},{x:'Spring Rapid Winner'},{x:'7-game win streak'}];
+      const rg=[]; const nm=i=>P[i][0];
+      this.D.byId.rapid.rounds.forEach(rd=>rd.games.forEach(g=>{
+        if((g.w===0||g.b===0)&&g.res!=='live'&&g.res!=='–'){
+          const won=(g.w===0&&g.res==='1-0')||(g.b===0&&g.res==='0-1');
+          const draw=g.res==='½-½';
+          rg.push({t:'vs '+nm(g.w===0?g.b:g.w),sub:'Rapid Championship · '+rd.label,chip:draw?'Draw':(won?'Won':'Lost'),cBg:draw?'rgba(33,48,78,.08)':(won?'rgba(169,138,63,.16)':'rgba(125,36,52,.1)'),cFg:draw?N:(won?'#79622a':BU)});
+        }
+      }));
+      v.pGames=rg;
+    }
+    v.signOut=()=>{ this.setState({user:null}); this.notify('Signed out'); };
+    v.syncCc=()=>this.notify('Chess.com sync is a mock — no API connected');
+
+    v.optReview=[{t:'Chess.com games',sub:'Import from your linked account',on:()=>this.go('picklist',{src:'Chess.com games'})},
+      {t:'Lichess games',sub:'Import from your linked account',on:()=>this.go('picklist',{src:'Lichess games'})},
+      {t:'Tournament games',sub:'Your club tournament history',on:()=>this.go('picklist',{src:'Tournament games'})},
+      {t:'Upload / import PGN file',sub:'Review a game from a PGN',on:()=>this.openBoard('mock')},
+      {t:'Upload / import FEN file',sub:'Review from a position',on:()=>this.openBoard('mock')}];
+    v.optAnalysis=[{t:'Start from empty board',sub:'Set up any position',on:()=>this.openBoard('empty')},
+      {t:'PGN file',sub:'Analyze an imported game',on:()=>this.openBoard('mock')},
+      {t:'FEN',sub:'Analyze from a position string',on:()=>this.openBoard('mock')},
+      {t:'Tournament game history',sub:'Pick from your club games',on:()=>this.go('picklist',{src:'Tournament games'})},
+      {t:'Chess.com games',sub:'Pick from your linked account',on:()=>this.go('picklist',{src:'Chess.com games'})},
+      {t:'Lichess games',sub:'Pick from your linked account',on:()=>this.go('picklist',{src:'Lichess games'})}];
+
+    if(v.isTournament) Object.assign(v,this.tdVals(user));
+    return v;
+  }
+}
+</script>
+</body>
+</html>
