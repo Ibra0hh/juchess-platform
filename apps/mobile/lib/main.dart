@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:appwrite/appwrite.dart';
+import 'package:appwrite/enums.dart' as enums;
 import 'package:appwrite/models.dart' as models;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -24,6 +26,10 @@ class AppConfig {
   static const registrationsTableId = String.fromEnvironment(
     'APPWRITE_REGISTRATIONS_TABLE_ID',
     defaultValue: 'registrations',
+  );
+  static const accessGuardFunctionId = String.fromEnvironment(
+    'APPWRITE_ACCESS_GUARD_FUNCTION_ID',
+    defaultValue: 'access-guards',
   );
   static const recoveryUrl = String.fromEnvironment(
     'APPWRITE_RECOVERY_URL',
@@ -53,12 +59,59 @@ class AppwriteService {
     return account.get();
   }
 
+  Future<Map<String, String?>> loadProfileIdentity(String accountId) async {
+    try {
+      final response = await tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.profilesTableId,
+        queries: [Query.equal('accountId', accountId), Query.limit(1)],
+        total: false,
+        ttl: 30,
+      );
+
+      if (response.rows.isEmpty) return <String, String?>{};
+      final data = response.rows.first.data;
+      return {
+        'displayName': data['displayName']?.toString(),
+        'universityId': data['universityId']?.toString(),
+        'phone': data['phone']?.toString(),
+        'status': data['status']?.toString(),
+      };
+    } catch (_) {
+      return <String, String?>{};
+    }
+  }
+
+  Future<Map<String, String?>> assertCurrentUserAllowed(models.User user) async {
+    final profile = await loadProfileIdentity(user.$id);
+    if (profile['status'] == 'suspended') {
+      throw Exception('This account is blocked by club administration.');
+    }
+
+    await assertAccessAllowed(
+      email: user.email,
+      universityId: profile['universityId'],
+      phone: profile['phone'],
+    );
+    return profile;
+  }
+
   Future<models.User> signIn({
     required String email,
     required String password,
   }) async {
+    await assertAccessAllowed(email: email);
     await account.createEmailPasswordSession(email: email, password: password);
-    return account.get();
+    try {
+      final user = await account.get();
+      await assertCurrentUserAllowed(user);
+      return user;
+    } catch (_) {
+      try {
+        await signOut();
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   Future<models.User> signUp({
@@ -66,7 +119,14 @@ class AppwriteService {
     required String email,
     required String password,
     String? universityId,
+    String? phone,
   }) async {
+    await assertAccessAllowed(
+      email: email,
+      universityId: universityId,
+      phone: phone,
+    );
+
     final user = await account.create(
       userId: ID.unique(),
       email: email,
@@ -75,8 +135,10 @@ class AppwriteService {
     );
 
     await account.createEmailPasswordSession(email: email, password: password);
-    await _createProfile(user, universityId: universityId);
-    return account.get();
+    await _createProfile(user, universityId: universityId, phone: phone);
+    final currentUser = await account.get();
+    await assertCurrentUserAllowed(currentUser);
+    return currentUser;
   }
 
   Future<void> signOut() async {
@@ -85,6 +147,42 @@ class AppwriteService {
 
   Future<void> sendPasswordRecovery(String email) async {
     await account.createRecovery(email: email, url: AppConfig.recoveryUrl);
+  }
+
+  Future<void> assertAccessAllowed({
+    String? email,
+    String? universityId,
+    String? phone,
+  }) async {
+    if (AppConfig.accessGuardFunctionId.isEmpty) return;
+
+    final execution = await functions.createExecution(
+      functionId: AppConfig.accessGuardFunctionId,
+      body: jsonEncode({
+        'email': email?.trim(),
+        'universityId': universityId?.trim(),
+        'phone': normalizeJordanPhone(phone),
+      }),
+      xasync: false,
+      path: '/check',
+      method: enums.ExecutionMethod.pOST,
+      headers: {'content-type': 'application/json'},
+    );
+
+    final payload = jsonDecode(execution.responseBody);
+    if (payload is! Map<String, dynamic>) {
+      throw Exception('Access guard returned an unreadable response.');
+    }
+
+    if (execution.responseStatusCode >= 400 ||
+        payload['ok'] == false ||
+        payload['allowed'] == false) {
+      throw Exception(
+        payload['reason']?.toString() ??
+            payload['error']?.toString() ??
+            'This account is blocked by club administration.',
+      );
+    }
   }
 
   Future<List<TournamentSeed>> loadTournaments() async {
@@ -112,7 +210,11 @@ class AppwriteService {
     return rows;
   }
 
-  Future<void> _createProfile(models.User user, {String? universityId}) async {
+  Future<void> _createProfile(
+    models.User user, {
+    String? universityId,
+    String? phone,
+  }) async {
     try {
       await tablesDB.createRow(
         databaseId: AppConfig.databaseId,
@@ -124,6 +226,8 @@ class AppwriteService {
           'email': user.email,
           if (universityId != null && universityId.trim().isNotEmpty)
             'universityId': universityId.trim(),
+          if (normalizeJordanPhone(phone) != null)
+            'phone': normalizeJordanPhone(phone),
           'rating': 1200,
           'role': 'member',
           'status': 'pending',
@@ -255,12 +359,28 @@ class AppState extends ChangeNotifier {
 
     try {
       final user = await service.currentUser();
-      userName = user.name.isNotEmpty ? user.name : user.email;
+      final profile = await service.assertCurrentUserAllowed(user);
+      final displayName = profile['displayName'];
+      userName =
+          displayName != null && displayName.isNotEmpty
+              ? displayName
+              : user.name.isNotEmpty
+              ? user.name
+              : user.email;
       userEmail = user.email;
       error = null;
-    } catch (_) {
+    } catch (caught) {
+      if (service.ready) {
+        try {
+          await service.signOut();
+        } catch (_) {}
+      }
       userName = null;
       userEmail = null;
+      error =
+          caught is AppwriteException && caught.type != 'user_blocked'
+              ? null
+              : appwriteMessage(caught);
     }
 
     notifyListeners();
@@ -296,6 +416,7 @@ class AppState extends ChangeNotifier {
     String email,
     String password,
     String universityId,
+    String phone,
   ) async {
     if (!service.ready) {
       error = 'Appwrite is not configured yet.';
@@ -313,6 +434,7 @@ class AppState extends ChangeNotifier {
         email: email,
         password: password,
         universityId: universityId,
+        phone: phone,
       );
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
@@ -390,6 +512,27 @@ String appwriteMessage(Object error) {
   }
 
   return error.toString();
+}
+
+String? normalizeJordanPhone(String? value) {
+  final raw = value?.trim();
+  if (raw == null || raw.isEmpty) return null;
+
+  final compact = raw.replaceAll(RegExp(r'[^\d+]'), '');
+  if (compact.startsWith('+962')) {
+    return '+962${compact.substring(4).replaceAll(RegExp(r'\D'), '')}';
+  }
+  if (compact.startsWith('00962')) {
+    return '+962${compact.substring(5).replaceAll(RegExp(r'\D'), '')}';
+  }
+  if (compact.startsWith('962')) {
+    return '+962${compact.substring(3).replaceAll(RegExp(r'\D'), '')}';
+  }
+
+  final digits = compact.replaceAll(RegExp(r'\D'), '');
+  if (digits.startsWith('0')) return '+962${digits.substring(1)}';
+  if (digits.startsWith('7') && digits.length == 9) return '+962$digits';
+  return raw;
 }
 
 int? _asInt(Object? value) {
@@ -2273,6 +2416,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       _emailController.text.trim(),
       _passwordController.text,
       _universityController.text.trim(),
+      _phoneController.text.trim(),
     );
 
     if (success && mounted) Navigator.of(context).pop();

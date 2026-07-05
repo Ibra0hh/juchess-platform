@@ -8,6 +8,7 @@
         "displayName": "string|required",
         "universityId": "string|unique",
         "email": "email|required",
+        "phone": "string|unique",
         "rating": "integer|default:1200",
         "role": "enum:member,organizer,admin",
         "status": "enum:pending,active,suspended",
@@ -87,8 +88,33 @@
         "payload": "string",
         "createdAt": "datetime|required"
       }
+    },
+    "identity_blocks": {
+      "fields": {
+        "type": "enum:email,universityId,phone",
+        "value": "string|required",
+        "reason": "string",
+        "status": "enum:active,lifted",
+        "targetUserId": "string",
+        "targetProfileId": "string",
+        "createdByProfileId": "string|required",
+        "createdAt": "datetime|required",
+        "liftedByProfileId": "string",
+        "liftedAt": "datetime"
+      }
+    },
+    "ip_blocks": {
+      "fields": {
+        "ipRange": "string|required",
+        "reason": "string",
+        "status": "enum:active,lifted",
+        "createdByProfileId": "string|required",
+        "createdAt": "datetime|required",
+        "liftedByProfileId": "string",
+        "liftedAt": "datetime"
+      }
     }
   },
   "buckets": ["avatars", "tournament-assets"],
-  "functions": ["admin-actions"]
+  "functions": ["admin-actions", "access-guards"]
 }

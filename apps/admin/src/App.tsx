@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import {
+  Ban,
   CalendarDays,
   ListChecks,
   LogOut,
+  RotateCcw,
   ShieldCheck,
   Trophy,
   Users,
@@ -11,13 +13,22 @@ import './App.css'
 import { appwriteReady } from './lib/appwrite'
 import {
   createTournament,
+  blockIdentity,
+  blockIp,
   formatAdminError,
   getAdminSession,
+  loadBlockLists,
   loadAdminTournaments,
   signInAdmin,
   signOutAdmin,
+  unblockIdentity,
+  unblockIp,
   type AdminSession,
   type AdminTournament,
+  type BlockListLoadResult,
+  type IdentityBlock,
+  type IdentityBlockType,
+  type IpBlock,
   type TournamentInput,
 } from './lib/adminData'
 import { adminQueues } from './lib/juchess'
@@ -29,6 +40,7 @@ const tabs: AdminTab[] = ['participants', 'rounds', 'procedure', 'standings']
 function App() {
   const [session, setSession] = useState<AdminSession | null>(null)
   const [tournaments, setTournaments] = useState<AdminTournament[]>([])
+  const [blocks, setBlocks] = useState<BlockListLoadResult>({ identityBlocks: [], ipBlocks: [] })
   const [loading, setLoading] = useState(true)
   const [dataSource, setDataSource] = useState<'appwrite' | 'prototype'>('prototype')
   const [message, setMessage] = useState<string | null>(null)
@@ -40,18 +52,25 @@ function App() {
     setMessage(result.error ? 'Appwrite data is unavailable. Showing prototype tournament data.' : null)
   }
 
+  async function refreshBlocks() {
+    const result = await loadBlockLists()
+    setBlocks(result)
+  }
+
   useEffect(() => {
     let alive = true
 
     async function boot() {
-      const [loadedSession, tournamentResult] = await Promise.all([
+      const [loadedSession, tournamentResult, blockResult] = await Promise.all([
         getAdminSession(),
         loadAdminTournaments(),
+        loadBlockLists(),
       ])
 
       if (!alive) return
       setSession(loadedSession)
       setTournaments(tournamentResult.tournaments)
+      setBlocks(blockResult)
       setDataSource(tournamentResult.source)
       setMessage(tournamentResult.error ? 'Appwrite data is unavailable. Showing prototype tournament data.' : null)
       setLoading(false)
@@ -83,6 +102,7 @@ function App() {
           onLogin={(nextSession) => {
             setSession(nextSession)
             void refreshTournaments()
+            void refreshBlocks()
           }}
         />
       </AdminChrome>
@@ -114,9 +134,11 @@ function App() {
       <AdminDashboard
         message={message}
         session={session}
+        blocks={blocks}
         tournaments={tournaments}
         source={dataSource}
         onCreated={refreshTournaments}
+        onBlocksChanged={refreshBlocks}
       />
     </AdminChrome>
   )
@@ -243,13 +265,17 @@ function ConfigPanel({ tournaments }: { tournaments: AdminTournament[] }) {
 }
 
 function AdminDashboard({
+  blocks,
   message,
+  onBlocksChanged,
   onCreated,
   session,
   source,
   tournaments,
 }: {
+  blocks: BlockListLoadResult
   message: string | null
+  onBlocksChanged: () => Promise<void>
   onCreated: () => Promise<void>
   session: AdminSession
   source: 'appwrite' | 'prototype'
@@ -260,6 +286,8 @@ function AdminDashboard({
     const players = tournaments.reduce((sum, item) => sum + item.players, 0)
     return { active, players, total: tournaments.length }
   }, [tournaments])
+  const activeBlocks = blocks.identityBlocks.filter((item) => item.status === 'active').length
+    + blocks.ipBlocks.filter((item) => item.status === 'active').length
 
   return (
     <main className="admin-main">
@@ -274,6 +302,7 @@ function AdminDashboard({
           <Kpi icon={CalendarDays} label="Active" value={stats.active} />
           <Kpi icon={Users} label="Players" value={stats.players} />
           <Kpi icon={ListChecks} label="Queues" value={adminQueues.pendingRegistrations} />
+          <Kpi icon={Ban} label="Blocks" value={activeBlocks} />
         </div>
       </section>
 
@@ -291,6 +320,7 @@ function AdminDashboard({
       </div>
 
       <TournamentTable tournaments={tournaments} source={source} />
+      <BlockManagement blocks={blocks} session={session} onChanged={onBlocksChanged} />
     </main>
   )
 }
@@ -507,6 +537,287 @@ function TournamentTable({
       </div>
     </section>
   )
+}
+
+function BlockManagement({
+  blocks,
+  onChanged,
+  session,
+}: {
+  blocks: BlockListLoadResult
+  onChanged: () => Promise<void>
+  session: AdminSession
+}) {
+  const [identityForm, setIdentityForm] = useState({
+    type: 'email' as IdentityBlockType,
+    value: '',
+    reason: '',
+    targetUserId: '',
+    targetProfileId: '',
+  })
+  const [ipForm, setIpForm] = useState({ ipRange: '', reason: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState<string | null>(
+    blocks.error ? 'Block lists could not be loaded from Appwrite.' : null,
+  )
+
+  const actorProfileId = session.profile?.$id
+
+  async function handleIdentityBlock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSubmitting(true)
+    setMessage(null)
+
+    try {
+      await blockIdentity({
+        ...identityForm,
+        value: identityForm.value.trim(),
+        reason: identityForm.reason.trim(),
+        targetUserId: identityForm.targetUserId.trim(),
+        targetProfileId: identityForm.targetProfileId.trim(),
+        actorProfileId,
+      })
+      setIdentityForm((current) => ({ ...current, value: '', reason: '', targetUserId: '', targetProfileId: '' }))
+      setMessage('Identity block added.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleIpBlock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSubmitting(true)
+    setMessage(null)
+
+    try {
+      await blockIp({
+        ipRange: ipForm.ipRange.trim(),
+        reason: ipForm.reason.trim(),
+        actorProfileId,
+      })
+      setIpForm({ ipRange: '', reason: '' })
+      setMessage('IP block added.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleUnblockIdentity(block: IdentityBlock) {
+    setSubmitting(true)
+    setMessage(null)
+
+    try {
+      await unblockIdentity(block.$id, actorProfileId)
+      setMessage('Identity block lifted.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleUnblockIp(block: IpBlock) {
+    setSubmitting(true)
+    setMessage(null)
+
+    try {
+      await unblockIp(block.$id, actorProfileId)
+      setMessage('IP block lifted.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <section className="admin-panel block-management">
+      <div className="panel-title-row">
+        <h2>Blocked players</h2>
+        <span>Admin only</span>
+      </div>
+      <div className="admin-note">
+        Identity blocks stop matching email, University ID, or Jordan phone numbers. IP blocks stop requests
+        from a specific IP or IPv4 CIDR range.
+      </div>
+
+      <div className="block-grid">
+        <form className="admin-form block-form" onSubmit={handleIdentityBlock}>
+          <div className="panel-title-row compact">
+            <h3>Identity block</h3>
+            <Ban size={18} aria-hidden="true" />
+          </div>
+          <div className="admin-form-row">
+            <label>
+              Type
+              <select
+                value={identityForm.type}
+                onChange={(event) => setIdentityForm((current) => ({
+                  ...current,
+                  type: event.target.value as IdentityBlockType,
+                }))}
+              >
+                <option value="email">Email</option>
+                <option value="universityId">University ID</option>
+                <option value="phone">Phone</option>
+              </select>
+            </label>
+            <label>
+              Value
+              <input
+                value={identityForm.value}
+                onChange={(event) => setIdentityForm((current) => ({ ...current, value: event.target.value }))}
+                placeholder={identityForm.type === 'phone' ? '0791234567' : 'player@ju.edu.jo'}
+                required
+              />
+            </label>
+          </div>
+          <label>
+            Reason
+            <input
+              value={identityForm.reason}
+              onChange={(event) => setIdentityForm((current) => ({ ...current, reason: event.target.value }))}
+              placeholder="Optional admin note"
+            />
+          </label>
+          <div className="admin-form-row">
+            <label>
+              Appwrite user ID
+              <input
+                value={identityForm.targetUserId}
+                onChange={(event) => setIdentityForm((current) => ({ ...current, targetUserId: event.target.value }))}
+                placeholder="Optional"
+              />
+            </label>
+            <label>
+              Profile row ID
+              <input
+                value={identityForm.targetProfileId}
+                onChange={(event) => setIdentityForm((current) => ({
+                  ...current,
+                  targetProfileId: event.target.value,
+                }))}
+                placeholder="Optional"
+              />
+            </label>
+          </div>
+          <button type="submit" disabled={submitting}>Block identity</button>
+        </form>
+
+        <form className="admin-form block-form" onSubmit={handleIpBlock}>
+          <div className="panel-title-row compact">
+            <h3>IP block</h3>
+            <Ban size={18} aria-hidden="true" />
+          </div>
+          <label>
+            IP or CIDR
+            <input
+              value={ipForm.ipRange}
+              onChange={(event) => setIpForm((current) => ({ ...current, ipRange: event.target.value }))}
+              placeholder="203.0.113.10 or 203.0.113.0/24"
+              required
+            />
+          </label>
+          <label>
+            Reason
+            <input
+              value={ipForm.reason}
+              onChange={(event) => setIpForm((current) => ({ ...current, reason: event.target.value }))}
+              placeholder="Optional admin note"
+            />
+          </label>
+          <button type="submit" disabled={submitting}>Block IP</button>
+        </form>
+      </div>
+
+      {message ? <div className="admin-inline-note" role="status">{message}</div> : null}
+
+      <div className="block-lists">
+        <BlockList
+          title="Identity block list"
+          empty="No identity blocks yet."
+          rows={blocks.identityBlocks}
+          renderValue={(block) => `${identityLabel(block.type)} · ${block.value}`}
+          onUnblock={handleUnblockIdentity}
+          disabled={submitting}
+        />
+        <BlockList
+          title="IP block list"
+          empty="No IP blocks yet."
+          rows={blocks.ipBlocks}
+          renderValue={(block) => block.ipRange}
+          onUnblock={handleUnblockIp}
+          disabled={submitting}
+        />
+      </div>
+    </section>
+  )
+}
+
+function BlockList<T extends IdentityBlock | IpBlock>({
+  disabled,
+  empty,
+  onUnblock,
+  renderValue,
+  rows,
+  title,
+}: {
+  disabled: boolean
+  empty: string
+  onUnblock: (row: T) => Promise<void>
+  renderValue: (row: T) => string
+  rows: T[]
+  title: string
+}) {
+  return (
+    <div className="block-list">
+      <h3>{title}</h3>
+      {rows.length === 0 ? <div className="block-empty">{empty}</div> : null}
+      {rows.map((row) => (
+        <div className="block-row" key={row.$id}>
+          <div>
+            <strong>{renderValue(row)}</strong>
+            <span className={`admin-status ${row.status}`}>{row.status}</span>
+            {row.reason ? <small>{row.reason}</small> : null}
+            <small>{formatBlockDate(row.createdAt || row.$createdAt)}</small>
+          </div>
+          {row.status === 'active' ? (
+            <button type="button" className="admin-ghost" disabled={disabled} onClick={() => void onUnblock(row)}>
+              <RotateCcw size={15} aria-hidden="true" />
+              Unblock
+            </button>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function identityLabel(type: IdentityBlockType) {
+  if (type === 'universityId') return 'University ID'
+  if (type === 'phone') return 'Phone'
+  return 'Email'
+}
+
+function formatBlockDate(value?: string) {
+  if (!value) return 'Date unavailable'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date)
 }
 
 function workflowTitle(tab: AdminTab) {

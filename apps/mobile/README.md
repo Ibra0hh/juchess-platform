@@ -1,17 +1,16 @@
-# juchess_mobile
+# JuChess Mobile
 
-A new Flutter project.
+Flutter implementation of the JuChess mobile and tablet prototype.
 
-## Getting Started
+## Run With Appwrite
 
-This project is a starting point for a Flutter application.
+```bash
+flutter run \
+  --dart-define=APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 \
+  --dart-define=APPWRITE_PROJECT_ID=juchess-platform \
+  --dart-define=APPWRITE_DATABASE_ID=juchess \
+  --dart-define=APPWRITE_ACCESS_GUARD_FUNCTION_ID=access-guards
+```
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+The access guard checks active email, University ID, phone, and IP blocks before
+sign-in/sign-up and when restoring a saved session.

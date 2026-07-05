@@ -33,6 +33,7 @@ Fields:
 - `displayName` string, required.
 - `universityId` string, optional, unique when present.
 - `email` email, required.
+- `phone` string, optional, unique when present. Stored in normalized `+962...` format for Jordan numbers.
 - `rating` integer, default `1200`.
 - `role` enum: `member`, `organizer`, `admin`.
 - `status` enum: `pending`, `active`, `suspended`.
@@ -155,6 +156,43 @@ Permissions:
 - Admins can read.
 - Admin Function writes.
 
+### `identity_blocks`
+
+Admin-managed block list for player identity values.
+
+Fields:
+- `type` enum: `email`, `universityId`, `phone`.
+- `value` string, required. Email and University ID are lowercase; Jordan phones are normalized to `+962...`.
+- `reason` string, optional admin note.
+- `status` enum: `active`, `lifted`.
+- `targetUserId` string, optional Appwrite user ID. When present, blocking also disables the Appwrite account and deletes sessions.
+- `targetProfileId` string, optional profile row ID. When present, blocking also suspends the profile.
+- `createdByProfileId` string, required.
+- `createdAt` datetime, required.
+- `liftedByProfileId` string, optional.
+- `liftedAt` datetime, optional.
+
+Permissions:
+- Admin Function writes.
+- Guard Function reads active rows and only returns allowed/blocked, never the list.
+
+### `ip_blocks`
+
+Admin-managed network block list.
+
+Fields:
+- `ipRange` string, required. Supports a single IPv4 address or an IPv4 CIDR range.
+- `reason` string, optional admin note.
+- `status` enum: `active`, `lifted`.
+- `createdByProfileId` string, required.
+- `createdAt` datetime, required.
+- `liftedByProfileId` string, optional.
+- `liftedAt` datetime, optional.
+
+Permissions:
+- Admin Function writes.
+- Guard Function reads active rows and only returns allowed/blocked.
+
 ## Storage Buckets
 
 ### `avatars`
@@ -177,9 +215,15 @@ Responsibilities:
 - Recalculate standings.
 - Manage announcements.
 - Manage profile roles and status.
+- Manage identity and IP blocks.
 
 Implemented routes:
 - `GET /`
+- `GET /blocks`
+- `POST /blocks/identity`
+- `POST /blocks/identity/:id/unblock`
+- `POST /blocks/ip`
+- `POST /blocks/ip/:id/unblock`
 - `POST /tournaments`
 - `PATCH /tournaments/:id`
 - `DELETE /tournaments/:id`
@@ -188,3 +232,16 @@ Implemented routes:
 - `POST /profiles/:id/role`
 - `POST /profiles/:id/status`
 - `POST /announcements`
+
+## First Guard Function
+
+Function ID: `access-guards`
+
+Responsibilities:
+- Check sign-in/sign-up identity values against active block rows.
+- Check request IP against active IP blocks.
+- Return only `{ allowed: true }` or blocked metadata, without exposing the block lists to clients.
+
+Implemented routes:
+- `GET /`
+- `POST /check`

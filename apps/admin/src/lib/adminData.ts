@@ -6,6 +6,8 @@ export type AdminProfile = Models.Row & {
   accountId: string
   displayName: string
   email: string
+  phone?: string
+  universityId?: string
   role?: 'member' | 'organizer' | 'admin'
   status?: 'pending' | 'active' | 'suspended'
 }
@@ -72,6 +74,53 @@ export type AdminTournamentLoadResult = {
   tournaments: AdminTournament[]
   source: 'appwrite' | 'prototype'
   error?: unknown
+}
+
+export type IdentityBlockType = 'email' | 'universityId' | 'phone'
+export type BlockStatus = 'active' | 'lifted'
+
+export type IdentityBlock = Models.Row & {
+  type: IdentityBlockType
+  value: string
+  reason?: string
+  status: BlockStatus
+  targetUserId?: string
+  targetProfileId?: string
+  createdByProfileId: string
+  createdAt: string
+  liftedByProfileId?: string
+  liftedAt?: string
+}
+
+export type IpBlock = Models.Row & {
+  ipRange: string
+  reason?: string
+  status: BlockStatus
+  createdByProfileId: string
+  createdAt: string
+  liftedByProfileId?: string
+  liftedAt?: string
+}
+
+export type BlockListLoadResult = {
+  identityBlocks: IdentityBlock[]
+  ipBlocks: IpBlock[]
+  error?: unknown
+}
+
+export type IdentityBlockInput = {
+  type: IdentityBlockType
+  value: string
+  reason?: string
+  targetUserId?: string
+  targetProfileId?: string
+  actorProfileId?: string
+}
+
+export type IpBlockInput = {
+  ipRange: string
+  reason?: string
+  actorProfileId?: string
 }
 
 const adminFunctionId = import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions'
@@ -141,6 +190,60 @@ export async function createTournament(input: TournamentInput) {
     method: ExecutionMethod.POST,
     path: '/tournaments',
     body: cleanTournamentInput(input),
+  })
+
+  return response.row
+}
+
+export async function loadBlockLists(): Promise<BlockListLoadResult> {
+  if (!appwriteReady) return { identityBlocks: [], ipBlocks: [] }
+
+  try {
+    return await runAdminAction<BlockListLoadResult>({
+      method: ExecutionMethod.GET,
+      path: '/blocks',
+      body: {},
+    })
+  } catch (error) {
+    return { identityBlocks: [], ipBlocks: [], error }
+  }
+}
+
+export async function blockIdentity(input: IdentityBlockInput) {
+  const response = await runAdminAction<{ row: IdentityBlock }>({
+    method: ExecutionMethod.POST,
+    path: '/blocks/identity',
+    body: cleanBlockInput(input),
+  })
+
+  return response.row
+}
+
+export async function unblockIdentity(blockId: string, actorProfileId?: string) {
+  const response = await runAdminAction<{ row: IdentityBlock }>({
+    method: ExecutionMethod.POST,
+    path: `/blocks/identity/${blockId}/unblock`,
+    body: cleanBlockInput({ actorProfileId }),
+  })
+
+  return response.row
+}
+
+export async function blockIp(input: IpBlockInput) {
+  const response = await runAdminAction<{ row: IpBlock }>({
+    method: ExecutionMethod.POST,
+    path: '/blocks/ip',
+    body: cleanBlockInput(input),
+  })
+
+  return response.row
+}
+
+export async function unblockIp(blockId: string, actorProfileId?: string) {
+  const response = await runAdminAction<{ row: IpBlock }>({
+    method: ExecutionMethod.POST,
+    path: `/blocks/ip/${blockId}/unblock`,
+    body: cleanBlockInput({ actorProfileId }),
   })
 
   return response.row
@@ -284,6 +387,12 @@ function parseExecutionBody<T>(body: string): T {
 }
 
 function cleanTournamentInput(input: TournamentInput): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(input).filter(([, value]) => value !== undefined && value !== ''),
+  )
+}
+
+function cleanBlockInput(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined && value !== ''),
   )

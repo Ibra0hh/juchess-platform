@@ -67,6 +67,7 @@ organization account. Local web/admin env files should use:
 VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
 VITE_APPWRITE_PROJECT_ID=juchess-platform
 VITE_APPWRITE_DATABASE_ID=juchess
+VITE_APPWRITE_ACCESS_GUARD_FUNCTION_ID=access-guards
 ```
 
 The admin app also needs:
@@ -84,14 +85,27 @@ Provisioned resources:
 - Storage buckets: `avatars`, `tournament-assets`.
 - Function: `admin-actions`, runtime `node-22`, deployed from
   `appwrite/functions/admin-actions`.
+- Function: `access-guards`, runtime `node-22`, deployed from
+  `appwrite/functions/access-guards`.
 
 Admin-only mutations must go through Appwrite Functions, not browser API keys.
-To redeploy the function after edits:
+To redeploy the admin function after edits:
 
 ```bash
 appwrite functions create-deployment \
   --function-id admin-actions \
   --code appwrite/functions/admin-actions \
+  --activate true \
+  --entrypoint src/main.js \
+  --commands "npm install"
+```
+
+To deploy the public access guard function:
+
+```bash
+appwrite functions create-deployment \
+  --function-id access-guards \
+  --code appwrite/functions/access-guards \
   --activate true \
   --entrypoint src/main.js \
   --commands "npm install"
@@ -104,6 +118,10 @@ appwrite functions create-deployment \
 - Admin sign-in, admin/organizer role guard, tournament reads, and tournament
   creation are wired to Appwrite. Writes go through the `admin-actions`
   Function.
+- Admin can create and lift identity/IP blocks. Blocking with an Appwrite user
+  ID disables the account and deletes its sessions.
+- Web and Flutter sign-in/sign-up call the `access-guards` Function so blocked
+  emails, University IDs, phones, and IPs cannot continue.
 - Flutter has Appwrite config, session detection, sign-in, sign-up, sign-out,
   and tournament reads while preserving the prototype visual structure.
 - The `admin-actions` Function has concrete admin mutation routes for

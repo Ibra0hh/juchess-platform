@@ -4,6 +4,7 @@ export const appwriteConfig = {
   endpoint: import.meta.env.VITE_APPWRITE_ENDPOINT ?? '',
   projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID ?? '',
   databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID ?? '',
+  accessGuardFunctionId: import.meta.env.VITE_APPWRITE_ACCESS_GUARD_FUNCTION_ID ?? 'access-guards',
 }
 
 export const appwriteReady = Boolean(

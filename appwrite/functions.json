@@ -21,7 +21,44 @@
     ],
     "scopes": [
       "databases.read",
-      "databases.write"
+      "databases.write",
+      "rows.read",
+      "rows.write",
+      "documents.read",
+      "documents.write",
+      "users.read",
+      "users.write"
+    ],
+    "vars": [
+      {
+        "key": "JUCHESS_DATABASE_ID",
+        "value": "juchess"
+      }
+    ]
+  },
+  {
+    "$id": "access-guards",
+    "name": "JuChess Access Guards",
+    "runtime": "node-22",
+    "path": "functions/access-guards",
+    "entrypoint": "src/main.js",
+    "commands": "npm install",
+    "execute": [
+      "any"
+    ],
+    "events": [],
+    "schedule": "",
+    "timeout": 10,
+    "enabled": true,
+    "logging": true,
+    "ignore": [
+      "node_modules",
+      ".git"
+    ],
+    "scopes": [
+      "databases.read",
+      "rows.read",
+      "documents.read"
     ],
     "vars": [
       {

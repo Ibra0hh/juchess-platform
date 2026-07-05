@@ -15,6 +15,7 @@ function AuthPage({ mode }: AuthPageProps) {
   const isSignup = mode === 'sign-up'
   const [fullName, setFullName] = useState('')
   const [universityId, setUniversityId] = useState('')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -40,6 +41,7 @@ function AuthPage({ mode }: AuthPageProps) {
         await signUp({
           fullName: fullName.trim(),
           universityId: universityId.trim(),
+          phone: phone.trim(),
           email: email.trim(),
           password,
         })
@@ -95,6 +97,16 @@ function AuthPage({ mode }: AuthPageProps) {
                     onChange={(event) => setUniversityId(event.target.value)}
                     autoComplete="username"
                     placeholder="2026xxxxx"
+                  />
+                </label>
+                <label>
+                  Phone number
+                  <input
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    autoComplete="tel"
+                    inputMode="tel"
+                    placeholder="0791234567"
                   />
                 </label>
               </>

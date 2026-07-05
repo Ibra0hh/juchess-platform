@@ -235,7 +235,7 @@
 
 .admin-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(86px, 1fr));
+  grid-template-columns: repeat(5, minmax(86px, 1fr));
   gap: 10px;
 }
 
@@ -292,6 +292,15 @@
 
 .panel-title-row h2 {
   font-size: 24px;
+}
+
+.panel-title-row h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.panel-title-row.compact {
+  margin-bottom: 8px;
 }
 
 .panel-title-row span {
@@ -416,6 +425,89 @@
   color: #79622a;
 }
 
+.admin-status.lifted {
+  background: rgba(30, 43, 69, 0.08);
+  color: rgba(30, 43, 69, 0.58);
+}
+
+.block-management {
+  margin-top: 18px;
+}
+
+.block-management > .admin-note {
+  margin-bottom: 16px;
+}
+
+.block-grid,
+.block-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.block-form {
+  margin-top: 0;
+  padding: 15px;
+  border: 1px solid rgba(30, 43, 69, 0.11);
+  border-radius: 10px;
+  background: rgba(245, 239, 227, 0.38);
+}
+
+.block-form .panel-title-row svg {
+  color: #7a2431;
+}
+
+.block-lists {
+  margin-top: 16px;
+}
+
+.block-list {
+  border: 1px solid rgba(30, 43, 69, 0.11);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fffaf0;
+}
+
+.block-list h3 {
+  margin: 0;
+  padding: 12px 14px;
+  background: rgba(30, 43, 69, 0.06);
+  font-size: 14px;
+}
+
+.block-empty {
+  padding: 14px;
+  color: rgba(30, 43, 69, 0.58);
+  font-size: 13px;
+}
+
+.block-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(30, 43, 69, 0.08);
+}
+
+.block-row > div {
+  display: grid;
+  gap: 5px;
+}
+
+.block-row strong {
+  overflow-wrap: anywhere;
+}
+
+.block-row small {
+  color: rgba(30, 43, 69, 0.58);
+  font-size: 11.5px;
+}
+
+.block-row .admin-status {
+  width: fit-content;
+}
+
 @media (max-width: 980px) {
   .admin-hero,
   .admin-grid {
@@ -424,6 +516,11 @@
 
   .admin-kpis {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .block-grid,
+  .block-lists {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -449,6 +546,10 @@
   .workflow-tabs {
     grid-template-columns: 1fr;
     border-radius: 12px;
+  }
+
+  .block-row {
+    grid-template-columns: 1fr;
   }
 
   .workflow-tabs button {
