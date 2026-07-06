@@ -3,12 +3,16 @@ import { useAuth } from '../context/AuthContext'
 import './SiteHeader.css'
 
 type SiteHeaderProps = {
-  active: 'home' | 'tournaments' | 'games' | 'leaderboard' | 'profile'
+  active: 'home' | 'tournaments' | 'games' | 'tools' | 'leaderboard' | 'profile'
+  profilePreview?: {
+    displayName: string
+    initials: string
+  }
 }
 
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 
-function SiteHeader({ active }: SiteHeaderProps) {
+function SiteHeader({ active, profilePreview }: SiteHeaderProps) {
   const { loading, profile, signOut, user } = useAuth()
   const displayName = profile?.displayName || user?.name || user?.email || ''
   const initials = displayName
@@ -41,6 +45,9 @@ function SiteHeader({ active }: SiteHeaderProps) {
           <Link to="/games" className={active === 'games' ? 'active' : undefined}>
             Games
           </Link>
+          <Link to="/tools" className={active === 'tools' ? 'active' : undefined}>
+            Tools
+          </Link>
           <Link to="/leaderboard" className={active === 'leaderboard' ? 'active' : undefined}>
             Leaderboard
           </Link>
@@ -50,7 +57,11 @@ function SiteHeader({ active }: SiteHeaderProps) {
         </nav>
 
         <div className="auth-nav">
-          {user ? (
+          {profilePreview ? (
+            <Link to="/profile" className="profile-link" title={profilePreview.displayName}>
+              {profilePreview.initials}
+            </Link>
+          ) : user ? (
             <>
               <Link to="/profile" className="profile-link" title={displayName}>
                 {initials}

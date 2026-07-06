@@ -44,6 +44,38 @@ export type Member = {
   universityId: string
 }
 
+export type BoardCell = {
+  key: string
+  glyph: string
+  isWhite: boolean
+  isDark: boolean
+}
+
+export type GameSource = 'chess.com' | 'lichess' | 'tournament'
+
+export type MoveClassification = 'Brilliant' | 'Great' | 'Book' | 'Best' | 'Mistake' | 'Blunder'
+
+export type SampleGame = {
+  key: string
+  id: string
+  source: GameSource
+  white: string
+  black: string
+  wRating: number
+  bRating: number
+  result: string
+  date: string
+  opening: string
+  round: string
+  fen: string
+  moves: string[]
+  classes: MoveClassification[]
+  evals: number[]
+  wAcc: number
+  bAcc: number
+  live?: boolean
+}
+
 export const tableIds = {
   profiles: 'profiles',
   tournaments: 'tournaments',
@@ -71,10 +103,380 @@ export const members: Member[] = [
   { id: 'zaid', name: 'Zaid Hamdan', rating: 1310, universityId: 'zhamdan' },
 ]
 
+export const demoTournaments: Tournament[] = [
+  {
+    id: 'spring-open',
+    name: 'JU Spring Open 2026',
+    status: 'Active',
+    date: 'Jun 14 - Jul 12, 2026',
+    location: 'Student Union Hall B',
+    format: 'Swiss',
+    timeControl: '15+10 Rapid',
+    participants: 12,
+    capacity: 32,
+    round: 'Round 4 of 7',
+    desc: "The club's flagship open - seven Swiss rounds across four weekends, open to all JU students and staff.",
+  },
+  {
+    id: 'faculty-rr',
+    name: 'Faculty Round-Robin',
+    status: 'Active',
+    date: 'May 3 - May 31, 2026',
+    location: 'Engineering Lounge',
+    format: 'Round-robin',
+    timeControl: '10+5 Rapid',
+    participants: 6,
+    capacity: 6,
+    round: 'Final - 5 rounds',
+    desc: 'Six faculty champions, everyone plays everyone once.',
+  },
+  {
+    id: 'masters-drr',
+    name: 'Masters Double Round-Robin',
+    status: 'Active',
+    date: 'Jun 1 - Jul 20, 2026',
+    location: 'Library Seminar Room 2',
+    format: 'Double round-robin',
+    timeControl: '25+10 Classical',
+    participants: 4,
+    capacity: 4,
+    round: 'Cycle 2 - Round 5 of 6',
+    desc: 'Top four club ratings meet twice - once with each color.',
+  },
+  {
+    id: 'knockout-cup',
+    name: 'JU Knockout Cup',
+    status: 'Active',
+    date: 'Jun 20 - Jul 10, 2026',
+    location: 'Hall A',
+    format: 'Single elimination',
+    timeControl: '10+0 Blitz',
+    participants: 16,
+    capacity: 16,
+    round: 'Semifinals',
+    desc: 'Sixteen enter, one lifts the cup. Straight knockout, no second chances.',
+  },
+  {
+    id: 'blitz-de',
+    name: 'Summer Blitz Double Elimination',
+    status: 'Active',
+    date: 'Jun 26 - Jul 5, 2026',
+    location: 'Hall A',
+    format: 'Double elimination',
+    timeControl: '5+3 Blitz',
+    participants: 12,
+    capacity: 12,
+    round: 'Losers Round 3',
+    desc: 'Twelve blitz players, two lives each. Lose once, drop to the losers bracket; lose twice, you are out.',
+  },
+  {
+    id: 'autumn-qualifier',
+    name: 'Autumn Team Qualifier',
+    status: 'Upcoming',
+    date: 'Sep 12 - Sep 19, 2026',
+    location: 'Student Union Hall B',
+    format: 'Swiss team',
+    timeControl: '15+10 Rapid',
+    participants: 0,
+    capacity: 40,
+    round: 'Registration open',
+    desc: 'Qualifying event for the university rapid team selection.',
+  },
+  {
+    id: 'beginner-arena',
+    name: 'Beginner Friday Arena',
+    status: 'Upcoming',
+    date: 'Aug 7, 2026',
+    location: 'Club Room',
+    format: 'Arena',
+    timeControl: '5+0 Blitz',
+    participants: 0,
+    capacity: 48,
+    round: 'Registration open',
+    desc: 'A low-pressure club night for new players and casual members.',
+  },
+  {
+    id: 'winter-classic',
+    name: 'Winter Classic 2025',
+    status: 'Completed',
+    date: 'Dec 5 - Dec 19, 2025',
+    location: 'Library Seminar Room 2',
+    format: 'Swiss',
+    timeControl: '30+30 Classical',
+    participants: 18,
+    capacity: 24,
+    round: 'Final',
+    desc: 'The previous semester classical championship.',
+  },
+]
+
 export const liveGames = [
   { id: 'g1', board: 1, white: 'Ibrahim Ahmad', black: 'Omar Saleh', result: 'live' },
   { id: 'g2', board: 2, white: 'Leen Haddad', black: 'Yazan Khaled', result: 'live' },
 ]
+
+const pieceGlyphs: Record<string, string> = {
+  p: '\u265f',
+  n: '\u265e',
+  b: '\u265d',
+  r: '\u265c',
+  q: '\u265b',
+  k: '\u265a',
+}
+
+const sampleFens = [
+  'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R',
+  'r1bq1rk1/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1',
+  'r2q1rk1/pp1bppbp/2np1np1/8/3NP3/2N1BP2/PPPQ2PP/2KR1B1R',
+  'r1bqk2r/pp2bppp/2n1pn2/2pp4/3P1B2/2P1PN2/PP1N1PPP/R2QKB1R',
+  'r3r1k1/pp3ppp/2p2n2/3q4/3P4/2NB4/PP3PPP/R2Q1RK1',
+  '2r2rk1/pb2qppp/1pn1pn2/8/2PP4/1PN1PN2/PB2QPPP/2R2RK1',
+  'r4rk1/1pp1qppp/p1np1n2/4p3/2B1P1b1/2NP1N2/PPP1QPPP/R1B2RK1',
+  '3r2k1/5ppp/2p5/1pQ5/8/1P4P1/P4P1P/3q2K1',
+  '8/5pk1/6p1/8/3K4/8/5PP1/8',
+]
+
+const sampleMoves = [
+  'e4',
+  'e5',
+  'Nf3',
+  'Nc6',
+  'Bc4',
+  'Bc5',
+  'c3',
+  'Nf6',
+  'd4',
+  'exd4',
+  'cxd4',
+  'Bb4+',
+  'Nc3',
+  'Nxe4',
+  'O-O',
+  'Bxc3',
+  'd5',
+  'Bf6',
+  'Re1',
+  'Ne7',
+  'Rxe4',
+  'd6',
+  'Bg5',
+  'Bxg5',
+  'Nxg5',
+  'h6',
+  'Qe2',
+  'hxg5',
+  'Re1',
+  'Be6',
+  'dxe6',
+  'f6',
+  'Qd3',
+  'gxe6',
+  'Rxe6',
+  'Kf7',
+  'Qb3',
+  'Qd7',
+  'Rae1',
+  'Rhe8',
+]
+
+const sampleClasses: MoveClassification[] = [
+  'Book',
+  'Book',
+  'Book',
+  'Book',
+  'Book',
+  'Book',
+  'Best',
+  'Best',
+  'Best',
+  'Great',
+  'Best',
+  'Book',
+  'Best',
+  'Mistake',
+  'Best',
+  'Best',
+  'Great',
+  'Best',
+  'Best',
+  'Best',
+  'Brilliant',
+  'Best',
+  'Best',
+  'Mistake',
+  'Best',
+  'Blunder',
+  'Best',
+  'Best',
+  'Best',
+  'Mistake',
+  'Great',
+  'Best',
+  'Best',
+  'Blunder',
+  'Brilliant',
+  'Best',
+  'Best',
+  'Best',
+  'Great',
+  'Best',
+]
+
+const sampleEvals = [
+  0.2,
+  0.2,
+  0.3,
+  0.2,
+  0.4,
+  0.3,
+  0.4,
+  0.4,
+  0.5,
+  0.3,
+  0.4,
+  0.4,
+  0.6,
+  1.1,
+  1.2,
+  1.0,
+  1.4,
+  1.3,
+  1.4,
+  1.5,
+  2.2,
+  2.0,
+  2.1,
+  2.9,
+  3.0,
+  4.6,
+  4.4,
+  4.5,
+  4.6,
+  5.4,
+  5.6,
+  5.5,
+  5.7,
+  7.2,
+  8.5,
+  8.3,
+  8.6,
+  8.8,
+  9.4,
+  9.6,
+]
+
+export function fenBoard(fen: string): BoardCell[] {
+  const boardFen = fen.split(' ')[0] || '8/8/8/8/8/8/8/8'
+  const rows = boardFen.split('/')
+  const cells: BoardCell[] = []
+
+  rows.forEach((row, rankIndex) => {
+    let fileIndex = 0
+
+    row.split('').forEach((char) => {
+      const emptyCount = Number.parseInt(char, 10)
+
+      if (Number.isInteger(emptyCount) && emptyCount > 0) {
+        for (let i = 0; i < emptyCount; i += 1) {
+          cells.push({
+            key: `${rankIndex}-${fileIndex}`,
+            glyph: '',
+            isWhite: false,
+            isDark: (rankIndex + fileIndex) % 2 === 1,
+          })
+          fileIndex += 1
+        }
+        return
+      }
+
+      cells.push({
+        key: `${rankIndex}-${fileIndex}`,
+        glyph: pieceGlyphs[char.toLowerCase()] || '',
+        isWhite: char === char.toUpperCase(),
+        isDark: (rankIndex + fileIndex) % 2 === 1,
+      })
+      fileIndex += 1
+    })
+  })
+
+  return cells.slice(0, 64)
+}
+
+function memberName(index: number) {
+  return members[index]?.name || members[0].name
+}
+
+function memberRating(index: number) {
+  return members[index]?.rating || members[0].rating
+}
+
+function makeSampleGame(
+  source: GameSource,
+  id: number,
+  whiteIndex: number,
+  blackIndex: number,
+  result: string,
+  date: string,
+  opening: string,
+  round = '',
+): SampleGame {
+  return {
+    key: `${source}-${id}`,
+    id: String(id),
+    source,
+    white: memberName(whiteIndex),
+    black: memberName(blackIndex),
+    wRating: memberRating(whiteIndex),
+    bRating: memberRating(blackIndex),
+    result,
+    date,
+    opening,
+    round,
+    fen: sampleFens[id % sampleFens.length],
+    moves: sampleMoves,
+    classes: sampleClasses,
+    evals: sampleEvals,
+    wAcc: [91.4, 84.2, 88.7, 79.3, 93.1, 86.5][id % 6],
+    bAcc: [83.6, 88.9, 76.2, 90.4, 81.7, 74.9][id % 6],
+  }
+}
+
+export const sampleGamesBySource: Record<GameSource, SampleGame[]> = {
+  'chess.com': [
+    makeSampleGame('chess.com', 1, 0, 3, '1-0', 'Jun 30, 2026', 'Italian Game: Classical'),
+    makeSampleGame('chess.com', 2, 1, 0, '0-1', 'Jun 28, 2026', 'Sicilian Defense: Najdorf'),
+    makeSampleGame('chess.com', 3, 0, 5, '1/2-1/2', 'Jun 26, 2026', "Queen's Gambit Declined"),
+    makeSampleGame('chess.com', 4, 2, 0, '0-1', 'Jun 22, 2026', 'Ruy Lopez: Berlin'),
+    makeSampleGame('chess.com', 5, 0, 4, '1-0', 'Jun 19, 2026', 'Caro-Kann: Advance'),
+    makeSampleGame('chess.com', 6, 0, 1, '1-0', 'Jun 15, 2026', 'English Opening'),
+    makeSampleGame('chess.com', 7, 3, 0, '1/2-1/2', 'Jun 12, 2026', 'French Defense: Tarrasch'),
+    makeSampleGame('chess.com', 8, 0, 2, '1-0', 'Jun 8, 2026', 'Scotch Game'),
+  ],
+  lichess: [
+    makeSampleGame('lichess', 2, 4, 1, '0-1', 'Jul 1, 2026', "King's Indian Defense"),
+    makeSampleGame('lichess', 5, 1, 2, '1-0', 'Jun 29, 2026', 'Vienna Game'),
+    makeSampleGame('lichess', 7, 3, 1, '1/2-1/2', 'Jun 25, 2026', 'Slav Defense'),
+    makeSampleGame('lichess', 1, 1, 5, '1-0', 'Jun 21, 2026', 'Italian Game: Evans Gambit'),
+    makeSampleGame('lichess', 4, 2, 3, '1-0', 'Jun 18, 2026', 'Nimzo-Indian Defense'),
+    makeSampleGame('lichess', 3, 5, 1, '0-1', 'Jun 14, 2026', 'Pirc Defense'),
+  ],
+  tournament: [
+    makeSampleGame('tournament', 1, 0, 1, '1-0', 'Jul 2, 2026', 'Ruy Lopez: Closed', 'Spring Open - R4'),
+    makeSampleGame('tournament', 6, 2, 3, '1/2-1/2', 'Jul 2, 2026', 'Catalan Opening', 'Spring Open - R4'),
+    makeSampleGame('tournament', 3, 4, 5, '1-0', 'Jul 2, 2026', 'Sicilian: Alapin', 'Spring Open - R4'),
+    makeSampleGame('tournament', 8, 1, 4, '1-0', 'Jun 27, 2026', "Queen's Gambit Accepted", 'Knockout Cup - QF'),
+    makeSampleGame('tournament', 2, 3, 2, '0-1', 'Jun 27, 2026', 'London System', 'Knockout Cup - QF'),
+    makeSampleGame('tournament', 5, 0, 5, '1-0', 'Jun 20, 2026', 'Italian Game: Giuoco Piano', 'Masters DRR - R3'),
+  ],
+}
+
+export function findSampleGame(value: string | null | undefined): SampleGame | null {
+  if (!value) return null
+
+  return Object.values(sampleGamesBySource)
+    .flat()
+    .find((game) => game.key === value || game.id === value) || null
+}
 
 export type TournamentLoadResult = {
   tournaments: Tournament[]
@@ -85,7 +487,7 @@ export type TournamentLoadResult = {
 export async function loadTournaments(): Promise<TournamentLoadResult> {
   if (!appwriteReady) {
     return {
-      tournaments: [],
+      tournaments: demoTournaments,
       source: 'unavailable',
       error: new Error('Cloud connection is not configured for this app.'),
     }
@@ -114,7 +516,7 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
     }
   } catch (error) {
     console.warn('JuChess cloud tournament read failed.', error)
-    return { tournaments: [], source: 'unavailable', error }
+    return { tournaments: demoTournaments, source: 'unavailable', error }
   }
 }
 
