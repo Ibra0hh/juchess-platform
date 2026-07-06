@@ -717,16 +717,6 @@ function WindowsScreen() {
 
       <section className="device-preview">
         <div className="preview-panel">
-          <div className="preview-panel-head">
-            <div>
-              <strong>{current.label} preview</strong>
-              <span>{previewDeviceLabel(device)} · {guestMode ? 'guest mode' : 'signed-in member'}</span>
-            </div>
-          </div>
-          <div className="preview-account-strip">
-            <span>{guestMode ? 'Browsing as' : 'Always signed in as'}</span>
-            <strong>{previewAccount}</strong>
-          </div>
           <div className="preview-stage">
             <div className={`device-frame ${device}`}>
               <div className="device-screen">
@@ -1461,12 +1451,6 @@ function previewHostLabel(value: string) {
   } catch {
     return 'Live app'
   }
-}
-
-function previewDeviceLabel(device: DeviceKey) {
-  if (device === 'ios') return 'iPhone'
-  if (device === 'web') return 'Desktop web'
-  return device[0].toUpperCase() + device.slice(1)
 }
 
 export default App

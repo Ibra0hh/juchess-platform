@@ -846,44 +846,11 @@ button {
 }
 
 .preview-panel {
-  border: 1px solid #e5dcc9;
-  border-radius: 18px;
-  background: #fffaf0;
-  box-shadow: 0 28px 70px -42px rgba(33, 48, 78, 0.55);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   overflow: hidden;
-}
-
-.preview-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  border-bottom: 1px solid #eadfca;
-}
-
-.preview-panel-head > div:first-child {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.preview-panel-head strong {
-  color: #21304e;
-  font-family: "Source Serif 4", Georgia, serif;
-  font-size: 19px;
-  line-height: 1.1;
-}
-
-.preview-panel-head span {
-  color: #8a7e63;
-  font-size: 11.5px;
-  font-weight: 800;
-}
-
-.web-preview-layout .preview-panel-head {
-  align-items: flex-start;
-  flex-direction: column;
 }
 
 .device-switchbar {
@@ -913,46 +880,19 @@ button {
   color: #fff;
 }
 
-.preview-account-strip {
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid #eadfca;
-  background: #f6f0e2;
-}
-
-.preview-account-strip span {
-  color: #8a7e63;
-  font-size: 11.5px;
-  font-weight: 900;
-}
-
-.preview-account-strip strong {
-  min-width: 0;
-  color: #7d2434;
-  font-size: 12px;
-  font-weight: 900;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .preview-stage {
   display: grid;
-  place-items: center;
-  min-height: 560px;
-  padding: 14px;
+  justify-items: end;
+  align-items: start;
+  min-height: 0;
+  padding: 0 0 0 14px;
   background:
     linear-gradient(135deg, rgba(125, 36, 52, 0.06), transparent 35%),
     #eee5d4;
 }
 
 .mobile-preview-layout .preview-stage {
-  min-height: 790px;
-  padding: 14px;
+  min-height: 0;
 }
 
 .web-preview-layout .preview-stage {
@@ -961,7 +901,7 @@ button {
 }
 
 .device-frame {
-  width: min(100%, 340px);
+  width: min(100%, 318px);
   flex: none;
   border-radius: 30px;
   background: #21304e;
@@ -985,7 +925,7 @@ button {
 }
 
 .device-screen {
-  height: 760px;
+  height: min(704px, calc(100vh - 204px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1039,7 +979,7 @@ button {
   width: 390px;
   height: 860px;
   flex: none;
-  transform: scale(0.831);
+  transform: scale(0.774);
   transform-origin: top left;
 }
 
@@ -1579,12 +1519,6 @@ button {
     margin-top: 20px;
   }
 
-  .preview-panel-head,
-  .preview-account-strip {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .device-tabs {
     width: 100%;
     justify-content: center;
@@ -1593,7 +1527,7 @@ button {
 
   .device-frame:not(.web),
   .device-frame.tablet {
-    width: min(100%, 340px);
+    width: min(100%, 318px);
   }
 
   .device-frame.web {
