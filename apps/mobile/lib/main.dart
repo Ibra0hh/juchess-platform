@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/enums.dart' as enums;
@@ -1032,7 +1033,7 @@ class JuChessApp extends StatelessWidget {
           ),
           fontFamily: '-apple-system',
         ),
-        home: const PrototypeShell(),
+        home: const JuChessSplashGate(child: PrototypeShell()),
       ),
     );
   }
@@ -1048,6 +1049,246 @@ class PrototypeColors {
   static const gold = Color(0xffa98a3f);
   static const muted = Color(0xff6a7489);
   static const screen = Color(0xfff6f0e2);
+}
+
+class JuChessSplashGate extends StatefulWidget {
+  const JuChessSplashGate({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  State<JuChessSplashGate> createState() => _JuChessSplashGateState();
+}
+
+class _JuChessSplashGateState extends State<JuChessSplashGate>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final List<SplashFaller> _fallers;
+  Timer? _dismissTimer;
+  bool _dismissing = false;
+  bool _visible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fallers = SplashFaller.seeded();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 8200),
+    )..repeat();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _dismissTimer = Timer(const Duration(milliseconds: 1750), () {
+        if (mounted) setState(() => _dismissing = true);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _dismissTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.child,
+        if (_visible)
+          IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: _dismissing ? 0 : 1,
+              duration: const Duration(milliseconds: 420),
+              curve: Curves.easeOutCubic,
+              onEnd: () {
+                if (_dismissing && mounted) {
+                  setState(() => _visible = false);
+                }
+              },
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  return CustomPaint(
+                    painter: SplashBackdropPainter(
+                      progress: _controller.value,
+                      fallers: _fallers,
+                    ),
+                    child: const Center(child: SplashLogoMark()),
+                  );
+                },
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class SplashLogoMark extends StatelessWidget {
+  const SplashLogoMark({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 138,
+          height: 138,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xfffffcf4),
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0x55a98a3f), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x267d2434),
+                blurRadius: 28,
+                offset: Offset(0, 16),
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: Image.asset('assets/juchess-logo.png', fit: BoxFit.cover),
+          ),
+        ),
+        const SizedBox(height: 18),
+        const SerifText('Chess Club JU', size: 32, weight: FontWeight.w700),
+        const SizedBox(height: 5),
+        const Text(
+          'University of Jordan',
+          style: TextStyle(
+            color: Color(0xa621304e),
+            decoration: TextDecoration.none,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class SplashFaller {
+  const SplashFaller({
+    required this.glyph,
+    required this.left,
+    required this.size,
+    required this.duration,
+    required this.delay,
+    required this.opacity,
+    required this.rotation,
+  });
+
+  final String glyph;
+  final double left;
+  final double size;
+  final double duration;
+  final double delay;
+  final double opacity;
+  final double rotation;
+
+  static List<SplashFaller> seeded() {
+    const glyphs = ['♟', '♞', '♝', '♜', '♛', '♚'];
+    var seed = 91;
+
+    double rnd() {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    }
+
+    return List.generate(16, (_) {
+      return SplashFaller(
+        glyph: glyphs[(rnd() * glyphs.length).floor()],
+        left: 0.02 + rnd() * 0.96,
+        size: 20 + rnd() * 34,
+        duration: 9 + rnd() * 12,
+        delay: rnd() * -18,
+        opacity: 0.05 + rnd() * 0.13,
+        rotation: rnd() * math.pi,
+      );
+    });
+  }
+}
+
+class SplashBackdropPainter extends CustomPainter {
+  const SplashBackdropPainter({required this.progress, required this.fallers});
+
+  final double progress;
+  final List<SplashFaller> fallers;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawColor(PrototypeColors.screen, BlendMode.src);
+    _paintGrid(canvas, size);
+    _paintGlow(canvas, size);
+    _paintFallers(canvas, size);
+  }
+
+  void _paintGrid(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0x0a16213b)
+      ..strokeWidth = 1;
+    const step = 72.0;
+    for (var x = 0.0; x <= size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (var y = 0.0; y <= size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  void _paintGlow(Canvas canvas, Size size) {
+    final radius = math.min(size.shortestSide * 0.72, 360.0);
+    final rect = Rect.fromCircle(
+      center: Offset(size.width / 2, size.height * 0.45),
+      radius: radius,
+    );
+    final paint = Paint()
+      ..shader = const RadialGradient(
+        colors: [Color(0x29c9ae6b), Color(0x00c9ae6b)],
+      ).createShader(rect);
+    canvas.drawCircle(rect.center, radius, paint);
+  }
+
+  void _paintFallers(Canvas canvas, Size size) {
+    for (final faller in fallers) {
+      final t = ((progress * 8.2 + faller.delay) / faller.duration) % 1.0;
+      final y = -size.height * 0.2 + t * size.height * 1.38;
+      final x = faller.left * size.width;
+      final fadeIn = (t / 0.09).clamp(0.0, 1.0);
+      final fadeOut = ((1 - t) / 0.1).clamp(0.0, 1.0);
+      final opacity = faller.opacity * math.min(fadeIn, fadeOut);
+      if (opacity <= 0) continue;
+
+      final painter = TextPainter(
+        text: TextSpan(
+          text: faller.glyph,
+          style: TextStyle(
+            color: PrototypeColors.navy.withValues(alpha: opacity),
+            fontSize: faller.size,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(faller.rotation + t * math.pi * 1.8);
+      painter.paint(canvas, Offset(-painter.width / 2, -painter.height / 2));
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant SplashBackdropPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.fallers != fallers;
+  }
 }
 
 class PrototypeShell extends StatefulWidget {
@@ -1191,16 +1432,31 @@ class _PrototypeShellState extends State<PrototypeShell> {
               indicatorColor: const Color(0x147d2434),
               selectedIndex: state.tab,
               onDestinationSelected: state.selectTab,
-              destinations: const [
+              destinations: [
                 NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(
-                    Icons.home,
-                    color: PrototypeColors.burgundy,
+                  icon: ClipOval(
+                    child: Image.asset(
+                      'assets/juchess-logo.png',
+                      width: 26,
+                      height: 26,
+                    ),
+                  ),
+                  selectedIcon: Container(
+                    width: 32,
+                    height: 32,
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: PrototypeColors.cream,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: PrototypeColors.burgundy),
+                    ),
+                    child: ClipOval(
+                      child: Image.asset('assets/juchess-logo.png'),
+                    ),
                   ),
                   label: 'Home',
                 ),
-                NavigationDestination(
+                const NavigationDestination(
                   icon: Icon(Icons.emoji_events_outlined),
                   selectedIcon: Icon(
                     Icons.emoji_events,
@@ -1208,7 +1464,7 @@ class _PrototypeShellState extends State<PrototypeShell> {
                   ),
                   label: 'Tournaments',
                 ),
-                NavigationDestination(
+                const NavigationDestination(
                   icon: Icon(Icons.grid_view_outlined),
                   selectedIcon: Icon(
                     Icons.grid_view,
@@ -1216,7 +1472,7 @@ class _PrototypeShellState extends State<PrototypeShell> {
                   ),
                   label: 'Games',
                 ),
-                NavigationDestination(
+                const NavigationDestination(
                   icon: Icon(Icons.tune),
                   selectedIcon: Icon(
                     Icons.tune,
@@ -1224,7 +1480,7 @@ class _PrototypeShellState extends State<PrototypeShell> {
                   ),
                   label: 'Tools',
                 ),
-                NavigationDestination(
+                const NavigationDestination(
                   icon: Icon(Icons.person_outline),
                   selectedIcon: Icon(
                     Icons.person,
@@ -4829,6 +5085,7 @@ class SerifText extends StatelessWidget {
         fontSize: size,
         fontWeight: weight,
         height: height,
+        decoration: TextDecoration.none,
       ),
     );
   }
