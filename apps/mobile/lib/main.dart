@@ -82,7 +82,9 @@ class AppwriteService {
     }
   }
 
-  Future<Map<String, String?>> assertCurrentUserAllowed(models.User user) async {
+  Future<Map<String, String?>> assertCurrentUserAllowed(
+    models.User user,
+  ) async {
     final profile = await loadProfileIdentity(user.$id);
     if (profile['status'] == 'suspended') {
       throw Exception('This account is blocked by club administration.');
@@ -304,7 +306,7 @@ class AppState extends ChangeNotifier {
   }
 
   final AppwriteService service;
-  int tab = 0;
+  int tab = _initialPreviewTab();
   bool authLoading = false;
   bool dataLoading = false;
   String tournamentFilter = 'active';
@@ -361,12 +363,11 @@ class AppState extends ChangeNotifier {
       final user = await service.currentUser();
       final profile = await service.assertCurrentUserAllowed(user);
       final displayName = profile['displayName'];
-      userName =
-          displayName != null && displayName.isNotEmpty
-              ? displayName
-              : user.name.isNotEmpty
-              ? user.name
-              : user.email;
+      userName = displayName != null && displayName.isNotEmpty
+          ? displayName
+          : user.name.isNotEmpty
+          ? user.name
+          : user.email;
       userEmail = user.email;
       error = null;
     } catch (caught) {
@@ -377,10 +378,9 @@ class AppState extends ChangeNotifier {
       }
       userName = null;
       userEmail = null;
-      error =
-          caught is AppwriteException && caught.type != 'user_blocked'
-              ? null
-              : appwriteMessage(caught);
+      error = caught is AppwriteException && caught.type != 'user_blocked'
+          ? null
+          : appwriteMessage(caught);
     }
 
     notifyListeners();
@@ -506,6 +506,29 @@ class AppState extends ChangeNotifier {
   }
 }
 
+int _initialPreviewTab() {
+  switch (_previewScreen()) {
+    case 'tournaments':
+      return 1;
+    case 'games':
+      return 2;
+    case 'tools':
+      return 3;
+    case 'profile':
+    case 'auth':
+      return 4;
+    default:
+      return 0;
+  }
+}
+
+String _previewScreen() {
+  if (Uri.base.queryParameters['adminPreview'] != '1') return '';
+  return Uri.base.queryParameters['screen']?.toLowerCase() ?? '';
+}
+
+bool _shouldOpenAuthPreview() => _previewScreen() == 'auth';
+
 String appwriteMessage(Object error) {
   if (error is AppwriteException && error.message != null) {
     return error.message!;
@@ -625,8 +648,26 @@ class PrototypeColors {
   static const screen = Color(0xfff6f0e2);
 }
 
-class PrototypeShell extends StatelessWidget {
+class PrototypeShell extends StatefulWidget {
   const PrototypeShell({super.key});
+
+  @override
+  State<PrototypeShell> createState() => _PrototypeShellState();
+}
+
+class _PrototypeShellState extends State<PrototypeShell> {
+  bool _authPreviewOpened = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_authPreviewOpened || !_shouldOpenAuthPreview()) return;
+
+    _authPreviewOpened = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showAuthSheet(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -152,6 +152,19 @@ const windowModel: Array<{ key: WindowKey; label: string; icon: string; sections
   { key: 'auth', label: 'Auth', icon: '◇', sections: ['Sign in', 'Sign up', 'Forgot password', 'Guest browsing'] },
 ]
 
+const previewRoutes: Record<WindowKey, string> = {
+  home: '/home',
+  tournaments: '/tournaments',
+  games: '/games',
+  tools: '/tools',
+  profile: '/profile',
+  auth: '/sign-in',
+}
+
+const mobilePreviewBase = import.meta.env.VITE_MOBILE_PREVIEW_BASE_URL as string | undefined
+const webPreviewBase = import.meta.env.VITE_WEB_PREVIEW_BASE_URL as string | undefined
+const appPreviewBase = import.meta.env.VITE_APP_PREVIEW_BASE_URL as string | undefined
+
 function App() {
   const [session, setSession] = useState<AdminSession | null>(null)
   const [screen, setScreen] = useState<Screen>('dashboard')
@@ -632,6 +645,7 @@ function WindowsScreen() {
   const [device, setDevice] = useState<DeviceKey>('ios')
   const [guestMode, setGuestMode] = useState(false)
   const current = windowModel.find((item) => item.key === selected) ?? windowModel[0]
+  const previewUrl = buildPreviewUrl(selected, device, guestMode)
 
   return (
     <div className="windows-screen">
@@ -697,62 +711,18 @@ function WindowsScreen() {
           <div className="device-screen">
             <div className="device-status">
               <span>9:41</span>
-              <b>{device === 'web' ? 'juchess.ju.edu.jo/' + selected : 'JuChess'}</b>
+              <b>{device === 'web' ? previewHostLabel(previewUrl) : 'JuChess'}</b>
               <span>▰▰</span>
             </div>
-            <PreviewContent windowKey={selected} guestMode={guestMode} />
+            <iframe
+              key={`${device}-${selected}-${guestMode ? 'guest' : 'member'}`}
+              className="live-app-frame"
+              src={previewUrl}
+              title={`Live ${current.label} app preview`}
+            />
           </div>
         </div>
       </section>
-    </div>
-  )
-}
-
-function PreviewContent({ guestMode, windowKey }: { guestMode: boolean; windowKey: WindowKey }) {
-  if (windowKey === 'home') {
-    return (
-      <div className="preview-stack">
-        <div className="preview-welcome">
-          <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="" />
-          <span>
-            <strong>{guestMode ? 'You are browsing as a guest' : 'Welcome back, Ibrahim'}</strong>
-            <small>{guestMode ? 'Sign in to register and save analyses' : 'Club rank #1 · Rating 1810'}</small>
-          </span>
-        </div>
-        <PreviewCard title="University of Jordan Rapid Championship" body="Sat, Jul 4 · 4:00 PM · Main Campus · Hall B" />
-        <PreviewCard title="Quick tools" body="Game Review · Analysis Board · Chess Clock · Leaderboard" />
-        <PreviewCard title="Club leaderboard" body="1 Ibrahim Ahmad 1810 · 2 Omar Saleh 1740" />
-        <PreviewCard title="Announcements" body="Summer training camp registration opens July 10" />
-      </div>
-    )
-  }
-
-  if (windowKey === 'tournaments') {
-    return (
-      <div className="preview-stack">
-        <PreviewTabs items={['Upcoming', 'Active', 'Completed']} />
-        <PreviewCard title="Autumn Open" body="Rapid · 16/16 · Live" />
-        <PreviewCard title="JU Grand Circuit" body="Classical · 16/16 · Upcoming" />
-        <PreviewCard title="Midnight Arena" body="Bullet · 16/16 · Upcoming" />
-      </div>
-    )
-  }
-
-  if (windowKey === 'games') return <div className="preview-stack"><PreviewCard title="Review games" body="Game Review" /><PreviewCard title="New Analysis" body="Upload PGN or start from FEN" /></div>
-  if (windowKey === 'tools') return <div className="preview-stack"><PreviewCard title="Chess Clock" body="1+0 · 3+2 · 5+0 · 10+5" /><PreviewCard title="Saved Analyses" body="3 saved positions · tap to open" /></div>
-  if (windowKey === 'profile') return <div className="preview-stack"><PreviewCard title="Ibrahim Ahmad · 1810" body="48 games · 62% win · Rank #1" /><PreviewCard title="Recent games" body="vs Omar Saleh - Win · vs Leen Haddad - Draw" /></div>
-  return <div className="preview-stack"><PreviewCard title="Continue with" body="Apple · Google" /><PreviewCard title="Guest browsing" body={guestMode ? 'Enabled' : 'Disabled'} /></div>
-}
-
-function PreviewTabs({ items }: { items: string[] }) {
-  return <div className="preview-tabs">{items.map((item) => <span key={item}>{item}</span>)}</div>
-}
-
-function PreviewCard({ body, title }: { body: string; title: string }) {
-  return (
-    <div className="preview-card">
-      <strong>{title}</strong>
-      <small>{body}</small>
     </div>
   )
 }
@@ -1431,6 +1401,42 @@ function formatTime(value?: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(date)
+}
+
+function buildPreviewUrl(windowKey: WindowKey, device: DeviceKey, guestMode: boolean) {
+  const target = previewTargetForDevice(device)
+  const url = new URL(target.routeMode === 'query' ? '/' : previewRoutes[windowKey], withTrailingSlash(target.base))
+  url.searchParams.set('adminPreview', '1')
+  url.searchParams.set('screen', windowKey)
+  url.searchParams.set('device', device)
+  url.searchParams.set('mode', guestMode ? 'guest' : 'member')
+  return url.toString()
+}
+
+function previewTargetForDevice(device: DeviceKey): { base: string; routeMode: 'path' | 'query' } {
+  if (device === 'web' && webPreviewBase) return { base: webPreviewBase, routeMode: 'path' }
+  if (device !== 'web' && mobilePreviewBase) return { base: mobilePreviewBase, routeMode: 'query' }
+  if (appPreviewBase) return { base: appPreviewBase, routeMode: 'path' }
+
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    const port = device === 'web' ? '8062' : '8063'
+    return { base: `${window.location.protocol}//${window.location.hostname}:${port}`, routeMode: device === 'web' ? 'path' : 'query' }
+  }
+
+  return { base: window.location.origin, routeMode: 'path' }
+}
+
+function withTrailingSlash(value: string) {
+  return value.endsWith('/') ? value : `${value}/`
+}
+
+function previewHostLabel(value: string) {
+  try {
+    const url = new URL(value)
+    return `${url.host}${url.pathname === '/' ? '' : url.pathname}`
+  } catch {
+    return 'Live app'
+  }
 }
 
 export default App

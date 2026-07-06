@@ -49,6 +49,12 @@ cd apps/mobile
 flutter run
 ```
 
+Run Flutter as the admin phone/tablet live preview:
+
+```bash
+npm run dev:mobile-web
+```
+
 Run Flutter with Appwrite config:
 
 ```bash
@@ -74,7 +80,17 @@ The admin app also needs:
 
 ```bash
 VITE_APPWRITE_ADMIN_FUNCTION_ID=admin-actions
+VITE_APP_PREVIEW_BASE_URL=
+VITE_WEB_PREVIEW_BASE_URL=http://127.0.0.1:8062
+VITE_MOBILE_PREVIEW_BASE_URL=http://127.0.0.1:8063
 ```
+
+`App Windows` in the admin panel embeds the real app inside the phone, tablet,
+and web frames. Locally, run the public web app on port `8062`, run the Flutter
+web preview on port `8063`, and run the admin app on its own port. In
+production, point `VITE_WEB_PREVIEW_BASE_URL` at the public web domain and
+`VITE_MOBILE_PREVIEW_BASE_URL` at the hosted Flutter web preview. If one shared
+preview app should handle every device, use `VITE_APP_PREVIEW_BASE_URL`.
 
 Provisioned resources:
 
