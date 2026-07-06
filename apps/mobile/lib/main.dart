@@ -5,10 +5,62 @@ import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/enums.dart' as enums;
 import 'package:appwrite/models.dart' as models;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  runApp(const JuChessApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const OrientationPolicy(child: JuChessApp()));
+}
+
+class OrientationPolicy extends StatefulWidget {
+  const OrientationPolicy({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  State<OrientationPolicy> createState() => _OrientationPolicyState();
+}
+
+class _OrientationPolicyState extends State<OrientationPolicy>
+    with WidgetsBindingObserver {
+  static const _tabletMinWidthDp = 600;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _applyOrientation());
+  }
+
+  @override
+  void didChangeMetrics() {
+    _applyOrientation();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(SystemChrome.setPreferredOrientations(const []));
+    super.dispose();
+  }
+
+  void _applyOrientation() {
+    if (!mounted) return;
+
+    final view = View.of(context);
+    final widthDp = view.display.size.width / view.display.devicePixelRatio;
+    final tablet = widthDp >= _tabletMinWidthDp;
+
+    unawaited(
+      SystemChrome.setPreferredOrientations(
+        tablet ? const [] : const [DeviceOrientation.portraitUp],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class AppConfig {

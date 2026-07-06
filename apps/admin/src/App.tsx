@@ -489,7 +489,7 @@ function AdminAppShell({
             </button>
           </div>
         </header>
-        <main className="prototype-content">{children}</main>
+        <main className={`prototype-content ${screen === 'windows' ? 'windows-content' : ''}`}>{children}</main>
       </div>
     </div>
   )

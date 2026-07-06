@@ -419,6 +419,11 @@ button {
   animation: cj-fade 0.25s ease;
 }
 
+.prototype-content.windows-content {
+  padding-top: 14px;
+  padding-right: 32px;
+}
+
 .dashboard-screen,
 .tournament-screen,
 .players-screen {
@@ -665,18 +670,18 @@ button {
 }
 
 .windows-screen {
-  width: min(100%, 1180px);
+  width: 100%;
   display: grid;
-  grid-template-columns: minmax(420px, 1fr) minmax(420px, 500px);
+  grid-template-columns: minmax(390px, 660px) minmax(520px, 1fr);
   grid-template-areas:
     "switch switch"
     "control preview";
-  gap: 16px 22px;
+  gap: 14px 28px;
   align-items: start;
 }
 
 .windows-screen.web-preview-layout {
-  width: min(100%, 1180px);
+  width: 100%;
   grid-template-columns: 1fr;
   grid-template-areas:
     "switch"
@@ -840,7 +845,7 @@ button {
 .device-preview {
   grid-area: preview;
   position: sticky;
-  top: 92px;
+  top: 78px;
   min-width: 0;
   width: 100%;
 }
@@ -858,6 +863,7 @@ button {
   display: flex;
   justify-content: center;
   min-width: 0;
+  width: 100%;
 }
 
 .device-tabs {
@@ -885,14 +891,16 @@ button {
   justify-items: end;
   align-items: start;
   min-height: 0;
-  padding: 0 0 0 14px;
+  width: 100%;
+  padding: 12px 0 12px 24px;
   background:
-    linear-gradient(135deg, rgba(125, 36, 52, 0.06), transparent 35%),
+    linear-gradient(135deg, rgba(125, 36, 52, 0.07), transparent 34%),
+    linear-gradient(180deg, rgba(255, 250, 240, 0.74), rgba(238, 229, 212, 0.68)),
     #eee5d4;
 }
 
 .mobile-preview-layout .preview-stage {
-  min-height: 0;
+  min-height: min(758px, calc(100vh - 136px));
 }
 
 .web-preview-layout .preview-stage {
@@ -901,18 +909,18 @@ button {
 }
 
 .device-frame {
-  width: min(100%, 318px);
+  width: min(100%, 342px);
   flex: none;
-  border-radius: 30px;
+  border-radius: 32px;
   background: #21304e;
   padding: 8px;
   box-shadow: 0 30px 60px -24px rgba(12, 20, 40, 0.5);
 }
 
 .device-frame.tablet {
-  width: min(100%, 390px);
-  border-radius: 22px;
-  padding: 8px;
+  width: min(100%, 560px);
+  border-radius: 24px;
+  padding: 10px;
 }
 
 .device-frame.web {
@@ -925,7 +933,7 @@ button {
 }
 
 .device-screen {
-  height: min(704px, calc(100vh - 204px));
+  height: min(710px, calc(100vh - 184px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -939,7 +947,7 @@ button {
 }
 
 .tablet .device-screen {
-  height: 800px;
+  height: min(706px, calc(100vh - 188px));
 }
 
 .web .device-screen {
@@ -979,14 +987,14 @@ button {
   width: 390px;
   height: 860px;
   flex: none;
-  transform: scale(0.774);
+  transform: scale(0.835);
   transform-origin: top left;
 }
 
 .device-frame.tablet .live-app-frame {
-  width: 760px;
-  height: 1600px;
-  transform: scale(0.492);
+  width: 820px;
+  height: 1080px;
+  transform: scale(0.659);
 }
 
 .device-frame.web .live-app-frame {
