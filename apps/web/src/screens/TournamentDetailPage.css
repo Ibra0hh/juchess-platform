@@ -591,6 +591,47 @@
   border-color: #1e2b45;
 }
 
+.bracket-round-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 2px 0 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.bracket-round-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.bracket-round-nav button {
+  flex: none;
+  height: 34px;
+  padding: 0 14px;
+  color: rgba(30, 43, 69, 0.72);
+  background: rgba(255, 252, 244, 0.68);
+  border: 1px solid rgba(30, 43, 69, 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.bracket-round-nav button:hover {
+  color: #7a2431;
+  border-color: rgba(122, 36, 49, 0.4);
+}
+
+.bracket-round-nav button.active {
+  color: #f5efe3;
+  background: #1e2b45;
+  border-color: #1e2b45;
+  box-shadow: 0 1px 4px rgba(30, 43, 69, 0.14);
+}
+
 .bracket-scroll {
   margin-top: 20px;
   overflow-x: auto;
@@ -840,5 +881,10 @@
 
   .bracket-switch button {
     flex: 1 1 160px;
+  }
+
+  .bracket-round-nav {
+    margin-right: -12px;
+    padding-right: 12px;
   }
 }

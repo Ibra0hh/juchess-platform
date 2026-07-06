@@ -511,7 +511,41 @@ function BracketPanel({
   const activeBracket = bracketConfig.type === 'double'
     ? bracketConfig.brackets[bracketView]
     : bracketConfig.bracket
+  const [activeRound, setActiveRound] = useState(0)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
   const trackRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setActiveRound(0)
+    if (scrollRef.current) scrollRef.current.scrollLeft = 0
+  }, [activeBracket])
+
+  useEffect(() => {
+    const scroll = scrollRef.current
+    const track = trackRef.current
+    if (!scroll || !track) return
+
+    const updateActiveRound = () => {
+      const columns = Array.from(track.querySelectorAll<HTMLElement>('[data-round-index]'))
+      const targetLeft = scroll.scrollLeft + 12
+      let nearest = 0
+      let nearestDistance = Number.POSITIVE_INFINITY
+
+      columns.forEach((column, index) => {
+        const distance = Math.abs(column.offsetLeft - targetLeft)
+        if (distance < nearestDistance) {
+          nearest = index
+          nearestDistance = distance
+        }
+      })
+
+      setActiveRound(nearest)
+    }
+
+    updateActiveRound()
+    scroll.addEventListener('scroll', updateActiveRound, { passive: true })
+    return () => scroll.removeEventListener('scroll', updateActiveRound)
+  }, [activeBracket])
 
   useLayoutEffect(() => {
     const track = trackRef.current
@@ -537,6 +571,18 @@ function BracketPanel({
     }
   }, [activeBracket])
 
+  const jumpToRound = (roundIndex: number) => {
+    const scroll = scrollRef.current
+    const target = trackRef.current?.querySelector<HTMLElement>(`[data-round-index="${roundIndex}"]`)
+    if (!scroll || !target) return
+
+    setActiveRound(roundIndex)
+    scroll.scrollTo({
+      left: Math.max(0, target.offsetLeft - 18),
+      behavior: 'smooth',
+    })
+  }
+
   return (
     <div className="bracket-panel rich-bracket-panel">
       <div className="bracket-heading">
@@ -561,7 +607,21 @@ function BracketPanel({
         ) : null}
       </div>
 
-      <div className="bracket-scroll" aria-label={bracketConfig.title}>
+      <nav className="bracket-round-nav" aria-label="Bracket rounds">
+        {activeBracket.rounds.map((roundName, roundIndex) => (
+          <button
+            type="button"
+            className={activeRound === roundIndex ? 'active' : undefined}
+            aria-current={activeRound === roundIndex ? 'true' : undefined}
+            onClick={() => jumpToRound(roundIndex)}
+            key={roundName}
+          >
+            {roundName}
+          </button>
+        ))}
+      </nav>
+
+      <div className="bracket-scroll" aria-label={bracketConfig.title} ref={scrollRef}>
         <div className="bracket-track" ref={trackRef}>
           <svg className="bracket-lines" data-brk-svg aria-hidden="true" />
           {activeBracket.rounds.map((roundName, roundIndex) => (
