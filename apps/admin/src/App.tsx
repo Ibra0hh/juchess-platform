@@ -1428,9 +1428,9 @@ function buildPreviewUrl(windowKey: WindowKey, device: DeviceKey, guestMode: boo
 }
 
 function previewTargetForDevice(device: DeviceKey): { base: string; routeMode: 'path' | 'query' } {
-  if (device === 'web' && webPreviewBase) return { base: webPreviewBase, routeMode: 'path' }
-  if (device !== 'web' && mobilePreviewBase) return { base: mobilePreviewBase, routeMode: 'query' }
-  if (appPreviewBase) return { base: appPreviewBase, routeMode: 'path' }
+  if (device === 'web' && isUsablePreviewBase(webPreviewBase)) return { base: webPreviewBase, routeMode: 'path' }
+  if (device !== 'web' && isUsablePreviewBase(mobilePreviewBase)) return { base: mobilePreviewBase, routeMode: 'query' }
+  if (isUsablePreviewBase(appPreviewBase)) return { base: appPreviewBase, routeMode: 'path' }
 
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     const port = device === 'web' ? '8062' : '8063'
@@ -1438,6 +1438,17 @@ function previewTargetForDevice(device: DeviceKey): { base: string; routeMode: '
   }
 
   return { base: window.location.origin, routeMode: 'path' }
+}
+
+function isUsablePreviewBase(value?: string): value is string {
+  if (!value?.trim()) return false
+
+  try {
+    new URL(value)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function withTrailingSlash(value: string) {
