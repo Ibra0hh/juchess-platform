@@ -310,8 +310,8 @@ class AppState extends ChangeNotifier {
   bool authLoading = false;
   bool dataLoading = false;
   String tournamentFilter = 'active';
-  String? userName;
-  String? userEmail;
+  String? userName = _initialPreviewUserName();
+  String? userEmail = _initialPreviewEmail();
   String? error;
   List<TournamentSeed> tournamentItems = fallbackTournaments;
 
@@ -357,6 +357,14 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> loadCurrentUser() async {
+    if (_isMemberPreview()) {
+      userName = _initialPreviewUserName();
+      userEmail = _initialPreviewEmail();
+      error = null;
+      notifyListeners();
+      return;
+    }
+
     if (!service.ready) return;
 
     try {
@@ -387,6 +395,14 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> signIn(String email, String password) async {
+    if (_isAdminPreview()) {
+      userName = _displayNameFromEmail(email);
+      userEmail = email.trim().isEmpty ? _initialPreviewEmail() : email.trim();
+      error = null;
+      notifyListeners();
+      return true;
+    }
+
     if (!service.ready) {
       error = 'Appwrite is not configured yet.';
       notifyListeners();
@@ -418,6 +434,16 @@ class AppState extends ChangeNotifier {
     String universityId,
     String phone,
   ) async {
+    if (_isAdminPreview()) {
+      userName = name.trim().isEmpty
+          ? _displayNameFromEmail(email)
+          : name.trim();
+      userEmail = email.trim().isEmpty ? _initialPreviewEmail() : email.trim();
+      error = null;
+      notifyListeners();
+      return true;
+    }
+
     if (!service.ready) {
       error = 'Appwrite is not configured yet.';
       notifyListeners();
@@ -472,6 +498,13 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    if (_isMemberPreview()) {
+      userName = _initialPreviewUserName();
+      userEmail = _initialPreviewEmail();
+      notifyListeners();
+      return;
+    }
+
     if (service.ready) {
       try {
         await service.signOut();
@@ -506,6 +539,11 @@ class AppState extends ChangeNotifier {
   }
 }
 
+bool _isAdminPreview() => Uri.base.queryParameters['adminPreview'] == '1';
+
+bool _isMemberPreview() =>
+    _isAdminPreview() && Uri.base.queryParameters['mode'] != 'guest';
+
 int _initialPreviewTab() {
   switch (_previewScreen()) {
     case 'tournaments':
@@ -523,11 +561,37 @@ int _initialPreviewTab() {
 }
 
 String _previewScreen() {
-  if (Uri.base.queryParameters['adminPreview'] != '1') return '';
+  if (!_isAdminPreview()) return '';
   return Uri.base.queryParameters['screen']?.toLowerCase() ?? '';
 }
 
 bool _shouldOpenAuthPreview() => _previewScreen() == 'auth';
+
+String? _initialPreviewEmail() {
+  if (!_isMemberPreview()) return null;
+  final value = Uri.base.queryParameters['previewEmail']?.trim();
+  return value == null || value.isEmpty ? 'student.preview@ju.edu.jo' : value;
+}
+
+String? _initialPreviewUserName() {
+  final email = _initialPreviewEmail();
+  if (email == null) return null;
+  return _displayNameFromEmail(email);
+}
+
+String _displayNameFromEmail(String email) {
+  final localPart = email.trim().split('@').first;
+  if (localPart.isEmpty) return 'Preview Member';
+
+  final words = localPart
+      .replaceAll(RegExp(r'[._-]+'), ' ')
+      .split(' ')
+      .where((part) => part.isNotEmpty)
+      .map((part) => part[0].toUpperCase() + part.substring(1));
+
+  final displayName = words.join(' ');
+  return displayName.isEmpty ? 'Preview Member' : displayName;
+}
 
 String appwriteMessage(Object error) {
   if (error is AppwriteException && error.message != null) {

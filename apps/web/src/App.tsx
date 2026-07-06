@@ -22,10 +22,17 @@ const prototypeScreens: PrototypeScreen[] = [
 
 function PrototypeFrame({ screen }: { screen: PrototypeScreen }) {
   const location = useLocation()
+  const preview = previewSessionFromSearch(location.search)
   const prototypeUrl = new URL(
     `prototype/${screen.file}`,
     new URL(import.meta.env.BASE_URL, window.location.origin),
   )
+
+  if (preview) {
+    preview.searchParams.forEach((value, key) => {
+      prototypeUrl.searchParams.set(key, value)
+    })
+  }
 
   if (screen.file === 'Tournament.dc.html' && location.pathname.includes('/tournament/')) {
     const id = location.pathname.split('/').filter(Boolean).at(-1)
@@ -51,6 +58,13 @@ function NotFound() {
       <a href="/home">Open JuChess Home</a>
     </main>
   )
+}
+
+function previewSessionFromSearch(search: string) {
+  const searchParams = new URLSearchParams(search)
+  if (searchParams.get('adminPreview') !== '1') return null
+
+  return { searchParams }
 }
 
 function App() {

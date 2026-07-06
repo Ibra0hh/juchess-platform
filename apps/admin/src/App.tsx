@@ -164,6 +164,7 @@ const previewRoutes: Record<WindowKey, string> = {
 const mobilePreviewBase = import.meta.env.VITE_MOBILE_PREVIEW_BASE_URL as string | undefined
 const webPreviewBase = import.meta.env.VITE_WEB_PREVIEW_BASE_URL as string | undefined
 const appPreviewBase = import.meta.env.VITE_APP_PREVIEW_BASE_URL as string | undefined
+const defaultPreviewEmail = 'student.preview@ju.edu.jo'
 
 function App() {
   const [session, setSession] = useState<AdminSession | null>(null)
@@ -644,11 +645,13 @@ function WindowsScreen() {
   const [selected, setSelected] = useState<WindowKey>('home')
   const [device, setDevice] = useState<DeviceKey>('ios')
   const [guestMode, setGuestMode] = useState(false)
+  const [previewEmail, setPreviewEmail] = useState(defaultPreviewEmail)
   const current = windowModel.find((item) => item.key === selected) ?? windowModel[0]
-  const previewUrl = buildPreviewUrl(selected, device, guestMode)
+  const previewUrl = buildPreviewUrl(selected, device, guestMode, previewEmail)
+  const previewAccount = guestMode ? 'Guest preview' : previewEmail.trim() || defaultPreviewEmail
 
   return (
-    <div className="windows-screen">
+    <div className={`windows-screen ${device === 'web' ? 'web-preview-layout' : 'mobile-preview-layout'}`}>
       <section className="window-control">
         <div className="window-toolbar">
           <button type="button" className={guestMode ? 'solid-green' : ''} onClick={() => setGuestMode((value) => !value)}>
@@ -657,6 +660,15 @@ function WindowsScreen() {
           <span>0 items hidden from players</span>
           <button type="button">↺ Reset to defaults</button>
         </div>
+        <label className="preview-email-field">
+          <span>Preview member email</span>
+          <input
+            type="email"
+            value={previewEmail}
+            onChange={(event) => setPreviewEmail(event.target.value)}
+            placeholder={defaultPreviewEmail}
+          />
+        </label>
         <div className="panel-card window-list">
           <div className="panel-title">Windows</div>
           {windowModel.map((item) => (
@@ -695,31 +707,45 @@ function WindowsScreen() {
       </section>
 
       <section className="device-preview">
-        <div className="device-tabs">
-          {(['ios', 'android', 'tablet', 'web'] as DeviceKey[]).map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={device === item ? 'active' : undefined}
-              onClick={() => setDevice(item)}
-            >
-              {item === 'ios' ? 'iOS' : item === 'web' ? 'Web' : item[0].toUpperCase() + item.slice(1)}
-            </button>
-          ))}
-        </div>
-        <div className={`device-frame ${device}`}>
-          <div className="device-screen">
-            <div className="device-status">
-              <span>9:41</span>
-              <b>{device === 'web' ? previewHostLabel(previewUrl) : 'JuChess'}</b>
-              <span>▰▰</span>
+        <div className="preview-panel">
+          <div className="preview-panel-head">
+            <div>
+              <strong>{current.label} preview</strong>
+              <span>{previewDeviceLabel(device)} · {guestMode ? 'guest mode' : 'signed-in member'}</span>
             </div>
-            <iframe
-              key={`${device}-${selected}-${guestMode ? 'guest' : 'member'}`}
-              className="live-app-frame"
-              src={previewUrl}
-              title={`Live ${current.label} app preview`}
-            />
+            <div className="device-tabs">
+              {(['ios', 'android', 'tablet', 'web'] as DeviceKey[]).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={device === item ? 'active' : undefined}
+                  onClick={() => setDevice(item)}
+                >
+                  {item === 'ios' ? 'iOS' : item === 'web' ? 'Web' : item[0].toUpperCase() + item.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="preview-account-strip">
+            <span>{guestMode ? 'Browsing as' : 'Always signed in as'}</span>
+            <strong>{previewAccount}</strong>
+          </div>
+          <div className="preview-stage">
+            <div className={`device-frame ${device}`}>
+              <div className="device-screen">
+                <div className="device-status">
+                  <span>{device === 'web' ? 'Live web' : '9:41'}</span>
+                  <b>{device === 'web' ? previewHostLabel(previewUrl) : 'JuChess'}</b>
+                  <span>{device === 'web' ? 'Desktop' : '▰▰'}</span>
+                </div>
+                <iframe
+                  key={`${device}-${selected}-${guestMode ? 'guest' : 'member'}-${previewAccount}`}
+                  className="live-app-frame"
+                  src={previewUrl}
+                  title={`Live ${current.label} app preview`}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1403,13 +1429,14 @@ function formatTime(value?: string) {
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(date)
 }
 
-function buildPreviewUrl(windowKey: WindowKey, device: DeviceKey, guestMode: boolean) {
+function buildPreviewUrl(windowKey: WindowKey, device: DeviceKey, guestMode: boolean, previewEmail: string) {
   const target = previewTargetForDevice(device)
   const url = new URL(target.routeMode === 'query' ? '/' : previewRoutes[windowKey], withTrailingSlash(target.base))
   url.searchParams.set('adminPreview', '1')
   url.searchParams.set('screen', windowKey)
   url.searchParams.set('device', device)
   url.searchParams.set('mode', guestMode ? 'guest' : 'member')
+  url.searchParams.set('previewEmail', previewEmail.trim() || defaultPreviewEmail)
   return url.toString()
 }
 
@@ -1437,6 +1464,12 @@ function previewHostLabel(value: string) {
   } catch {
     return 'Live app'
   }
+}
+
+function previewDeviceLabel(device: DeviceKey) {
+  if (device === 'ios') return 'iPhone'
+  if (device === 'web') return 'Desktop web'
+  return device[0].toUpperCase() + device.slice(1)
 }
 
 export default App
