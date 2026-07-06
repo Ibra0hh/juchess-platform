@@ -667,25 +667,28 @@ button {
 .windows-screen {
   width: min(100%, 1180px);
   display: grid;
-  grid-template-columns: minmax(440px, 1fr) minmax(360px, 430px);
-  gap: 20px;
+  grid-template-columns: minmax(420px, 1fr) minmax(420px, 500px);
+  grid-template-areas:
+    "switch switch"
+    "control preview";
+  gap: 16px 22px;
   align-items: start;
 }
 
 .windows-screen.web-preview-layout {
   width: min(100%, 1180px);
   grid-template-columns: 1fr;
+  grid-template-areas:
+    "switch"
+    "preview"
+    "control";
 }
 
 .web-preview-layout .window-control {
-  grid-row: 2;
-  grid-column: 1;
   grid-template-columns: minmax(0, 0.58fr) minmax(320px, 0.42fr);
 }
 
 .web-preview-layout .device-preview {
-  grid-row: 1;
-  grid-column: 1 / -1;
   position: static;
 }
 
@@ -695,6 +698,7 @@ button {
 }
 
 .window-control {
+  grid-area: control;
   min-width: 0;
   display: grid;
   gap: 14px;
@@ -834,6 +838,7 @@ button {
 }
 
 .device-preview {
+  grid-area: preview;
   position: sticky;
   top: 92px;
   min-width: 0;
@@ -876,33 +881,16 @@ button {
   font-weight: 800;
 }
 
-.mobile-preview-layout .preview-panel-head {
-  align-items: flex-start;
-  flex-direction: column;
-}
-
 .web-preview-layout .preview-panel-head {
   align-items: flex-start;
   flex-direction: column;
 }
 
-.web-preview-layout .device-tabs {
-  width: min(100%, 420px);
-}
-
-.web-preview-layout .device-tabs button {
-  flex: 1;
-}
-
-.mobile-preview-layout .device-tabs {
-  width: 100%;
+.device-switchbar {
+  grid-area: switch;
+  display: flex;
   justify-content: center;
-  gap: 4px;
-}
-
-.mobile-preview-layout .device-tabs button {
-  padding: 7px 9px;
-  font-size: 11.5px;
+  min-width: 0;
 }
 
 .device-tabs {
@@ -913,6 +901,10 @@ button {
   border-radius: 11px;
   background: #fdfaf1;
   padding: 5px;
+}
+
+.device-tabs button {
+  min-width: 78px;
 }
 
 .device-tabs button.active {
@@ -952,15 +944,15 @@ button {
   display: grid;
   place-items: center;
   min-height: 560px;
-  padding: 18px;
+  padding: 14px;
   background:
     linear-gradient(135deg, rgba(125, 36, 52, 0.06), transparent 35%),
     #eee5d4;
 }
 
 .mobile-preview-layout .preview-stage {
-  min-height: 640px;
-  padding: 16px;
+  min-height: 790px;
+  padding: 14px;
 }
 
 .web-preview-layout .preview-stage {
@@ -969,7 +961,7 @@ button {
 }
 
 .device-frame {
-  width: 280px;
+  width: min(100%, 340px);
   flex: none;
   border-radius: 30px;
   background: #21304e;
@@ -978,7 +970,7 @@ button {
 }
 
 .device-frame.tablet {
-  width: min(100%, 300px);
+  width: min(100%, 390px);
   border-radius: 22px;
   padding: 8px;
 }
@@ -993,7 +985,7 @@ button {
 }
 
 .device-screen {
-  height: 625px;
+  height: 760px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1007,7 +999,7 @@ button {
 }
 
 .tablet .device-screen {
-  height: 640px;
+  height: 800px;
 }
 
 .web .device-screen {
@@ -1047,14 +1039,14 @@ button {
   width: 390px;
   height: 860px;
   flex: none;
-  transform: scale(0.677);
+  transform: scale(0.831);
   transform-origin: top left;
 }
 
 .device-frame.tablet .live-app-frame {
   width: 760px;
   height: 1600px;
-  transform: scale(0.374);
+  transform: scale(0.492);
 }
 
 .device-frame.web .live-app-frame {
@@ -1524,7 +1516,7 @@ button {
   }
 
   .mobile-preview-layout {
-    grid-template-columns: minmax(390px, 1fr) minmax(340px, 410px);
+    grid-template-columns: minmax(350px, 1fr) minmax(400px, 1fr);
   }
 
   .web-preview-layout {
@@ -1532,7 +1524,7 @@ button {
   }
 
   .web-preview-layout .window-control {
-    grid-column: 1;
+    grid-area: control;
   }
 }
 
@@ -1596,11 +1588,12 @@ button {
   .device-tabs {
     width: 100%;
     justify-content: center;
+    overflow-x: auto;
   }
 
   .device-frame:not(.web),
   .device-frame.tablet {
-    width: min(100%, 300px);
+    width: min(100%, 340px);
   }
 
   .device-frame.web {

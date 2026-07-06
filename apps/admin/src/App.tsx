@@ -651,6 +651,20 @@ function WindowsScreen() {
 
   return (
     <div className={`windows-screen ${device === 'web' ? 'web-preview-layout' : 'mobile-preview-layout'}`}>
+      <div className="device-switchbar" aria-label="Preview device">
+        <div className="device-tabs">
+          {(['ios', 'android', 'tablet', 'web'] as DeviceKey[]).map((item) => (
+            <button
+              key={item}
+              type="button"
+              className={device === item ? 'active' : undefined}
+              onClick={() => setDevice(item)}
+            >
+              {item === 'ios' ? 'iOS' : item === 'web' ? 'Web' : item[0].toUpperCase() + item.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
       <section className="window-control">
         <div className="window-toolbar">
           <button type="button" className={guestMode ? 'solid-green' : ''} onClick={() => setGuestMode((value) => !value)}>
@@ -707,18 +721,6 @@ function WindowsScreen() {
             <div>
               <strong>{current.label} preview</strong>
               <span>{previewDeviceLabel(device)} · {guestMode ? 'guest mode' : 'signed-in member'}</span>
-            </div>
-            <div className="device-tabs">
-              {(['ios', 'android', 'tablet', 'web'] as DeviceKey[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={device === item ? 'active' : undefined}
-                  onClick={() => setDevice(item)}
-                >
-                  {item === 'ios' ? 'iOS' : item === 'web' ? 'Web' : item[0].toUpperCase() + item.slice(1)}
-                </button>
-              ))}
             </div>
           </div>
           <div className="preview-account-strip">
