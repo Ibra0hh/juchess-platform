@@ -2331,8 +2331,18 @@ class _TournamentBracketViewState extends State<TournamentBracketView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var i = 0; i < widget.rounds.length; i++) ...[
-                  BracketColumn(round: widget.rounds[i]),
-                  if (i != widget.rounds.length - 1) const SizedBox(width: 14),
+                  BracketColumn(
+                    round: widget.rounds[i],
+                    roundIndex: i,
+                    maxMatches: widget.rounds.first.games.length,
+                  ),
+                  if (i != widget.rounds.length - 1)
+                    BracketConnector(
+                      roundIndex: i,
+                      sourceMatches: widget.rounds[i].games.length,
+                      targetMatches: widget.rounds[i + 1].games.length,
+                      maxMatches: widget.rounds.first.games.length,
+                    ),
                 ],
               ],
             ),
@@ -2345,6 +2355,35 @@ class _TournamentBracketViewState extends State<TournamentBracketView> {
         ],
       ),
     );
+  }
+}
+
+class BracketMetrics {
+  const BracketMetrics._();
+
+  static const matchHeight = 72.0;
+  static const baseGap = 10.0;
+  static const basePitch = matchHeight + baseGap;
+  static const labelBand = 29.0;
+  static const connectorWidth = 38.0;
+
+  static double roundOffset(int roundIndex) {
+    final step = 1 << roundIndex;
+    return basePitch * (step - 1) / 2;
+  }
+
+  static double matchTop(int roundIndex, int matchIndex) {
+    return labelBand +
+        roundOffset(roundIndex) +
+        matchIndex * basePitch * (1 << roundIndex);
+  }
+
+  static double matchCenter(int roundIndex, int matchIndex) {
+    return matchTop(roundIndex, matchIndex) + matchHeight / 2;
+  }
+
+  static double boardHeight(int maxMatches) {
+    return labelBand + maxMatches * basePitch - baseGap;
   }
 }
 
@@ -2386,38 +2425,141 @@ class BracketRoundChip extends StatelessWidget {
 }
 
 class BracketColumn extends StatelessWidget {
-  const BracketColumn({required this.round, super.key});
+  const BracketColumn({
+    required this.round,
+    required this.roundIndex,
+    required this.maxMatches,
+    super.key,
+  });
 
   final RoundSeed round;
+  final int roundIndex;
+  final int maxMatches;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: 172,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      height: BracketMetrics.boardHeight(maxMatches),
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Text(
-            round.label.toUpperCase(),
-            style: const TextStyle(
-              color: Color(0x8c21304e),
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Text(
+              round.label.toUpperCase(),
+              style: const TextStyle(
+                color: Color(0x8c21304e),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Column(
-            children: [
-              for (var i = 0; i < round.games.length; i++) ...[
-                BracketMatchCard(match: round.games[i]),
-                if (i != round.games.length - 1) const SizedBox(height: 10),
-              ],
-            ],
-          ),
+          for (var i = 0; i < round.games.length; i++)
+            Positioned(
+              top: BracketMetrics.matchTop(roundIndex, i),
+              left: 0,
+              right: 0,
+              height: BracketMetrics.matchHeight,
+              child: BracketMatchCard(match: round.games[i]),
+            ),
         ],
       ),
     );
+  }
+}
+
+class BracketConnector extends StatelessWidget {
+  const BracketConnector({
+    required this.roundIndex,
+    required this.sourceMatches,
+    required this.targetMatches,
+    required this.maxMatches,
+    super.key,
+  });
+
+  final int roundIndex;
+  final int sourceMatches;
+  final int targetMatches;
+  final int maxMatches;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: BracketMetrics.connectorWidth,
+      height: BracketMetrics.boardHeight(maxMatches),
+      child: CustomPaint(
+        painter: BracketConnectorPainter(
+          roundIndex: roundIndex,
+          sourceMatches: sourceMatches,
+          targetMatches: targetMatches,
+        ),
+      ),
+    );
+  }
+}
+
+class BracketConnectorPainter extends CustomPainter {
+  const BracketConnectorPainter({
+    required this.roundIndex,
+    required this.sourceMatches,
+    required this.targetMatches,
+  });
+
+  final int roundIndex;
+  final int sourceMatches;
+  final int targetMatches;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0x99a98a3f)
+      ..strokeWidth = 1.6
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final dotPaint = Paint()
+      ..color = const Color(0xffa98a3f)
+      ..style = PaintingStyle.fill;
+
+    for (var i = 0; i < targetMatches; i++) {
+      final firstSource = i * 2;
+      if (firstSource >= sourceMatches) break;
+
+      final secondSource = firstSource + 1;
+      final topY = BracketMetrics.matchCenter(roundIndex, firstSource);
+      final bottomY = secondSource < sourceMatches
+          ? BracketMetrics.matchCenter(roundIndex, secondSource)
+          : topY;
+      final targetY = BracketMetrics.matchCenter(roundIndex + 1, i);
+      final joinX = size.width * 0.58;
+
+      final upperPath = Path()
+        ..moveTo(0, topY)
+        ..lineTo(joinX, targetY)
+        ..lineTo(size.width, targetY);
+      canvas.drawPath(upperPath, paint);
+
+      if (bottomY != topY) {
+        final lowerPath = Path()
+          ..moveTo(0, bottomY)
+          ..lineTo(joinX, targetY);
+        canvas.drawPath(lowerPath, paint);
+      }
+
+      canvas.drawCircle(Offset(size.width, targetY), 2.2, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant BracketConnectorPainter oldDelegate) {
+    return oldDelegate.roundIndex != roundIndex ||
+        oldDelegate.sourceMatches != sourceMatches ||
+        oldDelegate.targetMatches != targetMatches;
   }
 }
 
@@ -2456,7 +2598,7 @@ class BracketMatchCard extends StatelessWidget {
           if (_live)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: const BoxDecoration(
                 color: Color(0x127d2434),
                 border: Border(top: BorderSide(color: Color(0x337d2434))),
@@ -2508,42 +2650,44 @@ class BracketPlayerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final opacity = _pending ? 0.45 : (faded ? 0.42 : 1.0);
-    return Opacity(
-      opacity: opacity,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          border: bottomBorder
-              ? const Border(bottom: BorderSide(color: Color(0x1421304e)))
-              : null,
-        ),
-        child: Row(
-          children: [
-            if (winner) ...[
-              const Text(
-                '✓',
-                style: TextStyle(
-                  color: PrototypeColors.gold,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
+    return Expanded(
+      child: Opacity(
+        opacity: opacity,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            border: bottomBorder
+                ? const Border(bottom: BorderSide(color: Color(0x1421304e)))
+                : null,
+          ),
+          child: Row(
+            children: [
+              if (winner) ...[
+                const Text(
+                  '✓',
+                  style: TextStyle(
+                    color: PrototypeColors.gold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
+                child: Text(
+                  _pending ? 'TBD' : name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: PrototypeColors.navy,
+                    fontSize: 12.5,
+                    fontWeight: winner ? FontWeight.w800 : FontWeight.w500,
+                    fontStyle: _pending ? FontStyle.italic : FontStyle.normal,
+                  ),
                 ),
               ),
-              const SizedBox(width: 6),
             ],
-            Expanded(
-              child: Text(
-                _pending ? 'TBD' : name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: PrototypeColors.navy,
-                  fontSize: 12.5,
-                  fontWeight: winner ? FontWeight.w800 : FontWeight.w500,
-                  fontStyle: _pending ? FontStyle.italic : FontStyle.normal,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
