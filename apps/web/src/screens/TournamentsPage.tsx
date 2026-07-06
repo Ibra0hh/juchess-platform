@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { loadTournaments, prototypeTournaments, type Tournament, type TournamentStatus } from '../lib/juchess'
+import { loadTournaments, type Tournament, type TournamentStatus } from '../lib/juchess'
 import './TournamentsPage.css'
 
 type ViewMode = 'list' | 'grid'
@@ -25,9 +25,9 @@ function TournamentsPage() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<TournamentStatus>('Active')
   const [view, setView] = useState<ViewMode>('list')
-  const [tournaments, setTournaments] = useState<Tournament[]>(prototypeTournaments)
+  const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
-  const [hasFallbackError, setHasFallbackError] = useState(false)
+  const [cloudError, setCloudError] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -35,7 +35,7 @@ function TournamentsPage() {
     loadTournaments().then((result) => {
       if (!alive) return
       setTournaments(result.tournaments)
-      setHasFallbackError(Boolean(result.error))
+      setCloudError(Boolean(result.error))
       setLoading(false)
     })
 
@@ -121,9 +121,9 @@ function TournamentsPage() {
           </div>
         </div>
 
-        {hasFallbackError ? (
+        {cloudError ? (
           <div className="data-note" role="status">
-            Appwrite data is unavailable right now. Showing the locked prototype data.
+            Cloud tournaments are unavailable right now.
           </div>
         ) : null}
 
@@ -135,7 +135,7 @@ function TournamentsPage() {
               <TournamentCard key={tournament.id} tournament={tournament} />
             ))
           ) : (
-            <EmptyState />
+            <EmptyState hasAnyTournaments={tournaments.length > 0} filter={filter} />
           )}
         </section>
       </main>
@@ -209,12 +209,18 @@ function LoadingState() {
   )
 }
 
-function EmptyState() {
+function EmptyState({
+  filter,
+  hasAnyTournaments,
+}: {
+  filter: TournamentStatus
+  hasAnyTournaments: boolean
+}) {
   return (
     <div className="empty-state">
       <Trophy size={34} aria-hidden="true" />
-      <h2>No tournaments match</h2>
-      <p>Try a different search or filter.</p>
+      <h2>{hasAnyTournaments ? `No ${filter.toLowerCase()} tournaments match` : 'No tournaments published yet'}</h2>
+      <p>{hasAnyTournaments ? 'Try a different search or filter.' : 'Create a tournament in the control center to publish it here.'}</p>
     </div>
   )
 }

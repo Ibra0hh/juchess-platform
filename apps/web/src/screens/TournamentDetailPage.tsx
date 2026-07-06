@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { loadTournaments, members, prototypeTournaments, type Member, type Tournament } from '../lib/juchess'
+import { loadTournaments, members, type Member, type Tournament } from '../lib/juchess'
 import './TournamentDetailPage.css'
 
 type DetailTab = 'home' | 'games' | 'table'
@@ -47,9 +47,9 @@ function TournamentDetailPage() {
   const { id } = useParams()
   const [tab, setTab] = useState<DetailTab>('home')
   const [gameView, setGameView] = useState<GameView>('grid')
-  const [tournaments, setTournaments] = useState<Tournament[]>(prototypeTournaments)
+  const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
-  const [hasFallbackError, setHasFallbackError] = useState(false)
+  const [cloudError, setCloudError] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -57,7 +57,7 @@ function TournamentDetailPage() {
     loadTournaments().then((result) => {
       if (!alive) return
       setTournaments(result.tournaments)
-      setHasFallbackError(Boolean(result.error))
+      setCloudError(Boolean(result.error))
       setLoading(false)
     })
 
@@ -95,8 +95,8 @@ function TournamentDetailPage() {
           </Link>
           <div className="detail-empty">
             <Trophy size={36} aria-hidden="true" />
-            <h1>Tournament not found</h1>
-            <p>The event may have moved or is not published yet.</p>
+            <h1>{cloudError ? 'Tournament cloud unavailable' : 'Tournament not found'}</h1>
+            <p>{cloudError ? 'Try again shortly.' : 'The event may have moved or is not published yet.'}</p>
           </div>
         </main>
       </div>
@@ -128,9 +128,9 @@ function TournamentDetailPage() {
           <span className="detail-round">{tournament.round}</span>
         </section>
 
-        {hasFallbackError ? (
+        {cloudError ? (
           <div className="detail-note" role="status">
-            Appwrite data is unavailable right now. Showing the locked prototype data.
+            Cloud tournaments are unavailable right now.
           </div>
         ) : null}
 
@@ -404,7 +404,7 @@ function StatusBadge({ status }: { status: Tournament['status'] }) {
 }
 
 function buildDetail(tournament: Tournament) {
-  const rotation = Math.max(0, prototypeTournaments.findIndex((item) => item.id === tournament.id))
+  const rotation = rotationFromId(tournament.id)
   const orderedMembers = [...members.slice(rotation), ...members.slice(0, rotation)]
   const count = Math.min(Math.max(tournament.participants, 4), orderedMembers.length)
   const selectedMembers = orderedMembers.slice(0, count)
@@ -448,6 +448,11 @@ function buildDetail(tournament: Tournament) {
     games,
     schedule: buildSchedule(tournament),
   }
+}
+
+function rotationFromId(id: string) {
+  const seed = [...id].reduce((total, letter) => total + letter.charCodeAt(0), 0)
+  return seed % members.length
 }
 
 function buildSchedule(tournament: Tournament): ScheduleRow[] {

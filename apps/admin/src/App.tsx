@@ -6,6 +6,7 @@ import {
   blockIp,
   createAdminProfile,
   createTournament,
+  deleteTournament,
   formatAdminError,
   getAdminSession,
   loadAdminProfiles,
@@ -16,6 +17,7 @@ import {
   unblockIdentity,
   unblockIp,
   updateAdminStatus,
+  updateTournament,
   type AdminProfile,
   type AdminProfileLoadResult,
   type AdminRole,
@@ -32,6 +34,7 @@ import { adminQueues } from './lib/juchess'
 
 type Screen = 'dashboard' | 'windows' | 'tournaments' | 'players' | 'news' | 'announcements'
 type TournamentTab = 'upcoming' | 'active' | 'completed'
+type TournamentDataSource = 'cloud' | 'unavailable'
 type WindowKey = 'home' | 'tournaments' | 'games' | 'tools' | 'profile' | 'auth'
 type DeviceKey = 'ios' | 'android' | 'tablet' | 'web'
 
@@ -173,14 +176,14 @@ function App() {
   const [blocks, setBlocks] = useState<BlockListLoadResult>({ identityBlocks: [], ipBlocks: [] })
   const [adminProfiles, setAdminProfiles] = useState<AdminProfileLoadResult>({ admins: [] })
   const [loading, setLoading] = useState(true)
-  const [dataSource, setDataSource] = useState<'appwrite' | 'prototype'>('prototype')
+  const [dataSource, setDataSource] = useState<TournamentDataSource>('unavailable')
   const [message, setMessage] = useState<string | null>(null)
 
   async function refreshTournaments() {
     const result = await loadAdminTournaments()
     setTournaments(result.tournaments)
     setDataSource(result.source)
-    setMessage(result.error ? 'Appwrite data is unavailable. Showing prototype tournament data.' : null)
+    setMessage(result.error ? 'Cloud tournaments are unavailable right now.' : null)
   }
 
   async function refreshBlocks(currentSession = session) {
@@ -235,7 +238,7 @@ function App() {
       setBlocks(blockResult)
       setAdminProfiles(adminProfileResult)
       setDataSource(tournamentResult.source)
-      setMessage(tournamentResult.error ? 'Appwrite data is unavailable. Showing prototype tournament data.' : null)
+      setMessage(tournamentResult.error ? 'Cloud tournaments are unavailable right now.' : null)
       setLoading(false)
     }
 
@@ -499,12 +502,11 @@ function ConfigNotice({ tournaments }: { tournaments: AdminTournament[] }) {
   return (
     <section className="panel-card">
       <div className="panel-head">
-        <strong>Appwrite configuration required</strong>
-        <span>Prototype data</span>
+        <strong>Cloud configuration required</strong>
+        <span>Admin setup</span>
       </div>
       <p className="muted">
-        Add VITE_APPWRITE_ENDPOINT, VITE_APPWRITE_PROJECT_ID, VITE_APPWRITE_DATABASE_ID and
-        VITE_APPWRITE_ADMIN_FUNCTION_ID to enable real admin control.
+        Add the cloud endpoint, project, database and admin function environment values to enable real admin control.
       </p>
       <TournamentMiniTable tournaments={tournaments} />
     </section>
@@ -525,13 +527,14 @@ function DashboardScreen({
   tournaments: AdminTournament[]
 }) {
   const activeCount = tournaments.filter((item) => item.status === 'active').length
+  const upcomingCount = tournaments.filter((item) => item.status === 'upcoming').length
   const activeBlocks = blocks.identityBlocks.filter((item) => item.status === 'active').length
     + blocks.ipBlocks.filter((item) => item.status === 'active').length
 
   const statCards = [
     { label: 'Total players', value: '248', icon: '◍', tint: '#F3E4E6', delta: '+12 this month', color: '#2E7D5B' },
-    { label: 'Active tournaments', value: String(activeCount || 4), icon: '♞', tint: '#EAF0FA', delta: '2 live now', color: '#8B8577' },
-    { label: 'Upcoming matches', value: '32', icon: '⚔', tint: '#EAF6F0', delta: 'Next in 2 days', color: '#8B8577' },
+    { label: 'Active tournaments', value: String(activeCount), icon: '♞', tint: '#EAF0FA', delta: `${activeCount} live now`, color: '#8B8577' },
+    { label: 'Upcoming tournaments', value: String(upcomingCount), icon: '⚔', tint: '#EAF6F0', delta: `${tournaments.length} total events`, color: '#8B8577' },
     { label: 'Pending registrations', value: String(adminQueues.pendingRegistrations), icon: '⏳', tint: '#FBF1E2', delta: 'Needs review', color: '#C77D0A' },
   ]
 
@@ -676,7 +679,7 @@ function WindowsScreen() {
         <div className="preview-email-field preview-member-card">
           <span>Preview member</span>
           <strong>{defaultPreviewEmail}</strong>
-          <small>Used by the live Appwrite preview session</small>
+          <small>Used by the live cloud preview session</small>
         </div>
         <div className="panel-card window-list">
           <div className="panel-title">Windows</div>
@@ -746,7 +749,7 @@ function TournamentsScreen({
   session,
   tournaments,
 }: {
-  dataSource: 'appwrite' | 'prototype'
+  dataSource: TournamentDataSource
   onChanged: () => Promise<void>
   session: AdminSession
   tournaments: AdminTournament[]
@@ -783,8 +786,58 @@ function TournamentsScreen({
     try {
       await createTournament({ ...form, createdByProfileId: session.profile?.$id })
       setMessage('Tournament created.')
-      setForm((current) => ({ ...current, slug: '', name: '', description: '' }))
+      setForm((current) => ({
+        ...current,
+        slug: '',
+        name: '',
+        currentRound: undefined,
+        description: '',
+        endsAt: undefined,
+        location: '',
+        roundsTotal: undefined,
+        startsAt: undefined,
+      }))
       setShowCreate(false)
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleStatusChange(item: AdminTournament, status: TournamentTab) {
+    if (!item.rowId) {
+      setMessage('Only cloud tournaments can be updated.')
+      return
+    }
+
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      await updateTournament(item.rowId, { status })
+      setMessage('Tournament status updated.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleDelete(item: AdminTournament) {
+    if (!item.rowId) {
+      setMessage('Only cloud tournaments can be deleted.')
+      return
+    }
+
+    if (!window.confirm(`Delete ${item.name}?`)) return
+
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      await deleteTournament(item.rowId)
+      setMessage('Tournament deleted.')
       await onChanged()
     } catch (error) {
       setMessage(formatAdminError(error))
@@ -803,7 +856,7 @@ function TournamentsScreen({
         ))}
       </div>
       <div className="table-toolbar">
-        <span>{tabDescription(tab)} · {dataSource === 'appwrite' ? 'Live Appwrite' : 'Prototype fallback'}</span>
+        <span>{tabDescription(tab)} · {dataSource === 'cloud' ? 'Live cloud' : 'Cloud unavailable'}</span>
         <button type="button" className="primary-button" onClick={() => setShowCreate((value) => !value)}>
           <span>+</span> Create tournament
         </button>
@@ -822,6 +875,10 @@ function TournamentsScreen({
             <label>Format<input value={form.format} onChange={(event) => update('format', event.target.value)} required /></label>
             <label>Time control<input value={form.timeControl} onChange={(event) => update('timeControl', event.target.value)} required /></label>
             <label>Location<input value={form.location ?? ''} onChange={(event) => update('location', event.target.value)} /></label>
+            <label>Starts at<input type="datetime-local" value={toDateTimeLocalValue(form.startsAt)} onChange={(event) => update('startsAt', fromDateTimeLocalValue(event.target.value))} /></label>
+            <label>Ends at<input type="datetime-local" value={toDateTimeLocalValue(form.endsAt)} onChange={(event) => update('endsAt', fromDateTimeLocalValue(event.target.value))} /></label>
+            <label>Rounds<input type="number" min={1} value={form.roundsTotal ?? ''} onChange={(event) => update('roundsTotal', numberInput(event.target.value))} /></label>
+            <label>Current round<input type="number" min={0} value={form.currentRound ?? ''} onChange={(event) => update('currentRound', numberInput(event.target.value))} /></label>
             <label className="wide">Description<textarea value={form.description ?? ''} onChange={(event) => update('description', event.target.value)} rows={3} /></label>
             <button type="submit" disabled={submitting}>{submitting ? 'Creating...' : 'Save tournament'}</button>
           </form>
@@ -829,13 +886,32 @@ function TournamentsScreen({
       ) : null}
       {message ? <div className="prototype-note" role="status">{message}</div> : null}
       <section className="panel-card table-card">
-        {filtered.length ? <TournamentTable rows={filtered} /> : <EmptyState title={emptyTitle(tab)} body="Create one to get started." />}
+        {filtered.length ? (
+          <TournamentTable
+            disabled={submitting}
+            onDelete={handleDelete}
+            onStatusChange={handleStatusChange}
+            rows={filtered}
+          />
+        ) : (
+          <EmptyState title={emptyTitle(tab)} body="Create one to get started." />
+        )}
       </section>
     </div>
   )
 }
 
-function TournamentTable({ rows }: { rows: AdminTournament[] }) {
+function TournamentTable({
+  disabled,
+  onDelete,
+  onStatusChange,
+  rows,
+}: {
+  disabled: boolean
+  onDelete: (item: AdminTournament) => Promise<void>
+  onStatusChange: (item: AdminTournament, status: TournamentTab) => Promise<void>
+  rows: AdminTournament[]
+}) {
   return (
     <div className="table-scroll">
       <table className="prototype-table">
@@ -862,8 +938,25 @@ function TournamentTable({ rows }: { rows: AdminTournament[] }) {
               <td><StatusPill status={item.status} /></td>
               <td><strong>{formatDate(item.startsAt)}</strong><small>{formatTime(item.startsAt)}</small></td>
               <td className="right">
-                <button type="button" className="mini-button">{item.status === 'active' ? 'Run' : item.status === 'completed' ? 'Media' : 'Prepare'}</button>
-                <button type="button" className="mini-button ghost">Edit</button>
+                <select
+                  aria-label={`Update ${item.name} status`}
+                  className="mini-select"
+                  disabled={disabled || !item.rowId}
+                  value={item.status}
+                  onChange={(event) => void onStatusChange(item, event.target.value as TournamentTab)}
+                >
+                  <option value="upcoming">Upcoming</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                </select>
+                <button
+                  type="button"
+                  className="mini-button ghost danger"
+                  disabled={disabled || !item.rowId}
+                  onClick={() => void onDelete(item)}
+                >
+                  Delete
+                </button>
               </td>
             </tr>
           ))}
@@ -1113,7 +1206,7 @@ function BlockManagement({
           <label>Type<select value={identityForm.type} onChange={(event) => setIdentityForm((current) => ({ ...current, type: event.target.value as IdentityBlockType }))}><option value="email">Email</option><option value="universityId">University ID</option><option value="phone">Phone</option></select></label>
           <label>Value<input value={identityForm.value} onChange={(event) => setIdentityForm((current) => ({ ...current, value: event.target.value }))} placeholder={identityForm.type === 'phone' ? '0791234567' : 'player@ju.edu.jo'} required /></label>
           <label>Reason<input value={identityForm.reason} onChange={(event) => setIdentityForm((current) => ({ ...current, reason: event.target.value }))} placeholder="Optional admin note" /></label>
-          <label>Appwrite user ID<input value={identityForm.targetUserId} onChange={(event) => setIdentityForm((current) => ({ ...current, targetUserId: event.target.value }))} placeholder="Optional" /></label>
+          <label>Account ID<input value={identityForm.targetUserId} onChange={(event) => setIdentityForm((current) => ({ ...current, targetUserId: event.target.value }))} placeholder="Optional" /></label>
           <label>Profile row ID<input value={identityForm.targetProfileId} onChange={(event) => setIdentityForm((current) => ({ ...current, targetProfileId: event.target.value }))} placeholder="Optional" /></label>
           <button type="submit" disabled={submitting}>Block identity</button>
         </form>
@@ -1322,14 +1415,14 @@ function AdminAccessManagement({
         <strong>Admin access</strong>
         <span>Super admin only</span>
       </div>
-      <p className="muted">Admin access is separate from player profiles. Create rows in admin_profiles and assign accounts to admin-only Appwrite teams.</p>
+      <p className="muted">Admin access is separate from player profiles. Create admin profile rows and assign accounts to admin-only teams.</p>
       <div className="access-grid">
         <form className="prototype-form compact" onSubmit={handleSubmit}>
           <h3>Create admin</h3>
           <label>Email<input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="admin@ju.edu.jo" required /></label>
           <label>Display name<input value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} placeholder="Admin name" required /></label>
           <label>Role<select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as AdminRole }))}><option value="admin">Admin</option><option value="organizer">Organizer</option><option value="superAdmin">Super admin</option></select></label>
-          <label>Appwrite user ID<input value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} placeholder="Optional if email exists" /></label>
+          <label>Account ID<input value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} placeholder="Optional if email exists" /></label>
           <label>Notes<input value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Optional internal note" /></label>
           <button type="submit" disabled={submitting}>Create admin access</button>
         </form>
@@ -1414,6 +1507,27 @@ function formatTime(value?: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(date)
+}
+
+function toDateTimeLocalValue(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 16)
+}
+
+function fromDateTimeLocalValue(value: string) {
+  if (!value) return undefined
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toISOString()
+}
+
+function numberInput(value: string) {
+  if (value === '') return undefined
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 function buildPreviewUrl(windowKey: WindowKey, device: DeviceKey, guestMode: boolean, previewEmail: string) {

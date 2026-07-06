@@ -23,7 +23,7 @@ function ForgotPasswordPage() {
   const title = isReset ? 'Set a new password' : 'Reset your password'
   const subtitle = isReset
     ? 'Choose a new password for your JuChess account.'
-    : 'We will send a recovery link to your Appwrite account email.'
+    : 'We will send a recovery link to your account email.'
 
   const buttonLabel = useMemo(() => {
     if (submitting) return 'Working...'
@@ -68,7 +68,7 @@ function ForgotPasswordPage() {
 
           {!appwriteReady ? (
             <div className="auth-note" role="status">
-              Appwrite is not configured yet. Recovery is available after the web env values are set.
+              Cloud accounts are not configured yet. Recovery will be available after setup.
             </div>
           ) : null}
 

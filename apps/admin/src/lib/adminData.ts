@@ -1,6 +1,6 @@
 import { ExecutionMethod, Query, type Models } from 'appwrite'
 import { account, appwriteConfig, appwriteReady, functions, tablesDB } from './appwrite'
-import { tableIds, tournaments as prototypeTournaments, type TournamentStatus } from './juchess'
+import { tableIds, type TournamentStatus } from './juchess'
 
 export type AdminRole = 'superAdmin' | 'admin' | 'organizer'
 export type AdminStatus = 'active' | 'suspended'
@@ -79,7 +79,7 @@ export type TournamentInput = {
 
 export type AdminTournamentLoadResult = {
   tournaments: AdminTournament[]
-  source: 'appwrite' | 'prototype'
+  source: 'cloud' | 'unavailable'
   error?: unknown
 }
 
@@ -201,7 +201,11 @@ export async function getAdminSession(): Promise<AdminSession | null> {
 
 export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult> {
   if (!appwriteReady) {
-    return { tournaments: mapPrototypeTournaments(), source: 'prototype' }
+    return {
+      tournaments: [],
+      source: 'unavailable',
+      error: new Error('Cloud connection is not configured for the admin app.'),
+    }
   }
 
   try {
@@ -222,11 +226,11 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
       .sort((a, b) => statusOrder(a.status) - statusOrder(b.status) || a.name.localeCompare(b.name))
 
     return {
-      tournaments: tournaments.length ? tournaments : mapPrototypeTournaments(),
-      source: tournaments.length ? 'appwrite' : 'prototype',
+      tournaments,
+      source: 'cloud',
     }
   } catch (error) {
-    return { tournaments: mapPrototypeTournaments(), source: 'prototype', error }
+    return { tournaments: [], source: 'unavailable', error }
   }
 }
 
@@ -238,6 +242,26 @@ export async function createTournament(input: TournamentInput) {
   })
 
   return response.row
+}
+
+export async function updateTournament(rowId: string, input: Partial<TournamentInput>) {
+  const response = await runAdminAction<{ row: AppwriteTournamentRow }>({
+    method: ExecutionMethod.PATCH,
+    path: `/tournaments/${rowId}`,
+    body: cleanTournamentInput(input),
+  })
+
+  return response.row
+}
+
+export async function deleteTournament(rowId: string) {
+  const response = await runAdminAction<{ rowId: string }>({
+    method: ExecutionMethod.DELETE,
+    path: `/tournaments/${rowId}`,
+    body: {},
+  })
+
+  return response.rowId
 }
 
 export async function loadBlockLists(): Promise<BlockListLoadResult> {
@@ -330,14 +354,18 @@ export async function unblockIp(blockId: string, actorProfileId?: string) {
 }
 
 export function formatAdminError(error: unknown) {
-  if (error instanceof Error && error.message) return error.message
+  if (error instanceof Error && error.message) return cloudMessage(error.message)
 
   if (typeof error === 'object' && error !== null && 'message' in error) {
     const message = (error as { message?: unknown }).message
-    if (typeof message === 'string') return message
+    if (typeof message === 'string') return cloudMessage(message)
   }
 
   return 'Admin action failed.'
+}
+
+function cloudMessage(value: string) {
+  return value.replace(/appwrite/gi, 'cloud')
 }
 
 async function loadRegistrationCounts() {
@@ -386,20 +414,6 @@ function mapTournament(
     location: row.location,
     description: row.description,
   }
-}
-
-function mapPrototypeTournaments(): AdminTournament[] {
-  return prototypeTournaments.map((tournament) => ({
-    id: tournament.id,
-    slug: tournament.id,
-    name: tournament.name,
-    status: tournament.status,
-    players: tournament.players,
-    capacity: tournament.capacity,
-    format: 'Prototype',
-    timeControl: '15+10 Rapid',
-    round: tournament.round,
-  }))
 }
 
 function formatRound(row: AppwriteTournamentRow) {
@@ -456,7 +470,7 @@ function parseExecutionBody<T>(body: string): T {
   }
 }
 
-function cleanTournamentInput(input: TournamentInput): Record<string, unknown> {
+function cleanTournamentInput(input: Partial<TournamentInput>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined && value !== ''),
   )
@@ -470,6 +484,6 @@ function cleanBlockInput(input: Record<string, unknown>): Record<string, unknown
 
 function requireAppwriteReady() {
   if (!appwriteReady) {
-    throw new Error('Appwrite is not configured for the admin app.')
+    throw new Error('Cloud connection is not configured for the admin app.')
   }
 }

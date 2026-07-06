@@ -72,8 +72,7 @@ function AuthPage({ mode }: AuthPageProps) {
 
           {!ready ? (
             <div className="auth-note" role="status">
-              Appwrite is not configured yet. Add VITE_APPWRITE_ENDPOINT, VITE_APPWRITE_PROJECT_ID
-              and VITE_APPWRITE_DATABASE_ID to enable real accounts.
+              Cloud accounts are not configured yet. Account sign-in will be available after setup.
             </div>
           ) : null}
 

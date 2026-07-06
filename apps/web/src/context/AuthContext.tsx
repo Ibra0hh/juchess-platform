@@ -187,7 +187,7 @@ async function loadAppwritePreviewSession(fallbackSession: PreviewAuthSession): 
 
     return { user, profile: realProfile }
   } catch (error) {
-    console.warn('JuChess preview profile could not be loaded from Appwrite.', error)
+    console.warn('JuChess preview profile could not be loaded from the cloud.', error)
     return fallbackSession
   }
 }

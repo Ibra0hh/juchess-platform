@@ -3,6 +3,7 @@ import './App.css'
 import { AuthProvider } from './context/AuthContext'
 import AuthPage from './screens/AuthPage'
 import ForgotPasswordPage from './screens/ForgotPasswordPage'
+import HomePage from './screens/HomePage'
 import TournamentDetailPage from './screens/TournamentDetailPage'
 import TournamentsPage from './screens/TournamentsPage'
 
@@ -13,7 +14,6 @@ type PrototypeScreen = {
 }
 
 const prototypeScreens: PrototypeScreen[] = [
-  { route: '/home', title: 'JuChess Home', file: 'Home.dc.html' },
   { route: '/games', title: 'JuChess Games', file: 'Games.dc.html' },
   { route: '/leaderboard', title: 'JuChess Leaderboard', file: 'Leaderboard.dc.html' },
   { route: '/profile', title: 'JuChess Profile', file: 'Profile.dc.html' },
@@ -72,6 +72,7 @@ function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/home" element={<HomePage />} />
         <Route path="/tournaments" element={<TournamentsPage />} />
         <Route path="/tournament/:id" element={<TournamentDetailPage />} />
         <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />

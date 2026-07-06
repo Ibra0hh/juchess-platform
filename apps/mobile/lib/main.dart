@@ -391,7 +391,7 @@ class AppState extends ChangeNotifier {
   String? userName = _initialPreviewUserName();
   String? userEmail = _initialPreviewEmail();
   String? error;
-  List<TournamentSeed> tournamentItems = fallbackTournaments;
+  List<TournamentSeed> tournamentItems = const [];
 
   bool get appwriteReady => service.ready;
   bool get signedIn => userEmail != null;
@@ -400,14 +400,15 @@ class AppState extends ChangeNotifier {
     final filtered = tournamentItems
         .where((item) => item.status == tournamentFilter)
         .toList();
-    return filtered.isEmpty ? tournamentItems : filtered;
+    return filtered;
   }
 
-  TournamentSeed get featuredTournament {
-    final active = tournamentItems.where((item) => item.status == 'active');
-    if (active.isNotEmpty) return active.first;
+  TournamentSeed? get featuredTournament {
+    for (final item in tournamentItems) {
+      if (item.status == 'active') return item;
+    }
     if (tournamentItems.isNotEmpty) return tournamentItems.first;
-    return fallbackTournaments.first;
+    return null;
   }
 
   void selectTab(int value) {
@@ -492,7 +493,7 @@ class AppState extends ChangeNotifier {
     }
 
     if (!service.ready) {
-      error = 'Appwrite is not configured yet.';
+      error = 'Cloud connection is not configured yet.';
       notifyListeners();
       return false;
     }
@@ -533,7 +534,7 @@ class AppState extends ChangeNotifier {
     }
 
     if (!service.ready) {
-      error = 'Appwrite is not configured yet.';
+      error = 'Cloud connection is not configured yet.';
       notifyListeners();
       return false;
     }
@@ -564,7 +565,7 @@ class AppState extends ChangeNotifier {
 
   Future<bool> sendPasswordRecovery(String email) async {
     if (!service.ready) {
-      error = 'Appwrite is not configured yet.';
+      error = 'Cloud connection is not configured yet.';
       notifyListeners();
       return false;
     }
@@ -606,7 +607,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> loadTournaments() async {
     if (!service.ready) {
-      tournamentItems = fallbackTournaments;
+      tournamentItems = const [];
       return;
     }
 
@@ -615,10 +616,10 @@ class AppState extends ChangeNotifier {
 
     try {
       final loaded = await service.loadTournaments();
-      tournamentItems = loaded.isEmpty ? fallbackTournaments : loaded;
+      tournamentItems = loaded;
       error = null;
     } catch (caught) {
-      tournamentItems = fallbackTournaments;
+      tournamentItems = const [];
       error = appwriteMessage(caught);
     } finally {
       dataLoading = false;
@@ -683,10 +684,14 @@ String _displayNameFromEmail(String email) {
 
 String appwriteMessage(Object error) {
   if (error is AppwriteException && error.message != null) {
-    return error.message!;
+    return _cloudMessage(error.message!);
   }
 
-  return error.toString();
+  return _cloudMessage(error.toString());
+}
+
+String _cloudMessage(String value) {
+  return value.replaceAll(RegExp('appwrite', caseSensitive: false), 'cloud');
 }
 
 String? normalizeJordanPhone(String? value) {
@@ -1073,6 +1078,8 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final featuredTournament = context.watch<AppState>().featuredTournament;
+
     return AppScroll(
       children: [
         const PrototypeHeader(
@@ -1083,10 +1090,14 @@ class HomeScreen extends StatelessWidget {
         const GuestCard(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: FeaturedTournamentCard(
-            event: context.watch<AppState>().featuredTournament,
-            onTap: () => context.read<AppState>().selectTab(1),
-          ),
+          child: featuredTournament == null
+              ? EmptyTournamentCard(
+                  onTap: () => context.read<AppState>().selectTab(1),
+                )
+              : FeaturedTournamentCard(
+                  event: featuredTournament,
+                  onTap: () => context.read<AppState>().selectTab(1),
+                ),
         ),
         SectionHeading(
           title: 'Quick actions',
@@ -1136,7 +1147,7 @@ class GuestCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   state.signedIn
-                      ? 'Registrations and analyses will sync with Appwrite'
+                      ? 'Registrations and analyses will sync with the club cloud'
                       : 'Sign in to register and save analyses',
                   style: const TextStyle(
                     color: Color(0x9921304e),
@@ -1266,6 +1277,55 @@ class FeaturedTournamentCard extends StatelessWidget {
   }
 }
 
+class EmptyTournamentCard extends StatelessWidget {
+  const EmptyTournamentCard({required this.onTap, super.key});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = context.watch<AppState>().appwriteReady;
+
+    return PrototypeCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'FEATURED TOURNAMENT',
+            style: TextStyle(
+              color: Color(0x8021304e),
+              fontSize: 9.8,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 7),
+          SerifText(
+            ready ? 'No tournament published yet' : 'Cloud connection needed',
+            size: 16.2,
+            weight: FontWeight.w700,
+            height: 1.2,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ready
+                ? 'Create a tournament in the control center to publish it here.'
+                : 'Tournaments will appear after the club cloud is configured.',
+            style: const TextStyle(color: Color(0x9921304e), fontSize: 11.8),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: PrototypeButton(label: 'Open Tournaments', onTap: onTap),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class QuickActionsGrid extends StatelessWidget {
   const QuickActionsGrid({super.key});
 
@@ -1341,7 +1401,7 @@ class TournamentsScreen extends StatelessWidget {
         if (!state.appwriteReady)
           const AppNotice(
             text:
-                'Appwrite is not configured yet. Showing prototype tournament data.',
+                'Cloud connection is not configured yet. Tournaments will appear after setup.',
           ),
         if (state.error != null && state.appwriteReady)
           AppNotice(text: state.error!),
@@ -1357,14 +1417,18 @@ class TournamentsScreen extends StatelessWidget {
                       ),
                     ),
                   ]
-                : state.visibleTournaments
-                      .map(
-                        (event) => Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
-                          child: TournamentCard(event: event),
-                        ),
-                      )
-                      .toList(),
+                : state.visibleTournaments.isEmpty
+                    ? [
+                        TournamentEmptyState(filter: state.tournamentFilter),
+                      ]
+                    : state.visibleTournaments
+                          .map(
+                            (event) => Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: TournamentCard(event: event),
+                            ),
+                          )
+                          .toList(),
           ),
         ),
       ],
@@ -1471,6 +1535,52 @@ class TournamentCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
               fontSize: 12,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TournamentEmptyState extends StatelessWidget {
+  const TournamentEmptyState({required this.filter, super.key});
+
+  final String filter;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = context.watch<AppState>().appwriteReady;
+    final label = filter == 'active'
+        ? 'active'
+        : filter == 'upcoming'
+            ? 'upcoming'
+            : 'completed';
+
+    return PrototypeCard(
+      margin: EdgeInsets.zero,
+      child: Column(
+        children: [
+          const Text(
+            '♞',
+            style: TextStyle(
+              color: PrototypeColors.burgundy,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SerifText(
+            ready ? 'No $label tournaments' : 'Cloud connection needed',
+            size: 17,
+            weight: FontWeight.w700,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ready
+                ? 'Create one in the control center to show it here.'
+                : 'Tournaments will appear here after setup.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0x9921304e), fontSize: 12),
           ),
         ],
       ),
@@ -2578,7 +2688,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
         ),
         const SizedBox(height: 14),
         const Text(
-          'If an account matches, a recovery link will be sent. Appwrite password recovery is email based.',
+          'If an account matches, a recovery link will be sent. Password recovery is email based.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Color(0x8021304e),
@@ -2621,7 +2731,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     final value = _recoveryController.text.trim();
     if (!value.contains('@')) {
       context.read<AppState>().setError(
-        'Appwrite recovery needs the email tied to your account.',
+        'Password recovery needs the email tied to your account.',
       );
       return;
     }
@@ -3205,40 +3315,6 @@ class PlayerSeed {
   final String name;
   final int rating;
 }
-
-const fallbackTournaments = [
-  TournamentSeed(
-    name: 'University of Jordan Rapid Championship',
-    meta: 'Sat, Jul 4 · 4:00 PM · Main Campus · Hall B',
-    chips: ['Swiss · 7 rounds', '15+10 Rapid', '12/16 players'],
-    current: 'Round 4 of 7',
-  ),
-  TournamentSeed(
-    name: 'JU Blitz Knockout Cup',
-    meta: 'Thu, Jul 2 · 6:00 PM · Student Union · Room 12',
-    chips: ['Single elimination', '3+2 Blitz', '16 players'],
-    current: 'Semifinal',
-  ),
-  TournamentSeed(
-    name: 'Summer Bullet Arena',
-    meta: 'Today · 8:00 PM · Online · Club server',
-    chips: ['Arena · 60 min', '1+0 Bullet', '10 players'],
-    current: 'In progress',
-  ),
-  TournamentSeed(
-    name: 'Amman Universities Team Battle',
-    meta: 'Jul 1 – Jul 8 · 5:00 PM · JU Sports Complex · Hall 2',
-    chips: ['Team · 4 boards', '10+0 Rapid', '4 teams'],
-    current: 'Match Day 2 of 3',
-  ),
-  TournamentSeed(
-    name: 'Masters Six Invitational',
-    meta: 'Sun, Jul 12 · 10:00 AM · Library Seminar Room',
-    chips: ['Double round-robin', '25+10 Classical', '6 players'],
-    current: 'Registration',
-    status: 'upcoming',
-  ),
-];
 
 const players = [
   PlayerSeed(1, 'Ibrahim Ahmad', 1810),

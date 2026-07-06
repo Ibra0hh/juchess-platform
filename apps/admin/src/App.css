@@ -1162,6 +1162,29 @@ button {
   color: #14213d;
 }
 
+.mini-button.danger {
+  color: #8a2433;
+}
+
+.mini-button:disabled,
+.mini-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.mini-select {
+  min-height: 31px;
+  margin-right: 7px;
+  border: 1px solid #d8d1c4;
+  border-radius: 8px;
+  background: #fff;
+  color: #14213d;
+  padding: 0 28px 0 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .empty-state {
   display: grid;
   justify-items: center;

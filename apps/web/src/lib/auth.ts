@@ -61,7 +61,7 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
       try {
         await account.deleteSession({ sessionId: 'current' })
       } catch {
-        // The session may already be invalid on Appwrite's side.
+        // The session may already be invalid on the cloud side.
       }
       throw error
     }
@@ -173,14 +173,18 @@ export async function loadPreviewProfileByEmail(email: string): Promise<AuthProf
 }
 
 export function formatAppwriteError(error: unknown) {
-  if (error instanceof Error && error.message) return error.message
+  if (error instanceof Error && error.message) return cloudMessage(error.message)
 
   if (typeof error === 'object' && error !== null && 'message' in error) {
     const message = (error as { message?: unknown }).message
-    if (typeof message === 'string') return message
+    if (typeof message === 'string') return cloudMessage(message)
   }
 
   return 'Something went wrong. Please try again.'
+}
+
+function cloudMessage(value: string) {
+  return value.replace(/appwrite/gi, 'cloud')
 }
 
 async function createProfileForUser(user: Models.User, input: SignUpInput) {
@@ -205,13 +209,13 @@ async function createProfileForUser(user: Models.User, input: SignUpInput) {
       ],
     })
   } catch (error) {
-    console.warn('JuChess profile creation failed after Appwrite signup.', error)
+    console.warn('JuChess profile creation failed after signup.', error)
   }
 }
 
 function requireAppwriteReady() {
   if (!appwriteReady) {
-    throw new Error('Appwrite is not configured for this app.')
+    throw new Error('Cloud accounts are not configured for this app.')
   }
 }
 
