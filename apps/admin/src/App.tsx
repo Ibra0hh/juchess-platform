@@ -7,6 +7,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Trophy,
+  UserPlus,
   Users,
 } from 'lucide-react'
 import './App.css'
@@ -15,15 +16,22 @@ import {
   createTournament,
   blockIdentity,
   blockIp,
+  createAdminProfile,
   formatAdminError,
   getAdminSession,
+  loadAdminProfiles,
   loadBlockLists,
   loadAdminTournaments,
   signInAdmin,
   signOutAdmin,
   unblockIdentity,
   unblockIp,
+  updateAdminStatus,
+  type AdminProfile,
+  type AdminProfileLoadResult,
+  type AdminRole,
   type AdminSession,
+  type AdminStatus,
   type AdminTournament,
   type BlockListLoadResult,
   type IdentityBlock,
@@ -41,6 +49,7 @@ function App() {
   const [session, setSession] = useState<AdminSession | null>(null)
   const [tournaments, setTournaments] = useState<AdminTournament[]>([])
   const [blocks, setBlocks] = useState<BlockListLoadResult>({ identityBlocks: [], ipBlocks: [] })
+  const [adminProfiles, setAdminProfiles] = useState<AdminProfileLoadResult>({ admins: [] })
   const [loading, setLoading] = useState(true)
   const [dataSource, setDataSource] = useState<'appwrite' | 'prototype'>('prototype')
   const [message, setMessage] = useState<string | null>(null)
@@ -57,20 +66,27 @@ function App() {
     setBlocks(result)
   }
 
+  async function refreshAdminProfiles() {
+    const result = await loadAdminProfiles()
+    setAdminProfiles(result)
+  }
+
   useEffect(() => {
     let alive = true
 
     async function boot() {
-      const [loadedSession, tournamentResult, blockResult] = await Promise.all([
+      const [loadedSession, tournamentResult, blockResult, adminProfileResult] = await Promise.all([
         getAdminSession(),
         loadAdminTournaments(),
         loadBlockLists(),
+        loadAdminProfiles(),
       ])
 
       if (!alive) return
       setSession(loadedSession)
       setTournaments(tournamentResult.tournaments)
       setBlocks(blockResult)
+      setAdminProfiles(adminProfileResult)
       setDataSource(tournamentResult.source)
       setMessage(tournamentResult.error ? 'Appwrite data is unavailable. Showing prototype tournament data.' : null)
       setLoading(false)
@@ -103,6 +119,7 @@ function App() {
             setSession(nextSession)
             void refreshTournaments()
             void refreshBlocks()
+            void refreshAdminProfiles()
           }}
         />
       </AdminChrome>
@@ -135,10 +152,12 @@ function App() {
         message={message}
         session={session}
         blocks={blocks}
+        adminProfiles={adminProfiles}
         tournaments={tournaments}
         source={dataSource}
         onCreated={refreshTournaments}
         onBlocksChanged={refreshBlocks}
+        onAdminsChanged={refreshAdminProfiles}
       />
     </AdminChrome>
   )
@@ -201,7 +220,7 @@ function LoginPanel({ onLogin }: { onLogin: (session: AdminSession) => void }) {
       <section className="admin-auth-card" aria-labelledby="admin-login-title">
         <ShieldCheck size={34} aria-hidden="true" />
         <h1 id="admin-login-title">Admin sign in</h1>
-        <p>Use an Appwrite account with an admin or organizer profile role.</p>
+        <p>Use an Appwrite account registered in the separate admin access table.</p>
         <form onSubmit={handleSubmit}>
           <label>
             Email
@@ -241,8 +260,8 @@ function AccessDenied({ onSignOut, session }: { onSignOut: () => Promise<void>; 
         <ShieldCheck size={34} aria-hidden="true" />
         <h1 id="admin-denied-title">No admin access</h1>
         <p>
-          {session.profile?.displayName || session.user.email} is signed in, but this profile is not an
-          admin or organizer.
+          {session.profile?.displayName || session.user.email} is signed in, but this account is not active in
+          the separate admin access table.
         </p>
         <button type="button" onClick={() => void onSignOut()}>
           Sign out
@@ -265,16 +284,20 @@ function ConfigPanel({ tournaments }: { tournaments: AdminTournament[] }) {
 }
 
 function AdminDashboard({
+  adminProfiles,
   blocks,
   message,
+  onAdminsChanged,
   onBlocksChanged,
   onCreated,
   session,
   source,
   tournaments,
 }: {
+  adminProfiles: AdminProfileLoadResult
   blocks: BlockListLoadResult
   message: string | null
+  onAdminsChanged: () => Promise<void>
   onBlocksChanged: () => Promise<void>
   onCreated: () => Promise<void>
   session: AdminSession
@@ -320,6 +343,9 @@ function AdminDashboard({
       </div>
 
       <TournamentTable tournaments={tournaments} source={source} />
+      {session.profile?.role === 'superAdmin' ? (
+        <AdminAccessManagement admins={adminProfiles} session={session} onChanged={onAdminsChanged} />
+      ) : null}
       <BlockManagement blocks={blocks} session={session} onChanged={onBlocksChanged} />
     </main>
   )
@@ -535,6 +561,178 @@ function TournamentTable({
           </tbody>
         </table>
       </div>
+    </section>
+  )
+}
+
+function AdminAccessManagement({
+  admins,
+  onChanged,
+  session,
+}: {
+  admins: AdminProfileLoadResult
+  onChanged: () => Promise<void>
+  session: AdminSession
+}) {
+  const [form, setForm] = useState({
+    email: '',
+    displayName: '',
+    accountId: '',
+    role: 'admin' as AdminRole,
+    notes: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState<string | null>(
+    admins.error ? 'Admin profiles could not be loaded from Appwrite.' : null,
+  )
+
+  const actorProfileId = session.profile?.$id
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSubmitting(true)
+    setMessage(null)
+
+    try {
+      await createAdminProfile({
+        email: form.email.trim(),
+        displayName: form.displayName.trim(),
+        accountId: form.accountId.trim(),
+        role: form.role,
+        notes: form.notes.trim(),
+        actorProfileId,
+      })
+      setForm({ email: '', displayName: '', accountId: '', role: 'admin', notes: '' })
+      setMessage('Admin access created.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleStatus(admin: AdminProfile, status: AdminStatus) {
+    setSubmitting(true)
+    setMessage(null)
+
+    try {
+      await updateAdminStatus(admin.$id, status, actorProfileId)
+      setMessage(status === 'active' ? 'Admin access activated.' : 'Admin access suspended.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <section className="admin-panel admin-access-management">
+      <div className="panel-title-row">
+        <h2>Admin access</h2>
+        <span>Super admin only</span>
+      </div>
+      <div className="admin-note">
+        Admin access is separate from player profiles. This panel creates rows in admin_profiles and assigns
+        accounts to the admin-only Appwrite teams.
+      </div>
+
+      <div className="block-grid">
+        <form className="admin-form block-form" onSubmit={handleSubmit}>
+          <div className="panel-title-row compact">
+            <h3>Create admin</h3>
+            <UserPlus size={18} aria-hidden="true" />
+          </div>
+          <div className="admin-form-row">
+            <label>
+              Email
+              <input
+                type="email"
+                value={form.email}
+                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                placeholder="admin@ju.edu.jo"
+                required
+              />
+            </label>
+            <label>
+              Display name
+              <input
+                value={form.displayName}
+                onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))}
+                placeholder="Admin name"
+                required
+              />
+            </label>
+          </div>
+          <div className="admin-form-row">
+            <label>
+              Role
+              <select
+                value={form.role}
+                onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as AdminRole }))}
+              >
+                <option value="admin">Admin</option>
+                <option value="organizer">Organizer</option>
+                <option value="superAdmin">Super admin</option>
+              </select>
+            </label>
+            <label>
+              Appwrite user ID
+              <input
+                value={form.accountId}
+                onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))}
+                placeholder="Optional if email exists"
+              />
+            </label>
+          </div>
+          <label>
+            Notes
+            <input
+              value={form.notes}
+              onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+              placeholder="Optional internal note"
+            />
+          </label>
+          <button type="submit" disabled={submitting}>Create admin access</button>
+        </form>
+
+        <div className="block-list">
+          <h3>Admin list</h3>
+          {admins.admins.length === 0 ? <div className="block-empty">No admin profiles yet.</div> : null}
+          {admins.admins.map((admin) => (
+            <div className="block-row" key={admin.$id}>
+              <div>
+                <strong>{admin.displayName}</strong>
+                <span className={`admin-status ${admin.status}`}>{admin.status}</span>
+                <small>{admin.email} · {adminRoleLabel(admin.role)}</small>
+                <small>{admin.accountId}</small>
+              </div>
+              {admin.status === 'active' ? (
+                <button
+                  type="button"
+                  className="admin-ghost"
+                  disabled={submitting || admin.accountId === session.user.$id}
+                  onClick={() => void handleStatus(admin, 'suspended')}
+                >
+                  Suspend
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="admin-ghost"
+                  disabled={submitting}
+                  onClick={() => void handleStatus(admin, 'active')}
+                >
+                  Activate
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {message ? <div className="admin-inline-note" role="status">{message}</div> : null}
     </section>
   )
 }
@@ -805,6 +1003,12 @@ function identityLabel(type: IdentityBlockType) {
   if (type === 'universityId') return 'University ID'
   if (type === 'phone') return 'Phone'
   return 'Email'
+}
+
+function adminRoleLabel(role: AdminRole) {
+  if (role === 'superAdmin') return 'Super admin'
+  if (role === 'organizer') return 'Organizer'
+  return 'Admin'
 }
 
 function formatBlockDate(value?: string) {

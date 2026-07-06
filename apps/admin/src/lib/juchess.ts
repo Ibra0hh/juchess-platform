@@ -10,6 +10,7 @@ export type Tournament = {
 }
 
 export const tableIds = {
+  adminProfiles: 'admin_profiles',
   profiles: 'profiles',
   tournaments: 'tournaments',
   registrations: 'registrations',

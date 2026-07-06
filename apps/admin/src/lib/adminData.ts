@@ -2,20 +2,27 @@ import { ExecutionMethod, Query, type Models } from 'appwrite'
 import { account, appwriteConfig, appwriteReady, functions, tablesDB } from './appwrite'
 import { tableIds, tournaments as prototypeTournaments, type TournamentStatus } from './juchess'
 
+export type AdminRole = 'superAdmin' | 'admin' | 'organizer'
+export type AdminStatus = 'active' | 'suspended'
+
 export type AdminProfile = Models.Row & {
   accountId: string
   displayName: string
   email: string
-  phone?: string
-  universityId?: string
-  role?: 'member' | 'organizer' | 'admin'
-  status?: 'pending' | 'active' | 'suspended'
+  role: AdminRole
+  status: AdminStatus
+  teamId?: string
+  membershipId?: string
+  createdByAdminId?: string
+  createdAt?: string
+  notes?: string
 }
 
 export type AdminSession = {
   user: Models.User
   profile: AdminProfile | null
   allowed: boolean
+  reason?: string
 }
 
 type AppwriteTournamentRow = Models.Row & {
@@ -123,12 +130,32 @@ export type IpBlockInput = {
   actorProfileId?: string
 }
 
+export type AdminProfileInput = {
+  email: string
+  displayName: string
+  role: AdminRole
+  accountId?: string
+  notes?: string
+  actorProfileId?: string
+}
+
+export type AdminProfileLoadResult = {
+  admins: AdminProfile[]
+  error?: unknown
+}
+
 const adminFunctionId = import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions'
 
 export async function signInAdmin(email: string, password: string) {
   requireAppwriteReady()
   await account.createEmailPasswordSession({ email, password })
-  return getAdminSession()
+  const session = await getAdminSession()
+  if (!session?.allowed) {
+    await signOutAdmin().catch(() => undefined)
+    throw new Error(session?.reason || 'This account is not registered for the admin panel.')
+  }
+
+  return session
 }
 
 export async function signOutAdmin() {
@@ -141,14 +168,27 @@ export async function getAdminSession(): Promise<AdminSession | null> {
 
   try {
     const user = await account.get()
-    const profile = await loadAdminProfile(user.$id)
-    const allowed = Boolean(
-      profile
-        && profile.status !== 'suspended'
-        && (profile.role === 'admin' || profile.role === 'organizer'),
-    )
+    try {
+      const response = await runAdminAction<{ profile: AdminProfile; allowed: boolean; reason?: string }>({
+        method: ExecutionMethod.GET,
+        path: '/admin/session',
+        body: {},
+      })
 
-    return { user, profile, allowed }
+      return {
+        user,
+        profile: response.profile,
+        allowed: response.allowed,
+        reason: response.reason,
+      }
+    } catch (error) {
+      return {
+        user,
+        profile: null,
+        allowed: false,
+        reason: formatAdminError(error),
+      }
+    }
   } catch {
     return null
   }
@@ -209,6 +249,41 @@ export async function loadBlockLists(): Promise<BlockListLoadResult> {
   }
 }
 
+export async function loadAdminProfiles(): Promise<AdminProfileLoadResult> {
+  if (!appwriteReady) return { admins: [] }
+
+  try {
+    const response = await runAdminAction<AdminProfileLoadResult>({
+      method: ExecutionMethod.GET,
+      path: '/admin/admins',
+      body: {},
+    })
+    return response
+  } catch (error) {
+    return { admins: [], error }
+  }
+}
+
+export async function createAdminProfile(input: AdminProfileInput) {
+  const response = await runAdminAction<{ row: AdminProfile }>({
+    method: ExecutionMethod.POST,
+    path: '/admin/admins',
+    body: cleanBlockInput(input),
+  })
+
+  return response.row
+}
+
+export async function updateAdminStatus(adminId: string, status: AdminStatus, actorProfileId?: string) {
+  const response = await runAdminAction<{ row: AdminProfile }>({
+    method: ExecutionMethod.POST,
+    path: `/admin/admins/${adminId}/status`,
+    body: cleanBlockInput({ status, actorProfileId }),
+  })
+
+  return response.row
+}
+
 export async function blockIdentity(input: IdentityBlockInput) {
   const response = await runAdminAction<{ row: IdentityBlock }>({
     method: ExecutionMethod.POST,
@@ -258,18 +333,6 @@ export function formatAdminError(error: unknown) {
   }
 
   return 'Admin action failed.'
-}
-
-async function loadAdminProfile(accountId: string): Promise<AdminProfile | null> {
-  const response = await tablesDB.listRows<AdminProfile>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.profiles,
-    queries: [Query.equal('accountId', accountId), Query.limit(1)],
-    total: false,
-    ttl: 30,
-  })
-
-  return response.rows[0] ?? null
 }
 
 async function loadRegistrationCounts() {
@@ -358,6 +421,7 @@ async function runAdminAction<T>({
   body: Record<string, unknown>
 }): Promise<T> {
   requireAppwriteReady()
+  const adminJwt = await account.createJWT({ duration: 900 })
 
   const execution = await functions.createExecution({
     functionId: adminFunctionId,
@@ -367,6 +431,7 @@ async function runAdminAction<T>({
     method,
     headers: {
       'content-type': 'application/json',
+      'juchess-admin-jwt': adminJwt.jwt,
     },
   })
 

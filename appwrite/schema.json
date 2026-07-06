@@ -1,7 +1,21 @@
 {
   "databaseId": "juchess",
-  "teams": ["admins", "organizers", "members"],
+  "teams": ["admin_super_admins", "admin_staff", "admins", "organizers", "members"],
   "tables": {
+    "admin_profiles": {
+      "fields": {
+        "accountId": "string|required|unique",
+        "email": "email|required|unique",
+        "displayName": "string|required",
+        "role": "enum:superAdmin,admin,organizer",
+        "status": "enum:active,suspended",
+        "teamId": "string",
+        "membershipId": "string",
+        "createdByAdminId": "string",
+        "createdAt": "datetime|required",
+        "notes": "string"
+      }
+    },
     "profiles": {
       "fields": {
         "accountId": "string|required|unique",

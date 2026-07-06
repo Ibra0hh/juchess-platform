@@ -7,8 +7,8 @@
     "entrypoint": "src/main.js",
     "commands": "npm install",
     "execute": [
-      "team:admins",
-      "team:organizers"
+      "team:admin_super_admins",
+      "team:admin_staff"
     ],
     "events": [],
     "schedule": "",
@@ -26,6 +26,8 @@
       "rows.write",
       "documents.read",
       "documents.write",
+      "teams.read",
+      "teams.write",
       "users.read",
       "users.write"
     ],

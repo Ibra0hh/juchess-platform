@@ -1,6 +1,6 @@
 # JuChess Appwrite Schema
 
-This is the first backend contract for the real JuChess apps. The web app, admin app, and Flutter app should all use these same table IDs and field names.
+This is the first backend contract for the real JuChess apps. The public web app and Flutter app share player-facing tables. The admin app has a separate admin access table and admin-only teams.
 
 ## Project Platforms
 
@@ -14,15 +14,40 @@ This is the first backend contract for the real JuChess apps. The web app, admin
 - Client apps use the Account API for normal sign in, sign up, sessions, and password recovery.
 - Admin screens must not expose API keys in browser code.
 - Appwrite Teams:
-  - `admins`: full club operators.
-  - `organizers`: can manage assigned tournaments.
+  - `admin_super_admins`: super-admin access for the admin app only.
+  - `admin_staff`: regular admin/organizer access for the admin app only.
+  - `admins`: legacy player-profile role team; do not use for admin app authorization.
+  - `organizers`: legacy player-profile role team; do not use for admin app authorization.
   - `members`: approved club members.
+- Admin app authorization must use `admin_profiles` plus `admin_super_admins` or `admin_staff`, not the player `profiles.role` field.
 
 ## Tables
 
 Database ID: `juchess`
 
 Machine-readable contract: `appwrite/schema.json`
+
+### `admin_profiles`
+
+Private admin-panel identity table. This is separate from the player `profiles` table.
+
+Fields:
+- `accountId` string, required, unique. Appwrite Auth user ID.
+- `email` email, required, unique.
+- `displayName` string, required.
+- `role` enum: `superAdmin`, `admin`, `organizer`.
+- `status` enum: `active`, `suspended`.
+- `teamId` string, optional. Usually `admin_super_admins` or `admin_staff`.
+- `membershipId` string, optional Appwrite team membership ID.
+- `createdByAdminId` string, optional `admin_profiles` row ID.
+- `createdAt` datetime, required.
+- `notes` string, optional.
+
+Permissions:
+- No direct browser reads/writes.
+- Admin Function reads/writes.
+- `superAdmin` can create and suspend admin profiles.
+- Active rows are required for every admin function route except `GET /`.
 
 ### `profiles`
 
@@ -207,6 +232,15 @@ Posters, QR codes, and downloadable event files.
 
 Function ID: `admin-actions`
 
+Execute permissions:
+- `team:admin_super_admins`
+- `team:admin_staff`
+
+Admin execution contract:
+- The admin React app creates a short Account JWT and sends it as the execution header `juchess-admin-jwt`.
+- The Function validates that JWT with the Account API, then checks `admin_profiles`.
+- CLI/console executions without that JWT must return `401 Admin session is required.`
+
 Responsibilities:
 - Approve member accounts.
 - Create/update tournaments.
@@ -216,9 +250,14 @@ Responsibilities:
 - Manage announcements.
 - Manage profile roles and status.
 - Manage identity and IP blocks.
+- Manage admin-panel access through separate admin profiles and admin-only teams.
 
 Implemented routes:
 - `GET /`
+- `GET /admin/session`
+- `GET /admin/admins`
+- `POST /admin/admins`
+- `POST /admin/admins/:id/status`
 - `GET /blocks`
 - `POST /blocks/identity`
 - `POST /blocks/identity/:id/unblock`

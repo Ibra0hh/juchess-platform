@@ -1,6 +1,7 @@
-import { Client, ID, Query, TablesDB, Users } from 'node-appwrite';
+import { Account, Client, ID, Query, TablesDB, Teams, Users } from 'node-appwrite';
 
 const tableIds = {
+  adminProfiles: 'admin_profiles',
   profiles: 'profiles',
   tournaments: 'tournaments',
   registrations: 'registrations',
@@ -10,6 +11,11 @@ const tableIds = {
   adminAudit: 'admin_audit',
   identityBlocks: 'identity_blocks',
   ipBlocks: 'ip_blocks',
+};
+
+const adminTeamIds = {
+  superAdmins: 'admin_super_admins',
+  staff: 'admin_staff',
 };
 
 function parseBody(req) {
@@ -55,6 +61,13 @@ function notFound(res, method, path) {
   return res.json({ ok: false, error: `No admin action for ${method} ${path}` }, 404);
 }
 
+class HttpError extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
 function requireFields(body, fields) {
   return fields.filter((field) => body[field] === undefined || body[field] === null || body[field] === '');
 }
@@ -81,8 +94,8 @@ function normalizeIdentityValue(type, value) {
   return String(value ?? '').trim();
 }
 
-function actorProfileId(req, body) {
-  return body.actorProfileId || req.headers['x-appwrite-user-id'] || 'system';
+function actorProfileId(req, body, actor) {
+  return body.actorProfileId || actor?.$id || req.headers['x-appwrite-user-id'] || 'system';
 }
 
 async function writeAudit(tablesDB, databaseId, { actorProfileId, action, targetTable, targetRowId, payload }) {
@@ -141,6 +154,67 @@ function compareCreatedAtDesc(a, b) {
   return String(b.createdAt || b.$createdAt || '').localeCompare(String(a.createdAt || a.$createdAt || ''));
 }
 
+async function loadAdminProfile(tablesDB, databaseId, accountId) {
+  if (!accountId) return null;
+
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.adminProfiles,
+    queries: [Query.equal('accountId', accountId), Query.limit(1)],
+    total: false,
+  });
+
+  return response.rows[0] ?? null;
+}
+
+async function getAuthenticatedAccountId(req) {
+  const jwt = req.headers['juchess-admin-jwt'] || req.headers['x-appwrite-user-jwt'];
+  if (!jwt) {
+    throw new HttpError(401, 'Admin session is required.');
+  }
+
+  const userClient = new Client()
+    .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
+    .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
+    .setJWT(jwt);
+
+  const account = new Account(userClient);
+  try {
+    const user = await account.get();
+    return user.$id;
+  } catch {
+    throw new HttpError(401, 'Admin session is required.');
+  }
+}
+
+async function requireAdminActor(req, tablesDB, databaseId) {
+  const accountId = await getAuthenticatedAccountId(req);
+  const profile = await loadAdminProfile(tablesDB, databaseId, accountId);
+  if (!profile) {
+    throw new HttpError(403, 'This account is not registered for the admin panel.');
+  }
+
+  if (profile.status !== 'active') {
+    throw new HttpError(403, 'This admin account is suspended.');
+  }
+
+  if (!['superAdmin', 'admin', 'organizer'].includes(profile.role)) {
+    throw new HttpError(403, 'This admin role is not allowed.');
+  }
+
+  return profile;
+}
+
+function requireSuperAdmin(actor) {
+  if (actor.role !== 'superAdmin') {
+    throw new HttpError(403, 'Only a super admin can manage admin access.');
+  }
+}
+
+function adminTeamForRole(role) {
+  return role === 'superAdmin' ? adminTeamIds.superAdmins : adminTeamIds.staff;
+}
+
 export default async ({ req, res, log, error }) => {
   const client = new Client()
     .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
@@ -149,6 +223,7 @@ export default async ({ req, res, log, error }) => {
 
   const tablesDB = new TablesDB(client);
   const users = new Users(client);
+  const teams = new Teams(client);
   const databaseId = process.env.JUCHESS_DATABASE_ID ?? 'juchess';
   const method = req.method.toUpperCase();
   const path = req.path || '/';
@@ -167,6 +242,10 @@ export default async ({ req, res, log, error }) => {
         'POST /tournaments',
         'PATCH /tournaments/:id',
         'DELETE /tournaments/:id',
+        'GET /admin/session',
+        'GET /admin/admins',
+        'POST /admin/admins',
+        'POST /admin/admins/:id/status',
         'GET /blocks',
         'POST /blocks/identity',
         'POST /blocks/identity/:id/unblock',
@@ -182,6 +261,122 @@ export default async ({ req, res, log, error }) => {
   }
 
   try {
+    const actor = await requireAdminActor(req, tablesDB, databaseId);
+
+    if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'session') {
+      return res.json({ ok: true, allowed: true, profile: actor });
+    }
+
+    if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'admins' && segments.length === 2) {
+      requireSuperAdmin(actor);
+
+      const response = await tablesDB.listRows({
+        databaseId,
+        tableId: tableIds.adminProfiles,
+        queries: [Query.limit(500)],
+        total: false,
+      });
+
+      return res.json({ ok: true, admins: response.rows.toSorted(compareCreatedAtDesc) });
+    }
+
+    if (method === 'POST' && segments[0] === 'admin' && segments[1] === 'admins' && segments.length === 2) {
+      requireSuperAdmin(actor);
+
+      const missing = requireFields(body, ['email', 'displayName', 'role']);
+      if (missing.length > 0) {
+        return badRequest(res, 'Missing admin profile fields.', { missing });
+      }
+
+      if (!['superAdmin', 'admin', 'organizer'].includes(body.role)) {
+        return badRequest(res, 'Unsupported admin role.');
+      }
+
+      const email = String(body.email).trim().toLowerCase();
+      const displayName = String(body.displayName).trim();
+      const teamId = adminTeamForRole(body.role);
+      const membership = await teams.createMembership({
+        teamId,
+        roles: [body.role],
+        email: body.accountId ? undefined : email,
+        userId: body.accountId || undefined,
+        name: displayName,
+      });
+
+      const accountId = membership.userId || body.accountId;
+      if (!accountId) {
+        throw new HttpError(500, 'Admin membership was created without an account ID.');
+      }
+
+      const row = await tablesDB.createRow({
+        databaseId,
+        tableId: tableIds.adminProfiles,
+        rowId: ID.unique(),
+        data: cleanObject({
+          accountId,
+          email,
+          displayName,
+          role: body.role,
+          status: 'active',
+          teamId,
+          membershipId: membership.$id,
+          createdByAdminId: actor.$id,
+          createdAt: new Date().toISOString(),
+          notes: body.notes,
+        }),
+      });
+
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'createAdminProfile',
+        targetTable: tableIds.adminProfiles,
+        targetRowId: row.$id,
+        payload: { email, role: body.role, teamId },
+      });
+
+      return res.json({ ok: true, action: 'createAdminProfile', row });
+    }
+
+    if (method === 'POST' && segments[0] === 'admin' && segments[1] === 'admins' && segments[2] && segments[3] === 'status') {
+      requireSuperAdmin(actor);
+
+      const missing = requireFields(body, ['status']);
+      if (missing.length > 0) {
+        return badRequest(res, 'Missing admin status.', { missing });
+      }
+
+      if (!['active', 'suspended'].includes(body.status)) {
+        return badRequest(res, 'Unsupported admin status.');
+      }
+
+      const target = await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.adminProfiles,
+        rowId: segments[2],
+      });
+
+      if (target.accountId === actor.accountId && body.status === 'suspended') {
+        return badRequest(res, 'A super admin cannot suspend their own admin access.');
+      }
+
+      const row = await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.adminProfiles,
+        rowId: segments[2],
+        data: { status: body.status },
+      });
+
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'updateAdminStatus',
+        targetTable: tableIds.adminProfiles,
+        targetRowId: row.$id,
+        payload: { email: target.email, status: body.status },
+      });
+
+      return res.json({ ok: true, action: 'updateAdminStatus', row });
+    }
+
     if (method === 'GET' && segments[0] === 'blocks' && segments.length === 1) {
       const blocks = await listBlockRows(tablesDB, databaseId);
       return res.json({ ok: true, ...blocks });
@@ -220,13 +415,13 @@ export default async ({ req, res, log, error }) => {
           status: 'active',
           targetUserId: body.targetUserId,
           targetProfileId: body.targetProfileId,
-          createdByProfileId: actorProfileId(req, body),
+          createdByProfileId: actorProfileId(req, body, actor),
           createdAt: new Date().toISOString(),
         }),
       });
 
       await writeAudit(tablesDB, databaseId, {
-        actorProfileId: actorProfileId(req, body),
+        actorProfileId: actorProfileId(req, body, actor),
         action: 'blockIdentity',
         targetTable: tableIds.identityBlocks,
         targetRowId: row.$id,
@@ -257,13 +452,13 @@ export default async ({ req, res, log, error }) => {
         rowId: segments[2],
         data: cleanObject({
           status: 'lifted',
-          liftedByProfileId: actorProfileId(req, body),
+          liftedByProfileId: actorProfileId(req, body, actor),
           liftedAt: new Date().toISOString(),
         }),
       });
 
       await writeAudit(tablesDB, databaseId, {
-        actorProfileId: actorProfileId(req, body),
+        actorProfileId: actorProfileId(req, body, actor),
         action: 'unblockIdentity',
         targetTable: tableIds.identityBlocks,
         targetRowId: row.$id,
@@ -288,13 +483,13 @@ export default async ({ req, res, log, error }) => {
           ipRange,
           reason: body.reason,
           status: 'active',
-          createdByProfileId: actorProfileId(req, body),
+          createdByProfileId: actorProfileId(req, body, actor),
           createdAt: new Date().toISOString(),
         }),
       });
 
       await writeAudit(tablesDB, databaseId, {
-        actorProfileId: actorProfileId(req, body),
+        actorProfileId: actorProfileId(req, body, actor),
         action: 'blockIp',
         targetTable: tableIds.ipBlocks,
         targetRowId: row.$id,
@@ -317,13 +512,13 @@ export default async ({ req, res, log, error }) => {
         rowId: segments[2],
         data: cleanObject({
           status: 'lifted',
-          liftedByProfileId: actorProfileId(req, body),
+          liftedByProfileId: actorProfileId(req, body, actor),
           liftedAt: new Date().toISOString(),
         }),
       });
 
       await writeAudit(tablesDB, databaseId, {
-        actorProfileId: actorProfileId(req, body),
+        actorProfileId: actorProfileId(req, body, actor),
         action: 'unblockIp',
         targetTable: tableIds.ipBlocks,
         targetRowId: row.$id,
@@ -356,7 +551,7 @@ export default async ({ req, res, log, error }) => {
           location: body.location,
           capacity: body.capacity,
           description: body.description,
-          createdByProfileId: body.createdByProfileId ?? req.headers['x-appwrite-user-id'] ?? 'system',
+          createdByProfileId: body.createdByProfileId ?? actor.$id,
         }),
       });
 
@@ -480,7 +675,7 @@ export default async ({ req, res, log, error }) => {
           audience: body.audience ?? 'public',
           status: body.status ?? 'published',
           publishedAt: body.publishedAt ?? new Date().toISOString(),
-          createdByProfileId: body.createdByProfileId ?? req.headers['x-appwrite-user-id'] ?? 'system',
+          createdByProfileId: body.createdByProfileId ?? actor.$id,
         }),
       });
 
@@ -490,6 +685,13 @@ export default async ({ req, res, log, error }) => {
     return notFound(res, method, path);
   } catch (cause) {
     error(cause?.message ?? String(cause));
+    if (cause instanceof HttpError) {
+      return res.json({
+        ok: false,
+        error: cause.message,
+      }, cause.statusCode);
+    }
+
     return res.json({
       ok: false,
       error: 'Admin action failed.',
