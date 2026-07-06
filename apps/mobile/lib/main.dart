@@ -2339,7 +2339,7 @@ class _TournamentBracketViewState extends State<TournamentBracketView> {
                   if (i != widget.rounds.length - 1)
                     BracketConnector(
                       roundIndex: i,
-                      sourceMatches: widget.rounds[i].games.length,
+                      sourceMatches: widget.rounds[i].games,
                       targetMatches: widget.rounds[i + 1].games.length,
                       maxMatches: widget.rounds.first.games.length,
                     ),
@@ -2361,11 +2361,11 @@ class _TournamentBracketViewState extends State<TournamentBracketView> {
 class BracketMetrics {
   const BracketMetrics._();
 
-  static const matchHeight = 72.0;
-  static const baseGap = 10.0;
+  static const matchHeight = 90.0;
+  static const baseGap = 12.0;
   static const basePitch = matchHeight + baseGap;
   static const labelBand = 29.0;
-  static const connectorWidth = 38.0;
+  static const connectorWidth = 46.0;
 
   static double roundOffset(int roundIndex) {
     final step = 1 << roundIndex;
@@ -2482,7 +2482,7 @@ class BracketConnector extends StatelessWidget {
   });
 
   final int roundIndex;
-  final int sourceMatches;
+  final List<MatchSeed> sourceMatches;
   final int targetMatches;
   final int maxMatches;
 
@@ -2510,48 +2510,62 @@ class BracketConnectorPainter extends CustomPainter {
   });
 
   final int roundIndex;
-  final int sourceMatches;
+  final List<MatchSeed> sourceMatches;
   final int targetMatches;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0x99a98a3f)
-      ..strokeWidth = 1.6
+    final mutedPaint = Paint()
+      ..color = const Color(0x3821304e)
+      ..strokeWidth = 1.45
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    final dotPaint = Paint()
-      ..color = const Color(0xffa98a3f)
+    final livePaint = Paint()
+      ..color = const Color(0xcca98a3f)
+      ..strokeWidth = 1.65
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final decidedPaint = Paint()
+      ..color = PrototypeColors.burgundy
+      ..strokeWidth = 2.2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final endPaint = Paint()
+      ..color = const Color(0x667d2434)
       ..style = PaintingStyle.fill;
 
     for (var i = 0; i < targetMatches; i++) {
       final firstSource = i * 2;
-      if (firstSource >= sourceMatches) break;
+      if (firstSource >= sourceMatches.length) break;
 
-      final secondSource = firstSource + 1;
-      final topY = BracketMetrics.matchCenter(roundIndex, firstSource);
-      final bottomY = secondSource < sourceMatches
-          ? BracketMetrics.matchCenter(roundIndex, secondSource)
-          : topY;
       final targetY = BracketMetrics.matchCenter(roundIndex + 1, i);
-      final joinX = size.width * 0.58;
+      final midX = size.width / 2;
 
-      final upperPath = Path()
-        ..moveTo(0, topY)
-        ..lineTo(joinX, targetY)
-        ..lineTo(size.width, targetY);
-      canvas.drawPath(upperPath, paint);
+      for (final sourceIndex in [firstSource, firstSource + 1]) {
+        if (sourceIndex >= sourceMatches.length) continue;
+        final sourceY = BracketMetrics.matchCenter(roundIndex, sourceIndex);
+        final match = sourceMatches[sourceIndex];
+        final paint = switch (match.result.toLowerCase()) {
+          'live' => livePaint,
+          '1-0' || '0-1' => decidedPaint,
+          _ => mutedPaint,
+        };
 
-      if (bottomY != topY) {
-        final lowerPath = Path()
-          ..moveTo(0, bottomY)
-          ..lineTo(joinX, targetY);
-        canvas.drawPath(lowerPath, paint);
+        final path = Path()
+          ..moveTo(0, sourceY)
+          ..lineTo(midX, sourceY)
+          ..lineTo(midX, targetY)
+          ..lineTo(size.width, targetY);
+        canvas.drawPath(path, paint);
       }
 
-      canvas.drawCircle(Offset(size.width, targetY), 2.2, dotPaint);
+      canvas.drawCircle(Offset(size.width, targetY), 2.0, endPaint);
     }
   }
 
