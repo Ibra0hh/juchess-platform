@@ -122,8 +122,10 @@ class AppwriteService {
       );
 
       if (response.rows.isEmpty) return <String, String?>{};
-      final data = response.rows.first.data;
+      final row = response.rows.first;
+      final data = row.data;
       return {
+        'profileId': row.$id,
         'displayName': data['displayName']?.toString(),
         'universityId': data['universityId']?.toString(),
         'phone': data['phone']?.toString(),
@@ -148,8 +150,10 @@ class AppwriteService {
       );
 
       if (response.rows.isEmpty) return <String, String?>{};
-      final data = response.rows.first.data;
+      final row = response.rows.first;
+      final data = row.data;
       return {
+        'profileId': row.$id,
         'displayName': data['displayName']?.toString(),
         'universityId': data['universityId']?.toString(),
         'phone': data['phone']?.toString(),
@@ -227,6 +231,49 @@ class AppwriteService {
 
   Future<void> sendPasswordRecovery(String email) async {
     await account.createRecovery(email: email, url: AppConfig.recoveryUrl);
+  }
+
+  Future<void> registerForTournament({
+    required String tournamentRowId,
+    required String profileId,
+  }) async {
+    final existing = await tablesDB.listRows(
+      databaseId: AppConfig.databaseId,
+      tableId: AppConfig.registrationsTableId,
+      queries: [
+        Query.equal('tournamentId', tournamentRowId),
+        Query.equal('profileId', profileId),
+        Query.limit(1),
+      ],
+      total: false,
+      ttl: 0,
+    );
+
+    if (existing.rows.isNotEmpty) {
+      final row = existing.rows.first;
+      if (row.data['status'] == 'cancelled') {
+        await tablesDB.updateRow(
+          databaseId: AppConfig.databaseId,
+          tableId: AppConfig.registrationsTableId,
+          rowId: row.$id,
+          data: {'status': 'confirmed', 'checkedIn': false},
+        );
+      }
+      return;
+    }
+
+    await tablesDB.createRow(
+      databaseId: AppConfig.databaseId,
+      tableId: AppConfig.registrationsTableId,
+      rowId: ID.unique(),
+      data: {
+        'tournamentId': tournamentRowId,
+        'profileId': profileId,
+        'status': 'confirmed',
+        'checkedIn': false,
+        'checkInCode': _checkInCode(),
+      },
+    );
   }
 
   Future<void> assertAccessAllowed({
@@ -365,6 +412,7 @@ class AppwriteService {
     final startsAt = data['startsAt']?.toString();
 
     return TournamentSeed(
+      rowId: row.$id,
       id: data['slug']?.toString() ?? row.$id,
       name: name,
       meta: '${_formatDate(startsAt)} · $location',
@@ -402,8 +450,10 @@ class AppState extends ChangeNotifier {
   String tournamentFilter = 'active';
   String? userName = _initialPreviewUserName();
   String? userEmail = _initialPreviewEmail();
+  String? profileId;
   String? error;
   List<TournamentSeed> tournamentItems = const [];
+  Set<String> registeredTournamentRowIds = <String>{};
 
   bool get appwriteReady => service.ready;
   bool get signedIn => userEmail != null;
@@ -456,9 +506,12 @@ class AppState extends ChangeNotifier {
       if (service.ready && previewEmail != null) {
         final profile = await service.loadProfileIdentityByEmail(previewEmail);
         final displayName = profile['displayName'];
+        profileId = profile['profileId'];
         if (displayName != null && displayName.isNotEmpty) {
           userName = displayName;
         }
+      } else {
+        profileId = 'preview-profile';
       }
 
       error = null;
@@ -472,6 +525,7 @@ class AppState extends ChangeNotifier {
       final user = await service.currentUser();
       final profile = await service.assertCurrentUserAllowed(user);
       final displayName = profile['displayName'];
+      profileId = profile['profileId'];
       userName = displayName != null && displayName.isNotEmpty
           ? displayName
           : user.name.isNotEmpty
@@ -487,6 +541,7 @@ class AppState extends ChangeNotifier {
       }
       userName = null;
       userEmail = null;
+      profileId = null;
       error = caught is AppwriteException && caught.type != 'user_blocked'
           ? null
           : appwriteMessage(caught);
@@ -499,6 +554,7 @@ class AppState extends ChangeNotifier {
     if (_isAdminPreview()) {
       userName = _displayNameFromEmail(email);
       userEmail = email.trim().isEmpty ? _initialPreviewEmail() : email.trim();
+      profileId = 'preview-profile';
       error = null;
       notifyListeners();
       return true;
@@ -516,8 +572,10 @@ class AppState extends ChangeNotifier {
 
     try {
       final user = await service.signIn(email: email, password: password);
+      final profile = await service.loadProfileIdentity(user.$id);
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
+      profileId = profile['profileId'];
       return true;
     } catch (caught) {
       error = appwriteMessage(caught);
@@ -540,6 +598,7 @@ class AppState extends ChangeNotifier {
           ? _displayNameFromEmail(email)
           : name.trim();
       userEmail = email.trim().isEmpty ? _initialPreviewEmail() : email.trim();
+      profileId = 'preview-profile';
       error = null;
       notifyListeners();
       return true;
@@ -563,8 +622,10 @@ class AppState extends ChangeNotifier {
         universityId: universityId,
         phone: phone,
       );
+      final profile = await service.loadProfileIdentity(user.$id);
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
+      profileId = profile['profileId'];
       return true;
     } catch (caught) {
       error = appwriteMessage(caught);
@@ -614,7 +675,54 @@ class AppState extends ChangeNotifier {
 
     userName = null;
     userEmail = null;
+    profileId = null;
+    registeredTournamentRowIds = <String>{};
     notifyListeners();
+  }
+
+  bool isRegisteredFor(TournamentSeed event) {
+    return registeredTournamentRowIds.contains(event.rowId);
+  }
+
+  Future<bool> registerForTournament(TournamentSeed event) async {
+    if (!signedIn) {
+      error = 'Sign in to register for this tournament.';
+      notifyListeners();
+      return false;
+    }
+
+    if (_isMemberPreview()) {
+      registeredTournamentRowIds = {...registeredTournamentRowIds, event.rowId};
+      error = null;
+      notifyListeners();
+      return true;
+    }
+
+    if (!service.ready || profileId == null) {
+      error = 'Account service is not ready yet.';
+      notifyListeners();
+      return false;
+    }
+
+    authLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      await service.registerForTournament(
+        tournamentRowId: event.rowId,
+        profileId: profileId!,
+      );
+      registeredTournamentRowIds = {...registeredTournamentRowIds, event.rowId};
+      await loadTournaments();
+      return true;
+    } catch (caught) {
+      error = appwriteMessage(caught);
+      return false;
+    } finally {
+      authLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> loadTournaments() async {
@@ -741,6 +849,11 @@ int _statusOrder(String status) {
   if (status == 'active') return 0;
   if (status == 'upcoming') return 1;
   return 2;
+}
+
+String _checkInCode() {
+  final value = DateTime.now().microsecondsSinceEpoch % 900000;
+  return (value + 100000).toString();
 }
 
 String _roundLabel(String status, int? currentRound, int? roundsTotal) {
@@ -1121,16 +1234,18 @@ class HomeScreen extends StatelessWidget {
         ),
         const QuickActionsGrid(),
         SectionHeading(
-          title: 'News',
-          margin: const EdgeInsets.fromLTRB(16, 22, 16, 10),
-        ),
-        const NewsList(),
-        SectionHeading(
           title: 'Club leaderboard',
           action: 'View all',
+          onAction: () =>
+              openPrototypeRoute(context, const LeaderboardScreen()),
           margin: const EdgeInsets.fromLTRB(16, 22, 16, 10),
         ),
         const LeaderboardPreview(),
+        SectionHeading(
+          title: 'Announcements',
+          margin: const EdgeInsets.fromLTRB(16, 22, 16, 10),
+        ),
+        const NewsList(),
       ],
     );
   }
@@ -1347,11 +1462,27 @@ class QuickActionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const actions = [
-      ('♞', 'Game Review'),
-      ('♟', 'Analysis Board'),
-      ('5:00', 'Chess Clock'),
-      ('♛', 'Leaderboard'),
+    final actions = [
+      (
+        '♞',
+        'Game Review',
+        () => openPrototypeRoute(context, const GameReviewScreen()),
+      ),
+      (
+        '♟',
+        'Analysis Board',
+        () => openPrototypeRoute(context, const AnalysisBoardScreen()),
+      ),
+      (
+        '5:00',
+        'Chess Clock',
+        () => openPrototypeRoute(context, const ChessClockScreen()),
+      ),
+      (
+        '♛',
+        'Leaderboard',
+        () => openPrototypeRoute(context, const LeaderboardScreen()),
+      ),
     ];
 
     return Padding(
@@ -1365,35 +1496,39 @@ class QuickActionsGrid extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         children: actions
             .map(
-              (item) => Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: cardDecoration(radius: 13),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      item.$1,
-                      style: const TextStyle(
-                        color: PrototypeColors.burgundy,
-                        fontWeight: FontWeight.w800,
+              (item) => InkWell(
+                borderRadius: BorderRadius.circular(13),
+                onTap: item.$3,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: cardDecoration(radius: 13),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        item.$1,
+                        style: const TextStyle(
+                          color: PrototypeColors.burgundy,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      item.$2,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: PrototypeColors.navy,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(height: 5),
+                      Text(
+                        item.$2,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: PrototypeColors.navy,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             )
@@ -1574,68 +1709,87 @@ void openTournamentDetail(BuildContext context, TournamentSeed event) {
   );
 }
 
-class TournamentDetailScreen extends StatelessWidget {
+class TournamentDetailScreen extends StatefulWidget {
   const TournamentDetailScreen({required this.event, super.key});
 
   final TournamentSeed event;
 
   @override
+  State<TournamentDetailScreen> createState() => _TournamentDetailScreenState();
+}
+
+class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
+  String tab = 'overview';
+
+  TournamentSeed get event => widget.event;
+
+  @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final registered = state.isRegisteredFor(event);
+    final tabs = _tabsFor(event);
+
     return Scaffold(
       backgroundColor: PrototypeColors.screen,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          padding: const EdgeInsets.only(bottom: 28),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 460),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.arrow_back),
-                        color: PrototypeColors.navy,
-                        tooltip: 'Back',
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    decoration: const BoxDecoration(
+                      color: PrototypeColors.header,
+                      border: Border(
+                        bottom: BorderSide(color: Color(0x1f21304e)),
                       ),
-                      const SizedBox(width: 4),
-                      const Expanded(
-                        child: SerifText(
-                          'Tournament',
-                          size: 21,
-                          weight: FontWeight.w700,
+                    ),
+                    child: Row(
+                      children: [
+                        SquareIconButton(
+                          icon: Icons.chevron_left,
+                          onTap: () => Navigator.of(context).pop(),
+                          tooltip: 'Back',
                         ),
-                      ),
-                      if (event.status == 'active')
-                        const LivePill(small: true)
-                      else
-                        StatusPill(event.status),
-                    ],
+                        const SizedBox(width: 10),
+                        ClipOval(
+                          child: Image.asset(
+                            'assets/juchess-logo.png',
+                            width: 32,
+                            height: 32,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: SerifText(
+                            'JuChess',
+                            size: 15,
+                            weight: FontWeight.w700,
+                          ),
+                        ),
+                        if (event.status == 'active')
+                          const LivePill(small: true)
+                        else
+                          StatusPill(event.status),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  PrototypeCard(
-                    margin: EdgeInsets.zero,
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         SerifText(
                           event.name,
-                          size: 23,
+                          size: 20,
                           weight: FontWeight.w700,
-                          height: 1.12,
+                          height: 1.3,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          event.meta,
-                          style: const TextStyle(
-                            color: Color(0x9921304e),
-                            fontSize: 12.8,
-                          ),
-                        ),
-                        const SizedBox(height: 13),
+                        const SizedBox(height: 10),
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
@@ -1648,105 +1802,77 @@ class TournamentDetailScreen extends StatelessWidget {
                           event.current,
                           style: const TextStyle(
                             color: PrototypeColors.burgundy,
-                            fontSize: 13,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  GridView.count(
-                    crossAxisCount: 2,
-                    childAspectRatio: 1.42,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    physics: const NeverScrollableScrollPhysics(),
-                    shrinkWrap: true,
-                    children: [
-                      TournamentInfoTile(
-                        label: 'Format',
-                        value: event.format,
-                        icon: Icons.account_tree_outlined,
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                    decoration: const BoxDecoration(
+                      color: PrototypeColors.screen,
+                      border: Border(
+                        top: BorderSide(color: Color(0x1421304e)),
+                        bottom: BorderSide(color: Color(0x1a21304e)),
                       ),
-                      TournamentInfoTile(
-                        label: 'Time control',
-                        value: event.timeControl,
-                        icon: Icons.timer_outlined,
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: tabs
+                            .map(
+                              (item) => Padding(
+                                padding: const EdgeInsets.only(right: 7),
+                                child: GestureDetector(
+                                  onTap: () => setState(() => tab = item.key),
+                                  child: DetailTabPill(
+                                    item.label,
+                                    selected: tab == item.key,
+                                    live: item.key == 'live',
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
                       ),
-                      TournamentInfoTile(
-                        label: 'Players',
-                        value: event.playerLabel,
-                        icon: Icons.groups_outlined,
-                      ),
-                      TournamentInfoTile(
-                        label: 'Location',
-                        value: event.location,
-                        icon: Icons.place_outlined,
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 14),
-                  PrototypeCard(
-                    margin: EdgeInsets.zero,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SerifText(
-                          'Details',
-                          size: 18,
-                          weight: FontWeight.w700,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          event.description,
-                          style: const TextStyle(
-                            color: Color(0xcc21304e),
-                            fontSize: 13,
-                            height: 1.45,
+                  if (tab == 'overview')
+                    _TournamentOverview(
+                      event: event,
+                      registered: registered,
+                      onRegister: () async {
+                        if (!state.signedIn) {
+                          showAuthSheet(context);
+                          return;
+                        }
+                        final appState = context.read<AppState>();
+                        final messenger = ScaffoldMessenger.of(context);
+                        final ok = await appState.registerForTournament(event);
+                        if (!mounted) return;
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              ok
+                                  ? 'Registration saved.'
+                                  : appState.error ??
+                                        'Could not register right now.',
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  PrototypeCard(
-                    margin: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        TournamentStep(
-                          label: 'Participants',
-                          value: event.playerLabel,
-                          done: event.players > 0,
-                        ),
-                        const TournamentDivider(),
-                        TournamentStep(
-                          label: 'Rounds',
-                          value: event.roundsLabel,
-                          done: event.currentRound != null,
-                        ),
-                        const TournamentDivider(),
-                        TournamentStep(
-                          label: 'Standings',
-                          value: event.status == 'completed'
-                              ? 'Final standings'
-                              : 'Updates during play',
-                          done: event.status != 'upcoming',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  PrototypeButton(
-                    label: event.status == 'upcoming'
-                        ? 'Register'
-                        : event.status == 'completed'
-                        ? 'View standings'
-                        : 'Open live tournament',
-                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${event.name} is open.')),
-                    ),
-                  ),
+                        );
+                      },
+                      onMain: () => setState(() => tab = _mainTabKey(event)),
+                    )
+                  else if (tab == 'live')
+                    _TournamentLiveTab(event: event)
+                  else if (tab == 'main')
+                    _TournamentMainTab(event: event)
+                  else if (tab == 'rounds')
+                    _TournamentRoundsTab(event: event)
+                  else
+                    _TournamentPlayersTab(event: event),
                 ],
               ),
             ),
@@ -1755,6 +1881,718 @@ class TournamentDetailScreen extends StatelessWidget {
       ),
     );
   }
+
+  List<DetailTab> _tabsFor(TournamentSeed event) {
+    final items = <DetailTab>[
+      DetailTab(
+        'overview',
+        event.status == 'completed' ? 'Overview' : 'Registration',
+      ),
+    ];
+    if (event.status == 'active') items.add(const DetailTab('live', 'Live'));
+    items.add(DetailTab('main', _mainTabLabel(event)));
+    items.add(DetailTab('rounds', _roundsTabLabel(event)));
+    items.add(const DetailTab('players', 'Players'));
+    if (!items.any((item) => item.key == tab)) tab = 'overview';
+    return items;
+  }
+}
+
+class DetailTab {
+  const DetailTab(this.key, this.label);
+
+  final String key;
+  final String label;
+}
+
+class DetailTabPill extends StatelessWidget {
+  const DetailTabPill(
+    this.label, {
+    required this.selected,
+    this.live = false,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final bool live;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: selected ? PrototypeColors.navy : Colors.transparent,
+        border: Border.all(color: const Color(0x4021304e)),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (live) ...[
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: PrototypeColors.burgundy,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 5),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              color: selected ? PrototypeColors.cream : PrototypeColors.navy,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TournamentOverview extends StatelessWidget {
+  const _TournamentOverview({
+    required this.event,
+    required this.registered,
+    required this.onRegister,
+    required this.onMain,
+  });
+
+  final TournamentSeed event;
+  final bool registered;
+  final VoidCallback onRegister;
+  final VoidCallback onMain;
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = event.status == 'completed';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (completed)
+            PrototypeCard(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: const Row(
+                children: [
+                  Text(
+                    '♛',
+                    style: TextStyle(color: PrototypeColors.gold, fontSize: 23),
+                  ),
+                  SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'CHAMPION',
+                          style: TextStyle(
+                            color: Color(0xff79622a),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Ibrahim Ahmad',
+                          style: TextStyle(
+                            color: PrototypeColors.navy,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          PrototypeCard(
+            margin: EdgeInsets.zero,
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                FactRow('Dates', event.meta.split(' · ').first),
+                FactRow('Location', event.location),
+                FactRow('Organizer', 'JU Chess Club'),
+                FactRow('Format', event.format),
+                FactRow('Time control', event.timeControl),
+                FactRow('Players', event.playerLabel),
+                FactRow('Status', event.current),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (registered)
+            PrototypeCard(
+              margin: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0x1f1f8a5b),
+                      border: Border.all(color: const Color(0x661f8a5b)),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text(
+                      "You're registered",
+                      style: TextStyle(
+                        color: Color(0xff1f8a5b),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Show this at check-in - it stays here anytime.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Color(0x9921304e), fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: 148,
+                    height: 148,
+                    decoration: BoxDecoration(
+                      color: PrototypeColors.surface,
+                      border: Border.all(color: const Color(0x2421304e)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_2,
+                      color: PrototypeColors.navy,
+                      size: 118,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'CHECK-IN CODE',
+                    style: TextStyle(
+                      color: Color(0x8021304e),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    _checkInCode().split('').join(' '),
+                    style: const TextStyle(
+                      color: PrototypeColors.navy,
+                      fontFamily: 'monospace',
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (!registered && !completed)
+            PrototypeCard(
+              margin: EdgeInsets.zero,
+              child: Text(
+                event.description,
+                style: const TextStyle(
+                  color: Color(0xcc21304e),
+                  fontSize: 13,
+                  height: 1.45,
+                ),
+              ),
+            ),
+          const SizedBox(height: 14),
+          PrototypeButton(
+            label: completed
+                ? 'View final ${_mainTabLabel(event).toLowerCase()}'
+                : registered
+                ? 'Cancel registration'
+                : 'Register',
+            onTap: completed ? onMain : onRegister,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class FactRow extends StatelessWidget {
+  const FactRow(this.label, this.value, {super.key});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0x1421304e))),
+      ),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Color(0x9921304e), fontSize: 12.5),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: PrototypeColors.navy,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TournamentLiveTab extends StatelessWidget {
+  const _TournamentLiveTab({required this.event});
+
+  final TournamentSeed event;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: Column(
+        children: liveBoards
+            .map(
+              (game) => PrototypeCard(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Board ${game.board}',
+                          style: const TextStyle(
+                            color: Color(0x8021304e),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          game.note,
+                          style: const TextStyle(
+                            color: Color(0x7321304e),
+                            fontSize: 11,
+                          ),
+                        ),
+                        const Spacer(),
+                        const LivePill(small: true),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              PlayerColorLine(
+                                color: PrototypeColors.surface,
+                                name: game.white,
+                                border: true,
+                              ),
+                              const SizedBox(height: 6),
+                              PlayerColorLine(
+                                color: const Color(0xff232a36),
+                                name: game.black,
+                              ),
+                            ],
+                          ),
+                        ),
+                        PrototypeOutlineButton(
+                          label: 'Watch',
+                          onTap: () => openPrototypeRoute(
+                            context,
+                            const AnalysisBoardScreen(mode: 'live'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class PlayerColorLine extends StatelessWidget {
+  const PlayerColorLine({
+    required this.color,
+    required this.name,
+    this.border = false,
+    super.key,
+  });
+
+  final Color color;
+  final String name;
+  final bool border;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 11,
+          height: 11,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+            border: border ? Border.all(color: const Color(0x6621304e)) : null,
+          ),
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TournamentMainTab extends StatelessWidget {
+  const _TournamentMainTab({required this.event});
+
+  final TournamentSeed event;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_mainTabLabel(event) == 'Bracket') {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+        child: Column(
+          children: bracketRounds
+              .map(
+                (round) => PrototypeCard(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        round.label,
+                        style: const TextStyle(
+                          color: PrototypeColors.burgundy,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 9),
+                      ...round.games.map(
+                        (game) => MatchLine(
+                          white: game.white,
+                          black: game.black,
+                          result: game.result,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: PrototypeCard(
+        margin: EdgeInsets.zero,
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: clubPlayers.take(event.players.clamp(4, 10).toInt()).map((
+            player,
+          ) {
+            final points = (10 - player.rank) / 2;
+            return StandingRow(
+              rank: player.rank,
+              name: player.name,
+              rating: player.rating,
+              points: points < 0 ? '0' : points.toStringAsFixed(1),
+              record: '${player.rank + 1}-${player.rank % 2}-${player.rank}',
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class StandingRow extends StatelessWidget {
+  const StandingRow({
+    required this.rank,
+    required this.name,
+    required this.rating,
+    required this.points,
+    required this.record,
+    super.key,
+  });
+
+  final int rank;
+  final String name;
+  final int rating;
+  final String points;
+  final String record;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0x1421304e))),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '$rank',
+            style: const TextStyle(
+              color: Color(0xff79622a),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(
+                  '$rating · $record',
+                  style: const TextStyle(
+                    color: Color(0x8c21304e),
+                    fontSize: 11.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            points,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              color: PrototypeColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TournamentRoundsTab extends StatelessWidget {
+  const _TournamentRoundsTab({required this.event});
+
+  final TournamentSeed event;
+
+  @override
+  Widget build(BuildContext context) {
+    final rounds = event.status == 'upcoming' ? <RoundSeed>[] : sampleRounds;
+    if (rounds.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+        child: TournamentEmptyPanel(
+          title: 'No pairings yet',
+          subtitle: 'Pairings will be published when Round 1 starts.',
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: Column(
+        children: rounds
+            .map(
+              (round) => PrototypeCard(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      round.label,
+                      style: const TextStyle(
+                        color: PrototypeColors.burgundy,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    ...round.games.map(
+                      (game) => MatchLine(
+                        white: game.white,
+                        black: game.black,
+                        result: game.result,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _TournamentPlayersTab extends StatelessWidget {
+  const _TournamentPlayersTab({required this.event});
+
+  final TournamentSeed event;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = event.players == 0 ? 8 : event.players.clamp(4, 16).toInt();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: PrototypeCard(
+        margin: EdgeInsets.zero,
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: clubPlayers
+              .take(shown)
+              .map(
+                (player) => LeaderboardRow(
+                  rank: player.rank,
+                  name: player.name,
+                  username: player.username,
+                  rating: player.rating,
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class MatchLine extends StatelessWidget {
+  const MatchLine({
+    required this.white,
+    required this.black,
+    required this.result,
+    super.key,
+  });
+
+  final String white;
+  final String black;
+  final String result;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        children: [
+          Expanded(
+            child: PlayerColorLine(
+              color: PrototypeColors.surface,
+              name: white,
+              border: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            result,
+            style: const TextStyle(
+              color: PrototypeColors.navy,
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: PlayerColorLine(color: const Color(0xff232a36), name: black),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TournamentEmptyPanel extends StatelessWidget {
+  const TournamentEmptyPanel({
+    required this.title,
+    required this.subtitle,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeCard(
+      margin: EdgeInsets.zero,
+      child: Column(
+        children: [
+          const Text(
+            '♙',
+            style: TextStyle(color: PrototypeColors.burgundy, fontSize: 24),
+          ),
+          const SizedBox(height: 8),
+          SerifText(title, size: 17, weight: FontWeight.w700),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0x9921304e), fontSize: 12.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _mainTabLabel(TournamentSeed event) {
+  final lower = event.format.toLowerCase();
+  if (lower.contains('knockout') || lower.contains('elimination')) {
+    return 'Bracket';
+  }
+  if (lower.contains('arena')) return 'Leaderboard';
+  if (lower.contains('team')) return 'Teams';
+  if (lower.contains('stage')) return 'Stages';
+  return 'Standings';
+}
+
+String _mainTabKey(TournamentSeed event) => 'main';
+
+String _roundsTabLabel(TournamentSeed event) {
+  final lower = event.format.toLowerCase();
+  if (lower.contains('knockout') || lower.contains('elimination')) {
+    return 'Matches';
+  }
+  if (lower.contains('arena')) return 'Games';
+  return 'Rounds';
 }
 
 class TournamentInfoTile extends StatelessWidget {
@@ -1904,20 +2742,22 @@ class GamesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AppScroll(
+    return AppScroll(
       children: [
-        PrototypeHeader(title: 'Games'),
-        SizedBox(height: 16),
+        const PrototypeHeader(title: 'Games'),
+        const SizedBox(height: 16),
         BigActionCard(
           title: 'Game Review',
           subtitle: 'Review recent tournament games',
           icon: '♞',
           filled: true,
+          onTap: () => openPrototypeRoute(context, const GameReviewScreen()),
         ),
         BigActionCard(
           title: 'New Analysis',
           subtitle: 'Set up a board and record lines',
           icon: '♝',
+          onTap: () => openPrototypeRoute(context, const NewAnalysisScreen()),
         ),
       ],
     );
@@ -1929,19 +2769,27 @@ class ToolsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AppScroll(
+    return AppScroll(
       children: [
-        PrototypeHeader(title: 'Tools'),
-        SizedBox(height: 16),
+        const PrototypeHeader(title: 'Tools'),
+        const SizedBox(height: 16),
         ToolTile(
           title: 'Chess Clock',
           subtitle: 'Run over-the-board time controls',
           icon: '5:00',
+          onTap: () => openPrototypeRoute(context, const ChessClockScreen()),
+        ),
+        ToolTile(
+          title: 'Analysis Board',
+          subtitle: 'Set up any position and save lines',
+          icon: '♟',
+          onTap: () => openPrototypeRoute(context, const AnalysisBoardScreen()),
         ),
         ToolTile(
           title: 'Saved Analyses',
           subtitle: 'Open lines saved to your profile',
           icon: '♜',
+          onTap: () => openPrototypeRoute(context, const SavedAnalysesScreen()),
         ),
       ],
     );
@@ -2031,6 +2879,7 @@ class BigActionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
+    required this.onTap,
     this.filled = false,
     super.key,
   });
@@ -2038,62 +2887,71 @@ class BigActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String icon;
+  final VoidCallback onTap;
   final bool filled;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-        decoration: BoxDecoration(
-          color: filled ? PrototypeColors.burgundy : PrototypeColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: filled ? PrototypeColors.burgundy : PrototypeColors.navy,
-            width: filled ? 0 : 1.5,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+          decoration: BoxDecoration(
+            color: filled ? PrototypeColors.burgundy : PrototypeColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: filled ? PrototypeColors.burgundy : PrototypeColors.navy,
+              width: filled ? 0 : 1.5,
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Text(
-              icon,
-              style: TextStyle(
-                color: filled
-                    ? PrototypeColors.cream
-                    : PrototypeColors.burgundy,
-                fontSize: 24,
+          child: Row(
+            children: [
+              Text(
+                icon,
+                style: TextStyle(
+                  color: filled
+                      ? PrototypeColors.cream
+                      : PrototypeColors.burgundy,
+                  fontSize: 24,
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: filled
-                          ? PrototypeColors.cream
-                          : PrototypeColors.navy,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: filled
+                            ? PrototypeColors.cream
+                            : PrototypeColors.navy,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: filled
-                          ? const Color(0xccf7f1e3)
-                          : const Color(0x9921304e),
-                      fontSize: 12,
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: filled
+                            ? const Color(0xccf7f1e3)
+                            : const Color(0x9921304e),
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              Icon(
+                Icons.chevron_right,
+                color: filled ? PrototypeColors.cream : PrototypeColors.navy,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2105,67 +2963,1040 @@ class ToolTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
+    required this.onTap,
     super.key,
   });
 
   final String title;
   final String subtitle;
   final String icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: cardDecoration(radius: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0x147d2434),
-                border: Border.all(color: const Color(0x337d2434)),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Center(
-                child: Text(
-                  icon,
-                  style: const TextStyle(
-                    color: PrototypeColors.burgundy,
-                    fontWeight: FontWeight.w800,
-                  ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: cardDecoration(radius: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0x147d2434),
+                  border: Border.all(color: const Color(0x337d2434)),
+                  borderRadius: BorderRadius.circular(11),
                 ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
+                child: Center(
+                  child: Text(
+                    icon,
                     style: const TextStyle(
-                      color: PrototypeColors.navy,
-                      fontSize: 15,
+                      color: PrototypeColors.burgundy,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Color(0x9921304e),
-                      fontSize: 12,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: PrototypeColors.navy,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0x9921304e),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Color(0x6621304e)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PrototypeRouteScaffold extends StatelessWidget {
+  const PrototypeRouteScaffold({
+    required this.title,
+    required this.children,
+    this.trailing,
+    super.key,
+  });
+
+  final String title;
+  final List<Widget> children;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: PrototypeColors.screen,
+      body: AppScroll(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: const BoxDecoration(
+              color: PrototypeColors.header,
+              border: Border(bottom: BorderSide(color: Color(0x1f21304e))),
+            ),
+            child: Row(
+              children: [
+                SquareIconButton(
+                  icon: Icons.chevron_left,
+                  onTap: () => Navigator.of(context).pop(),
+                  tooltip: 'Back',
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SerifText(title, size: 18, weight: FontWeight.w700),
+                ),
+                ?trailing,
+              ],
+            ),
+          ),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class SquareIconButton extends StatelessWidget {
+  const SquareIconButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+    super.key,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      tooltip: tooltip,
+      icon: Icon(icon, size: 21),
+      style: IconButton.styleFrom(
+        backgroundColor: PrototypeColors.surface,
+        foregroundColor: PrototypeColors.navy,
+        fixedSize: const Size(40, 40),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0x2e21304e)),
+        ),
+      ),
+    );
+  }
+}
+
+class LeaderboardScreen extends StatelessWidget {
+  const LeaderboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeRouteScaffold(
+      title: 'Leaderboard',
+      children: [
+        const SizedBox(height: 14),
+        PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: clubPlayers
+                .map(
+                  (player) => LeaderboardRow(
+                    rank: player.rank,
+                    name: player.name,
+                    username: player.username,
+                    rating: player.rating,
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class LeaderboardRow extends StatelessWidget {
+  const LeaderboardRow({
+    required this.rank,
+    required this.name,
+    required this.username,
+    required this.rating,
+    super.key,
+  });
+
+  final int rank;
+  final String name;
+  final String username;
+  final int rating;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0x1421304e))),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 13,
+            backgroundColor: const Color(0x24a98a3f),
+            child: Text(
+              '$rank',
+              style: const TextStyle(
+                color: Color(0xff79622a),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '@$username',
+                  style: const TextStyle(
+                    color: Color(0x8c21304e),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '$rating',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              color: PrototypeColors.navy,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class GameReviewScreen extends StatelessWidget {
+  const GameReviewScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeRouteScaffold(
+      title: 'Game Review',
+      children: [
+        const SizedBox(height: 14),
+        PrototypeOptionTile(
+          title: 'Chess.com games',
+          subtitle: 'Import from your linked account',
+          icon: '♘',
+          onTap: () => openPrototypeRoute(
+            context,
+            const PickGameScreen(title: 'Chess.com games'),
+          ),
+        ),
+        PrototypeOptionTile(
+          title: 'Lichess games',
+          subtitle: 'Import from your linked account',
+          icon: '♞',
+          onTap: () => openPrototypeRoute(
+            context,
+            const PickGameScreen(title: 'Lichess games'),
+          ),
+        ),
+        PrototypeOptionTile(
+          title: 'Tournament games',
+          subtitle: 'Your club tournament history',
+          icon: '♜',
+          onTap: () => openPrototypeRoute(
+            context,
+            const PickGameScreen(title: 'Tournament games'),
+          ),
+        ),
+        PrototypeOptionTile(
+          title: 'Upload / import PGN file',
+          subtitle: 'Review a game from a PGN',
+          icon: 'PGN',
+          onTap: () => openPrototypeRoute(
+            context,
+            const AnalysisBoardScreen(mode: 'review'),
+          ),
+        ),
+        PrototypeOptionTile(
+          title: 'Upload / import FEN file',
+          subtitle: 'Review from a position',
+          icon: 'FEN',
+          onTap: () => openPrototypeRoute(
+            context,
+            const AnalysisBoardScreen(mode: 'review'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class NewAnalysisScreen extends StatelessWidget {
+  const NewAnalysisScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeRouteScaffold(
+      title: 'New Analysis',
+      children: [
+        const SizedBox(height: 14),
+        PrototypeOptionTile(
+          title: 'Start from empty board',
+          subtitle: 'Set up any position',
+          icon: '♙',
+          onTap: () => openPrototypeRoute(
+            context,
+            const AnalysisBoardScreen(mode: 'empty'),
+          ),
+        ),
+        PrototypeOptionTile(
+          title: 'PGN file',
+          subtitle: 'Analyze an imported game',
+          icon: 'PGN',
+          onTap: () => openPrototypeRoute(context, const AnalysisBoardScreen()),
+        ),
+        PrototypeOptionTile(
+          title: 'FEN',
+          subtitle: 'Analyze from a position string',
+          icon: 'FEN',
+          onTap: () => openPrototypeRoute(context, const AnalysisBoardScreen()),
+        ),
+        PrototypeOptionTile(
+          title: 'Tournament game history',
+          subtitle: 'Pick from your club games',
+          icon: '♜',
+          onTap: () => openPrototypeRoute(
+            context,
+            const PickGameScreen(title: 'Tournament games'),
+          ),
+        ),
+        PrototypeOptionTile(
+          title: 'Chess.com games',
+          subtitle: 'Pick from your linked account',
+          icon: '♘',
+          onTap: () => openPrototypeRoute(
+            context,
+            const PickGameScreen(title: 'Chess.com games'),
+          ),
+        ),
+        PrototypeOptionTile(
+          title: 'Lichess games',
+          subtitle: 'Pick from your linked account',
+          icon: '♞',
+          onTap: () => openPrototypeRoute(
+            context,
+            const PickGameScreen(title: 'Lichess games'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class PickGameScreen extends StatelessWidget {
+  const PickGameScreen({required this.title, super.key});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeRouteScaffold(
+      title: title,
+      children: [
+        const SizedBox(height: 14),
+        ...sampleGames.map(
+          (game) => PrototypeOptionTile(
+            title: game.title,
+            subtitle: game.subtitle,
+            icon: game.result,
+            onTap: () =>
+                openPrototypeRoute(context, const AnalysisBoardScreen()),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class AnalysisBoardScreen extends StatefulWidget {
+  const AnalysisBoardScreen({this.mode = 'analysis', super.key});
+
+  final String mode;
+
+  @override
+  State<AnalysisBoardScreen> createState() => _AnalysisBoardScreenState();
+}
+
+class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
+  bool flipped = false;
+  final moves = <String>['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4'];
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeRouteScaffold(
+      title: 'Analysis Board',
+      trailing: SquareIconButton(
+        icon: Icons.flip,
+        tooltip: 'Flip board',
+        onTap: () => setState(() => flipped = !flipped),
+      ),
+      children: [
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: PrototypeChessBoard(flipped: flipped),
+        ),
+        const SizedBox(height: 12),
+        PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: PrototypeColors.cream,
+                      shape: BoxShape.circle,
+                      border: Border.fromBorderSide(
+                        BorderSide(color: Color(0x6621304e)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'White to move',
+                    style: TextStyle(
+                      color: Color(0xcc21304e),
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
-            ),
-            const Icon(Icons.chevron_right, color: Color(0x6621304e)),
-          ],
+              const SizedBox(height: 12),
+              Text(
+                moves
+                    .asMap()
+                    .entries
+                    .map((entry) {
+                      final index = entry.key;
+                      final move = entry.value;
+                      return index.isEven ? '${(index ~/ 2) + 1}. $move' : move;
+                    })
+                    .join('  '),
+                style: const TextStyle(
+                  color: PrototypeColors.navy,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
         ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: PrototypeOutlineButton(
+                  label: 'Undo',
+                  onTap: () {
+                    if (moves.isEmpty) return;
+                    setState(() => moves.removeLast());
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: PrototypeOutlineButton(
+                  label: 'Reset',
+                  onTap: () => setState(() {
+                    moves
+                      ..clear()
+                      ..addAll(['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4']);
+                  }),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: PrototypeButton(
+                  label: 'Save Analysis',
+                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Analysis saved.')),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Guest mode - sign in to keep saved analyses',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0x8021304e), fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class PrototypeChessBoard extends StatelessWidget {
+  const PrototypeChessBoard({required this.flipped, super.key});
+
+  final bool flipped;
+
+  @override
+  Widget build(BuildContext context) {
+    const pieces = [
+      '♜',
+      '♞',
+      '♝',
+      '♛',
+      '♚',
+      '♝',
+      '♞',
+      '♜',
+      '♟',
+      '♟',
+      '♟',
+      '♟',
+      '♟',
+      '♟',
+      '♟',
+      '♟',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '♙',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '♘',
+      '',
+      '',
+      '♙',
+      '♙',
+      '♙',
+      '',
+      '',
+      '♙',
+      '♙',
+      '♙',
+      '♖',
+      '♘',
+      '♗',
+      '♕',
+      '♔',
+      '♗',
+      '',
+      '♖',
+    ];
+
+    final squares = flipped ? pieces.reversed.toList() : pieces;
+
+    return AspectRatio(
+      aspectRatio: 1,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 8,
+          ),
+          itemCount: 64,
+          itemBuilder: (context, index) {
+            final row = index ~/ 8;
+            final col = index % 8;
+            final dark = (row + col).isOdd;
+            final piece = squares[index];
+            return Container(
+              color: dark ? const Color(0xff9a7b53) : const Color(0xffecdcbb),
+              alignment: Alignment.center,
+              child: Text(
+                piece,
+                style: TextStyle(
+                  fontSize: 28,
+                  color: '♙♖♘♗♕♔'.contains(piece)
+                      ? const Color(0xfff8f1e0)
+                      : const Color(0xff1f252e),
+                  shadows: const [
+                    Shadow(color: Color(0x66000000), offset: Offset(0, 1)),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class ChessClockScreen extends StatefulWidget {
+  const ChessClockScreen({super.key});
+
+  @override
+  State<ChessClockScreen> createState() => _ChessClockScreenState();
+}
+
+class _ChessClockScreenState extends State<ChessClockScreen> {
+  static const presets = [
+    ('3+2', 180, 2),
+    ('5+0', 300, 0),
+    ('10+5', 600, 5),
+    ('15+10', 900, 10),
+  ];
+
+  String preset = '5+0';
+  int white = 300;
+  int black = 300;
+  int increment = 0;
+  String turn = 'white';
+  bool running = false;
+  Timer? timer;
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  void toggleRun() {
+    setState(() => running = !running);
+    timer?.cancel();
+    if (!running) return;
+    timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        if (turn == 'white' && white > 0) white--;
+        if (turn == 'black' && black > 0) black--;
+        if (white == 0 || black == 0) {
+          running = false;
+          timer?.cancel();
+        }
+      });
+    });
+  }
+
+  void tapSide(String side) {
+    if (!running) {
+      toggleRun();
+      return;
+    }
+    setState(() {
+      if (side == 'white' && turn == 'white') {
+        white += increment;
+        turn = 'black';
+      } else if (side == 'black' && turn == 'black') {
+        black += increment;
+        turn = 'white';
+      }
+    });
+  }
+
+  void applyPreset((String, int, int) value) {
+    timer?.cancel();
+    setState(() {
+      preset = value.$1;
+      white = value.$2;
+      black = value.$2;
+      increment = value.$3;
+      running = false;
+      turn = 'white';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeRouteScaffold(
+      title: 'Chess Clock',
+      children: [
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SegmentedPills(
+            labels: presets.map((item) => item.$1).toList(),
+            selected: preset,
+            onSelected: (label) =>
+                applyPreset(presets.firstWhere((item) => item.$1 == label)),
+          ),
+        ),
+        const SizedBox(height: 14),
+        ClockPanel(
+          label: 'Black',
+          time: _clock(black),
+          active: running && turn == 'black',
+          onTap: () => tapSide('black'),
+        ),
+        ClockPanel(
+          label: 'White',
+          time: _clock(white),
+          active: running && turn == 'white',
+          onTap: () => tapSide('white'),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: PrototypeOutlineButton(
+                  label: 'Reset',
+                  onTap: () =>
+                      applyPreset(presets.firstWhere((p) => p.$1 == preset)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: PrototypeButton(
+                  label: running ? 'Pause' : 'Resume',
+                  onTap: toggleRun,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _clock(int seconds) {
+    final minutes = seconds ~/ 60;
+    final rest = seconds % 60;
+    return '$minutes:${rest.toString().padLeft(2, '0')}';
+  }
+}
+
+class ClockPanel extends StatelessWidget {
+  const ClockPanel({
+    required this.label,
+    required this.time,
+    required this.active,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final String time;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          height: 170,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: active ? PrototypeColors.navy : PrototypeColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: active ? PrototypeColors.navy : const Color(0x3821304e),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: active ? PrototypeColors.cream : PrototypeColors.navy,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                time,
+                style: TextStyle(
+                  color: active ? PrototypeColors.cream : PrototypeColors.navy,
+                  fontFamily: 'monospace',
+                  fontSize: 52,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                active ? 'Running...' : 'Tap to start opponent',
+                style: TextStyle(
+                  color: active
+                      ? const Color(0xccf7f1e3)
+                      : const Color(0x9921304e),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SavedAnalysesScreen extends StatelessWidget {
+  const SavedAnalysesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final signedIn = context.watch<AppState>().signedIn;
+
+    return PrototypeRouteScaffold(
+      title: 'Saved Analyses',
+      children: [
+        const SizedBox(height: 14),
+        if (!signedIn)
+          PrototypeCard(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.lock_outline,
+                  color: PrototypeColors.burgundy,
+                  size: 26,
+                ),
+                const SizedBox(height: 8),
+                const SerifText(
+                  'No saved analyses',
+                  size: 17,
+                  weight: FontWeight.w700,
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Sign in to keep analyses across sessions.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0x9921304e), fontSize: 12.5),
+                ),
+                const SizedBox(height: 14),
+                PrototypeButton(
+                  label: 'Sign in',
+                  onTap: () => showAuthSheet(context),
+                ),
+              ],
+            ),
+          )
+        else
+          ...savedAnalyses.map(
+            (item) => PrototypeOptionTile(
+              title: item.title,
+              subtitle: item.subtitle,
+              icon: '♜',
+              onTap: () =>
+                  openPrototypeRoute(context, const AnalysisBoardScreen()),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class PrototypeOptionTile extends StatelessWidget {
+  const PrototypeOptionTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+  final String icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: cardDecoration(radius: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0x147d2434),
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(color: const Color(0x337d2434)),
+                ),
+                child: Text(
+                  icon,
+                  style: const TextStyle(
+                    color: PrototypeColors.burgundy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: PrototypeColors.navy,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0x9921304e),
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: PrototypeColors.burgundy),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PrototypeOutlineButton extends StatelessWidget {
+  const PrototypeOutlineButton({
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: PrototypeColors.navy,
+        side: const BorderSide(color: PrototypeColors.navy, width: 1.5),
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+        textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+      ),
+      child: Text(label),
+    );
+  }
+}
+
+class SegmentedPills extends StatelessWidget {
+  const SegmentedPills({
+    required this.labels,
+    required this.selected,
+    required this.onSelected,
+    super.key,
+  });
+
+  final List<String> labels;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0x1021304e),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0x2021304e)),
+      ),
+      child: Row(
+        children: labels
+            .map(
+              (label) => Expanded(
+                child: GestureDetector(
+                  onTap: () => onSelected(label),
+                  child: TabPill(label, selected: selected == label),
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -2180,7 +4011,8 @@ class LeaderboardPreview extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: EdgeInsets.zero,
       child: Column(
-        children: players
+        children: clubPlayers
+            .take(4)
             .map(
               (player) => Container(
                 padding: const EdgeInsets.symmetric(
@@ -2206,9 +4038,22 @@ class LeaderboardPreview extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        player.name,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            player.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '@${player.username}',
+                            style: const TextStyle(
+                              color: Color(0x8c21304e),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Text(
@@ -2296,12 +4141,14 @@ class SectionHeading extends StatelessWidget {
   const SectionHeading({
     required this.title,
     this.action,
+    this.onAction,
     this.margin = EdgeInsets.zero,
     super.key,
   });
 
   final String title;
   final String? action;
+  final VoidCallback? onAction;
   final EdgeInsets margin;
 
   @override
@@ -2313,18 +4160,26 @@ class SectionHeading extends StatelessWidget {
           SerifText(title, size: 16, weight: FontWeight.w700),
           const Spacer(),
           if (action != null)
-            Text(
-              action!,
-              style: const TextStyle(
-                color: PrototypeColors.burgundy,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(
+                foregroundColor: PrototypeColors.burgundy,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                textStyle: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
+              child: Text(action!),
             ),
         ],
       ),
     );
   }
+}
+
+void openPrototypeRoute(BuildContext context, Widget screen) {
+  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
 }
 
 class PrototypeCard extends StatelessWidget {
@@ -3057,7 +4912,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
 
   void _showSocialUnavailable() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Social sign-in is not configured yet.')),
+      const SnackBar(content: Text('Social sign-in will be available soon.')),
     );
   }
 
@@ -3605,6 +5460,7 @@ int passwordScore(String value) {
 
 class TournamentSeed {
   const TournamentSeed({
+    required this.rowId,
     required this.id,
     required this.name,
     required this.meta,
@@ -3622,6 +5478,7 @@ class TournamentSeed {
     this.status = 'active',
   });
 
+  final String rowId;
   final String id;
   final String name;
   final String meta;
@@ -3653,16 +5510,107 @@ class TournamentSeed {
 }
 
 class PlayerSeed {
-  const PlayerSeed(this.rank, this.name, this.rating);
+  const PlayerSeed(this.rank, this.name, this.rating, this.username);
 
   final int rank;
   final String name;
   final int rating;
+  final String username;
 }
 
-const players = [
-  PlayerSeed(1, 'Ibrahim Ahmad', 1810),
-  PlayerSeed(2, 'Omar Saleh', 1740),
-  PlayerSeed(3, 'Leen Haddad', 1685),
-  PlayerSeed(4, 'Yazan Khaled', 1602),
+class GameSeed {
+  const GameSeed(this.title, this.subtitle, this.result);
+
+  final String title;
+  final String subtitle;
+  final String result;
+}
+
+class LiveBoardSeed {
+  const LiveBoardSeed(this.board, this.white, this.black, this.note);
+
+  final int board;
+  final String white;
+  final String black;
+  final String note;
+}
+
+class RoundSeed {
+  const RoundSeed(this.label, this.games);
+
+  final String label;
+  final List<MatchSeed> games;
+}
+
+class MatchSeed {
+  const MatchSeed(this.white, this.black, this.result);
+
+  final String white;
+  final String black;
+  final String result;
+}
+
+class SavedAnalysisSeed {
+  const SavedAnalysisSeed(this.title, this.subtitle);
+
+  final String title;
+  final String subtitle;
+}
+
+const clubPlayers = [
+  PlayerSeed(1, 'Ibrahim Ahmad', 1810, 'ibrahim_ahmad'),
+  PlayerSeed(2, 'Omar Saleh', 1740, 'omarsaleh'),
+  PlayerSeed(3, 'Leen Haddad', 1685, 'leen_haddad'),
+  PlayerSeed(4, 'Yazan Khaled', 1602, 'yazan_k'),
+  PlayerSeed(5, 'Rania Odeh', 1578, 'rania_odeh'),
+  PlayerSeed(6, 'Mira Nasser', 1535, 'mira_n'),
+  PlayerSeed(7, 'Khaled Mansour', 1498, 'khaledm'),
+  PlayerSeed(8, 'Sara Haddad', 1464, 'sara_h'),
+  PlayerSeed(9, 'Nour Alami', 1432, 'nour_alami'),
+  PlayerSeed(10, 'Tamer Qasem', 1408, 'tamer_q'),
+  PlayerSeed(11, 'Laith Hani', 1384, 'laith_h'),
+  PlayerSeed(12, 'Dina Faris', 1365, 'dina_f'),
+  PlayerSeed(13, 'Hadi Zaid', 1344, 'hadi_zaid'),
+  PlayerSeed(14, 'Salma Nouri', 1328, 'salma_n'),
+  PlayerSeed(15, 'Adam Kareem', 1305, 'adam_k'),
+  PlayerSeed(16, 'Jana Taha', 1288, 'jana_t'),
+];
+
+const sampleGames = [
+  GameSeed('Ibrahim Ahmad vs Rania Odeh', 'Blitz 3+2 · Jun 29', '1-0'),
+  GameSeed('Omar Saleh vs Ibrahim Ahmad', 'Rapid 10+0 · Jun 27', '1/2'),
+  GameSeed('Ibrahim Ahmad vs Yazan Khaled', 'Blitz 5+0 · Jun 25', '1-0'),
+  GameSeed('Leen Haddad vs Ibrahim Ahmad', 'Rapid 15+10 · Jun 21', '0-1'),
+];
+
+const liveBoards = [
+  LiveBoardSeed(1, 'Ibrahim Ahmad', 'Rania Odeh', 'Semifinal'),
+  LiveBoardSeed(2, 'Omar Saleh', 'Leen Haddad', 'Semifinal'),
+  LiveBoardSeed(3, 'Yazan Khaled', 'Mira Nasser', 'Round game'),
+];
+
+const sampleRounds = [
+  RoundSeed('Round 4', [
+    MatchSeed('Ibrahim Ahmad', 'Rania Odeh', '1-0'),
+    MatchSeed('Omar Saleh', 'Leen Haddad', 'live'),
+    MatchSeed('Yazan Khaled', 'Mira Nasser', '1/2'),
+  ]),
+  RoundSeed('Round 3', [
+    MatchSeed('Ibrahim Ahmad', 'Omar Saleh', '1/2'),
+    MatchSeed('Rania Odeh', 'Yazan Khaled', '1-0'),
+    MatchSeed('Leen Haddad', 'Mira Nasser', '0-1'),
+  ]),
+];
+
+const bracketRounds = [
+  RoundSeed('Semifinal', [
+    MatchSeed('Ibrahim Ahmad', 'Rania Odeh', 'live'),
+    MatchSeed('Omar Saleh', 'Leen Haddad', 'live'),
+  ]),
+  RoundSeed('Final', [MatchSeed('Winner SF1', 'Winner SF2', '-')]),
+];
+
+const savedAnalyses = [
+  SavedAnalysisSeed("King's Indian prep vs Omar", '32 moves · Jun 25'),
+  SavedAnalysisSeed('Rapid Ch. Round 2 endgame', '18 moves · Jun 28'),
 ];
