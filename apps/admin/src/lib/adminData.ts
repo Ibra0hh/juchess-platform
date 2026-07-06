@@ -148,6 +148,7 @@ const adminFunctionId = import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admi
 
 export async function signInAdmin(email: string, password: string) {
   requireAppwriteReady()
+  await clearCurrentSession()
   await account.createEmailPasswordSession({ email, password })
   const session = await getAdminSession()
   if (!session?.allowed) {
@@ -161,6 +162,10 @@ export async function signInAdmin(email: string, password: string) {
 export async function signOutAdmin() {
   if (!appwriteReady) return
   await account.deleteSession({ sessionId: 'current' })
+}
+
+async function clearCurrentSession() {
+  await signOutAdmin().catch(() => undefined)
 }
 
 export async function getAdminSession(): Promise<AdminSession | null> {

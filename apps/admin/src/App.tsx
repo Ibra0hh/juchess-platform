@@ -61,26 +61,52 @@ function App() {
     setMessage(result.error ? 'Appwrite data is unavailable. Showing prototype tournament data.' : null)
   }
 
-  async function refreshBlocks() {
+  async function refreshBlocks(currentSession = session) {
+    if (!currentSession?.allowed) {
+      setBlocks({ identityBlocks: [], ipBlocks: [] })
+      return
+    }
+
     const result = await loadBlockLists()
     setBlocks(result)
   }
 
-  async function refreshAdminProfiles() {
+  async function refreshAdminProfiles(currentSession = session) {
+    if (currentSession?.profile?.role !== 'superAdmin') {
+      setAdminProfiles({ admins: [] })
+      return
+    }
+
     const result = await loadAdminProfiles()
     setAdminProfiles(result)
+  }
+
+  async function handleSignOut() {
+    await signOutAdmin()
+    setSession(null)
+    setBlocks({ identityBlocks: [], ipBlocks: [] })
+    setAdminProfiles({ admins: [] })
   }
 
   useEffect(() => {
     let alive = true
 
     async function boot() {
-      const [loadedSession, tournamentResult, blockResult, adminProfileResult] = await Promise.all([
+      const [loadedSession, tournamentResult] = await Promise.all([
         getAdminSession(),
         loadAdminTournaments(),
-        loadBlockLists(),
-        loadAdminProfiles(),
       ])
+      const [blockResult, adminProfileResult] = loadedSession?.allowed
+        ? await Promise.all([
+            loadBlockLists(),
+            loadedSession.profile?.role === 'superAdmin'
+              ? loadAdminProfiles()
+              : Promise.resolve({ admins: [] }),
+          ])
+        : [
+            { identityBlocks: [], ipBlocks: [] },
+            { admins: [] },
+          ]
 
       if (!alive) return
       setSession(loadedSession)
@@ -118,8 +144,8 @@ function App() {
           onLogin={(nextSession) => {
             setSession(nextSession)
             void refreshTournaments()
-            void refreshBlocks()
-            void refreshAdminProfiles()
+            void refreshBlocks(nextSession)
+            void refreshAdminProfiles(nextSession)
           }}
         />
       </AdminChrome>
@@ -131,10 +157,7 @@ function App() {
       <AdminChrome>
         <AccessDenied
           session={session}
-          onSignOut={async () => {
-            await signOutAdmin()
-            setSession(null)
-          }}
+          onSignOut={handleSignOut}
         />
       </AdminChrome>
     )
@@ -143,10 +166,7 @@ function App() {
   return (
     <AdminChrome
       session={session}
-      onSignOut={async () => {
-        await signOutAdmin()
-        setSession(null)
-      }}
+      onSignOut={handleSignOut}
     >
       <AdminDashboard
         message={message}
@@ -755,9 +775,8 @@ function BlockManagement({
   })
   const [ipForm, setIpForm] = useState({ ipRange: '', reason: '' })
   const [submitting, setSubmitting] = useState(false)
-  const [message, setMessage] = useState<string | null>(
-    blocks.error ? 'Block lists could not be loaded from Appwrite.' : null,
-  )
+  const [message, setMessage] = useState<string | null>(null)
+  const blockLoadMessage = blocks.error ? 'Block lists could not be loaded from Appwrite.' : null
 
   const actorProfileId = session.profile?.$id
 
@@ -936,6 +955,7 @@ function BlockManagement({
         </form>
       </div>
 
+      {blockLoadMessage ? <div className="admin-inline-note" role="status">{blockLoadMessage}</div> : null}
       {message ? <div className="admin-inline-note" role="status">{message}</div> : null}
 
       <div className="block-lists">
