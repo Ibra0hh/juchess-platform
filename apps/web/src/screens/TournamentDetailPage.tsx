@@ -11,7 +11,7 @@ import SiteHeader from '../components/SiteHeader'
 import { demoTournaments, loadTournaments, members, type Member, type Tournament } from '../lib/juchess'
 import './TournamentDetailPage.css'
 
-type DetailTab = 'home' | 'players' | 'rounds' | 'games' | 'table'
+type DetailTab = 'registration' | 'players' | 'rounds' | 'games' | 'table'
 type GameView = 'grid' | 'list'
 type BracketView = 'winners' | 'losers' | 'final'
 
@@ -164,7 +164,7 @@ const bracketConfigs: Record<string, BracketConfig> = {
 
 function TournamentDetailPage() {
   const { id } = useParams()
-  const [tab, setTab] = useState<DetailTab>('home')
+  const [tab, setTab] = useState<DetailTab>('registration')
   const [gameView, setGameView] = useState<GameView>('grid')
   const [bracketView, setBracketView] = useState<BracketView>('winners')
   const [tournaments, setTournaments] = useState<Tournament[]>([])
@@ -230,19 +230,19 @@ function TournamentDetailPage() {
   const isBracket = isBracketTournament(tournament)
   const tabs: Array<{ key: DetailTab; label: string }> = isBracket
     ? [
-        { key: 'home', label: 'Home' },
+        { key: 'registration', label: 'Registration' },
         { key: 'players', label: 'Players' },
         { key: 'table', label: 'Bracket' },
         { key: 'games', label: 'Games' },
       ]
     : [
-        { key: 'home', label: 'Home' },
+        { key: 'registration', label: 'Registration' },
         { key: 'players', label: 'Players' },
         { key: 'rounds', label: 'Rounds' },
         { key: 'games', label: 'Games' },
         { key: 'table', label: 'Standings' },
       ]
-  const activeTab = tabs.some((item) => item.key === tab) ? tab : 'home'
+  const activeTab = tabs.some((item) => item.key === tab) ? tab : 'registration'
 
   return (
     <div className="detail-screen" data-screen-label="Tournament Detail">
@@ -287,8 +287,8 @@ function TournamentDetailPage() {
           ))}
         </div>
 
-        {activeTab === 'home' ? (
-          <HomeTab tournament={tournament} detail={detail} />
+        {activeTab === 'registration' ? (
+          <RegistrationTab tournament={tournament} detail={detail} />
         ) : null}
 
         {activeTab === 'players' ? (
@@ -316,7 +316,7 @@ function TournamentDetailPage() {
   )
 }
 
-function HomeTab({
+function RegistrationTab({
   tournament,
   detail,
 }: {
