@@ -243,21 +243,26 @@ class AppwriteService {
       queries: [
         Query.equal('tournamentId', tournamentRowId),
         Query.equal('profileId', profileId),
-        Query.limit(1),
+        Query.limit(100),
       ],
       total: false,
       ttl: 0,
     );
 
     if (existing.rows.isNotEmpty) {
-      final row = existing.rows.first;
-      if (row.data['status'] == 'cancelled') {
+      final activeRows = existing.rows.where(
+        (row) => row.data['status'] != 'cancelled',
+      );
+      if (activeRows.isNotEmpty) return;
+
+      for (final row in existing.rows) {
         await tablesDB.updateRow(
           databaseId: AppConfig.databaseId,
           tableId: AppConfig.registrationsTableId,
           rowId: row.$id,
           data: {'status': 'confirmed', 'checkedIn': false},
         );
+        break;
       }
       return;
     }
@@ -274,6 +279,51 @@ class AppwriteService {
         'checkInCode': _checkInCode(),
       },
     );
+  }
+
+  Future<void> cancelTournamentRegistration({
+    required String tournamentRowId,
+    required String profileId,
+  }) async {
+    final existing = await tablesDB.listRows(
+      databaseId: AppConfig.databaseId,
+      tableId: AppConfig.registrationsTableId,
+      queries: [
+        Query.equal('tournamentId', tournamentRowId),
+        Query.equal('profileId', profileId),
+        Query.limit(100),
+      ],
+      total: false,
+      ttl: 0,
+    );
+
+    for (final row in existing.rows) {
+      await tablesDB.updateRow(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.registrationsTableId,
+        rowId: row.$id,
+        data: {'status': 'cancelled', 'checkedIn': false},
+      );
+    }
+  }
+
+  Future<Set<String>> loadRegisteredTournamentIds(String profileId) async {
+    final response = await tablesDB.listRows(
+      databaseId: AppConfig.databaseId,
+      tableId: AppConfig.registrationsTableId,
+      queries: [
+        Query.equal('profileId', profileId),
+        Query.notEqual('status', 'cancelled'),
+        Query.limit(500),
+      ],
+      total: false,
+      ttl: 30,
+    );
+
+    return response.rows
+        .map((row) => row.data['tournamentId']?.toString())
+        .whereType<String>()
+        .toSet();
   }
 
   Future<void> assertAccessAllowed({
@@ -408,6 +458,9 @@ class AppwriteService {
     final currentRound = _asInt(data['currentRound']);
     final capacity = _asInt(data['capacity']);
     final players = counts[row.$id] ?? 0;
+    final displayedPlayers = capacity == null
+        ? players
+        : players.clamp(0, capacity).toInt();
     final location = data['location']?.toString() ?? 'University of Jordan';
     final startsAt = data['startsAt']?.toString();
 
@@ -419,12 +472,14 @@ class AppwriteService {
       chips: [
         roundsTotal == null ? format : '$format · $roundsTotal rounds',
         timeControl,
-        capacity == null ? '$players players' : '$players/$capacity players',
+        capacity == null
+            ? '$displayedPlayers players'
+            : '$displayedPlayers/$capacity players',
       ],
       current: _roundLabel(rawStatus, currentRound, roundsTotal),
       format: format,
       timeControl: timeControl,
-      players: players,
+      players: displayedPlayers,
       capacity: capacity,
       roundsTotal: roundsTotal,
       currentRound: currentRound,
@@ -510,6 +565,10 @@ class AppState extends ChangeNotifier {
         if (displayName != null && displayName.isNotEmpty) {
           userName = displayName;
         }
+        if (profileId != null) {
+          registeredTournamentRowIds = await service
+              .loadRegisteredTournamentIds(profileId!);
+        }
       } else {
         profileId = 'preview-profile';
       }
@@ -533,6 +592,11 @@ class AppState extends ChangeNotifier {
           : user.email;
       userEmail = user.email;
       error = null;
+      if (profileId != null) {
+        registeredTournamentRowIds = await service.loadRegisteredTournamentIds(
+          profileId!,
+        );
+      }
     } catch (caught) {
       if (service.ready) {
         try {
@@ -576,6 +640,11 @@ class AppState extends ChangeNotifier {
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
       profileId = profile['profileId'];
+      if (profileId != null) {
+        registeredTournamentRowIds = await service.loadRegisteredTournamentIds(
+          profileId!,
+        );
+      }
       return true;
     } catch (caught) {
       error = appwriteMessage(caught);
@@ -626,6 +695,11 @@ class AppState extends ChangeNotifier {
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
       profileId = profile['profileId'];
+      if (profileId != null) {
+        registeredTournamentRowIds = await service.loadRegisteredTournamentIds(
+          profileId!,
+        );
+      }
       return true;
     } catch (caught) {
       error = appwriteMessage(caught);
@@ -714,6 +788,49 @@ class AppState extends ChangeNotifier {
         profileId: profileId!,
       );
       registeredTournamentRowIds = {...registeredTournamentRowIds, event.rowId};
+      await loadTournaments();
+      return true;
+    } catch (caught) {
+      error = appwriteMessage(caught);
+      return false;
+    } finally {
+      authLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> cancelTournamentRegistration(TournamentSeed event) async {
+    if (!signedIn) {
+      error = 'Sign in to manage this registration.';
+      notifyListeners();
+      return false;
+    }
+
+    if (_isMemberPreview()) {
+      registeredTournamentRowIds = {...registeredTournamentRowIds}
+        ..remove(event.rowId);
+      error = null;
+      notifyListeners();
+      return true;
+    }
+
+    if (!service.ready || profileId == null) {
+      error = 'Account service is not ready yet.';
+      notifyListeners();
+      return false;
+    }
+
+    authLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      await service.cancelTournamentRegistration(
+        tournamentRowId: event.rowId,
+        profileId: profileId!,
+      );
+      registeredTournamentRowIds = {...registeredTournamentRowIds}
+        ..remove(event.rowId);
       await loadTournaments();
       return true;
     } catch (caught) {
@@ -1850,13 +1967,18 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                         }
                         final appState = context.read<AppState>();
                         final messenger = ScaffoldMessenger.of(context);
-                        final ok = await appState.registerForTournament(event);
+                        final wasRegistered = appState.isRegisteredFor(event);
+                        final ok = wasRegistered
+                            ? await appState.cancelTournamentRegistration(event)
+                            : await appState.registerForTournament(event);
                         if (!mounted) return;
                         messenger.showSnackBar(
                           SnackBar(
                             content: Text(
                               ok
-                                  ? 'Registration saved.'
+                                  ? wasRegistered
+                                        ? 'Registration cancelled.'
+                                        : 'Registration saved.'
                                   : appState.error ??
                                         'Could not register right now.',
                             ),
@@ -1976,142 +2098,6 @@ class _TournamentOverview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (completed)
-            PrototypeCard(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: const Row(
-                children: [
-                  Text(
-                    '♛',
-                    style: TextStyle(color: PrototypeColors.gold, fontSize: 23),
-                  ),
-                  SizedBox(width: 11),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'CHAMPION',
-                          style: TextStyle(
-                            color: Color(0xff79622a),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Ibrahim Ahmad',
-                          style: TextStyle(
-                            color: PrototypeColors.navy,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          PrototypeCard(
-            margin: EdgeInsets.zero,
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                FactRow('Dates', event.meta.split(' · ').first),
-                FactRow('Location', event.location),
-                FactRow('Organizer', 'JU Chess Club'),
-                FactRow('Format', event.format),
-                FactRow('Time control', event.timeControl),
-                FactRow('Players', event.playerLabel),
-                FactRow('Status', event.current),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (registered)
-            PrototypeCard(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0x1f1f8a5b),
-                      border: Border.all(color: const Color(0x661f8a5b)),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text(
-                      "You're registered",
-                      style: TextStyle(
-                        color: Color(0xff1f8a5b),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Show this at check-in - it stays here anytime.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0x9921304e), fontSize: 12.5),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    width: 148,
-                    height: 148,
-                    decoration: BoxDecoration(
-                      color: PrototypeColors.surface,
-                      border: Border.all(color: const Color(0x2421304e)),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.qr_code_2,
-                      color: PrototypeColors.navy,
-                      size: 118,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'CHECK-IN CODE',
-                    style: TextStyle(
-                      color: Color(0x8021304e),
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    _checkInCode().split('').join(' '),
-                    style: const TextStyle(
-                      color: PrototypeColors.navy,
-                      fontFamily: 'monospace',
-                      fontSize: 25,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          if (!registered && !completed)
-            PrototypeCard(
-              margin: EdgeInsets.zero,
-              child: Text(
-                event.description,
-                style: const TextStyle(
-                  color: Color(0xcc21304e),
-                  fontSize: 13,
-                  height: 1.45,
-                ),
-              ),
-            ),
-          const SizedBox(height: 14),
           PrototypeButton(
             label: completed
                 ? 'View final ${_mainTabLabel(event).toLowerCase()}'
@@ -2119,43 +2105,6 @@ class _TournamentOverview extends StatelessWidget {
                 ? 'Cancel registration'
                 : 'Register',
             onTap: completed ? onMain : onRegister,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class FactRow extends StatelessWidget {
-  const FactRow(this.label, this.value, {super.key});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0x1421304e))),
-      ),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: Color(0x9921304e), fontSize: 12.5),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: PrototypeColors.navy,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
           ),
         ],
       ),
