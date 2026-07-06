@@ -673,7 +673,8 @@ button {
 }
 
 .windows-screen.web-preview-layout {
-  width: min(100%, calc(100vw - 440px), 1040px);
+  width: 100%;
+  max-width: 1040px;
   grid-template-columns: 1fr;
 }
 
