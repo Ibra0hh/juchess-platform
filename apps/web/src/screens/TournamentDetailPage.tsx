@@ -11,7 +11,7 @@ import SiteHeader from '../components/SiteHeader'
 import { demoTournaments, loadTournaments, members, type Member, type Tournament } from '../lib/juchess'
 import './TournamentDetailPage.css'
 
-type DetailTab = 'home' | 'games' | 'table'
+type DetailTab = 'home' | 'players' | 'games' | 'table'
 type GameView = 'grid' | 'list'
 type BracketView = 'winners' | 'losers' | 'final'
 
@@ -33,13 +33,6 @@ type GameCard = {
   white: Member
   black: Member
   result: 'LIVE' | '1-0' | '0-1' | '1/2-1/2'
-}
-
-type ScheduleRow = {
-  when: string
-  what: string
-  where: string
-  state: 'done' | 'now' | 'next'
 }
 
 type BracketMatch = {
@@ -255,6 +248,14 @@ function TournamentDetailPage() {
           <button type="button" role="tab" className={tab === 'home' ? 'active' : undefined} onClick={() => setTab('home')}>
             Home
           </button>
+          <button
+            type="button"
+            role="tab"
+            className={tab === 'players' ? 'active' : undefined}
+            onClick={() => setTab('players')}
+          >
+            Players
+          </button>
           <button type="button" role="tab" className={tab === 'games' ? 'active' : undefined} onClick={() => setTab('games')}>
             Games
           </button>
@@ -264,7 +265,11 @@ function TournamentDetailPage() {
         </div>
 
         {tab === 'home' ? (
-          <HomeTab tournament={tournament} detail={detail} setTab={setTab} />
+          <HomeTab tournament={tournament} detail={detail} />
+        ) : null}
+
+        {tab === 'players' ? (
+          <PlayersTab standings={detail.standings} />
         ) : null}
 
         {tab === 'games' ? (
@@ -287,11 +292,9 @@ function TournamentDetailPage() {
 function HomeTab({
   tournament,
   detail,
-  setTab,
 }: {
   tournament: Tournament
   detail: ReturnType<typeof buildDetail>
-  setTab: (tab: DetailTab) => void
 }) {
   const leader = detail.standings[0]
 
@@ -324,40 +327,49 @@ function HomeTab({
           </Link>
         </div>
       </div>
+    </section>
+  )
+}
 
-      <div className="home-section-grid">
-        <section className="detail-panel">
-          <div className="panel-heading">
-            <h2>Live boards</h2>
-            <button type="button" onClick={() => setTab('games')}>
-              Open games
-            </button>
-          </div>
-          <div className="live-board-list">
-            {detail.games.slice(0, 3).map((game) => (
-              <GameMini key={game.id} game={game} />
+function PlayersTab({ standings }: { standings: StandingRow[] }) {
+  return (
+    <section className="detail-tab-panel">
+      <div className="players-panel">
+        <div className="panel-heading">
+          <h2>Players</h2>
+          <span>{standings.length} registered</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Player</th>
+              <th>Rating</th>
+              <th>Pts</th>
+              <th>W / D / L</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {standings.map((row) => (
+              <tr key={row.member.id}>
+                <td>{row.rank}</td>
+                <td>
+                  <strong>{row.member.name}</strong>
+                  <small>{row.member.universityId}</small>
+                </td>
+                <td>{row.member.rating}</td>
+                <td>{row.points}</td>
+                <td>
+                  {row.wins} / {row.draws} / {row.losses}
+                </td>
+                <td>
+                  <span className={`table-status ${row.status.toLowerCase()}`}>{row.status}</span>
+                </td>
+              </tr>
             ))}
-          </div>
-        </section>
-
-        <section className="detail-panel">
-          <div className="panel-heading">
-            <h2>Schedule</h2>
-          </div>
-          <div className="schedule-list">
-            {detail.schedule.map((row) => (
-              <div className={`schedule-row ${row.state}`} key={`${row.when}-${row.what}`}>
-                <span aria-hidden="true" />
-                <div>
-                  <strong>{row.what}</strong>
-                  <small>
-                    {row.when} · {row.where}
-                  </small>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+          </tbody>
+        </table>
       </div>
     </section>
   )
@@ -786,22 +798,6 @@ function OverviewItem({ label, value, tone }: { label: string; value: string; to
   )
 }
 
-function GameMini({ game }: { game: GameCard }) {
-  return (
-    <Link to={`/games?game=${game.id}`} className="game-mini">
-      <BoardPreview />
-      <span>
-        <strong>
-          {game.white.name} vs {game.black.name}
-        </strong>
-        <small>
-          {game.round} · Bd {game.board}
-        </small>
-      </span>
-    </Link>
-  )
-}
-
 function BoardPreview() {
   return (
     <span className="board-preview" aria-hidden="true">
@@ -870,28 +866,12 @@ function buildDetail(tournament: Tournament) {
   return {
     standings,
     games,
-    schedule: buildSchedule(tournament),
   }
 }
 
 function rotationFromId(id: string) {
   const seed = [...id].reduce((total, letter) => total + letter.charCodeAt(0), 0)
   return seed % members.length
-}
-
-function buildSchedule(tournament: Tournament): ScheduleRow[] {
-  if (tournament.status === 'Completed') {
-    return [
-      { when: tournament.date, what: 'Final round', where: tournament.location, state: 'done' },
-      { when: 'Published', what: 'Final standings', where: 'Club archive', state: 'done' },
-    ]
-  }
-
-  return [
-    { when: tournament.date, what: 'Opening stage', where: tournament.location, state: 'done' },
-    { when: 'Now', what: tournament.round, where: tournament.location, state: 'now' },
-    { when: 'Next club session', what: 'Next pairing window', where: tournament.location, state: 'next' },
-  ]
 }
 
 function isBracketTournament(tournament: Tournament) {
