@@ -157,19 +157,6 @@
   box-shadow: 0 24px 60px rgba(22, 33, 59, 0.14);
 }
 
-.home-feature-card::after {
-  content: "";
-  position: absolute;
-  right: 18px;
-  top: 18px;
-  z-index: -1;
-  width: 118px;
-  height: 118px;
-  pointer-events: none;
-  background: var(--home-crest-url) center/contain no-repeat;
-  opacity: 0.055;
-}
-
 .home-feature-card:hover {
   border-color: #a98a3f;
   box-shadow: 0 30px 68px rgba(22, 33, 59, 0.2);

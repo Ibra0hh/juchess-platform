@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, CalendarDays, MapPin, Newspaper, Trophy, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
@@ -6,7 +6,6 @@ import { loadTournaments, type Tournament } from '../lib/juchess'
 import './HomePage.css'
 
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
-const crestBackground = { '--home-crest-url': `url(${crestUrl})` } as CSSProperties
 
 function HomePage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([])
@@ -114,12 +113,12 @@ function FeaturedTournament({
   tournament: Tournament | null
 }) {
   if (loading) {
-    return <div className="home-feature-card skeleton" style={crestBackground} aria-label="Loading featured tournament" />
+    return <div className="home-feature-card skeleton" aria-label="Loading featured tournament" />
   }
 
   if (!tournament) {
     return (
-      <div className="home-feature-card empty-feature" style={crestBackground}>
+      <div className="home-feature-card empty-feature">
         <div className="feature-eyebrow">
           <span>{cloudError ? 'Cloud unavailable' : 'Not published yet'}</span>
           <strong>Featured tournament</strong>
@@ -131,7 +130,7 @@ function FeaturedTournament({
   }
 
   return (
-    <Link to={`/tournament/${tournament.id}`} className="home-feature-card" style={crestBackground}>
+    <Link to={`/tournament/${tournament.id}`} className="home-feature-card">
       <div className="feature-eyebrow">
         <span className={tournament.status === 'Active' ? 'live' : undefined}>
           {tournament.status === 'Active' ? 'Live now' : tournament.status}
