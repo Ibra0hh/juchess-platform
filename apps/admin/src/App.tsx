@@ -689,21 +689,6 @@ function WindowsScreen() {
             </button>
           ))}
         </div>
-        <div className="panel-card window-list section-list">
-          <div className="panel-title">{current.label} · sections</div>
-          {current.sections.map((section) => (
-            <button key={section} type="button">
-              <i />
-              <span><strong>{section}</strong></span>
-              <em>Shown</em>
-              <b>●</b>
-              <b>🔓</b>
-              <b>✎</b>
-              <b>↑</b>
-              <b>↓</b>
-            </button>
-          ))}
-        </div>
       </section>
 
       <section className="device-preview">
@@ -748,6 +733,22 @@ function WindowsScreen() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="panel-card window-list section-list window-sections">
+        <div className="panel-title">{current.label} · sections</div>
+        {current.sections.map((section) => (
+          <button key={section} type="button">
+            <i />
+            <span><strong>{section}</strong></span>
+            <em>Shown</em>
+            <b>●</b>
+            <b>🔓</b>
+            <b>✎</b>
+            <b>↑</b>
+            <b>↓</b>
+          </button>
+        ))}
       </section>
     </div>
   )

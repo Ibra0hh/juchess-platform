@@ -422,7 +422,7 @@ button {
 .dashboard-screen,
 .tournament-screen,
 .players-screen {
-  width: min(100%, 1120px);
+  width: 100%;
 }
 
 .stat-grid {
@@ -665,27 +665,34 @@ button {
 }
 
 .windows-screen {
-  width: min(100%, 660px);
+  width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 390px) 250px;
-  gap: 14px;
+  grid-template-columns: minmax(360px, 0.95fr) minmax(300px, 340px) minmax(300px, 0.72fr);
+  gap: 18px;
   align-items: start;
 }
 
 .windows-screen.web-preview-layout {
   width: 100%;
-  max-width: 1040px;
-  grid-template-columns: 1fr;
+  max-width: none;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.42fr);
 }
 
 .web-preview-layout .window-control {
   grid-row: 2;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.55fr);
+  grid-column: 1;
+  grid-template-columns: minmax(0, 0.58fr) minmax(320px, 0.42fr);
 }
 
 .web-preview-layout .device-preview {
   grid-row: 1;
+  grid-column: 1 / -1;
   position: static;
+}
+
+.web-preview-layout .window-sections {
+  grid-row: 2;
+  grid-column: 2;
 }
 
 .web-preview-layout .window-toolbar,
@@ -697,6 +704,10 @@ button {
   min-width: 0;
   display: grid;
   gap: 14px;
+}
+
+.window-sections {
+  min-width: 0;
 }
 
 .window-toolbar {
@@ -822,10 +833,6 @@ button {
 .window-list b {
   color: #7d2434;
   font-size: 12px;
-}
-
-.section-list .window-list {
-  margin-top: 18px;
 }
 
 .section-list i {
@@ -960,8 +967,8 @@ button {
 }
 
 .mobile-preview-layout .preview-stage {
-  min-height: 550px;
-  padding: 12px;
+  min-height: 640px;
+  padding: 16px;
 }
 
 .web-preview-layout .preview-stage {
@@ -970,7 +977,7 @@ button {
 }
 
 .device-frame {
-  width: 220px;
+  width: 260px;
   flex: none;
   border-radius: 30px;
   background: #21304e;
@@ -979,7 +986,7 @@ button {
 }
 
 .device-frame.tablet {
-  width: min(100%, 240px);
+  width: min(100%, 300px);
   border-radius: 22px;
   padding: 8px;
 }
@@ -994,7 +1001,7 @@ button {
 }
 
 .device-screen {
-  height: 500px;
+  height: 580px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1005,6 +1012,10 @@ button {
 .tablet .device-screen,
 .web .device-screen {
   border-radius: 12px;
+}
+
+.tablet .device-screen {
+  height: 640px;
 }
 
 .web .device-screen {
@@ -1044,14 +1055,14 @@ button {
   width: 390px;
   height: 860px;
   flex: none;
-  transform: scale(0.523);
+  transform: scale(0.626);
   transform-origin: top left;
 }
 
 .device-frame.tablet .live-app-frame {
   width: 760px;
   height: 1600px;
-  transform: scale(0.295);
+  transform: scale(0.374);
 }
 
 .device-frame.web .live-app-frame {
@@ -1519,6 +1530,23 @@ button {
   .stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .mobile-preview-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  }
+
+  .mobile-preview-layout .window-sections {
+    grid-column: 1 / -1;
+  }
+
+  .web-preview-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .web-preview-layout .window-control,
+  .web-preview-layout .window-sections {
+    grid-column: 1;
+  }
 }
 
 @media (max-width: 860px) {
@@ -1583,8 +1611,11 @@ button {
     justify-content: center;
   }
 
-  .device-frame,
-  .device-frame.tablet,
+  .device-frame:not(.web),
+  .device-frame.tablet {
+    width: min(100%, 300px);
+  }
+
   .device-frame.web {
     width: 100%;
     max-width: 420px;
