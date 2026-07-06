@@ -365,6 +365,7 @@ class AppwriteService {
     final startsAt = data['startsAt']?.toString();
 
     return TournamentSeed(
+      id: data['slug']?.toString() ?? row.$id,
       name: name,
       meta: '${_formatDate(startsAt)} · $location',
       chips: [
@@ -373,6 +374,17 @@ class AppwriteService {
         capacity == null ? '$players players' : '$players/$capacity players',
       ],
       current: _roundLabel(rawStatus, currentRound, roundsTotal),
+      format: format,
+      timeControl: timeControl,
+      players: players,
+      capacity: capacity,
+      roundsTotal: roundsTotal,
+      currentRound: currentRound,
+      location: location,
+      description:
+          data['description']?.toString() ??
+          'Tournament details will be published by the club organizers.',
+      startsAt: startsAt,
       status: rawStatus,
     );
   }
@@ -493,7 +505,7 @@ class AppState extends ChangeNotifier {
     }
 
     if (!service.ready) {
-      error = 'Cloud connection is not configured yet.';
+      error = 'Account service is not ready yet.';
       notifyListeners();
       return false;
     }
@@ -534,7 +546,7 @@ class AppState extends ChangeNotifier {
     }
 
     if (!service.ready) {
-      error = 'Cloud connection is not configured yet.';
+      error = 'Account service is not ready yet.';
       notifyListeners();
       return false;
     }
@@ -565,7 +577,7 @@ class AppState extends ChangeNotifier {
 
   Future<bool> sendPasswordRecovery(String email) async {
     if (!service.ready) {
-      error = 'Cloud connection is not configured yet.';
+      error = 'Account service is not ready yet.';
       notifyListeners();
       return false;
     }
@@ -620,7 +632,7 @@ class AppState extends ChangeNotifier {
       error = null;
     } catch (caught) {
       tournamentItems = const [];
-      error = appwriteMessage(caught);
+      error = null;
     } finally {
       dataLoading = false;
       notifyListeners();
@@ -684,14 +696,17 @@ String _displayNameFromEmail(String email) {
 
 String appwriteMessage(Object error) {
   if (error is AppwriteException && error.message != null) {
-    return _cloudMessage(error.message!);
+    return _serviceMessage(error.message!);
   }
 
-  return _cloudMessage(error.toString());
+  return _serviceMessage(error.toString());
 }
 
-String _cloudMessage(String value) {
-  return value.replaceAll(RegExp('appwrite', caseSensitive: false), 'cloud');
+String _serviceMessage(String value) {
+  return value.replaceAll(
+    RegExp('appwrite|cloud', caseSensitive: false),
+    'service',
+  );
 }
 
 String? normalizeJordanPhone(String? value) {
@@ -1096,7 +1111,8 @@ class HomeScreen extends StatelessWidget {
                 )
               : FeaturedTournamentCard(
                   event: featuredTournament,
-                  onTap: () => context.read<AppState>().selectTab(1),
+                  onTap: () =>
+                      openTournamentDetail(context, featuredTournament),
                 ),
         ),
         SectionHeading(
@@ -1147,7 +1163,7 @@ class GuestCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   state.signedIn
-                      ? 'Registrations and analyses will sync with the club cloud'
+                      ? 'Registrations and analyses stay saved to your account'
                       : 'Sign in to register and save analyses',
                   style: const TextStyle(
                     color: Color(0x9921304e),
@@ -1303,7 +1319,7 @@ class EmptyTournamentCard extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           SerifText(
-            ready ? 'No tournament published yet' : 'Cloud connection needed',
+            'No tournament published yet',
             size: 16.2,
             weight: FontWeight.w700,
             height: 1.2,
@@ -1312,7 +1328,7 @@ class EmptyTournamentCard extends StatelessWidget {
           Text(
             ready
                 ? 'Create a tournament in the control center to publish it here.'
-                : 'Tournaments will appear after the club cloud is configured.',
+                : 'Tournaments will appear here after they are published.',
             style: const TextStyle(color: Color(0x9921304e), fontSize: 11.8),
           ),
           const SizedBox(height: 10),
@@ -1398,11 +1414,6 @@ class TournamentsScreen extends StatelessWidget {
       children: [
         const PrototypeHeader(title: 'Tournaments'),
         const TournamentTabs(),
-        if (!state.appwriteReady)
-          const AppNotice(
-            text:
-                'Cloud connection is not configured yet. Tournaments will appear after setup.',
-          ),
         if (state.error != null && state.appwriteReady)
           AppNotice(text: state.error!),
         Padding(
@@ -1418,17 +1429,15 @@ class TournamentsScreen extends StatelessWidget {
                     ),
                   ]
                 : state.visibleTournaments.isEmpty
-                    ? [
-                        TournamentEmptyState(filter: state.tournamentFilter),
-                      ]
-                    : state.visibleTournaments
-                          .map(
-                            (event) => Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
-                              child: TournamentCard(event: event),
-                            ),
-                          )
-                          .toList(),
+                ? [TournamentEmptyState(filter: state.tournamentFilter)]
+                : state.visibleTournaments
+                      .map(
+                        (event) => Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: TournamentCard(event: event),
+                        ),
+                      )
+                      .toList(),
           ),
         ),
       ],
@@ -1494,50 +1503,356 @@ class TournamentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PrototypeCard(
-      margin: EdgeInsets.zero,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => openTournamentDetail(context, event),
+      child: PrototypeCard(
+        margin: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: SerifText(
+                    event.name,
+                    size: 16.5,
+                    weight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+                if (event.status == 'active')
+                  const LivePill(small: true)
+                else
+                  StatusPill(event.status),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              event.meta,
+              style: const TextStyle(color: Color(0x9921304e), fontSize: 12.5),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: event.chips.map((item) => ChipPill(item)).toList(),
+            ),
+            const SizedBox(height: 9),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    event.current,
+                    style: const TextStyle(
+                      color: PrototypeColors.burgundy,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: PrototypeColors.burgundy,
+                  size: 20,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void openTournamentDetail(BuildContext context, TournamentSeed event) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => TournamentDetailScreen(event: event),
+    ),
+  );
+}
+
+class TournamentDetailScreen extends StatelessWidget {
+  const TournamentDetailScreen({required this.event, super.key});
+
+  final TournamentSeed event;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: PrototypeColors.screen,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.arrow_back),
+                        color: PrototypeColors.navy,
+                        tooltip: 'Back',
+                      ),
+                      const SizedBox(width: 4),
+                      const Expanded(
+                        child: SerifText(
+                          'Tournament',
+                          size: 21,
+                          weight: FontWeight.w700,
+                        ),
+                      ),
+                      if (event.status == 'active')
+                        const LivePill(small: true)
+                      else
+                        StatusPill(event.status),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  PrototypeCard(
+                    margin: EdgeInsets.zero,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SerifText(
+                          event.name,
+                          size: 23,
+                          weight: FontWeight.w700,
+                          height: 1.12,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          event.meta,
+                          style: const TextStyle(
+                            color: Color(0x9921304e),
+                            fontSize: 12.8,
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: event.chips
+                              .map((item) => ChipPill(item))
+                              .toList(),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          event.current,
+                          style: const TextStyle(
+                            color: PrototypeColors.burgundy,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    childAspectRatio: 1.42,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    children: [
+                      TournamentInfoTile(
+                        label: 'Format',
+                        value: event.format,
+                        icon: Icons.account_tree_outlined,
+                      ),
+                      TournamentInfoTile(
+                        label: 'Time control',
+                        value: event.timeControl,
+                        icon: Icons.timer_outlined,
+                      ),
+                      TournamentInfoTile(
+                        label: 'Players',
+                        value: event.playerLabel,
+                        icon: Icons.groups_outlined,
+                      ),
+                      TournamentInfoTile(
+                        label: 'Location',
+                        value: event.location,
+                        icon: Icons.place_outlined,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  PrototypeCard(
+                    margin: EdgeInsets.zero,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SerifText(
+                          'Details',
+                          size: 18,
+                          weight: FontWeight.w700,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          event.description,
+                          style: const TextStyle(
+                            color: Color(0xcc21304e),
+                            fontSize: 13,
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  PrototypeCard(
+                    margin: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        TournamentStep(
+                          label: 'Participants',
+                          value: event.playerLabel,
+                          done: event.players > 0,
+                        ),
+                        const TournamentDivider(),
+                        TournamentStep(
+                          label: 'Rounds',
+                          value: event.roundsLabel,
+                          done: event.currentRound != null,
+                        ),
+                        const TournamentDivider(),
+                        TournamentStep(
+                          label: 'Standings',
+                          value: event.status == 'completed'
+                              ? 'Final standings'
+                              : 'Updates during play',
+                          done: event.status != 'upcoming',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  PrototypeButton(
+                    label: event.status == 'upcoming'
+                        ? 'Register'
+                        : event.status == 'completed'
+                        ? 'View standings'
+                        : 'Open live tournament',
+                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${event.name} is open.')),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TournamentInfoTile extends StatelessWidget {
+  const TournamentInfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: cardDecoration(radius: 13),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: SerifText(
-                  event.name,
-                  size: 16.5,
-                  weight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
-              if (event.status == 'active')
-                const LivePill(small: true)
-              else
-                StatusPill(event.status),
-            ],
-          ),
-          const SizedBox(height: 6),
+          Icon(icon, color: PrototypeColors.burgundy, size: 20),
+          const Spacer(),
           Text(
-            event.meta,
-            style: const TextStyle(color: Color(0x9921304e), fontSize: 12.5),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: event.chips.map((item) => ChipPill(item)).toList(),
-          ),
-          const SizedBox(height: 9),
-          Text(
-            event.current,
+            label,
             style: const TextStyle(
-              color: PrototypeColors.burgundy,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
+              color: Color(0x9921304e),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: PrototypeColors.navy,
+              fontSize: 12.4,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class TournamentStep extends StatelessWidget {
+  const TournamentStep({
+    required this.done,
+    required this.label,
+    required this.value,
+    super.key,
+  });
+
+  final bool done;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          done ? Icons.check_circle : Icons.radio_button_unchecked,
+          color: done ? PrototypeColors.burgundy : const Color(0x8021304e),
+          size: 19,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: PrototypeColors.navy,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(color: Color(0x9921304e), fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+class TournamentDivider extends StatelessWidget {
+  const TournamentDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 12),
+      child: Divider(height: 1, color: Color(0x1821304e)),
     );
   }
 }
@@ -1553,8 +1868,8 @@ class TournamentEmptyState extends StatelessWidget {
     final label = filter == 'active'
         ? 'active'
         : filter == 'upcoming'
-            ? 'upcoming'
-            : 'completed';
+        ? 'upcoming'
+        : 'completed';
 
     return PrototypeCard(
       margin: EdgeInsets.zero,
@@ -1569,16 +1884,12 @@ class TournamentEmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          SerifText(
-            ready ? 'No $label tournaments' : 'Cloud connection needed',
-            size: 17,
-            weight: FontWeight.w700,
-          ),
+          SerifText('No $label tournaments', size: 17, weight: FontWeight.w700),
           const SizedBox(height: 4),
           Text(
             ready
                 ? 'Create one in the control center to show it here.'
-                : 'Tournaments will appear here after setup.',
+                : 'Tournaments will appear here after they are published.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: Color(0x9921304e), fontSize: 12),
           ),
@@ -3294,18 +3605,51 @@ int passwordScore(String value) {
 
 class TournamentSeed {
   const TournamentSeed({
+    required this.id,
     required this.name,
     required this.meta,
     required this.chips,
     required this.current,
+    required this.format,
+    required this.timeControl,
+    required this.players,
+    required this.location,
+    required this.description,
+    this.capacity,
+    this.roundsTotal,
+    this.currentRound,
+    this.startsAt,
     this.status = 'active',
   });
 
+  final String id;
   final String name;
   final String meta;
   final List<String> chips;
   final String current;
+  final String format;
+  final String timeControl;
+  final int players;
+  final int? capacity;
+  final int? roundsTotal;
+  final int? currentRound;
+  final String location;
+  final String description;
+  final String? startsAt;
   final String status;
+
+  String get playerLabel {
+    final cap = capacity;
+    return cap == null ? '$players players' : '$players/$cap players';
+  }
+
+  String get roundsLabel {
+    final total = roundsTotal;
+    final current = currentRound;
+    if (current != null && total != null) return 'Round $current of $total';
+    if (total != null) return '$total rounds';
+    return this.current;
+  }
 }
 
 class PlayerSeed {

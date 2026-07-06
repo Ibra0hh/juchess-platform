@@ -7,7 +7,7 @@ void main() {
 
     expect(find.text('JuChess'), findsOneWidget);
     expect(find.text('University of Jordan Chess Club'), findsOneWidget);
-    expect(find.text('Cloud connection needed'), findsOneWidget);
+    expect(find.text('No tournament published yet'), findsOneWidget);
     expect(find.text('Guest Mode'), findsOneWidget);
   });
 }
