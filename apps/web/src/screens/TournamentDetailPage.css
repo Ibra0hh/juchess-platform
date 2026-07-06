@@ -614,6 +614,17 @@
   display: flex;
   align-items: stretch;
   gap: 34px;
+  position: relative;
+}
+
+.bracket-lines {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
 }
 
 .bracket-column {
@@ -668,15 +679,6 @@
 
 .bracket-match.rich.pending {
   background: rgba(255, 252, 244, 0.55);
-}
-
-.bracket-match.rich:not(.last-round)::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -35px;
-  width: 34px;
-  border-top: 1px solid rgba(30, 43, 69, 0.16);
 }
 
 .bracket-live-tag {
