@@ -11,6 +11,7 @@ import { appwriteReady } from '../lib/appwrite'
 import {
   formatAppwriteError,
   getCurrentSession,
+  loadPreviewProfileByEmail,
   signInWithEmail,
   signOutCurrentUser,
   signUpWithEmail,
@@ -48,8 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (previewSession) {
-      setUser(previewSession.user)
-      setProfile(previewSession.profile)
+      const nextSession = await loadAppwritePreviewSession(previewSession)
+      setUser(nextSession.user)
+      setProfile(nextSession.profile)
       setLoading(false)
       setError(null)
       return
@@ -169,6 +171,25 @@ function createPreviewSession(email: string, displayName = displayNameFromEmail(
   } as unknown as AuthProfile
 
   return { user, profile }
+}
+
+async function loadAppwritePreviewSession(fallbackSession: PreviewAuthSession): Promise<PreviewAuthSession> {
+  try {
+    const realProfile = await loadPreviewProfileByEmail(fallbackSession.user.email)
+    if (!realProfile) return fallbackSession
+
+    const user = {
+      ...fallbackSession.user,
+      $id: realProfile.accountId,
+      email: realProfile.email,
+      name: realProfile.displayName,
+    } as unknown as Models.User
+
+    return { user, profile: realProfile }
+  } catch (error) {
+    console.warn('JuChess preview profile could not be loaded from Appwrite.', error)
+    return fallbackSession
+  }
 }
 
 function displayNameFromEmail(email: string) {

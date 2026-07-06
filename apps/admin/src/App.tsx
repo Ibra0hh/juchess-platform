@@ -645,10 +645,9 @@ function WindowsScreen() {
   const [selected, setSelected] = useState<WindowKey>('home')
   const [device, setDevice] = useState<DeviceKey>('ios')
   const [guestMode, setGuestMode] = useState(false)
-  const [previewEmail, setPreviewEmail] = useState(defaultPreviewEmail)
   const current = windowModel.find((item) => item.key === selected) ?? windowModel[0]
-  const previewUrl = buildPreviewUrl(selected, device, guestMode, previewEmail)
-  const previewAccount = guestMode ? 'Guest preview' : previewEmail.trim() || defaultPreviewEmail
+  const previewUrl = buildPreviewUrl(selected, device, guestMode, defaultPreviewEmail)
+  const previewAccount = guestMode ? 'Guest preview' : defaultPreviewEmail
 
   return (
     <div className={`windows-screen ${device === 'web' ? 'web-preview-layout' : 'mobile-preview-layout'}`}>
@@ -660,15 +659,11 @@ function WindowsScreen() {
           <span>0 items hidden from players</span>
           <button type="button">↺ Reset to defaults</button>
         </div>
-        <label className="preview-email-field">
-          <span>Preview member email</span>
-          <input
-            type="email"
-            value={previewEmail}
-            onChange={(event) => setPreviewEmail(event.target.value)}
-            placeholder={defaultPreviewEmail}
-          />
-        </label>
+        <div className="preview-email-field preview-member-card">
+          <span>Preview member</span>
+          <strong>{defaultPreviewEmail}</strong>
+          <small>Used by the live Appwrite preview session</small>
+        </div>
         <div className="panel-card window-list">
           <div className="panel-title">Windows</div>
           {windowModel.map((item) => (
@@ -686,6 +681,21 @@ function WindowsScreen() {
               <em>Visible</em>
               <b>●</b>
               <b>🔓</b>
+            </button>
+          ))}
+        </div>
+        <div className="panel-card window-list section-list">
+          <div className="panel-title">{current.label} · sections</div>
+          {current.sections.map((section) => (
+            <button key={section} type="button">
+              <i />
+              <span><strong>{section}</strong></span>
+              <em>Shown</em>
+              <b>●</b>
+              <b>🔓</b>
+              <b>✎</b>
+              <b>↑</b>
+              <b>↓</b>
             </button>
           ))}
         </div>
@@ -733,22 +743,6 @@ function WindowsScreen() {
             </div>
           </div>
         </div>
-      </section>
-
-      <section className="panel-card window-list section-list window-sections">
-        <div className="panel-title">{current.label} · sections</div>
-        {current.sections.map((section) => (
-          <button key={section} type="button">
-            <i />
-            <span><strong>{section}</strong></span>
-            <em>Shown</em>
-            <b>●</b>
-            <b>🔓</b>
-            <b>✎</b>
-            <b>↑</b>
-            <b>↓</b>
-          </button>
-        ))}
       </section>
     </div>
   )

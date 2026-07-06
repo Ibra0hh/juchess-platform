@@ -155,6 +155,23 @@ export async function loadProfile(accountId: string): Promise<AuthProfile | null
   return response.rows[0] ?? null
 }
 
+export async function loadPreviewProfileByEmail(email: string): Promise<AuthProfile | null> {
+  if (!appwriteReady) return null
+
+  const normalizedEmail = email.trim()
+  if (!normalizedEmail) return null
+
+  const response = await tablesDB.listRows<AuthProfile>({
+    databaseId: appwriteConfig.databaseId,
+    tableId: tableIds.profiles,
+    queries: [Query.equal('email', normalizedEmail), Query.limit(1)],
+    total: false,
+    ttl: 30,
+  })
+
+  return response.rows[0] ?? null
+}
+
 export function formatAppwriteError(error: unknown) {
   if (error instanceof Error && error.message) return error.message
 

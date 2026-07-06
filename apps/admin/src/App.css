@@ -665,17 +665,16 @@ button {
 }
 
 .windows-screen {
-  width: 100%;
+  width: min(100%, 1180px);
   display: grid;
-  grid-template-columns: minmax(360px, 0.95fr) minmax(300px, 340px) minmax(300px, 0.72fr);
-  gap: 18px;
+  grid-template-columns: minmax(440px, 1fr) minmax(360px, 430px);
+  gap: 20px;
   align-items: start;
 }
 
 .windows-screen.web-preview-layout {
-  width: 100%;
-  max-width: none;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.42fr);
+  width: min(100%, 1180px);
+  grid-template-columns: 1fr;
 }
 
 .web-preview-layout .window-control {
@@ -690,11 +689,6 @@ button {
   position: static;
 }
 
-.web-preview-layout .window-sections {
-  grid-row: 2;
-  grid-column: 2;
-}
-
 .web-preview-layout .window-toolbar,
 .web-preview-layout .preview-email-field {
   min-height: 92px;
@@ -704,10 +698,6 @@ button {
   min-width: 0;
   display: grid;
   gap: 14px;
-}
-
-.window-sections {
-  min-width: 0;
 }
 
 .window-toolbar {
@@ -753,21 +743,23 @@ button {
   font-weight: 900;
 }
 
-.preview-email-field input {
-  width: 100%;
+.preview-member-card strong {
+  display: block;
   border: 1.5px solid #e4dac5;
   border-radius: 9px;
   background: #fff;
   color: #14213d;
   padding: 10px 11px;
-  outline: none;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 900;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
-.preview-email-field input:focus {
-  border-color: #7d2434;
-  box-shadow: 0 0 0 3px rgba(125, 36, 52, 0.12);
+.preview-member-card small {
+  color: #8a7e63;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .window-list {
@@ -977,7 +969,7 @@ button {
 }
 
 .device-frame {
-  width: 260px;
+  width: 280px;
   flex: none;
   border-radius: 30px;
   background: #21304e;
@@ -1001,7 +993,7 @@ button {
 }
 
 .device-screen {
-  height: 580px;
+  height: 625px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1055,7 +1047,7 @@ button {
   width: 390px;
   height: 860px;
   flex: none;
-  transform: scale(0.626);
+  transform: scale(0.677);
   transform-origin: top left;
 }
 
@@ -1532,19 +1524,14 @@ button {
   }
 
   .mobile-preview-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
-  }
-
-  .mobile-preview-layout .window-sections {
-    grid-column: 1 / -1;
+    grid-template-columns: minmax(390px, 1fr) minmax(340px, 410px);
   }
 
   .web-preview-layout {
     grid-template-columns: 1fr;
   }
 
-  .web-preview-layout .window-control,
-  .web-preview-layout .window-sections {
+  .web-preview-layout .window-control {
     grid-column: 1;
   }
 }

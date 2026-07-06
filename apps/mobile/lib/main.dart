@@ -82,6 +82,32 @@ class AppwriteService {
     }
   }
 
+  Future<Map<String, String?>> loadProfileIdentityByEmail(String email) async {
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty) return <String, String?>{};
+
+    try {
+      final response = await tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.profilesTableId,
+        queries: [Query.equal('email', normalizedEmail), Query.limit(1)],
+        total: false,
+        ttl: 30,
+      );
+
+      if (response.rows.isEmpty) return <String, String?>{};
+      final data = response.rows.first.data;
+      return {
+        'displayName': data['displayName']?.toString(),
+        'universityId': data['universityId']?.toString(),
+        'phone': data['phone']?.toString(),
+        'status': data['status']?.toString(),
+      };
+    } catch (_) {
+      return <String, String?>{};
+    }
+  }
+
   Future<Map<String, String?>> assertCurrentUserAllowed(
     models.User user,
   ) async {
@@ -358,8 +384,18 @@ class AppState extends ChangeNotifier {
 
   Future<void> loadCurrentUser() async {
     if (_isMemberPreview()) {
+      final previewEmail = _initialPreviewEmail();
       userName = _initialPreviewUserName();
-      userEmail = _initialPreviewEmail();
+      userEmail = previewEmail;
+
+      if (service.ready && previewEmail != null) {
+        final profile = await service.loadProfileIdentityByEmail(previewEmail);
+        final displayName = profile['displayName'];
+        if (displayName != null && displayName.isNotEmpty) {
+          userName = displayName;
+        }
+      }
+
       error = null;
       notifyListeners();
       return;
