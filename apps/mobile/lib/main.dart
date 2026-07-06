@@ -2237,39 +2237,7 @@ class _TournamentMainTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (_mainTabLabel(event) == 'Bracket') {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-        child: Column(
-          children: bracketRounds
-              .map(
-                (round) => PrototypeCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        round.label,
-                        style: const TextStyle(
-                          color: PrototypeColors.burgundy,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 9),
-                      ...round.games.map(
-                        (game) => MatchLine(
-                          white: game.white,
-                          black: game.black,
-                          result: game.result,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-      );
+      return const TournamentBracketView(rounds: bracketRounds);
     }
 
     return Padding(
@@ -2290,6 +2258,292 @@ class _TournamentMainTab extends StatelessWidget {
               record: '${player.rank + 1}-${player.rank % 2}-${player.rank}',
             );
           }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class TournamentBracketView extends StatefulWidget {
+  const TournamentBracketView({required this.rounds, super.key});
+
+  final List<RoundSeed> rounds;
+
+  @override
+  State<TournamentBracketView> createState() => _TournamentBracketViewState();
+}
+
+class _TournamentBracketViewState extends State<TournamentBracketView> {
+  final ScrollController _controller = ScrollController();
+  int _selectedRound = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _focusRound(int index) {
+    setState(() => _selectedRound = index);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_controller.hasClients) return;
+      final max = _controller.position.maxScrollExtent;
+      final target = (index * 186.0).clamp(0.0, max);
+      unawaited(
+        _controller.animateTo(
+          target,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        ),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.hardEdge,
+            child: Row(
+              children: [
+                for (var i = 0; i < widget.rounds.length; i++) ...[
+                  BracketRoundChip(
+                    label: widget.rounds[i].label,
+                    selected: i == _selectedRound,
+                    onPressed: () => _focusRound(i),
+                  ),
+                  if (i != widget.rounds.length - 1) const SizedBox(width: 7),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            controller: _controller,
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.hardEdge,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < widget.rounds.length; i++) ...[
+                  BracketColumn(round: widget.rounds[i]),
+                  if (i != widget.rounds.length - 1) const SizedBox(width: 14),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Scroll sideways to follow the bracket · ✓ marks the winner',
+            style: TextStyle(color: Color(0x8021304e), fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class BracketRoundChip extends StatelessWidget {
+  const BracketRoundChip({
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+        backgroundColor: selected ? PrototypeColors.navy : Colors.transparent,
+        foregroundColor: selected
+            ? PrototypeColors.cream
+            : PrototypeColors.navy,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+          side: const BorderSide(color: Color(0x3821304e)),
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+class BracketColumn extends StatelessWidget {
+  const BracketColumn({required this.round, super.key});
+
+  final RoundSeed round;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 172,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            round.label.toUpperCase(),
+            style: const TextStyle(
+              color: Color(0x8c21304e),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Column(
+            children: [
+              for (var i = 0; i < round.games.length; i++) ...[
+                BracketMatchCard(match: round.games[i]),
+                if (i != round.games.length - 1) const SizedBox(height: 10),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class BracketMatchCard extends StatelessWidget {
+  const BracketMatchCard({required this.match, super.key});
+
+  final MatchSeed match;
+
+  bool get _live => match.result.toLowerCase() == 'live';
+  bool get _whiteWon => match.result == '1-0';
+  bool get _blackWon => match.result == '0-1';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: PrototypeColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0x2e21304e)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          BracketPlayerRow(
+            name: match.white,
+            winner: _whiteWon,
+            faded: _blackWon,
+            bottomBorder: true,
+          ),
+          BracketPlayerRow(
+            name: match.black,
+            winner: _blackWon,
+            faded: _whiteWon,
+            bottomBorder: false,
+          ),
+          if (_live)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: const BoxDecoration(
+                color: Color(0x127d2434),
+                border: Border(top: BorderSide(color: Color(0x337d2434))),
+              ),
+              child: const Row(
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: PrototypeColors.burgundy,
+                      shape: BoxShape.circle,
+                    ),
+                    child: SizedBox(width: 5, height: 5),
+                  ),
+                  SizedBox(width: 5),
+                  Text(
+                    'LIVE',
+                    style: TextStyle(
+                      color: PrototypeColors.burgundy,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class BracketPlayerRow extends StatelessWidget {
+  const BracketPlayerRow({
+    required this.name,
+    required this.winner,
+    required this.faded,
+    required this.bottomBorder,
+    super.key,
+  });
+
+  final String name;
+  final bool winner;
+  final bool faded;
+  final bool bottomBorder;
+
+  bool get _pending => name == 'TBD' || name.startsWith('Winner ');
+
+  @override
+  Widget build(BuildContext context) {
+    final opacity = _pending ? 0.45 : (faded ? 0.42 : 1.0);
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          border: bottomBorder
+              ? const Border(bottom: BorderSide(color: Color(0x1421304e)))
+              : null,
+        ),
+        child: Row(
+          children: [
+            if (winner) ...[
+              const Text(
+                '✓',
+                style: TextStyle(
+                  color: PrototypeColors.gold,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Expanded(
+              child: Text(
+                _pending ? 'TBD' : name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: PrototypeColors.navy,
+                  fontSize: 12.5,
+                  fontWeight: winner ? FontWeight.w800 : FontWeight.w500,
+                  fontStyle: _pending ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -5552,11 +5806,27 @@ const sampleRounds = [
 ];
 
 const bracketRounds = [
+  RoundSeed('Round of 16', [
+    MatchSeed('Ibrahim Ahmad', 'Jana Taha', '1-0'),
+    MatchSeed('Rania Odeh', 'Adam Kareem', '1-0'),
+    MatchSeed('Omar Saleh', 'Salma Nouri', '1-0'),
+    MatchSeed('Leen Haddad', 'Hadi Zaid', '1-0'),
+    MatchSeed('Yazan Khaled', 'Dina Faris', '0-1'),
+    MatchSeed('Mira Nasser', 'Laith Hani', '1-0'),
+    MatchSeed('Khaled Mansour', 'Tamer Qasem', '1-0'),
+    MatchSeed('Sara Haddad', 'Nour Alami', '0-1'),
+  ]),
+  RoundSeed('Quarterfinal', [
+    MatchSeed('Ibrahim Ahmad', 'Rania Odeh', '1-0'),
+    MatchSeed('Omar Saleh', 'Leen Haddad', '1-0'),
+    MatchSeed('Dina Faris', 'Mira Nasser', '0-1'),
+    MatchSeed('Khaled Mansour', 'Nour Alami', '1-0'),
+  ]),
   RoundSeed('Semifinal', [
     MatchSeed('Ibrahim Ahmad', 'Rania Odeh', 'live'),
     MatchSeed('Omar Saleh', 'Leen Haddad', 'live'),
   ]),
-  RoundSeed('Final', [MatchSeed('Winner SF1', 'Winner SF2', '-')]),
+  RoundSeed('Final', [MatchSeed('TBD', 'TBD', '-')]),
 ];
 
 const savedAnalyses = [
