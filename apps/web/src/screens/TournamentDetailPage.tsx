@@ -8,11 +8,12 @@ import {
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { loadTournaments, members, type Member, type Tournament } from '../lib/juchess'
+import { demoTournaments, loadTournaments, members, type Member, type Tournament } from '../lib/juchess'
 import './TournamentDetailPage.css'
 
 type DetailTab = 'home' | 'games' | 'table'
 type GameView = 'grid' | 'list'
+type BracketView = 'winners' | 'losers' | 'final'
 
 type StandingRow = {
   member: Member
@@ -41,12 +42,124 @@ type ScheduleRow = {
   state: 'done' | 'now' | 'next'
 }
 
+type BracketMatch = {
+  a: string
+  b: string
+  sa?: number
+  sb?: number
+  w?: 'a' | 'b'
+  live?: boolean
+}
+
+type BracketDefinition = {
+  rounds: string[]
+  matches: BracketMatch[][]
+}
+
+type BracketConfig =
+  | {
+      type: 'single'
+      title: string
+      bracket: BracketDefinition
+    }
+  | {
+      type: 'double'
+      title: string
+      brackets: Record<BracketView, BracketDefinition>
+    }
+
 const boardPieces = ['♜', '♞', '', '♛', '', '♜', '♚', '', '♟', '♟', '', '', '♟', '♟', '♟', '', '', '', '♝', '', '', '♞', '', '', '', '', '', '♙', '♗', '', '', '', '', '', '♘', '', '♙', '', '', '', '', '', '', '', '', '♘', '♙', '', '♙', '♙', '♙', '', '', '♙', '♙', '♙', '♖', '', '♗', '♕', '', '♖', '♔', '']
+
+const bracketConfigs: Record<string, BracketConfig> = {
+  'knockout-cup': {
+    type: 'single',
+    title: 'Single elimination bracket',
+    bracket: {
+      rounds: ['Round of 16', 'Quarterfinal', 'Semifinal', 'Final'],
+      matches: [
+        [
+          { a: 'Ibrahim Ahmad', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
+          { a: 'Hasan Qasem', b: 'Sara Nasser', sa: 0, sb: 1, w: 'b' },
+          { a: 'Leen Haddad', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
+          { a: 'Khaled Mansour', b: 'Yazan Khaled', sa: 0, sb: 1, w: 'b' },
+          { a: 'Omar Saleh', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
+          { a: 'Rania Odeh', b: 'Mohammad Al-Khatib', sa: 0, sb: 1, w: 'b' },
+          { a: 'Amr Zaidan', b: 'Lina Shami', sa: 1, sb: 0, w: 'a' },
+          { a: 'Fadi Rimawi', b: 'Dana Aqel', sa: 0, sb: 1, w: 'b' },
+        ],
+        [
+          { a: 'Ibrahim Ahmad', b: 'Sara Nasser', sa: 1, sb: 0, w: 'a' },
+          { a: 'Leen Haddad', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a' },
+          { a: 'Omar Saleh', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' },
+          { a: 'Amr Zaidan', b: 'Dana Aqel', sa: 0, sb: 1, w: 'b' },
+        ],
+        [
+          { a: 'Ibrahim Ahmad', b: 'Leen Haddad', live: true },
+          { a: 'Omar Saleh', b: 'Dana Aqel', live: true },
+        ],
+        [{ a: 'TBD', b: 'TBD' }],
+      ],
+    },
+  },
+  'blitz-de': {
+    type: 'double',
+    title: 'Double elimination bracket',
+    brackets: {
+      winners: {
+        rounds: ['Round 1', 'Round 2', 'Semifinal', 'W-Final'],
+        matches: [
+          [
+            { a: 'Sara Nasser', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
+            { a: 'Yazan Khaled', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
+            { a: 'Mohammad Al-Khatib', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
+            { a: 'Rania Odeh', b: 'Hasan Qasem', sa: 0, sb: 1, w: 'b' },
+          ],
+          [
+            { a: 'Ibrahim Ahmad', b: 'Sara Nasser', sa: 1, sb: 0, w: 'a' },
+            { a: 'Omar Saleh', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a' },
+            { a: 'Leen Haddad', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' },
+            { a: 'Khaled Mansour', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a' },
+          ],
+          [
+            { a: 'Ibrahim Ahmad', b: 'Omar Saleh', sa: 1, sb: 0, w: 'a' },
+            { a: 'Leen Haddad', b: 'Khaled Mansour', sa: 1, sb: 0, w: 'a' },
+          ],
+          [{ a: 'Ibrahim Ahmad', b: 'Leen Haddad', live: true }],
+        ],
+      },
+      losers: {
+        rounds: ['L-Round 1', 'L-Round 2', 'L-Round 3', 'L-Final'],
+        matches: [
+          [
+            { a: 'Zaid Hamdan', b: 'Noor Barakat', sa: 0, sb: 1, w: 'b' },
+            { a: 'Tala Suleiman', b: 'Rania Odeh', sa: 1, sb: 0, w: 'a' },
+          ],
+          [
+            { a: 'Sara Nasser', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
+            { a: 'Yazan Khaled', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
+            { a: 'Mohammad Al-Khatib', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a' },
+          ],
+          [
+            { a: 'Omar Saleh', b: 'Sara Nasser', live: true },
+            { a: 'Khaled Mansour', b: 'Yazan Khaled', live: true },
+            { a: 'Mohammad Al-Khatib', b: 'bye', sa: 1, sb: 0, w: 'a' },
+          ],
+          [{ a: 'TBD', b: 'TBD' }],
+        ],
+      },
+      final: {
+        rounds: ['Grand Final'],
+        matches: [[{ a: 'Winners champion', b: 'Losers champion' }]],
+      },
+    },
+  },
+}
 
 function TournamentDetailPage() {
   const { id } = useParams()
   const [tab, setTab] = useState<DetailTab>('home')
   const [gameView, setGameView] = useState<GameView>('grid')
+  const [bracketView, setBracketView] = useState<BracketView>('winners')
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
   const [cloudError, setCloudError] = useState(false)
@@ -66,8 +179,12 @@ function TournamentDetailPage() {
     }
   }, [])
 
+  useEffect(() => {
+    setBracketView('winners')
+  }, [id])
+
   const tournament = useMemo(
-    () => tournaments.find((item) => item.id === id) || null,
+    () => tournaments.find((item) => item.id === id) || demoTournaments.find((item) => item.id === id) || null,
     [id, tournaments],
   )
 
@@ -155,7 +272,12 @@ function TournamentDetailPage() {
         ) : null}
 
         {tab === 'table' ? (
-          <TableTab tournament={tournament} standings={detail.standings} />
+          <TableTab
+            bracketView={bracketView}
+            setBracketView={setBracketView}
+            tournament={tournament}
+            standings={detail.standings}
+          />
         ) : null}
       </main>
     </div>
@@ -290,8 +412,32 @@ function GamesTab({
   )
 }
 
-function TableTab({ tournament, standings }: { tournament: Tournament; standings: StandingRow[] }) {
+function TableTab({
+  bracketView,
+  setBracketView,
+  standings,
+  tournament,
+}: {
+  bracketView: BracketView
+  setBracketView: (view: BracketView) => void
+  standings: StandingRow[]
+  tournament: Tournament
+}) {
+  const bracketConfig = bracketConfigs[tournament.id]
+
   if (isBracketTournament(tournament)) {
+    if (bracketConfig) {
+      return (
+        <section className="detail-tab-panel">
+          <BracketPanel
+            bracketConfig={bracketConfig}
+            bracketView={bracketView}
+            setBracketView={setBracketView}
+          />
+        </section>
+      )
+    }
+
     return (
       <section className="detail-tab-panel">
         <div className="bracket-panel">
@@ -350,6 +496,126 @@ function TableTab({ tournament, standings }: { tournament: Tournament; standings
         </table>
       </div>
     </section>
+  )
+}
+
+function BracketPanel({
+  bracketConfig,
+  bracketView,
+  setBracketView,
+}: {
+  bracketConfig: BracketConfig
+  bracketView: BracketView
+  setBracketView: (view: BracketView) => void
+}) {
+  const activeBracket = bracketConfig.type === 'double'
+    ? bracketConfig.brackets[bracketView]
+    : bracketConfig.bracket
+
+  return (
+    <div className="bracket-panel rich-bracket-panel">
+      <div className="bracket-heading">
+        <h2>{bracketConfig.title}</h2>
+        {bracketConfig.type === 'double' ? (
+          <div className="bracket-switch" aria-label="Double elimination bracket view">
+            {[
+              ['winners', 'Winners Bracket'],
+              ['losers', 'Losers Bracket'],
+              ['final', 'Final'],
+            ].map(([view, label]) => (
+              <button
+                type="button"
+                className={bracketView === view ? 'active' : undefined}
+                onClick={() => setBracketView(view as BracketView)}
+                key={view}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="bracket-scroll" aria-label={bracketConfig.title}>
+        <div className="bracket-track">
+          {activeBracket.rounds.map((roundName, roundIndex) => (
+            <div className="bracket-column" data-round-index={roundIndex} key={roundName}>
+              <h3>{roundName}</h3>
+              <div className="bracket-column-body">
+                {(activeBracket.matches[roundIndex] || []).map((match, matchIndex) => (
+                  <BracketMatchCard
+                    isLastRound={roundIndex === activeBracket.rounds.length - 1}
+                    key={`${roundName}-${match.a}-${match.b}-${matchIndex}`}
+                    match={match}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BracketMatchCard({ isLastRound, match }: { isLastRound: boolean; match: BracketMatch }) {
+  const isPending = isPendingMatch(match)
+  const stateClass = match.live ? 'live' : isPending ? 'pending' : match.w ? 'complete' : 'open'
+
+  return (
+    <div className={`bracket-match rich ${stateClass} ${isLastRound ? 'last-round' : ''}`}>
+      {match.live ? (
+        <div className="bracket-live-tag">
+          <span aria-hidden="true" />
+          Live
+        </div>
+      ) : null}
+      <BracketPlayerRow
+        name={match.a}
+        score={match.live ? '•' : formatBracketScore(match.sa)}
+        state={playerState(match, 'a')}
+      />
+      <BracketPlayerRow
+        name={match.b}
+        score={match.live ? '•' : formatBracketScore(match.sb)}
+        state={playerState(match, 'b')}
+      />
+    </div>
+  )
+}
+
+function BracketPlayerRow({
+  name,
+  score,
+  state,
+}: {
+  name: string
+  score: string
+  state: 'neutral' | 'winner' | 'muted'
+}) {
+  return (
+    <div className={`bracket-player ${state}`}>
+      <span>{name}</span>
+      <strong>{score}</strong>
+    </div>
+  )
+}
+
+function playerState(match: BracketMatch, side: 'a' | 'b') {
+  if (!match.w) return 'neutral'
+  return match.w === side ? 'winner' : 'muted'
+}
+
+function formatBracketScore(score?: number) {
+  return score === undefined ? '' : String(score)
+}
+
+function isPendingMatch(match: BracketMatch) {
+  return (
+    match.a === 'TBD'
+    || match.b === 'TBD'
+    || match.a === 'Winners champion'
+    || match.b === 'Losers champion'
   )
 }
 
@@ -471,7 +737,7 @@ function buildSchedule(tournament: Tournament): ScheduleRow[] {
 }
 
 function isBracketTournament(tournament: Tournament) {
-  return /elimination|stage/i.test(tournament.format)
+  return Boolean(bracketConfigs[tournament.id]) || /elimination|stage/i.test(tournament.format)
 }
 
 export default TournamentDetailPage

@@ -554,45 +554,189 @@
   padding: 18px;
 }
 
-.bracket-scroll {
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
-  gap: 16px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-
-.bracket-column h3 {
-  margin: 0 0 10px;
-  color: rgba(30, 43, 69, 0.58);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.bracket-match {
-  min-height: 54px;
+.bracket-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid rgba(30, 43, 69, 0.14);
-  border-radius: 9px;
-  background: rgba(255, 252, 244, 0.72);
-  margin-bottom: 10px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.bracket-match span {
+.bracket-switch {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bracket-switch button {
+  height: 38px;
+  padding: 0 20px;
+  color: #1e2b45;
+  background: transparent;
+  border: 1px solid rgba(30, 43, 69, 0.28);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-size: 13px;
   font-weight: 600;
 }
 
-.bracket-match strong {
-  color: #7a2431;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+.bracket-switch button:hover {
+  border-color: #7a2431;
+}
+
+.bracket-switch button.active {
+  color: #f5efe3;
+  background: #1e2b45;
+  border-color: #1e2b45;
+}
+
+.bracket-scroll {
+  margin-top: 20px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  cursor: grab;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(30, 43, 69, 0.3) transparent;
+}
+
+.bracket-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.bracket-scroll::-webkit-scrollbar-thumb {
+  background: rgba(30, 43, 69, 0.25);
+  border-radius: 4px;
+}
+
+.bracket-track {
+  min-width: max-content;
+  display: flex;
+  align-items: stretch;
+  gap: 34px;
+}
+
+.bracket-column {
+  width: 220px;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+}
+
+.bracket-column h3 {
+  margin: 0;
+  padding: 0 4px 10px;
+  color: rgba(30, 43, 69, 0.58);
   font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.bracket-column-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 12px;
+}
+
+.bracket-match.rich {
+  position: relative;
+  z-index: 1;
+  min-height: 76px;
+  margin: 0;
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid rgba(30, 43, 69, 0.14);
+  border-left: 3px solid rgba(30, 43, 69, 0.2);
+  border-radius: 8px;
+  background: #fffcf4;
+  box-shadow: 0 1px 3px rgba(30, 43, 69, 0.06);
+}
+
+.bracket-match.rich.complete {
+  border-left-color: #a98a3f;
+}
+
+.bracket-match.rich.live {
+  background: #fff7ee;
+  border-color: rgba(122, 36, 49, 0.4);
+  border-left-color: #7a2431;
+}
+
+.bracket-match.rich.pending {
+  background: rgba(255, 252, 244, 0.55);
+}
+
+.bracket-match.rich:not(.last-round)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -35px;
+  width: 34px;
+  border-top: 1px solid rgba(30, 43, 69, 0.16);
+}
+
+.bracket-live-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+  color: #7a2431;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bracket-live-tag span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #7a2431;
+  animation: ju-pulse 1.6s ease-in-out infinite;
+}
+
+.bracket-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bracket-player + .bracket-player {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(30, 43, 69, 0.08);
+}
+
+.bracket-player span {
+  min-width: 0;
+  overflow: hidden;
+  color: #1e2b45;
+  font-size: 13px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bracket-player.winner span {
+  font-weight: 600;
+}
+
+.bracket-player.muted span,
+.bracket-player.muted strong {
+  color: rgba(30, 43, 69, 0.45);
+}
+
+.bracket-player strong {
+  flex: none;
+  color: #1e2b45;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .detail-loading,
@@ -680,7 +824,19 @@
     align-items: flex-start;
   }
 
-  .bracket-scroll {
-    grid-template-columns: repeat(3, 210px);
+  .bracket-track {
+    gap: 22px;
+  }
+
+  .bracket-column {
+    width: 210px;
+  }
+
+  .bracket-switch {
+    width: 100%;
+  }
+
+  .bracket-switch button {
+    flex: 1 1 160px;
   }
 }
