@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { Chess, type Square } from 'chess.js'
 import './App.css'
 import { appwriteReady } from './lib/appwrite'
@@ -64,6 +64,11 @@ type Pairing = {
   blackRating: number | string
 }
 
+type PlayableBoard = Pairing & {
+  boardKey: string
+  boardLabel: string
+}
+
 type AdminBracketSide = 'white' | 'black'
 
 type AdminBracketMatch = Pairing & {
@@ -81,7 +86,13 @@ type AdminBracketRound = {
 
 type AdminBracketPhase = 'setup' | 'active' | 'completed'
 
+type LiveBoardState = {
+  moves: string[]
+  result: string
+}
+
 const DEFAULT_KNOCKOUT_BRACKET_SIZE = 16
+const EMPTY_LIVE_BOARD_STATE: LiveBoardState = { moves: [], result: 'Live' }
 
 const navItems: Array<{ key: Screen; label: string; icon: string }> = [
   { key: 'dashboard', label: 'Dashboard', icon: '▤' },
@@ -1441,17 +1452,45 @@ function TournamentManageView({
   const knockout = isKnockoutTournament(tournament)
   const playStage = knockout ? 'bracket' : 'rounds'
   const [stage, setStage] = useState(playStage)
-  const tournamentPlayers = buildTournamentPlayers(shuffleSeed)
+  const [selectedBoardKey, setSelectedBoardKey] = useState('')
+  const liveBoardRef = useRef<HTMLElement | null>(null)
   const bracketMatchCount = knockout ? getBracketMatchCount(tournament) : undefined
-  const pairings = buildPairings(tournamentPlayers, bracketMatchCount)
   const bracketPhase = getBracketPhase(tournament)
-  const bracketRounds = buildAdminBracketRounds(pairings, bracketPhase)
+  const tournamentPlayers = useMemo(() => buildTournamentPlayers(shuffleSeed), [shuffleSeed])
+  const pairings = useMemo(() => buildPairings(tournamentPlayers, bracketMatchCount), [bracketMatchCount, tournamentPlayers])
+  const bracketRounds = useMemo(() => buildAdminBracketRounds(pairings, bracketPhase), [bracketPhase, pairings])
+  const playableBoards = useMemo(() => (knockout
+    ? buildPlayableBracketBoards(bracketRounds)
+    : buildPlayableBoardsFromPairings(pairings)
+  ), [bracketRounds, knockout, pairings])
   const shuffleLocked = disabled || published
   const publishLocked = disabled || published
 
   useEffect(() => {
     setStage(playStage)
   }, [playStage, tournament.rowId, tournament.id])
+
+  useEffect(() => {
+    if (!playableBoards.length) {
+      if (selectedBoardKey) setSelectedBoardKey('')
+      return
+    }
+
+    if (!playableBoards.some((board) => board.boardKey === selectedBoardKey)) {
+      setSelectedBoardKey(playableBoards[0].boardKey)
+    }
+  }, [playableBoards, selectedBoardKey])
+
+  function selectLiveBoard(boardKey: string) {
+    const board = playableBoards.find((item) => item.boardKey === boardKey)
+    if (!board) return
+
+    setSelectedBoardKey(board.boardKey)
+    onMessage(`${board.boardLabel} selected for move entry.`)
+    window.setTimeout(() => {
+      liveBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 0)
+  }
 
   const manageMode = tournament.status === 'upcoming' ? 'Prepare Tournament' : 'Live Tournament'
   const publishState = published ? 'Published - shuffle locked' : 'Draft pairings'
@@ -1524,7 +1563,12 @@ function TournamentManageView({
           </>
         ) : null}
         {stage === 'bracket' ? (
-          <AdminBracketPreview rounds={bracketRounds} title={`${tournament.format} bracket`} />
+          <AdminBracketPreview
+            onSelectMatch={tournament.status === 'active' ? selectLiveBoard : undefined}
+            rounds={bracketRounds}
+            selectedBoardKey={selectedBoardKey}
+            title={`${tournament.format} bracket`}
+          />
         ) : null}
         {stage === 'procedure' ? (
           <>
@@ -1550,13 +1594,29 @@ function TournamentManageView({
         ) : null}
       </section>
       {tournament.status === 'active' ? (
-        <LiveTournamentBoard onMessage={onMessage} pairings={pairings} />
+        <LiveTournamentBoard
+          boards={playableBoards}
+          onBoardSelect={selectLiveBoard}
+          onMessage={onMessage}
+          panelRef={liveBoardRef}
+          selectedBoardKey={selectedBoardKey}
+        />
       ) : null}
     </div>
   )
 }
 
-function AdminBracketPreview({ rounds, title }: { rounds: AdminBracketRound[]; title: string }) {
+function AdminBracketPreview({
+  onSelectMatch,
+  rounds,
+  selectedBoardKey,
+  title,
+}: {
+  onSelectMatch?: (boardKey: string) => void
+  rounds: AdminBracketRound[]
+  selectedBoardKey: string
+  title: string
+}) {
   const [activeRound, setActiveRound] = useState(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const trackRef = useRef<HTMLDivElement | null>(null)
@@ -1659,11 +1719,14 @@ function AdminBracketPreview({ rounds, title }: { rounds: AdminBracketRound[]; t
               <div className="bracket-column-body">
                 {round.matches.map((match, matchIndex) => (
                   <AdminBracketMatchCard
+                    boardKey={bracketBoardKey(round.name, matchIndex)}
                     isLastRound={roundIndex === rounds.length - 1}
                     key={`${round.name}-${match.white}-${match.black}-${matchIndex}`}
                     match={match}
                     matchIndex={matchIndex}
+                    onSelect={onSelectMatch}
                     roundIndex={roundIndex}
+                    selectedBoardKey={selectedBoardKey}
                   />
                 ))}
               </div>
@@ -1676,25 +1739,35 @@ function AdminBracketPreview({ rounds, title }: { rounds: AdminBracketRound[]; t
 }
 
 function AdminBracketMatchCard({
+  boardKey,
   isLastRound,
   match,
   matchIndex,
+  onSelect,
   roundIndex,
+  selectedBoardKey,
 }: {
+  boardKey: string
   isLastRound: boolean
   match: AdminBracketMatch
   matchIndex: number
+  onSelect?: (boardKey: string) => void
   roundIndex: number
+  selectedBoardKey: string
 }) {
   const stateClass = match.live ? 'live' : match.pending ? 'pending' : match.winner ? 'complete' : 'open'
   const lineState = match.winner === 'white' ? 'a' : match.winner === 'black' ? 'b' : match.live ? 'live' : ''
-
-  return (
-    <div
-      className={`bracket-match rich ${stateClass} ${isLastRound ? 'last-round' : ''}`}
-      data-brk-card={`${roundIndex}-${matchIndex}`}
-      data-win={lineState}
-    >
+  const selectable = Boolean(onSelect && isPlayableMatch(match))
+  const selected = selectable && selectedBoardKey === boardKey
+  const className = [
+    'bracket-match rich',
+    stateClass,
+    selectable ? 'selectable' : '',
+    selected ? 'selected-board' : '',
+    isLastRound ? 'last-round' : '',
+  ].filter(Boolean).join(' ')
+  const content = (
+    <>
       {match.live ? (
         <div className="bracket-live-tag">
           <span aria-hidden="true" />
@@ -1711,6 +1784,30 @@ function AdminBracketMatchCard({
         score={match.live ? '•' : match.blackScore ?? ''}
         state={bracketPlayerState(match, 'black')}
       />
+    </>
+  )
+
+  if (selectable) {
+    return (
+      <button
+        type="button"
+        className={className}
+        data-brk-card={`${roundIndex}-${matchIndex}`}
+        data-win={lineState}
+        onClick={() => onSelect?.(boardKey)}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className={className}
+      data-brk-card={`${roundIndex}-${matchIndex}`}
+      data-win={lineState}
+    >
+      {content}
     </div>
   )
 }
@@ -1788,34 +1885,44 @@ function BracketPlayerRow({
 }
 
 function LiveTournamentBoard({
+  boards,
+  onBoardSelect,
   onMessage,
-  pairings,
+  panelRef,
+  selectedBoardKey,
 }: {
+  boards: PlayableBoard[]
+  onBoardSelect: (boardKey: string) => void
   onMessage: (message: string) => void
-  pairings: Pairing[]
+  panelRef: RefObject<HTMLElement | null>
+  selectedBoardKey: string
 }) {
-  const [boardIndex, setBoardIndex] = useState(0)
-  const [game, setGame] = useState(() => new Chess())
+  const [boardStates, setBoardStates] = useState<Record<string, LiveBoardState>>({})
   const [selected, setSelected] = useState<Square | null>(null)
-  const [result, setResult] = useState('Live')
-  const pairing = pairings[boardIndex] ?? pairings[0]
-  const pairingKey = pairing ? `${pairing.white}-${pairing.black}` : 'empty'
+  const pairing = boards.find((board) => board.boardKey === selectedBoardKey) ?? boards[0]
+  const pairingKey = pairing?.boardKey ?? 'empty'
+  const boardState = pairing ? boardStates[pairing.boardKey] ?? EMPTY_LIVE_BOARD_STATE : EMPTY_LIVE_BOARD_STATE
+  const game = useMemo(() => buildChessFromMoves(boardState.moves), [boardState.moves])
   const selectedTargets = selected
     ? new Set(game.moves({ square: selected, verbose: true }).map((move) => move.to))
     : new Set<string>()
-  const movePairs = buildMovePairs(game.history())
+  const movePairs = buildMovePairs(boardState.moves)
 
   useEffect(() => {
-    if (boardIndex >= pairings.length) setBoardIndex(0)
-  }, [boardIndex, pairings.length])
-
-  useEffect(() => {
-    setGame(new Chess())
     setSelected(null)
-    setResult('Live')
   }, [pairingKey])
 
+  function updateCurrentBoard(nextState: LiveBoardState) {
+    if (!pairing) return
+    setBoardStates((current) => ({
+      ...current,
+      [pairing.boardKey]: nextState,
+    }))
+  }
+
   function handleSquareClick(square: Square) {
+    if (!pairing) return
+
     const piece = game.get(square)
 
     if (!selected) {
@@ -1833,9 +1940,11 @@ function LiveTournamentBoard({
     try {
       const move = next.move({ from: selected, to: square, promotion: 'q' })
       if (move) {
-        setGame(next)
+        updateCurrentBoard({
+          moves: [...boardState.moves, move.san],
+          result: deriveChessResult(next),
+        })
         setSelected(null)
-        setResult(deriveChessResult(next))
         return
       }
     } catch {
@@ -1851,39 +1960,45 @@ function LiveTournamentBoard({
   }
 
   function undoMove() {
-    const next = new Chess(game.fen())
-    next.undo()
-    setGame(next)
+    if (!pairing || !boardState.moves.length) return
+    const moves = boardState.moves.slice(0, -1)
+    const next = buildChessFromMoves(moves)
+    updateCurrentBoard({
+      moves,
+      result: deriveChessResult(next),
+    })
     setSelected(null)
-    setResult(deriveChessResult(next))
   }
 
   function resetGame() {
-    setGame(new Chess())
+    updateCurrentBoard(EMPTY_LIVE_BOARD_STATE)
     setSelected(null)
-    setResult('Live')
   }
 
   function recordResult(value: string) {
-    setResult(value)
+    if (!pairing) return
+    updateCurrentBoard({
+      moves: boardState.moves,
+      result: value,
+    })
     onMessage(`${pairing.white} vs ${pairing.black} result set to ${value}.`)
   }
 
   return (
-    <section className="live-board-panel">
+    <section className="live-board-panel" ref={panelRef}>
       <div className="manage-panel-head">
         <strong>Digital board and result entry</strong>
-        <span>{pairing ? `Board ${pairing.board}` : 'No board selected'}</span>
+        <span>{pairing ? pairing.boardLabel : 'No board selected'}</span>
       </div>
       <div className="live-board-layout">
         <div className="live-board-area">
           <div className="live-board-top">
             <label>
               Board
-              <select value={boardIndex} onChange={(event) => setBoardIndex(Number(event.target.value))}>
-                {pairings.map((item, index) => (
-                  <option key={item.board} value={index}>
-                    Board {item.board} - {item.white} vs {item.black}
+              <select value={pairing?.boardKey ?? ''} onChange={(event) => onBoardSelect(event.target.value)} disabled={!boards.length}>
+                {boards.map((item) => (
+                  <option key={item.boardKey} value={item.boardKey}>
+                    {item.boardLabel} - {item.white} vs {item.black}
                   </option>
                 ))}
               </select>
@@ -1909,9 +2024,9 @@ function LiveTournamentBoard({
         <aside className="live-game-side">
           <div className="live-match-card">
             <span>Current match</span>
-            <strong>{pairing.white}</strong>
+            <strong>{pairing?.white ?? 'No active board'}</strong>
             <em>vs</em>
-            <strong>{pairing.black}</strong>
+            <strong>{pairing?.black ?? 'Select a live match'}</strong>
           </div>
           <div className="result-control">
             <span>Result</span>
@@ -1919,7 +2034,8 @@ function LiveTournamentBoard({
               {['Live', '1-0', '0-1', '1/2-1/2'].map((value) => (
                 <button
                   type="button"
-                  className={result === value ? 'active' : undefined}
+                  className={boardState.result === value ? 'active' : undefined}
+                  disabled={!pairing}
                   onClick={() => recordResult(value)}
                   key={value}
                 >
@@ -1931,7 +2047,7 @@ function LiveTournamentBoard({
           <div className="move-list-card">
             <div className="move-list-head">
               <strong>Live moves</strong>
-              <span>{game.history().length} moves</span>
+              <span>{boardState.moves.length} moves</span>
             </div>
             <div className="move-list-scroll">
               {movePairs.length ? movePairs.map((row) => (
@@ -1944,9 +2060,9 @@ function LiveTournamentBoard({
             </div>
           </div>
           <div className="live-board-actions">
-            <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!game.history().length}>Undo</button>
-            <button type="button" className="mini-button ghost" onClick={resetGame}>Reset</button>
-            <button type="button" className="mini-button dark" onClick={() => onMessage(`Board ${pairing.board} saved with result ${result}.`)}>
+            <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!boardState.moves.length}>Undo</button>
+            <button type="button" className="mini-button ghost" onClick={resetGame} disabled={!pairing}>Reset</button>
+            <button type="button" className="mini-button dark" disabled={!pairing} onClick={() => pairing && onMessage(`${pairing.boardLabel} saved with result ${boardState.result}.`)}>
               Save board
             </button>
           </div>
@@ -2641,6 +2757,31 @@ function buildPairings(players: Player[], targetMatchCount?: number): Pairing[] 
   return pairings.slice(0, matchCount)
 }
 
+function buildPlayableBoardsFromPairings(pairings: Pairing[]): PlayableBoard[] {
+  return pairings
+    .filter(hasKnownPlayers)
+    .map((pairing) => ({
+      ...pairing,
+      boardKey: `pairing:${pairing.board}`,
+      boardLabel: `Board ${pairing.board}`,
+    }))
+}
+
+function buildPlayableBracketBoards(rounds: AdminBracketRound[]): PlayableBoard[] {
+  return rounds.flatMap((round) => (
+    round.matches.flatMap((match, matchIndex) => (
+      isPlayableMatch(match)
+        ? [{
+          ...match,
+          board: matchIndex + 1,
+          boardKey: bracketBoardKey(round.name, matchIndex),
+          boardLabel: `${round.name} Board ${matchIndex + 1}`,
+        }]
+        : []
+    ))
+  ))
+}
+
 function getBracketMatchCount(tournament: AdminTournament) {
   const capacity = typeof tournament.capacity === 'number' && Number.isFinite(tournament.capacity) && tournament.capacity > 0
     ? tournament.capacity
@@ -2763,8 +2904,16 @@ function hasKnownPlayers(pairing: Pairing) {
   return isKnownBracketPlayer(pairing.white) && isKnownBracketPlayer(pairing.black)
 }
 
+function isPlayableMatch(match: AdminBracketMatch) {
+  return hasKnownPlayers(match) && !match.pending && !match.winner
+}
+
 function isKnownBracketPlayer(name: string) {
   return name !== 'TBD' && !name.startsWith('Winner ') && !name.startsWith('Open seed ')
+}
+
+function bracketBoardKey(roundName: string, matchIndex: number) {
+  return `bracket:${roundName}:${matchIndex}`
 }
 
 function bracketRoundName(playersInRound: number) {
@@ -2785,6 +2934,20 @@ function buildBracketRoundKey(rounds: AdminBracketRound[]) {
   return rounds
     .map((round) => `${round.name}:${round.matches.map((match) => `${match.white}-${match.black}-${match.winner ?? ''}-${match.live ? 'live' : ''}`).join(',')}`)
     .join('|')
+}
+
+function buildChessFromMoves(moves: string[]) {
+  const game = new Chess()
+
+  moves.forEach((move) => {
+    try {
+      game.move(move)
+    } catch {
+      // Ignore corrupt historical SAN entries and keep the board usable.
+    }
+  })
+
+  return game
 }
 
 function bracketPlayerState(match: AdminBracketMatch, side: AdminBracketSide) {

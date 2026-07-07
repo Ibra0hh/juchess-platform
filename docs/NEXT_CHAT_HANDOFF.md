@@ -130,6 +130,10 @@ Implemented/working:
 - Admin Active tournament management includes a digital chess board powered by
   `chess.js` for legal move entry, live move recording, result selection, undo,
   reset, and board save actions.
+- In active knockout management, clicking a playable/live bracket match selects
+  the same match in the digital chess board. The board list must come from the
+  actual live bracket matches, and move/result state is stored per board so
+  switching matches does not erase already-entered moves.
 - Completed and Archived tournament tabs should not show the Registration queue.
 - Flutter app has Appwrite session detection, sign-in, sign-up, sign-out,
   tournament reads, tournament details, registration/cancel behavior, and
