@@ -65,7 +65,7 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
 ]
 
 const tournamentTabs: TournamentTab[] = ['draft', 'upcoming', 'active', 'completed', 'archived']
-const createSteps = ['Basic information', 'Tournament format', 'Time control'] as const
+const createSteps = ['Basic information', 'Tournament format'] as const
 const formatOptions = [
   { value: 'Swiss', icon: '♟', layout: 'Standings + current pairings' },
   { value: 'Round robin', icon: '◍', layout: 'Standings + schedule' },
@@ -1152,45 +1152,48 @@ function TournamentsScreen({
                 </div>
               ) : null}
               {createStep === 1 ? (
-                <div>
-                  <div className="create-section-label">Choose a tournament format</div>
-                  <div className="format-card-grid">
-                    {formatOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={form.format === option.value ? 'active' : undefined}
-                        onClick={() => update('format', option.value)}
-                      >
-                        <span>{option.icon}</span>
-                        <strong>{option.value}</strong>
-                        <small>{option.layout}</small>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {createStep === 2 ? (
-                <div className="create-grid">
-                  <div className="create-field wide">
-                    <span>Time control category</span>
-                    <div className="create-chip-row">
-                      {timeOptions.map((option) => (
+                <div className="format-time-window">
+                  <div>
+                    <div className="create-section-label">Choose a tournament format</div>
+                    <div className="format-card-grid">
+                      {formatOptions.map((option) => (
                         <button
-                          key={option.label}
+                          key={option.value}
                           type="button"
-                          className={timeCategory === option.label ? 'active' : undefined}
-                          onClick={() => setTimeSelection({ category: option.label, minutes: option.minutes, increment: option.increment })}
+                          className={form.format === option.value ? 'active' : undefined}
+                          onClick={() => update('format', option.value)}
                         >
-                          {option.label}
+                          <span>{option.icon}</span>
+                          <strong>{option.value}</strong>
+                          <small>{option.layout}</small>
                         </button>
                       ))}
                     </div>
                   </div>
-                  <label>Initial minutes<input value={timeMinutes} onChange={(event) => setTimeSelection({ minutes: event.target.value })} placeholder="15" /></label>
-                  <label>Increment (seconds)<input value={timeIncrement} onChange={(event) => setTimeSelection({ increment: event.target.value })} placeholder="10" /></label>
-                  <label>Delay (seconds)<input value={timeDelay} onChange={(event) => setTimeSelection({ delay: event.target.value })} placeholder="0" /></label>
-                  <label>Games per match<input value={gamesPerMatch} onChange={(event) => setTimeSelection({ games: event.target.value })} placeholder="1" /></label>
+                  <div className="format-time-panel">
+                    <div className="create-section-label">Time control</div>
+                    <div className="create-grid compact-time-grid">
+                      <div className="create-field wide">
+                        <span>Time control category</span>
+                        <div className="create-chip-row">
+                          {timeOptions.map((option) => (
+                            <button
+                              key={option.label}
+                              type="button"
+                              className={timeCategory === option.label ? 'active' : undefined}
+                              onClick={() => setTimeSelection({ category: option.label, minutes: option.minutes, increment: option.increment })}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <label>Initial minutes<input value={timeMinutes} onChange={(event) => setTimeSelection({ minutes: event.target.value })} placeholder="15" /></label>
+                      <label>Increment (seconds)<input value={timeIncrement} onChange={(event) => setTimeSelection({ increment: event.target.value })} placeholder="10" /></label>
+                      <label>Delay (seconds)<input value={timeDelay} onChange={(event) => setTimeSelection({ delay: event.target.value })} placeholder="0" /></label>
+                      <label>Games per match<input value={gamesPerMatch} onChange={(event) => setTimeSelection({ games: event.target.value })} placeholder="1" /></label>
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </div>

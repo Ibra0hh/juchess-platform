@@ -1278,6 +1278,22 @@ button {
   font-weight: 900;
 }
 
+.format-time-window {
+  display: grid;
+  gap: 20px;
+}
+
+.format-time-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #efeae0;
+  padding-top: 18px;
+}
+
+.compact-time-grid {
+  gap: 12px 16px;
+}
+
 .format-card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2179,6 +2195,10 @@ button {
   .format-card-grid,
   .field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .format-time-window {
+    gap: 16px;
   }
 
   .create-modal-backdrop {

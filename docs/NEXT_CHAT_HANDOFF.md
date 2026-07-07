@@ -93,8 +93,9 @@ Implemented/working:
   Draft, Upcoming, Active, Completed, Archived.
 - Admin create tournament is intentionally enabled only on the Draft tab.
 - Admin create tournament currently saves every new tournament as `draft`.
-- Admin create tournament should have only three steps:
-  Basic information, Tournament format, Time control.
+- Admin create tournament should have only two steps:
+  Basic information and Tournament format. Time control lives inside the
+  Tournament format window, under the format cards.
 - Admin create tournament should not show Preview or Review steps.
 - Admin create tournament Basic information step must stay simple:
   tournament name, description, number of players, typed location/platform,
