@@ -252,9 +252,9 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
       loadRegistrationCounts(),
     ])
 
-    const tournaments = rows.rows
+    const tournaments = uniqueTournamentsByFormat(rows.rows
       .map((row) => mapTournament(row, participantCounts))
-      .filter((tournament): tournament is AdminTournament => Boolean(tournament))
+      .filter((tournament): tournament is AdminTournament => Boolean(tournament)))
       .sort((a, b) => statusOrder(a.status) - statusOrder(b.status) || a.name.localeCompare(b.name))
 
     return {
@@ -264,6 +264,14 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
   } catch (error) {
     return { tournaments: [], source: 'unavailable', error }
   }
+}
+
+function uniqueTournamentsByFormat(tournaments: AdminTournament[]) {
+  const rows = new Map<string, AdminTournament>()
+  tournaments.forEach((tournament) => {
+    if (!rows.has(tournament.id)) rows.set(tournament.id, tournament)
+  })
+  return Array.from(rows.values())
 }
 
 export async function createTournament(input: TournamentInput) {
@@ -492,25 +500,42 @@ function mapTournament(
   row: AppwriteTournamentRow,
   participantCounts: Map<string, number>,
 ): AdminTournament | null {
-  if (!row.name || !row.slug || !row.format || !row.timeControl) return null
+  if (!row.format || !row.timeControl) return null
   const status = row.status === 'cancelled' ? 'archived' : row.status
   if (!status) return null
+  const format = normalizeTournamentFormat(row.format)
+  const slug = formatRouteId(format)
 
   return {
-    id: row.slug,
+    id: slug,
     rowId: row.$id,
-    slug: row.slug,
-    name: row.name,
+    slug,
+    name: format,
     status,
     players: participantCounts.get(row.$id) ?? 0,
     capacity: row.capacity ?? 0,
-    format: row.format,
+    format,
     timeControl: row.timeControl,
     round: formatRound(row),
     startsAt: row.startsAt,
     location: row.location,
     description: row.description,
   }
+}
+
+function normalizeTournamentFormat(format: string) {
+  const value = format.trim()
+  if (/^round[-\s]?robin$/i.test(value)) return 'Round robin'
+  if (/^double\s+round[-\s]?robin$/i.test(value)) return 'Double round robin'
+  return value
+}
+
+function formatRouteId(format: string) {
+  return format
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 function mapRegistration(

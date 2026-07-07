@@ -143,7 +143,7 @@ const timeOptions = [
 function createInitialTournamentForm(): TournamentInput {
   return {
     slug: '',
-    name: '',
+    name: 'Swiss',
     status: 'draft',
     format: 'Swiss',
     timeControl: '15+10 Rapid',
@@ -876,7 +876,7 @@ function TournamentsScreen({
   const selectedTournament = filtered.find((item) => tournamentKey(item) === selectedTournamentKey) ?? filtered[0] ?? null
   const managedTournament = tournaments.find((item) => tournamentKey(item) === manageTournamentKey) ?? null
   const createEnabled = tab === 'draft'
-  const canSaveDraft = Boolean(form.name.trim()) && !submitting
+  const canSaveDraft = Boolean(form.format.trim()) && !submitting
   const isEditing = Boolean(editingTournament)
   const showRegistrationQueue = tab !== 'completed' && tab !== 'archived' && !managedTournament
   const selectedTournamentRowId = showRegistrationQueue ? selectedTournament?.rowId : undefined
@@ -931,7 +931,13 @@ function TournamentsScreen({
   }, [selectedTournamentRowId])
 
   function update<K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) {
-    setForm((current) => ({ ...current, [key]: value }))
+    setForm((current) => {
+      if (key === 'format' && typeof value === 'string') {
+        return { ...current, format: value, name: value }
+      }
+
+      return { ...current, [key]: value }
+    })
   }
 
   function resetCreateForm() {
@@ -1031,7 +1037,8 @@ function TournamentsScreen({
     try {
       const payload: TournamentInput = {
         ...form,
-        slug: isEditing ? form.slug : buildTournamentSlug(form.name),
+        name: form.format,
+        slug: buildTournamentSlugBase(form.format),
         status: isEditing ? form.status : 'draft',
         timeControl: `${timeMinutes || '0'}+${timeIncrement || '0'} ${timeCategory}`,
       }
@@ -1200,7 +1207,7 @@ function TournamentsScreen({
             <div className="create-step-body">
               {createStep === 0 ? (
                 <div className="create-grid">
-                  <label className="wide">Tournament name<input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="Swiss" required /></label>
+                  <label className="wide">Tournament name<input value={form.format} readOnly required /></label>
                   <label className="wide">Description<textarea value={form.description ?? ''} onChange={(event) => update('description', event.target.value)} placeholder="Short description..." rows={3} /></label>
                   <label>Number of players<input type="number" min={2} value={form.capacity ?? ''} onChange={(event) => update('capacity', Number(event.target.value))} /></label>
                   <label>
@@ -2514,7 +2521,7 @@ function BlockList<T extends IdentityBlock | IpBlock>({
 function NewsScreen() {
   const [posts, setPosts] = useState([
     { id: 'n1', title: 'Summer training camp registration opens July 10', body: 'Members can reserve seats from the app.', date: 'Jul 1, 2026' },
-    { id: 'n2', title: 'Club general assembly and board elections', body: 'Voting opens after the rapid championship.', date: 'Jun 28, 2026' },
+    { id: 'n2', title: 'Club general assembly and board elections', body: 'Voting opens after Swiss.', date: 'Jun 28, 2026' },
   ])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -3033,8 +3040,8 @@ function buildMovePairs(moves: string[]) {
 
 function tournamentToEditForm(item: AdminTournament): TournamentInput {
   return {
-    slug: item.slug,
-    name: item.name,
+    slug: buildTournamentSlugBase(item.format),
+    name: item.format,
     status: item.status,
     format: item.format,
     timeControl: item.timeControl,
@@ -3063,10 +3070,6 @@ function emptyTitle(tab: TournamentTab) {
   if (tab === 'completed') return 'No completed events'
   if (tab === 'archived') return 'No archived tournaments'
   return 'No upcoming tournaments'
-}
-
-function buildTournamentSlug(name: string) {
-  return `${buildTournamentSlugBase(name)}-${Date.now().toString(36)}`
 }
 
 function buildTournamentSlugBase(name: string) {

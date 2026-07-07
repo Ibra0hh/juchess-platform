@@ -330,7 +330,7 @@ class Component extends DCLogic {
 
     var events = [];
     if (window.JU) {
-      ['knockout-cup', 'spring-open', 'autumn-open'].forEach(function (id) {
+      ['single-elimination', 'swiss', 'league'].forEach(function (id) {
         var t = window.JU.getTournament(id);
         events.push({
           href: 'Tournament.dc.html?id=' + t.id,

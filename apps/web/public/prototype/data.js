@@ -89,7 +89,7 @@
       mkGame(3, 4, 5, '1-0', 'Jul 2, 2026', 'Sicilian: Alapin', 'Swiss \u00B7 R4'),
       mkGame(8, 1, 4, '1-0', 'Jun 27, 2026', 'Queen\u2019s Gambit Accepted', 'Single elimination \u00B7 QF'),
       mkGame(2, 3, 2, '0-1', 'Jun 27, 2026', 'London System', 'Single elimination \u00B7 QF'),
-      mkGame(5, 0, 5, '1-0', 'Jun 20, 2026', 'Italian Game: Giuoco Piano', 'Double round-robin \u00B7 R3')
+      mkGame(5, 0, 5, '1-0', 'Jun 20, 2026', 'Italian Game: Giuoco Piano', 'Double round robin \u00B7 R3')
     ]
   };
 
@@ -100,7 +100,7 @@
 
   var tournaments = [
     {
-      id: 'spring-open', name: 'Swiss', format: 'Swiss', status: 'Active',
+      id: 'swiss', name: 'Swiss', format: 'Swiss', status: 'Active',
       timeControl: '15+10 Rapid', date: 'Jun 14 \u2013 Jul 12, 2026', location: 'Student Union Hall B', participants: 12,
       round: 'Round 4 of 7', desc: 'The club\u2019s flagship open \u2014 seven Swiss rounds across four weekends, open to all JU students and staff.',
       standings: [
@@ -135,7 +135,7 @@
       ]
     },
     {
-      id: 'faculty-rr', name: 'Round-robin', format: 'Round-robin', status: 'Active',
+      id: 'round-robin', name: 'Round robin', format: 'Round robin', status: 'Active',
       timeControl: '10+5 Rapid', date: 'May 3 \u2013 May 31, 2026', location: 'Engineering Lounge', participants: 6,
       round: 'Final \u00B7 5 rounds', desc: 'Six faculty champions, everyone plays everyone once.',
       rrPlayers: [0, 1, 2, 3, 4, 5],
@@ -169,7 +169,7 @@
       ]
     },
     {
-      id: 'masters-drr', name: 'Double round-robin', format: 'Double round-robin', status: 'Active',
+      id: 'double-round-robin', name: 'Double round robin', format: 'Double round robin', status: 'Active',
       timeControl: '25+10 Classical', date: 'Jun 1 \u2013 Jul 20, 2026', location: 'Library Seminar Room 2', participants: 4,
       round: 'Cycle 2 \u00B7 Round 5 of 6', desc: 'Top four club ratings meet twice \u2014 once with each color.',
       rrPlayers: [0, 1, 2, 3], drr: true,
@@ -201,7 +201,7 @@
       ]
     },
     {
-      id: 'knockout-cup', name: 'Single elimination', format: 'Single elimination', status: 'Active',
+      id: 'single-elimination', name: 'Single elimination', format: 'Single elimination', status: 'Active',
       timeControl: '10+0 Blitz', date: 'Jun 20 \u2013 Jul 10, 2026', location: 'Hall A', participants: 16,
       round: 'Semifinals', desc: 'Sixteen enter, one lifts the cup. Straight knockout, no second chances.',
       bracket: {
@@ -246,7 +246,7 @@
       ]
     },
     {
-      id: 'blitz-de', name: 'Double elimination', format: 'Double elimination', status: 'Active',
+      id: 'double-elimination', name: 'Double elimination', format: 'Double elimination', status: 'Active',
       timeControl: '5+3 Blitz', date: 'Jun 26 \u2013 Jul 5, 2026', location: 'Hall A', participants: 12,
       round: 'Losers Round 3', desc: 'Twelve blitz players, two lives each. Lose once, drop to the losers bracket; lose twice, you\u2019re out.',
       winners: {
@@ -315,7 +315,7 @@
       ]
     },
     {
-      id: 'amman-league', name: 'League', format: 'League', status: 'Active',
+      id: 'league', name: 'League', format: 'League', status: 'Active',
       timeControl: '15+10 Rapid', date: 'Feb 8 \u2013 Nov 22, 2026', location: 'Rotating campuses', participants: 8,
       round: 'Week 14 of 22', desc: 'Season-long league \u2014 one fixture a week, three points for a win.',
       league: [
@@ -346,7 +346,7 @@
       ]
     },
     {
-      id: 'ju-gju-match', name: 'Team', format: 'Team', status: 'Active',
+      id: 'team', name: 'Team', format: 'Team', status: 'Active',
       timeControl: '25+10 Classical', date: 'Jun 13, 2026', location: 'JU Main Auditorium', participants: 8,
       round: 'Final score 2\u00BD \u2013 1\u00BD', desc: 'Annual four-board friendly against German Jordanian University.',
       teamScore: { home: 'JU', away: 'GJU', hs: '2\u00BD', as: '1\u00BD' },
@@ -373,7 +373,7 @@
       ]
     },
     {
-      id: 'friday-arena', name: 'Arena', format: 'Arena', status: 'Active',
+      id: 'arena', name: 'Arena', format: 'Arena', status: 'Active',
       timeControl: '3+2 Blitz', date: 'Jul 3, 2026 \u00B7 7:00\u20139:00 PM', location: 'Online \u00B7 Club room', participants: 12,
       round: 'In progress \u00B7 ends 9:00 PM', desc: 'Two hours, unlimited games, streak bonuses. Highest score wins.',
       arena: {
@@ -405,7 +405,7 @@
       ]
     },
     {
-      id: 'championship', name: 'Multi-stage', format: 'Multi-stage', status: 'Active',
+      id: 'multi-stage', name: 'Multi-stage', format: 'Multi-stage', status: 'Active',
       timeControl: '15+10 Rapid', date: 'May 10 \u2013 Jul 25, 2026', location: 'Hall A + Hall B', participants: 12,
       round: 'Stage 2 \u00B7 Quarterfinals', desc: 'Stage 1: 12-player Swiss qualifies the top eight. Stage 2: knockout for the university title.',
       stages: ['Stage 1 \u00B7 Swiss', 'Stage 2 \u00B7 Knockout'],
@@ -505,10 +505,10 @@
   }
   function buildRounds(t) {
     var rounds = [];
-    if (t.format === 'Round-robin' || t.format === 'Double round-robin') {
+    if (t.format === 'Round robin' || t.format === 'Double round robin') {
       var ids = t.rrPlayers.slice();
       var base = circle(ids);
-      var cycles = (t.format === 'Double round-robin') ? 2 : 1;
+      var cycles = (t.format === 'Double round robin') ? 2 : 1;
       var all = [];
       for (var c = 0; c < cycles; c++) {
         base.forEach(function (pr, ri) {

@@ -29,7 +29,7 @@ const toolCards = [
     action: 'Browse events',
   },
   {
-    to: '/tournament/spring-open',
+    to: '/tournament/swiss',
     icon: '\u2656',
     tag: 'Live',
     title: 'Live boards',

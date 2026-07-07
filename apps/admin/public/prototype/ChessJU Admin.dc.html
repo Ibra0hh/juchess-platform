@@ -1085,8 +1085,8 @@ class Component extends DCLogic {
   seedTournaments() {
     const base = [
       ['Swiss','Chess.com','swiss','Rapid','Oct 12, 2026','6:00 PM'],
-      ['Round-robin','Lichess.com','roundrobin','Classical','Oct 18, 2026','2:00 PM'],
-      ['Double round-robin','Campus Hall B','doubleroundrobin','Classical','Oct 25, 2026','10:00 AM'],
+      ['Round robin','Lichess.com','roundrobin','Classical','Oct 18, 2026','2:00 PM'],
+      ['Double round robin','Campus Hall B','doubleroundrobin','Classical','Oct 25, 2026','10:00 AM'],
       ['Knight\u2019s Gambit Cup','Chess.com','knockout','Blitz','Nov 2, 2026','7:30 PM'],
       ['Endgame Masters','Lichess.com','doubleelim','Rapid','Nov 9, 2026','5:00 PM'],
       ['League','Campus Hall A','league','Classical','Nov 15, 2026','12:00 PM'],
@@ -1109,7 +1109,7 @@ class Component extends DCLogic {
   }
 
   FMT = {
-    swiss:'Swiss', roundrobin:'Round-robin', doubleroundrobin:'Double round-robin',
+    swiss:'Swiss', roundrobin:'Round robin', doubleroundrobin:'Double round robin',
     knockout:'Single elimination', doubleelim:'Double elimination', league:'League',
     team:'Team tournament', arena:'Arena', multistage:'Multi-stage',
   };
@@ -1423,8 +1423,8 @@ class Component extends DCLogic {
   formatPublicLayout(fmt){
     const m={
       swiss:{label:'Standings + current pairings',mobile:'Live standings table with current-round pairings and player results.',web:'Full cross-table, round-by-round pairings and downloadable results.',dash:'Rolling standings with the active round highlighted.'},
-      roundrobin:{label:'Standings + schedule',mobile:'League-style standings and the full round schedule.',web:'Complete round-robin cross-table and fixture list.',dash:'Standings with next fixtures ticker.'},
-      doubleroundrobin:{label:'Standings + schedule',mobile:'Standings across both legs with schedule.',web:'Double round-robin cross-table (home/away) and fixtures.',dash:'Combined standings with leg indicator.'},
+      roundrobin:{label:'Standings + schedule',mobile:'League-style standings and the full round schedule.',web:'Complete round robin cross-table and fixture list.',dash:'Standings with next fixtures ticker.'},
+      doubleroundrobin:{label:'Standings + schedule',mobile:'Standings across both legs with schedule.',web:'Double round robin cross-table (home/away) and fixtures.',dash:'Combined standings with leg indicator.'},
       knockout:{label:'Bracket',mobile:'Interactive single-elimination bracket.',web:'Full bracket with match results and seeds.',dash:'Live bracket, current round auto-advances.'},
       doubleelim:{label:'Winners + losers + grand final',mobile:'Winners bracket, losers bracket and grand final tabs.',web:'Both brackets side by side with grand final.',dash:'Dual-bracket live view with elimination tracker.'},
       league:{label:'League table + fixtures',mobile:'League table with matchweek fixtures.',web:'Full league table, form guide and fixtures.',dash:'Table with live matchweek scores.'},
@@ -1563,7 +1563,7 @@ class Component extends DCLogic {
       else if(kind==='home.leaderboard') Object.assign(b,{isLeaderboard:true, lbTitle:'Club leaderboard', lb:[{rank:'1',name:'Ibrahim Ahmad',rating:'1810'},{rank:'2',name:'Omar Saleh',rating:'1740'},{rank:'3',name:'Leen Haddad',rating:'1685'},{rank:'4',name:'Yazan Khaled',rating:'1602'}]});
       else if(kind==='home.news') Object.assign(b,{isNews:true, news:[{title:'Summer training camp registration opens July 10',time:'Jul 1'},{title:'Club general assembly & board elections',time:'Jun 28'}]});
       else if(kind==='tournaments.tabs') Object.assign(b,{isTabs:true, tabItems:['Upcoming','Active','Completed']});
-      else if(kind==='tournaments.cards') Object.assign(b,{isTcards:true, tcards:[{name:'Swiss',meta:'Rapid · 16/16',status:'Live',color:'#B23A3A'},{name:'Round-robin',meta:'Classical · 16/16',status:'Upcoming',color:'#8a6f28'},{name:'Arena',meta:'Bullet · 16/16',status:'Upcoming',color:'#8a6f28'}]});
+      else if(kind==='tournaments.cards') Object.assign(b,{isTcards:true, tcards:[{name:'Swiss',meta:'Rapid · 16/16',status:'Live',color:'#B23A3A'},{name:'Round robin',meta:'Classical · 16/16',status:'Upcoming',color:'#8a6f28'},{name:'Arena',meta:'Bullet · 16/16',status:'Upcoming',color:'#8a6f28'}]});
       else if(kind==='games.review') Object.assign(b,{isBtnList:true, blTitle:'Review games', blBtns:['Game Review']});
       else if(kind==='games.analysis') Object.assign(b,{isBtnList:true, blTitle:'', blBtns:['New Analysis']});
       else if(kind==='tools.clock') Object.assign(b,{isChips:true, chTitle:'Chess Clock', chItems:['1+0','3+2','5+0','10+0','10+5']});
@@ -1646,7 +1646,7 @@ class Component extends DCLogic {
     ];
     const recentActivity = [
       {icon:'♞',tint:'#F3E4E6',title:'Swiss — Round 3 pairings generated',meta:'By Amina Osei · Swiss',time:'12m ago'},
-      {icon:'✓',tint:'#EAF6F0',title:'Round-robin published to public site',meta:'Visibility: Public',time:'1h ago'},
+      {icon:'✓',tint:'#EAF6F0',title:'Round robin published to public site',meta:'Visibility: Public',time:'1h ago'},
       {icon:'⚑',tint:'#FBEAEA',title:'Result disputed on Board 4',meta:'Knight\u2019s Gambit Cup',time:'2h ago'},
       {icon:'+',tint:'#EAF0FA',title:'6 new registrations approved',meta:'League',time:'4h ago'},
       {icon:'▦',tint:'#FBF1E2',title:'Winner photos uploaded',meta:'Swiss',time:'Yesterday'},

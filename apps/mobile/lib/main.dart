@@ -375,10 +375,10 @@ class AppwriteService {
     );
 
     final rows =
-        response.rows
-            .map((row) => _mapTournament(row, counts))
-            .whereType<TournamentSeed>()
-            .toList()
+        uniqueTournamentsByFormat(
+            response.rows
+                .map((row) => _mapTournament(row, counts))
+                .whereType<TournamentSeed>())
           ..sort((a, b) {
             final status = _statusOrder(
               a.status,
@@ -448,13 +448,13 @@ class AppwriteService {
 
   TournamentSeed? _mapTournament(models.Row row, Map<String, int> counts) {
     final data = row.data;
-    final name = data['name']?.toString();
     final format = data['format']?.toString();
     final timeControl = data['timeControl']?.toString();
     final rawStatus = data['status']?.toString() ?? 'upcoming';
 
-    if (name == null || format == null || timeControl == null) return null;
+    if (format == null || timeControl == null) return null;
     if (rawStatus == 'draft' || rawStatus == 'cancelled') return null;
+    final displayFormat = normalizeTournamentFormat(format);
 
     final roundsTotal = _asInt(data['roundsTotal']);
     final currentRound = _asInt(data['currentRound']);
@@ -468,18 +468,18 @@ class AppwriteService {
 
     return TournamentSeed(
       rowId: row.$id,
-      id: data['slug']?.toString() ?? row.$id,
-      name: name,
+      id: tournamentFormatId(displayFormat),
+      name: displayFormat,
       meta: '${_formatDate(startsAt)} · $location',
       chips: [
-        roundsTotal == null ? format : '$format · $roundsTotal rounds',
+        roundsTotal == null ? displayFormat : '$displayFormat · $roundsTotal rounds',
         timeControl,
         capacity == null
             ? '$displayedPlayers players'
             : '$displayedPlayers/$capacity players',
       ],
       current: _roundLabel(rawStatus, currentRound, roundsTotal),
-      format: format,
+      format: displayFormat,
       timeControl: timeControl,
       players: displayedPlayers,
       capacity: capacity,
@@ -973,6 +973,36 @@ int _statusOrder(String status) {
 String _checkInCode() {
   final value = DateTime.now().microsecondsSinceEpoch % 900000;
   return (value + 100000).toString();
+}
+
+String normalizeTournamentFormat(String value) {
+  final trimmed = value.trim();
+  if (RegExp(r'^round[-\s]?robin$', caseSensitive: false).hasMatch(trimmed)) {
+    return 'Round robin';
+  }
+  if (RegExp(r'^double\s+round[-\s]?robin$', caseSensitive: false)
+      .hasMatch(trimmed)) {
+    return 'Double round robin';
+  }
+  return trimmed;
+}
+
+String tournamentFormatId(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+}
+
+List<TournamentSeed> uniqueTournamentsByFormat(
+  Iterable<TournamentSeed> tournaments,
+) {
+  final rows = <String, TournamentSeed>{};
+  for (final tournament in tournaments) {
+    rows.putIfAbsent(tournament.id, () => tournament);
+  }
+  return rows.values.toList();
 }
 
 String _roundLabel(String status, int? currentRound, int? roundsTotal) {
@@ -5062,8 +5092,8 @@ class NewsList extends StatelessWidget {
           ),
           SizedBox(height: 10),
           NewsTile(
-            'Round-robin registration opens soon',
-            'Round-robin invitational · 6 players',
+            'Round robin registration opens soon',
+            'Round robin · 6 players',
           ),
         ],
       ),

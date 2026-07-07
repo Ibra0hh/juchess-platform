@@ -79,7 +79,7 @@ type BracketConfig =
 const boardPieces = ['♜', '♞', '', '♛', '', '♜', '♚', '', '♟', '♟', '', '', '♟', '♟', '♟', '', '', '', '♝', '', '', '♞', '', '', '', '', '', '♙', '♗', '', '', '', '', '', '♘', '', '♙', '', '', '', '', '', '', '', '', '♘', '♙', '', '♙', '♙', '♙', '', '', '♙', '♙', '♙', '♖', '', '♗', '♕', '', '♖', '♔', '']
 
 const bracketConfigs: Record<string, BracketConfig> = {
-  'knockout-cup': {
+  'single-elimination': {
     type: 'single',
     title: 'Single elimination bracket',
     bracket: {
@@ -109,7 +109,7 @@ const bracketConfigs: Record<string, BracketConfig> = {
       ],
     },
   },
-  'blitz-de': {
+  'double-elimination': {
     type: 'double',
     title: 'Double elimination bracket',
     brackets: {

@@ -105,7 +105,7 @@ export const members: Member[] = [
 
 export const demoTournaments: Tournament[] = [
   {
-    id: 'spring-open',
+    id: 'swiss',
     name: 'Swiss',
     status: 'Active',
     date: 'Jun 14 - Jul 12, 2026',
@@ -115,36 +115,36 @@ export const demoTournaments: Tournament[] = [
     participants: 12,
     capacity: 32,
     round: 'Round 4 of 7',
-    desc: "The club's flagship open - seven Swiss rounds across four weekends, open to all JU students and staff.",
+    desc: 'Swiss test tournament.',
   },
   {
-    id: 'faculty-rr',
-    name: 'Round-robin',
+    id: 'round-robin',
+    name: 'Round robin',
     status: 'Active',
     date: 'May 3 - May 31, 2026',
     location: 'Engineering Lounge',
-    format: 'Round-robin',
+    format: 'Round robin',
     timeControl: '10+5 Rapid',
     participants: 6,
     capacity: 6,
     round: 'Final - 5 rounds',
-    desc: 'Six faculty champions, everyone plays everyone once.',
+    desc: 'Round robin test tournament.',
   },
   {
-    id: 'masters-drr',
-    name: 'Double round-robin',
+    id: 'double-round-robin',
+    name: 'Double round robin',
     status: 'Active',
     date: 'Jun 1 - Jul 20, 2026',
     location: 'Library Seminar Room 2',
-    format: 'Double round-robin',
+    format: 'Double round robin',
     timeControl: '25+10 Classical',
     participants: 4,
     capacity: 4,
     round: 'Cycle 2 - Round 5 of 6',
-    desc: 'Top four club ratings meet twice - once with each color.',
+    desc: 'Double round robin test tournament.',
   },
   {
-    id: 'knockout-cup',
+    id: 'single-elimination',
     name: 'Single elimination',
     status: 'Active',
     date: 'Jun 20 - Jul 10, 2026',
@@ -154,10 +154,10 @@ export const demoTournaments: Tournament[] = [
     participants: 16,
     capacity: 16,
     round: 'Semifinals',
-    desc: 'Sixteen enter, one lifts the cup. Straight knockout, no second chances.',
+    desc: 'Single elimination test tournament.',
   },
   {
-    id: 'blitz-de',
+    id: 'double-elimination',
     name: 'Double elimination',
     status: 'Active',
     date: 'Jun 26 - Jul 5, 2026',
@@ -167,23 +167,36 @@ export const demoTournaments: Tournament[] = [
     participants: 12,
     capacity: 12,
     round: 'Losers Round 3',
-    desc: 'Twelve blitz players, two lives each. Lose once, drop to the losers bracket; lose twice, you are out.',
+    desc: 'Double elimination test tournament.',
   },
   {
-    id: 'autumn-qualifier',
-    name: 'Swiss team',
-    status: 'Upcoming',
-    date: 'Sep 12 - Sep 19, 2026',
-    location: 'Student Union Hall B',
-    format: 'Swiss team',
-    timeControl: '15+10 Rapid',
-    participants: 0,
-    capacity: 40,
-    round: 'Registration open',
-    desc: 'Qualifying event for the university rapid team selection.',
+    id: 'league',
+    name: 'League',
+    status: 'Active',
+    date: 'Jul 2 - Aug 20, 2026',
+    location: 'Hall B',
+    format: 'League',
+    timeControl: '10+5 Rapid',
+    participants: 8,
+    capacity: 8,
+    round: 'Week 4 of 7',
+    desc: 'League test tournament.',
   },
   {
-    id: 'beginner-arena',
+    id: 'team',
+    name: 'Team',
+    status: 'Active',
+    date: 'Jul 9 - Jul 23, 2026',
+    location: 'Hall A',
+    format: 'Team',
+    timeControl: '10+0 Rapid',
+    participants: 16,
+    capacity: 16,
+    round: 'Match day 2 of 3',
+    desc: 'Team test tournament.',
+  },
+  {
+    id: 'arena',
     name: 'Arena',
     status: 'Upcoming',
     date: 'Aug 7, 2026',
@@ -193,20 +206,20 @@ export const demoTournaments: Tournament[] = [
     participants: 0,
     capacity: 48,
     round: 'Registration open',
-    desc: 'A low-pressure club night for new players and casual members.',
+    desc: 'Arena test tournament.',
   },
   {
-    id: 'winter-classic',
-    name: 'Swiss',
-    status: 'Completed',
-    date: 'Dec 5 - Dec 19, 2025',
+    id: 'multi-stage',
+    name: 'Multi-stage',
+    status: 'Active',
+    date: 'Jul 5 - Jul 25, 2026',
     location: 'Library Seminar Room 2',
-    format: 'Swiss',
-    timeControl: '30+30 Classical',
-    participants: 18,
+    format: 'Multi-stage',
+    timeControl: '10+5 Rapid',
+    participants: 16,
     capacity: 24,
-    round: 'Final',
-    desc: 'The previous semester classical championship.',
+    round: 'Stage 2 - Quarterfinal',
+    desc: 'Multi-stage test tournament.',
   },
 ]
 
@@ -466,7 +479,7 @@ export const sampleGamesBySource: Record<GameSource, SampleGame[]> = {
     makeSampleGame('tournament', 3, 4, 5, '1-0', 'Jul 2, 2026', 'Sicilian: Alapin', 'Swiss - R4'),
     makeSampleGame('tournament', 8, 1, 4, '1-0', 'Jun 27, 2026', "Queen's Gambit Accepted", 'Single elimination - QF'),
     makeSampleGame('tournament', 2, 3, 2, '0-1', 'Jun 27, 2026', 'London System', 'Single elimination - QF'),
-    makeSampleGame('tournament', 5, 0, 5, '1-0', 'Jun 20, 2026', 'Italian Game: Giuoco Piano', 'Double round-robin - R3'),
+    makeSampleGame('tournament', 5, 0, 5, '1-0', 'Jun 20, 2026', 'Italian Game: Giuoco Piano', 'Double round robin - R3'),
   ],
 }
 
@@ -505,9 +518,9 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
       loadRegistrationCounts(),
     ])
 
-    const rows = response.rows
+    const rows = uniqueTournamentsByFormat(response.rows
       .map((row) => mapAppwriteTournament(row, participantCounts))
-      .filter((tournament): tournament is Tournament => Boolean(tournament))
+      .filter((tournament): tournament is Tournament => Boolean(tournament)))
       .sort(compareTournaments)
 
     return {
@@ -518,6 +531,14 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
     console.warn('JuChess cloud tournament read failed.', error)
     return { tournaments: [], source: 'unavailable', error }
   }
+}
+
+function uniqueTournamentsByFormat(tournaments: Tournament[]) {
+  const rows = new Map<string, Tournament>()
+  tournaments.forEach((tournament) => {
+    if (!rows.has(tournament.id)) rows.set(tournament.id, tournament)
+  })
+  return Array.from(rows.values())
 }
 
 async function loadRegistrationCounts() {
@@ -547,24 +568,40 @@ function mapAppwriteTournament(
   row: AppwriteTournamentRow,
   participantCounts: Map<string, number>,
 ): Tournament | null {
-  if (!row.name || !row.format || !row.timeControl) return null
+  if (!row.format || !row.timeControl) return null
 
   const status = mapStatus(row.status)
   if (!status) return null
+  const format = normalizeTournamentFormat(row.format)
 
   return {
-    id: row.slug || row.$id,
-    name: row.name,
+    id: formatRouteId(format),
+    name: format,
     status,
     date: formatDateRange(row.startsAt, row.endsAt),
     location: row.location || 'University of Jordan',
-    format: row.format,
+    format,
     timeControl: row.timeControl,
     participants: participantCounts.get(row.$id) ?? 0,
     capacity: row.capacity,
     round: formatRound(row),
     desc: row.description || 'Club tournament details will be published by the organizers.',
   }
+}
+
+function normalizeTournamentFormat(format: string) {
+  const value = format.trim()
+  if (/^round[-\s]?robin$/i.test(value)) return 'Round robin'
+  if (/^double\s+round[-\s]?robin$/i.test(value)) return 'Double round robin'
+  return value
+}
+
+function formatRouteId(format: string) {
+  return format
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 function mapStatus(status: AppwriteTournamentRow['status']): TournamentStatus | null {

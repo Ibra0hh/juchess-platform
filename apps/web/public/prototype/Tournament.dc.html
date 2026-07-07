@@ -492,7 +492,7 @@ class Component extends DCLogic {
 
   getT() {
     if (!window.JU) return null;
-    var id = new URLSearchParams(window.location.search).get('id') || 'spring-open';
+    var id = new URLSearchParams(window.location.search).get('id') || 'swiss';
     return window.JU.getTournament(id);
   }
 
@@ -536,7 +536,7 @@ class Component extends DCLogic {
 
     var isBracketFmt = t.format === 'Single elimination' || t.format === 'Double elimination';
     var isMulti = t.format === 'Multi-stage';
-    var isRR = t.format === 'Round-robin' || t.format === 'Double round-robin';
+    var isRR = t.format === 'Round robin' || t.format === 'Double round robin';
     var isLeague = t.format === 'League';
     var isTeam = t.format === 'Team';
     var isArena = t.format === 'Arena';
@@ -564,7 +564,7 @@ class Component extends DCLogic {
     } else if (isLeague) { leaderLine = t.league[0].team + ' \u00B7 ' + t.league[0].pts + ' pts'; }
     else if (isTeam) { leaderLine = t.teamScore.home + ' ' + t.teamScore.hs + ' \u2013 ' + t.teamScore.as + ' ' + t.teamScore.away; }
     else if (isArena) { leaderLine = window.JU.players[t.arena.board[0].p].name + ' \u00B7 ' + t.arena.board[0].score + ' pts'; }
-    else if (t.id === 'knockout-cup') { leaderLine = 'Semifinals in progress'; }
+    else if (t.id === 'single-elimination') { leaderLine = 'Semifinals in progress'; }
     else if (isDoubleElim) { leaderLine = 'Winners Final live'; }
 
     /* home leaders (standings formats) */
