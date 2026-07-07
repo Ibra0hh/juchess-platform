@@ -21,11 +21,20 @@ same UI, not a reason to redesign the product.
 - Repo path on this machine: `C:\Users\ibra_\Downloads\juchess-platform`
 - GitHub repo: `Ibra0hh/juchess-platform`
 - Current main branch is pushed.
-- GitHub Pages / docs are prototype/reference only. The real backend-connected
-  apps are under `apps/web`, `apps/admin`, and `apps/mobile`.
+- GitHub Pages output is built from the real React apps into `docs/web` and
+  `docs/admin`. Prototype references remain under `docs/prototypes`.
+- Public website: `https://ibra0hh.github.io/juchess-platform/web/`
+- Admin website: `https://ibra0hh.github.io/juchess-platform/admin/`
+- Root URL redirects to the public website:
+  `https://ibra0hh.github.io/juchess-platform/`
 
 Recent important commits:
 
+- `cf3ffc5 Make tournament creation draft-only`
+- `5439bf7 Fix GitHub Pages links`
+- `8495ecb Update admin tournament status workflow`
+- `2270110 Add stage tabs to tournament rounds`
+- `649ba09 Match web tournament tabs to mobile`
 - `2e22d72 Add mobile splash animation and logo icon`
 - `f5e0e5f Refine mobile bracket connectors`
 - `252e610 Add mobile bracket connector lines`
@@ -80,6 +89,16 @@ Implemented/working:
   state are wired with prototype fallback data.
 - Admin app has separated admin access through `admin_profiles`.
 - Admin can manage identity/IP blocks through server Functions.
+- Admin tournament list tabs must be:
+  Draft, Upcoming, Active, Completed, Archived.
+- Admin create tournament is intentionally enabled only on the Draft tab.
+- Admin create tournament currently saves every new tournament as `draft`.
+- Admin create tournament Basic information step must stay simple:
+  tournament name, description, number of players, typed location/platform,
+  start date/time, registration deadline, and tournament design image placeholder.
+- Admin create tournament Basic information step must not show:
+  end date/time, Chess.com/Lichess.com/Main Campus chips, visibility controls,
+  or access controls.
 - Flutter app has Appwrite session detection, sign-in, sign-up, sign-out,
   tournament reads, tournament details, registration/cancel behavior, and
   prototype-style mobile screens.
@@ -93,6 +112,17 @@ Implemented/working:
   chess pieces inspired by the web homepage.
 - Android native launch screen and launcher icon use the club logo.
 - Bottom Home tab in the Flutter app uses the club logo.
+
+Tournament detail tab rules:
+
+- Public website and Flutter mobile should match.
+- Tournament detail tabs should be:
+  Registration, Players, Rounds, Games, Standings.
+- Single elimination and double elimination use bracket-style Rounds content.
+- Swiss, Arena, League, Round robin, and similar formats keep the same top tabs
+  but change the content inside Rounds/Games/Standings as appropriate.
+- Multi-stage Rounds content should include a small inner nav with:
+  Stage one and Stage two.
 
 Most recent phone verification:
 
@@ -110,8 +140,19 @@ npm run dev:web
 npm run dev:admin
 npm run build:web
 npm run build:admin
+npm run build:pages
 npm run mobile:analyze
 npm run mobile:test
+```
+
+Build and publish GitHub Pages after web/admin React changes:
+
+```powershell
+npm run build:pages
+git status --short
+git add apps/web apps/admin docs
+git commit -m "<message>"
+git push origin main
 ```
 
 Run Flutter mobile with Appwrite config:
@@ -207,15 +248,16 @@ opening Settings > Languages & Frameworks > Android SDK and installing:
 
 Recommended next steps:
 
-1. Continue Flutter mobile UI fidelity screen-by-screen from
+1. Preserve the latest admin create tournament contract above.
+2. Continue Flutter mobile UI fidelity screen-by-screen from
    `docs/prototypes/mobile/JuChess.mobile.dc.html`.
-2. Keep connecting real Appwrite data after each screen matches the prototype.
-3. Continue porting web screens from prototype to real React:
+3. Keep connecting real Appwrite data after each screen matches the prototype.
+4. Continue porting web screens from prototype to real React:
    Home, Games, Leaderboard, Profile, Sign In, Sign Up, Forgot Password.
-4. Continue improving admin app while preserving the admin prototype layout.
-5. Build out real tournament management:
+5. Continue improving admin app while preserving the admin prototype layout.
+6. Build out real tournament management:
    participants, rounds, procedure, standings, games/results, announcements.
-6. Add chess features later:
+7. Add chess features later:
    PGN upload, review, analysis, move quality badges, then engine/Stockfish.
 
 ## Important User Preferences
@@ -228,10 +270,27 @@ Recommended next steps:
   screenshots when possible.
 - Avoid showing Appwrite/cloud wording to end users inside the app. User-facing
   copy should say normal product phrases such as "No tournaments published yet."
+- The user often asks to see screenshots in the Android emulator or hosted web.
+  Inspect the real screen before saying a visual change is done.
 
 ## Known Verification Status
 
-Latest verified commands:
+Latest verified commands on July 7, 2026:
+
+```powershell
+npm run build:admin
+npm run lint:admin
+npm run build:pages
+```
+
+Status:
+
+- `npm run build:admin` passed.
+- `npm run build:pages` passed and rebuilt `docs/web` plus `docs/admin`.
+- `npm run lint:admin` passed with existing warnings in
+  `apps/admin/public/prototype/support.js`.
+
+Earlier mobile verification commands:
 
 ```powershell
 npm run mobile:analyze
@@ -246,4 +305,3 @@ For web/admin, run before claiming a new change is complete:
 npm run build:web
 npm run build:admin
 ```
-

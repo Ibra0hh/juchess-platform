@@ -67,8 +67,6 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
 
 const tournamentTabs: TournamentTab[] = ['draft', 'upcoming', 'active', 'completed', 'archived']
 const createSteps = ['Basic information', 'Tournament format', 'Time control', 'Public preview', 'Review'] as const
-const locationOptions = ['Chess.com', 'Lichess.com', 'Main Campus', 'Custom']
-const accessOptions = ['Open', 'Members only', 'Invitational', 'University students only']
 const formatOptions = [
   { value: 'Swiss', icon: '♟', layout: 'Standings + current pairings' },
   { value: 'Round robin', icon: '◍', layout: 'Standings + schedule' },
@@ -96,7 +94,7 @@ function createInitialTournamentForm(): TournamentInput {
     format: 'Swiss',
     timeControl: '15+10 Rapid',
     capacity: 16,
-    location: 'Chess.com',
+    location: '',
   }
 }
 
@@ -802,8 +800,6 @@ function TournamentsScreen({
   const [timeIncrement, setTimeIncrement] = useState('10')
   const [timeDelay, setTimeDelay] = useState('0')
   const [gamesPerMatch, setGamesPerMatch] = useState('1')
-  const [accessMode, setAccessMode] = useState('Open')
-  const [customLocation, setCustomLocation] = useState('')
   const [selectedTournamentKey, setSelectedTournamentKey] = useState('')
   const [registrations, setRegistrations] = useState<AdminRegistration[]>([])
   const [registrationsLoading, setRegistrationsLoading] = useState(false)
@@ -829,12 +825,10 @@ function TournamentsScreen({
     { label: 'Name', value: form.name || '-' },
     { label: 'Format', value: form.format },
     { label: 'Players', value: String(form.capacity || '-') },
-    { label: 'Location', value: form.location === 'Custom' ? customLocation || 'Custom' : form.location || '-' },
+    { label: 'Location', value: form.location || '-' },
     { label: 'Time control', value: form.timeControl || '-' },
     { label: 'Games/match', value: gamesPerMatch || '-' },
     { label: 'Start', value: form.startsAt ? `${formatDate(form.startsAt)} ${formatTime(form.startsAt)}` : '-' },
-    { label: 'Visibility', value: 'Draft only' },
-    { label: 'Access', value: accessMode },
     { label: 'Slug', value: buildTournamentSlugBase(form.name) },
   ]
 
@@ -893,8 +887,6 @@ function TournamentsScreen({
     setTimeIncrement('10')
     setTimeDelay('0')
     setGamesPerMatch('1')
-    setAccessMode('Open')
-    setCustomLocation('')
   }
 
   function openCreatePanel() {
@@ -955,7 +947,6 @@ function TournamentsScreen({
     try {
       await createTournament({
         ...form,
-        location: form.location === 'Custom' ? customLocation || 'Custom' : form.location,
         slug: buildTournamentSlug(form.name),
         status: 'draft',
         timeControl: `${timeMinutes || '0'}+${timeIncrement || '0'} ${timeCategory}`,
@@ -1092,55 +1083,16 @@ function TournamentsScreen({
                   <label className="wide">Tournament name<input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="Spring Championship" required /></label>
                   <label className="wide">Description<textarea value={form.description ?? ''} onChange={(event) => update('description', event.target.value)} placeholder="Short description..." rows={3} /></label>
                   <label>Number of players<input type="number" min={2} value={form.capacity ?? ''} onChange={(event) => update('capacity', Number(event.target.value))} /></label>
-                  <div className="create-field">
-                    <span>Location / platform</span>
-                    <div className="create-chip-row">
-                      {locationOptions.map((location) => (
-                        <button
-                          key={location}
-                          type="button"
-                          className={form.location === location ? 'active' : undefined}
-                          onClick={() => update('location', location)}
-                        >
-                          {location}
-                        </button>
-                      ))}
-                    </div>
-                    {form.location === 'Custom' ? (
-                      <input
-                        aria-label="Custom location"
-                        value={customLocation}
-                        onChange={(event) => setCustomLocation(event.target.value)}
-                        placeholder="Type venue / platform..."
-                      />
-                    ) : null}
-                  </div>
+                  <label>
+                    Location / platform
+                    <input
+                      value={form.location ?? ''}
+                      onChange={(event) => update('location', event.target.value)}
+                      placeholder="Type venue / platform..."
+                    />
+                  </label>
                   <label>Start date / time<input type="datetime-local" value={toDateTimeLocalValue(form.startsAt)} onChange={(event) => update('startsAt', fromDateTimeLocalValue(event.target.value))} /></label>
-                  <label>End date / time<input type="datetime-local" value={toDateTimeLocalValue(form.endsAt)} onChange={(event) => update('endsAt', fromDateTimeLocalValue(event.target.value))} /></label>
                   <label>Registration deadline<input type="datetime-local" /></label>
-                  <div className="create-field">
-                    <span>Visibility</span>
-                    <div className="create-chip-row">
-                      <button type="button" className="active">Draft</button>
-                      <button type="button" disabled>Private</button>
-                      <button type="button" disabled>Public</button>
-                    </div>
-                  </div>
-                  <div className="create-field wide">
-                    <span>Access</span>
-                    <div className="create-chip-row">
-                      {accessOptions.map((access) => (
-                        <button
-                          key={access}
-                          type="button"
-                          className={accessMode === access ? 'active' : undefined}
-                          onClick={() => setAccessMode(access)}
-                        >
-                          {access}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                   <div className="create-upload wide">
                     <span>Tournament design image</span>
                     <strong>Attach design later from tournament media</strong>
@@ -1314,7 +1266,7 @@ function TournamentTable({
           {rows.map((item) => (
             <tr key={item.rowId ?? item.id}>
               <td><strong>{item.name}</strong></td>
-              <td>{item.location || 'Main Campus'}</td>
+              <td>{item.location || 'Not set'}</td>
               <td><span className="tag">{item.format}</span></td>
               <td><b>{item.timeControl}</b></td>
               <td className="mono center">{item.players}/{item.capacity || 'open'}</td>
