@@ -14,6 +14,7 @@ import './TournamentDetailPage.css'
 type DetailTab = 'registration' | 'players' | 'rounds' | 'games' | 'table'
 type GameView = 'grid' | 'list'
 type BracketView = 'winners' | 'losers' | 'final'
+type StageRoundTab = 'stage-one' | 'stage-two'
 
 type StandingRow = {
   member: Member
@@ -296,7 +297,7 @@ function TournamentDetailPage() {
         ) : null}
 
         {activeTab === 'rounds' ? (
-          <RoundsTab rounds={detail.rounds} />
+          <RoundsTab rounds={detail.rounds} tournament={tournament} />
         ) : null}
 
         {activeTab === 'games' ? (
@@ -402,16 +403,53 @@ function PlayersTab({ standings }: { standings: StandingRow[] }) {
   )
 }
 
-function RoundsTab({ rounds }: { rounds: RoundGroup[] }) {
+function RoundsTab({
+  rounds,
+  tournament,
+}: {
+  rounds: RoundGroup[]
+  tournament: Tournament
+}) {
+  const isMultiStage = isMultiStageTournament(tournament)
+  const [stageTab, setStageTab] = useState<StageRoundTab>(() => initialStageTab(tournament.round))
+
+  useEffect(() => {
+    setStageTab(initialStageTab(tournament.round))
+  }, [tournament.id, tournament.round])
+
+  const visibleRounds = isMultiStage ? buildStageRoundGroups(rounds, stageTab) : rounds
+
   return (
     <section className="detail-tab-panel">
       <div className="rounds-panel">
         <div className="panel-heading">
           <h2>Rounds</h2>
-          <span>{rounds.length} shown</span>
+          <span>{isMultiStage ? stageLabel(stageTab) : `${visibleRounds.length} shown`}</span>
         </div>
+        {isMultiStage ? (
+          <div className="stage-round-tabs" role="tablist" aria-label="Tournament stages">
+            <button
+              type="button"
+              role="tab"
+              className={stageTab === 'stage-one' ? 'active' : undefined}
+              aria-selected={stageTab === 'stage-one'}
+              onClick={() => setStageTab('stage-one')}
+            >
+              Stage One
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={stageTab === 'stage-two' ? 'active' : undefined}
+              aria-selected={stageTab === 'stage-two'}
+              onClick={() => setStageTab('stage-two')}
+            >
+              Stage Two
+            </button>
+          </div>
+        ) : null}
         <div className="round-list">
-          {rounds.map((round) => (
+          {visibleRounds.map((round) => (
             <article className={`round-card ${round.state}`} key={round.label}>
               <div className="round-card-heading">
                 <div>
@@ -984,6 +1022,24 @@ function buildRoundGroups(tournament: Tournament, players: Member[]): RoundGroup
   }]
 }
 
+function buildStageRoundGroups(rounds: RoundGroup[], stageTab: StageRoundTab): RoundGroup[] {
+  if (stageTab === 'stage-one') {
+    return rounds.map((round, index) => ({
+      ...round,
+      label: `Stage One - Round ${index + 1}`,
+      note: index === 0 ? 'Group stage pairings' : round.note,
+      state: round.state === 'next' ? 'done' : round.state,
+    }))
+  }
+
+  return rounds.map((round, index) => ({
+    ...round,
+    label: index === 0 ? 'Stage Two - Playoffs' : `Stage Two - Round ${index + 1}`,
+    note: index === 0 ? 'Playoff qualification pairings' : 'Placement pairings',
+    state: index === 0 ? 'live' : round.state,
+  }))
+}
+
 function pairRound(players: Member[], roundNumber: number, state: 'done' | 'live' | 'next'): RoundPairing[] {
   const rotated = [...players.slice(roundNumber % players.length), ...players.slice(0, roundNumber % players.length)]
   return rotated.slice(0, 8).reduce<RoundPairing[]>((acc, member, index, source) => {
@@ -1018,8 +1074,20 @@ function extractTotalRounds(value: string) {
   return total?.[1] ? Number(total[1]) : finalRounds?.[1] ? Number(finalRounds[1]) : null
 }
 
+function initialStageTab(round: string): StageRoundTab {
+  return /stage\s*2|stage\s*two/i.test(round) ? 'stage-two' : 'stage-one'
+}
+
+function stageLabel(stageTab: StageRoundTab) {
+  return stageTab === 'stage-one' ? 'Stage One' : 'Stage Two'
+}
+
+function isMultiStageTournament(tournament: Tournament) {
+  return /multi[-\s]?stage|stage/i.test(tournament.format)
+}
+
 function isBracketTournament(tournament: Tournament) {
-  return Boolean(bracketConfigs[tournament.id]) || /elimination|stage/i.test(tournament.format)
+  return Boolean(bracketConfigs[tournament.id]) || /knockout|elimination/i.test(tournament.format)
 }
 
 export default TournamentDetailPage

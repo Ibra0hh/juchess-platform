@@ -2203,7 +2203,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                                   child: DetailTabPill(
                                     item.label,
                                     selected: tab == item.key,
-                                    live: item.key == 'live',
+                                    live:
+                                        item.key == 'games' &&
+                                        event.status == 'active',
                                   ),
                                 ),
                               ),
@@ -2243,12 +2245,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       },
                       onMain: () => setState(() => tab = _mainTabKey(event)),
                     )
-                  else if (tab == 'live')
-                    _TournamentLiveTab(event: event)
                   else if (tab == 'main')
                     _TournamentMainTab(event: event)
                   else if (tab == 'rounds')
                     _TournamentRoundsTab(event: event)
+                  else if (tab == 'games')
+                    _TournamentLiveTab(event: event)
                   else
                     _TournamentPlayersTab(event: event),
                 ],
@@ -2261,16 +2263,16 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   List<DetailTab> _tabsFor(TournamentSeed event) {
-    final items = <DetailTab>[
-      DetailTab(
-        'overview',
-        event.status == 'completed' ? 'Overview' : 'Registration',
-      ),
-    ];
-    if (event.status == 'active') items.add(const DetailTab('live', 'Live'));
-    items.add(DetailTab('main', _mainTabLabel(event)));
-    items.add(DetailTab('rounds', _roundsTabLabel(event)));
+    final items = <DetailTab>[const DetailTab('overview', 'Registration')];
     items.add(const DetailTab('players', 'Players'));
+    if (_hasBracketTab(event)) {
+      items.add(DetailTab('main', _mainTabLabel(event)));
+      items.add(const DetailTab('games', 'Games'));
+    } else {
+      items.add(const DetailTab('rounds', 'Rounds'));
+      items.add(const DetailTab('games', 'Games'));
+      items.add(const DetailTab('main', 'Standings'));
+    }
     if (!items.any((item) => item.key == tab)) tab = 'overview';
     return items;
   }
@@ -3027,14 +3029,39 @@ class StandingRow extends StatelessWidget {
   }
 }
 
-class _TournamentRoundsTab extends StatelessWidget {
+class _TournamentRoundsTab extends StatefulWidget {
   const _TournamentRoundsTab({required this.event});
 
   final TournamentSeed event;
 
   @override
+  State<_TournamentRoundsTab> createState() => _TournamentRoundsTabState();
+}
+
+class _TournamentRoundsTabState extends State<_TournamentRoundsTab> {
+  late String _stageTab;
+
+  @override
+  void initState() {
+    super.initState();
+    _stageTab = _initialStageTab(widget.event);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TournamentRoundsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.event.id != widget.event.id ||
+        oldWidget.event.current != widget.event.current) {
+      _stageTab = _initialStageTab(widget.event);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final rounds = event.status == 'upcoming' ? <RoundSeed>[] : sampleRounds;
+    final showStageNav = _hasStageRounds(widget.event);
+    final rounds = widget.event.status == 'upcoming'
+        ? <RoundSeed>[]
+        : _roundsForStage(widget.event, _stageTab);
     if (rounds.isEmpty) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -3048,34 +3075,80 @@ class _TournamentRoundsTab extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: Column(
-        children: rounds
-            .map(
-              (round) => PrototypeCard(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      round.label,
-                      style: const TextStyle(
-                        color: PrototypeColors.burgundy,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
+        children: [
+          if (showStageNav) ...[
+            StageRoundNav(
+              selected: _stageTab,
+              onSelected: (value) => setState(() => _stageTab = value),
+            ),
+            const SizedBox(height: 12),
+          ],
+          ...rounds.map(
+            (round) => PrototypeCard(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    round.label,
+                    style: const TextStyle(
+                      color: PrototypeColors.burgundy,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
                     ),
-                    const SizedBox(height: 9),
-                    ...round.games.map(
-                      (game) => MatchLine(
-                        white: game.white,
-                        black: game.black,
-                        result: game.result,
-                      ),
+                  ),
+                  const SizedBox(height: 9),
+                  ...round.games.map(
+                    (game) => MatchLine(
+                      white: game.white,
+                      black: game.black,
+                      result: game.result,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            )
-            .toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class StageRoundNav extends StatelessWidget {
+  const StageRoundNav({
+    required this.selected,
+    required this.onSelected,
+    super.key,
+  });
+
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0x1021304e),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0x2021304e)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => onSelected('stage-one'),
+              child: TabPill('Stage One', selected: selected == 'stage-one'),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => onSelected('stage-two'),
+              child: TabPill('Stage Two', selected: selected == 'stage-two'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3192,10 +3265,8 @@ class TournamentEmptyPanel extends StatelessWidget {
 
 String _mainTabLabel(TournamentSeed event) {
   final lower = event.format.toLowerCase();
-  if (lower.contains('knockout') || lower.contains('elimination')) {
-    return 'Bracket';
-  }
-  if (lower.contains('arena')) return 'Leaderboard';
+  if (_hasBracketTab(event)) return 'Bracket';
+  if (lower.contains('arena')) return 'Standings';
   if (lower.contains('team')) return 'Teams';
   if (lower.contains('stage')) return 'Stages';
   return 'Standings';
@@ -3203,13 +3274,26 @@ String _mainTabLabel(TournamentSeed event) {
 
 String _mainTabKey(TournamentSeed event) => 'main';
 
-String _roundsTabLabel(TournamentSeed event) {
+String _initialStageTab(TournamentSeed event) {
+  final lower = event.current.toLowerCase();
+  return lower.contains('stage 2') || lower.contains('stage two')
+      ? 'stage-two'
+      : 'stage-one';
+}
+
+bool _hasStageRounds(TournamentSeed event) {
   final lower = event.format.toLowerCase();
-  if (lower.contains('knockout') || lower.contains('elimination')) {
-    return 'Matches';
-  }
-  if (lower.contains('arena')) return 'Games';
-  return 'Rounds';
+  return lower.contains('stage') || lower.contains('multi');
+}
+
+List<RoundSeed> _roundsForStage(TournamentSeed event, String stageTab) {
+  if (!_hasStageRounds(event)) return sampleRounds;
+  return stageTab == 'stage-two' ? stageTwoRounds : stageOneRounds;
+}
+
+bool _hasBracketTab(TournamentSeed event) {
+  final lower = event.format.toLowerCase();
+  return lower.contains('knockout') || lower.contains('elimination');
 }
 
 class TournamentInfoTile extends StatelessWidget {
@@ -6217,6 +6301,31 @@ const sampleRounds = [
     MatchSeed('Ibrahim Ahmad', 'Omar Saleh', '1/2'),
     MatchSeed('Rania Odeh', 'Yazan Khaled', '1-0'),
     MatchSeed('Leen Haddad', 'Mira Nasser', '0-1'),
+  ]),
+];
+
+const stageOneRounds = [
+  RoundSeed('Stage One - Round 1', [
+    MatchSeed('Ibrahim Ahmad', 'Jana Taha', '1-0'),
+    MatchSeed('Rania Odeh', 'Adam Kareem', '1-0'),
+    MatchSeed('Omar Saleh', 'Salma Nouri', '1/2'),
+  ]),
+  RoundSeed('Stage One - Round 2', [
+    MatchSeed('Leen Haddad', 'Hadi Zaid', '1-0'),
+    MatchSeed('Yazan Khaled', 'Dina Faris', '0-1'),
+    MatchSeed('Mira Nasser', 'Laith Hani', '1-0'),
+  ]),
+];
+
+const stageTwoRounds = [
+  RoundSeed('Stage Two - Playoffs', [
+    MatchSeed('Ibrahim Ahmad', 'Rania Odeh', 'live'),
+    MatchSeed('Omar Saleh', 'Leen Haddad', 'live'),
+    MatchSeed('Dina Faris', 'Mira Nasser', '-'),
+  ]),
+  RoundSeed('Stage Two - Finals', [
+    MatchSeed('Semifinal winner', 'Semifinal winner', '-'),
+    MatchSeed('Third-place match', 'Pending opponent', '-'),
   ]),
 ];
 

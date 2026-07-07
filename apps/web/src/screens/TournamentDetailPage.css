@@ -508,6 +508,38 @@
   overflow: hidden;
 }
 
+.stage-round-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 14px;
+  border-bottom: 1px solid rgba(30, 43, 69, 0.08);
+}
+
+.stage-round-tabs button {
+  flex: 1;
+  min-height: 38px;
+  border: 1px solid rgba(30, 43, 69, 0.16);
+  border-radius: 8px;
+  background: #fffaf0;
+  color: rgba(30, 43, 69, 0.72);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stage-round-tabs button:hover,
+.stage-round-tabs button.active {
+  border-color: #7a2431;
+  color: #7a2431;
+}
+
+.stage-round-tabs button.active {
+  background: #1e2b45;
+  border-color: #1e2b45;
+  color: #fffaf0;
+}
+
 .round-list {
   display: grid;
   gap: 14px;
