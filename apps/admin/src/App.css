@@ -1278,16 +1278,14 @@ button {
   font-weight: 900;
 }
 
-.format-card-grid,
-.preview-surface-grid {
+.format-card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 10px;
 }
 
-.format-card-grid button,
-.preview-surface-grid article {
+.format-card-grid button {
   border: 1.5px solid #e6dfd3;
   border-radius: 11px;
   background: #fff;
@@ -1312,8 +1310,7 @@ button {
   font-size: 21px;
 }
 
-.format-card-grid strong,
-.preview-surface-grid strong {
+.format-card-grid strong {
   display: block;
   color: inherit;
   font-size: 12.5px;
@@ -1326,96 +1323,6 @@ button {
   color: #8b8577;
   font-size: 11px;
   line-height: 1.35;
-}
-
-.preview-surface-grid article {
-  overflow: hidden;
-  background: #faf7f1;
-}
-
-.preview-surface-grid strong {
-  padding: 10px 12px;
-  background: #14213d;
-  color: #fff;
-}
-
-.preview-surface-grid span,
-.preview-surface-grid p {
-  display: block;
-  padding: 0 12px;
-}
-
-.preview-surface-grid span {
-  margin-top: 12px;
-  color: #7d2434;
-  font-size: 11px;
-  font-weight: 900;
-}
-
-.preview-surface-grid p {
-  margin: 7px 0 14px;
-  color: #8b8577;
-  font-size: 11.5px;
-  line-height: 1.5;
-}
-
-.review-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 18px;
-  margin-bottom: 18px;
-}
-
-.review-grid div {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 9px 12px;
-  border: 1px solid #ede6d9;
-  border-radius: 8px;
-  background: #faf7f1;
-}
-
-.review-grid span {
-  color: #8b8577;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.review-grid strong {
-  color: #14213d;
-  font-size: 12.5px;
-  font-weight: 900;
-  overflow-wrap: anywhere;
-  text-align: right;
-}
-
-.create-warning,
-.create-ok {
-  display: grid;
-  gap: 6px;
-  border-radius: 10px;
-  padding: 14px 16px;
-  font-size: 12.5px;
-  font-weight: 800;
-}
-
-.create-warning {
-  border: 1px solid #ead3a8;
-  background: #fbf1e2;
-  color: #8a6410;
-}
-
-.create-warning strong {
-  color: #c77d0a;
-  font-size: 12px;
-  text-transform: uppercase;
-}
-
-.create-ok {
-  border: 1px solid #b6dec9;
-  background: #eaf6f0;
-  color: #2e7d5b;
 }
 
 .create-modal-actions {
@@ -1493,6 +1400,132 @@ button {
   margin-top: 16px;
 }
 
+.tournament-management-panel {
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.management-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f4f0e8;
+  background: #fffaf0;
+}
+
+.management-toolbar label {
+  display: grid;
+  gap: 6px;
+  min-width: min(100%, 320px);
+  color: #21304e;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.management-toolbar select {
+  min-height: 38px;
+  border: 1.5px solid #e4dac5;
+  border-radius: 9px;
+  background: #fff;
+  color: #14213d;
+  padding: 0 12px;
+  font-weight: 800;
+}
+
+.management-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #8b8577;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.management-meta > span:not(.status-pill) {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #ece4d5;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 10px;
+}
+
+.management-edit-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  padding: 20px;
+}
+
+.management-edit-form label {
+  display: grid;
+  gap: 7px;
+  color: #8b8577;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.management-edit-form .wide,
+.management-actions.wide {
+  grid-column: 1 / -1;
+}
+
+.management-edit-form input,
+.management-edit-form select,
+.management-edit-form textarea {
+  width: 100%;
+  border: 1.5px solid #e6dfd3;
+  border-radius: 9px;
+  background: #fff;
+  color: #14213d;
+  outline: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.management-edit-form input,
+.management-edit-form select {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.management-edit-form textarea {
+  min-height: 74px;
+  padding: 11px 12px;
+  resize: vertical;
+}
+
+.management-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.management-actions .primary-action {
+  min-height: 42px;
+  border: 0;
+  border-radius: 9px;
+  background: #7d2434;
+  color: #fff;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.management-actions .primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
 .registration-toolbar {
   display: flex;
   align-items: end;
@@ -1561,6 +1594,14 @@ button {
   color: #4a4f5a;
   padding: 12px 14px;
   font-size: 12.5px;
+}
+
+.prototype-table tr.selected-row td {
+  background: #fcf6f3;
+}
+
+.prototype-table tr.selected-row td:first-child {
+  box-shadow: inset 3px 0 0 #7d2434;
 }
 
 .prototype-table td strong {
@@ -2031,8 +2072,7 @@ button {
   .prototype-form,
   .create-grid,
   .format-card-grid,
-  .preview-surface-grid,
-  .review-grid,
+  .management-edit-form,
   .field-grid {
     grid-template-columns: 1fr;
   }
@@ -2060,8 +2100,14 @@ button {
 
   .table-toolbar,
   .selection-bar,
+  .management-toolbar,
   .registration-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .management-meta,
+  .management-actions {
+    justify-content: flex-start;
   }
 }

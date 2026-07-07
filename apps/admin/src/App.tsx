@@ -66,7 +66,7 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
 ]
 
 const tournamentTabs: TournamentTab[] = ['draft', 'upcoming', 'active', 'completed', 'archived']
-const createSteps = ['Basic information', 'Tournament format', 'Time control', 'Public preview', 'Review'] as const
+const createSteps = ['Basic information', 'Tournament format', 'Time control'] as const
 const formatOptions = [
   { value: 'Swiss', icon: '♟', layout: 'Standings + current pairings' },
   { value: 'Round robin', icon: '◍', layout: 'Standings + schedule' },
@@ -818,19 +818,7 @@ function TournamentsScreen({
   const selectedTournament = filtered.find((item) => tournamentKey(item) === selectedTournamentKey) ?? filtered[0] ?? null
   const selectedTournamentRowId = selectedTournament?.rowId
   const createEnabled = tab === 'draft'
-  const selectedFormat = formatOptions.find((option) => option.value === form.format) ?? formatOptions[0]
-  const createWarnings = buildCreateWarnings(form, timeMinutes)
   const canSaveDraft = Boolean(form.name.trim()) && !submitting
-  const reviewRows = [
-    { label: 'Name', value: form.name || '-' },
-    { label: 'Format', value: form.format },
-    { label: 'Players', value: String(form.capacity || '-') },
-    { label: 'Location', value: form.location || '-' },
-    { label: 'Time control', value: form.timeControl || '-' },
-    { label: 'Games/match', value: gamesPerMatch || '-' },
-    { label: 'Start', value: form.startsAt ? `${formatDate(form.startsAt)} ${formatTime(form.startsAt)}` : '-' },
-    { label: 'Slug', value: buildTournamentSlugBase(form.name) },
-  ]
 
   useEffect(() => {
     if (!filtered.length) {
@@ -974,6 +962,25 @@ function TournamentsScreen({
     try {
       await updateTournament(item.rowId, { status })
       setMessage('Tournament status updated.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleTournamentUpdate(item: AdminTournament, input: Partial<TournamentInput>) {
+    if (!item.rowId) {
+      setMessage('Only cloud tournaments can be edited.')
+      return
+    }
+
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      await updateTournament(item.rowId, input)
+      setMessage('Tournament updated.')
       await onChanged()
     } catch (error) {
       setMessage(formatAdminError(error))
@@ -1141,48 +1148,6 @@ function TournamentsScreen({
                   <label>Games per match<input value={gamesPerMatch} onChange={(event) => setTimeSelection({ games: event.target.value })} placeholder="1" /></label>
                 </div>
               ) : null}
-              {createStep === 3 ? (
-                <div>
-                  <div className="create-section-label">How it appears publicly ({form.format})</div>
-                  <div className="preview-surface-grid">
-                    <article>
-                      <strong>Mobile app</strong>
-                      <span>{selectedFormat.layout}</span>
-                      <p>Compact tournament header with tabs for registration, players, rounds, games and standings.</p>
-                    </article>
-                    <article>
-                      <strong>Public website</strong>
-                      <span>{selectedFormat.layout}</span>
-                      <p>Full tournament page with the same tabs and format-specific content.</p>
-                    </article>
-                    <article>
-                      <strong>Live dashboard</strong>
-                      <span>{selectedFormat.layout}</span>
-                      <p>Admin-ready view for pairing progress, player counts and tournament status.</p>
-                    </article>
-                  </div>
-                </div>
-              ) : null}
-              {createStep === 4 ? (
-                <div>
-                  <div className="review-grid">
-                    {reviewRows.map((row) => (
-                      <div key={row.label}>
-                        <span>{row.label}</span>
-                        <strong>{row.value}</strong>
-                      </div>
-                    ))}
-                  </div>
-                  <div className={createWarnings.length ? 'create-warning' : 'create-ok'}>
-                    <strong>{createWarnings.length ? 'Warnings' : 'Ready to save'}</strong>
-                    {createWarnings.length ? (
-                      createWarnings.map((warning) => <span key={warning}>• {warning}</span>)
-                    ) : (
-                      <span>All required draft fields are present.</span>
-                    )}
-                  </div>
-                </div>
-              ) : null}
             </div>
             <footer className="create-modal-actions">
               <button
@@ -1214,13 +1179,23 @@ function TournamentsScreen({
           <TournamentTable
             disabled={submitting}
             onDelete={handleDelete}
+            onSelect={setSelectedTournamentKey}
             onStatusChange={handleStatusChange}
             rows={filtered}
+            selectedKey={selectedTournament ? tournamentKey(selectedTournament) : ''}
           />
         ) : (
           <EmptyState title={emptyTitle(tab)} body="Create one to get started." />
         )}
       </section>
+      <TournamentManagementPanel
+        disabled={submitting}
+        onSelectedChange={setSelectedTournamentKey}
+        onSubmit={handleTournamentUpdate}
+        selectedTournament={selectedTournament}
+        selectedTournamentKey={selectedTournament ? tournamentKey(selectedTournament) : ''}
+        tournaments={filtered}
+      />
       <RegistrationQueue
         actionId={registrationActionId}
         loading={registrationsLoading}
@@ -1239,13 +1214,17 @@ function TournamentsScreen({
 function TournamentTable({
   disabled,
   onDelete,
+  onSelect,
   onStatusChange,
   rows,
+  selectedKey,
 }: {
   disabled: boolean
   onDelete: (item: AdminTournament) => Promise<void>
+  onSelect: (key: string) => void
   onStatusChange: (item: AdminTournament, status: TournamentTab) => Promise<void>
   rows: AdminTournament[]
+  selectedKey: string
 }) {
   return (
     <div className="table-scroll">
@@ -1263,41 +1242,191 @@ function TournamentTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((item) => (
-            <tr key={item.rowId ?? item.id}>
-              <td><strong>{item.name}</strong></td>
-              <td>{item.location || 'Not set'}</td>
-              <td><span className="tag">{item.format}</span></td>
-              <td><b>{item.timeControl}</b></td>
-              <td className="mono center">{item.players}/{item.capacity || 'open'}</td>
-              <td><StatusPill status={item.status} /></td>
-              <td><strong>{formatDate(item.startsAt)}</strong><small>{formatTime(item.startsAt)}</small></td>
-              <td className="right">
-                <select
-                  aria-label={`Update ${item.name} status`}
-                  className="mini-select"
-                  disabled={disabled || !item.rowId}
-                  value={item.status}
-                  onChange={(event) => void onStatusChange(item, event.target.value as TournamentTab)}
-                >
-                  {tournamentTabs.map((status) => (
-                    <option key={status} value={status}>{capitalize(status)}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="mini-button ghost danger"
-                  disabled={disabled || !item.rowId}
-                  onClick={() => void onDelete(item)}
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
+          {rows.map((item) => {
+            const key = tournamentKey(item)
+            return (
+              <tr key={key} className={selectedKey === key ? 'selected-row' : undefined}>
+                <td><strong>{item.name}</strong></td>
+                <td>{item.location || 'Not set'}</td>
+                <td><span className="tag">{item.format}</span></td>
+                <td><b>{item.timeControl}</b></td>
+                <td className="mono center">{item.players}/{item.capacity || 'open'}</td>
+                <td><StatusPill status={item.status} /></td>
+                <td><strong>{formatDate(item.startsAt)}</strong><small>{formatTime(item.startsAt)}</small></td>
+                <td className="right">
+                  <select
+                    aria-label={`Update ${item.name} status`}
+                    className="mini-select"
+                    disabled={disabled || !item.rowId}
+                    value={item.status}
+                    onChange={(event) => void onStatusChange(item, event.target.value as TournamentTab)}
+                  >
+                    {tournamentTabs.map((status) => (
+                      <option key={status} value={status}>{capitalize(status)}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="mini-button ghost"
+                    onClick={() => onSelect(key)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="mini-button ghost danger"
+                    disabled={disabled || !item.rowId}
+                    onClick={() => void onDelete(item)}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
+  )
+}
+
+function TournamentManagementPanel({
+  disabled,
+  onSelectedChange,
+  onSubmit,
+  selectedTournament,
+  selectedTournamentKey,
+  tournaments,
+}: {
+  disabled: boolean
+  onSelectedChange: (key: string) => void
+  onSubmit: (item: AdminTournament, input: Partial<TournamentInput>) => Promise<void>
+  selectedTournament: AdminTournament | null
+  selectedTournamentKey: string
+  tournaments: AdminTournament[]
+}) {
+  const [editForm, setEditForm] = useState<TournamentInput>(() => (
+    selectedTournament ? tournamentToEditForm(selectedTournament) : createInitialTournamentForm()
+  ))
+
+  useEffect(() => {
+    setEditForm(selectedTournament ? tournamentToEditForm(selectedTournament) : createInitialTournamentForm())
+  }, [selectedTournamentKey, selectedTournament])
+
+  function updateEdit<K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) {
+    setEditForm((current) => ({ ...current, [key]: value }))
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedTournament) return
+
+    await onSubmit(selectedTournament, {
+      name: editForm.name,
+      status: editForm.status,
+      format: editForm.format,
+      timeControl: editForm.timeControl,
+      capacity: editForm.capacity,
+      location: editForm.location,
+      description: editForm.description,
+      startsAt: editForm.startsAt,
+    })
+  }
+
+  const canSave = Boolean(selectedTournament?.rowId) && Boolean(editForm.name.trim()) && !disabled
+
+  return (
+    <section className="panel-card table-card tournament-management-panel">
+      <div className="panel-head">
+        <strong>Tournament management</strong>
+        <span>{selectedTournament ? selectedTournament.name : 'No tournament selected'}</span>
+      </div>
+      <div className="management-toolbar">
+        <label>
+          Tournament
+          <select
+            value={selectedTournamentKey}
+            onChange={(event) => onSelectedChange(event.target.value)}
+            disabled={!tournaments.length}
+          >
+            {tournaments.map((item) => (
+              <option key={tournamentKey(item)} value={tournamentKey(item)}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {selectedTournament ? (
+          <div className="management-meta">
+            <StatusPill status={selectedTournament.status} />
+            <span>{selectedTournament.players}/{selectedTournament.capacity || 'open'} players</span>
+            <span>{formatDate(selectedTournament.startsAt)} {formatTime(selectedTournament.startsAt)}</span>
+          </div>
+        ) : null}
+      </div>
+      {!selectedTournament ? (
+        <EmptyState title="No tournament selected" body="Choose a tournament tab with events to manage." />
+      ) : !selectedTournament.rowId ? (
+        <EmptyState title="Cloud tournament required" body="Only cloud-backed tournaments can be edited here." />
+      ) : (
+        <form className="management-edit-form" onSubmit={handleSubmit}>
+          <label className="wide">
+            Tournament name
+            <input value={editForm.name} onChange={(event) => updateEdit('name', event.target.value)} required />
+          </label>
+          <label>
+            Status
+            <select value={editForm.status} onChange={(event) => updateEdit('status', event.target.value as TournamentStatus)}>
+              {tournamentTabs.map((status) => (
+                <option key={status} value={status}>{capitalize(status)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Format
+            <select value={editForm.format} onChange={(event) => updateEdit('format', event.target.value)}>
+              {formatOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.value}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Number of players
+            <input
+              type="number"
+              min={2}
+              value={editForm.capacity ?? ''}
+              onChange={(event) => updateEdit('capacity', event.target.value ? Number(event.target.value) : undefined)}
+            />
+          </label>
+          <label>
+            Location / platform
+            <input value={editForm.location ?? ''} onChange={(event) => updateEdit('location', event.target.value)} />
+          </label>
+          <label>
+            Time control
+            <input value={editForm.timeControl} onChange={(event) => updateEdit('timeControl', event.target.value)} />
+          </label>
+          <label>
+            Start date / time
+            <input
+              type="datetime-local"
+              value={toDateTimeLocalValue(editForm.startsAt)}
+              onChange={(event) => updateEdit('startsAt', fromDateTimeLocalValue(event.target.value))}
+            />
+          </label>
+          <label className="wide">
+            Description
+            <textarea value={editForm.description ?? ''} onChange={(event) => updateEdit('description', event.target.value)} rows={3} />
+          </label>
+          <div className="management-actions wide">
+            <button type="submit" className="primary-action" disabled={!canSave}>
+              {disabled ? 'Saving...' : 'Save changes'}
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
   )
 }
 
@@ -1933,6 +2062,20 @@ function tournamentKey(item: AdminTournament) {
   return item.rowId ?? item.id
 }
 
+function tournamentToEditForm(item: AdminTournament): TournamentInput {
+  return {
+    slug: item.slug,
+    name: item.name,
+    status: item.status,
+    format: item.format,
+    timeControl: item.timeControl,
+    capacity: item.capacity || undefined,
+    location: item.location ?? '',
+    description: item.description ?? '',
+    startsAt: item.startsAt,
+  }
+}
+
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
@@ -1965,25 +2108,6 @@ function buildTournamentSlugBase(name: string) {
     .replace(/^-+|-+$/g, '')
 
   return base || 'draft-tournament'
-}
-
-function buildCreateWarnings(form: TournamentInput, timeMinutes: string) {
-  const warnings: string[] = []
-  const capacity = Number(form.capacity || 0)
-
-  if (!form.name.trim()) warnings.push('Tournament name is missing')
-  if (capacity < 4) warnings.push('Not enough players (minimum 4)')
-  if (capacity > 0 && capacity % 2 !== 0) warnings.push('Odd number of players - one player will get a bye')
-  if (/elimination/i.test(form.format) && capacity > 0 && !isPowerOfTwo(capacity)) {
-    warnings.push('Elimination brackets work best with 8, 16 or 32 players')
-  }
-  if (!timeMinutes.trim()) warnings.push('Missing time control')
-
-  return warnings
-}
-
-function isPowerOfTwo(value: number) {
-  return Number.isInteger(value) && value > 0 && (value & (value - 1)) === 0
 }
 
 function formatDate(value?: string) {

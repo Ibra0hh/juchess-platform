@@ -93,12 +93,18 @@ Implemented/working:
   Draft, Upcoming, Active, Completed, Archived.
 - Admin create tournament is intentionally enabled only on the Draft tab.
 - Admin create tournament currently saves every new tournament as `draft`.
+- Admin create tournament should have only three steps:
+  Basic information, Tournament format, Time control.
+- Admin create tournament should not show Preview or Review steps.
 - Admin create tournament Basic information step must stay simple:
   tournament name, description, number of players, typed location/platform,
   start date/time, registration deadline, and tournament design image placeholder.
 - Admin create tournament Basic information step must not show:
   end date/time, Chess.com/Lichess.com/Main Campus chips, visibility controls,
   or access controls.
+- Admin Tournaments includes an inline Tournament management panel below the
+  tournament table. It edits the selected cloud tournament through
+  `updateTournament` using the same admin table/panel visual style.
 - Flutter app has Appwrite session detection, sign-in, sign-up, sign-out,
   tournament reads, tournament details, registration/cancel behavior, and
   prototype-style mobile screens.
