@@ -4337,8 +4337,8 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
       aspectRatio: 1,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xffb99654),
-          border: Border.all(color: const Color(0xffb99654), width: 5),
+          color: const Color(0xffc0a870),
+          border: Border.all(color: const Color(0xffc0a870), width: 4),
           boxShadow: const [
             BoxShadow(
               color: Color(0x33231812),
@@ -4377,8 +4377,8 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
                       duration: const Duration(milliseconds: 120),
                       decoration: BoxDecoration(
                         color: dark
-                            ? const Color(0xff67292b)
-                            : const Color(0xffecd2a2),
+                            ? const Color(0xff602830)
+                            : const Color(0xfff0d8b0),
                         border: selected
                             ? Border.all(
                                 color: const Color(0xfff8edd1),
@@ -4542,54 +4542,40 @@ class _MobileChessPiece extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final glyph = _glyphFor(piece);
-    final fill = piece.color == chess.Color.WHITE
-        ? const Color(0xfffbfbfb)
-        : const Color(0xff030303);
-    final stroke = piece.color == chess.Color.WHITE
-        ? const Color(0xffd0ad69)
-        : const Color(0xffb99654);
-    final size = compact ? 32.0 : 34.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final constrainedSide = math.min(
+          constraints.maxWidth.isFinite ? constraints.maxWidth : 42.0,
+          constraints.maxHeight.isFinite ? constraints.maxHeight : 42.0,
+        ).toDouble();
+        final base = compact ? 42.0 : math.max(34.0, constrainedSide);
 
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Text(
-          glyph,
-          style: TextStyle(
-            fontFamily: 'Times New Roman',
-            fontSize: size,
-            height: 1,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 3
-              ..color = stroke,
+        return SizedBox(
+          width: base,
+          height: base,
+          child: Image.asset(
+            _assetFor(piece),
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+            gaplessPlayback: true,
           ),
-        ),
-        Text(
-          glyph,
-          style: TextStyle(
-            color: fill,
-            fontFamily: 'Times New Roman',
-            fontSize: size,
-            height: 1,
-            shadows: const [
-              Shadow(color: Color(0x55000000), offset: Offset(0, 2)),
-            ],
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  String _glyphFor(chess.Piece piece) {
+  String _assetFor(chess.Piece piece) {
     final white = piece.color == chess.Color.WHITE;
-    if (piece.type == chess.PieceType.KING) return white ? '♔' : '♚';
-    if (piece.type == chess.PieceType.QUEEN) return white ? '♕' : '♛';
-    if (piece.type == chess.PieceType.ROOK) return white ? '♖' : '♜';
-    if (piece.type == chess.PieceType.BISHOP) return white ? '♗' : '♝';
-    if (piece.type == chess.PieceType.KNIGHT) return white ? '♘' : '♞';
-    return white ? '♙' : '♟';
+    final color = white ? 'w' : 'b';
+    final type = switch (piece.type) {
+      chess.PieceType.KING => 'k',
+      chess.PieceType.QUEEN => 'q',
+      chess.PieceType.ROOK => 'r',
+      chess.PieceType.BISHOP => 'b',
+      chess.PieceType.KNIGHT => 'n',
+      _ => 'p',
+    };
+    return 'assets/chess-pieces/$color$type.png';
   }
 }
 

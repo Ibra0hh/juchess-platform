@@ -39,10 +39,6 @@ type JuChessBoardProps = {
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
 const PROMOTIONS: PieceSymbol[] = ['q', 'r', 'b', 'n']
-const PIECES: Record<Color, Record<PieceSymbol, string>> = {
-  b: { b: '♝', k: '♚', n: '♞', p: '♟', q: '♛', r: '♜' },
-  w: { b: '♗', k: '♔', n: '♘', p: '♙', q: '♕', r: '♖' },
-}
 
 export function JuChessBoard({
   className,
@@ -142,11 +138,7 @@ export function JuChessBoard({
               onClick={() => handleSquareClick(square.key)}
               key={square.key}
             >
-              {square.piece ? (
-                <span className={`ju-chess-piece ${square.piece.color === 'w' ? 'white' : 'black'}`}>
-                  {PIECES[square.piece.color][square.piece.type]}
-                </span>
-              ) : null}
+              {square.piece ? <PieceGlyph color={square.piece.color} type={square.piece.type} /> : null}
             </button>
           )
         })}
@@ -154,13 +146,24 @@ export function JuChessBoard({
           <div className="ju-promotion-panel">
             {PROMOTIONS.map((piece) => (
               <button type="button" onClick={() => playMove(pendingPromotion.from, pendingPromotion.to, piece)} key={piece}>
-                {PIECES[pendingPromotion.color][piece]}
+                <PieceGlyph color={pendingPromotion.color} type={piece} />
               </button>
             ))}
           </div>
         ) : null}
       </div>
     </div>
+  )
+}
+
+function PieceGlyph({ color, type }: { color: Color; type: PieceSymbol }) {
+  return (
+    <img
+      alt=""
+      className={`ju-chess-piece ${color === 'w' ? 'white' : 'black'}`}
+      draggable={false}
+      src={`${import.meta.env.BASE_URL}chess-pieces/${color}${type}.png`}
+    />
   )
 }
 

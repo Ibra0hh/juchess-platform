@@ -9,12 +9,12 @@
   grid-template-rows: repeat(8, minmax(0, 1fr));
   aspect-ratio: 1;
   overflow: hidden;
-  border: 5px solid #b99654;
-  border-radius: 2px;
-  background: #b99654;
+  border: 4px solid #c0a870;
+  border-radius: 1px;
+  background: #c0a870;
   box-shadow:
-    0 18px 35px rgba(35, 24, 18, 0.22),
-    inset 0 0 0 1px rgba(255, 239, 198, 0.5);
+    0 14px 28px rgba(35, 24, 18, 0.2),
+    inset 0 0 0 1px rgba(255, 232, 178, 0.45);
 }
 
 .ju-chess-square {
@@ -36,17 +36,17 @@
 }
 
 .ju-chess-square.light {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(183, 137, 70, 0.14)),
-    #ecd2a2;
-  box-shadow: inset 0 0 9px rgba(82, 45, 34, 0.18);
+  background: #f0d8b0;
+  box-shadow:
+    inset 0 0 10px rgba(123, 75, 34, 0.18),
+    inset 2px 2px 4px rgba(255, 246, 226, 0.38);
 }
 
 .ju-chess-square.dark {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(35, 5, 10, 0.15)),
-    #67292b;
-  box-shadow: inset 0 0 9px rgba(32, 10, 12, 0.28);
+  background: #602830;
+  box-shadow:
+    inset 0 0 10px rgba(32, 10, 12, 0.25),
+    inset 2px 2px 4px rgba(117, 48, 53, 0.3);
 }
 
 .ju-chess-square.selected {
@@ -95,37 +95,13 @@
 .ju-chess-piece {
   position: relative;
   z-index: 1;
-  display: grid;
-  place-items: center;
+  display: block;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", serif;
-  font-size: clamp(26px, 7.4vw, 52px);
-  font-weight: 700;
-  line-height: 0.86;
-  text-align: center;
+  object-fit: contain;
+  pointer-events: none;
   user-select: none;
-}
-
-.ju-chess-piece.black {
-  color: #030303;
-  text-shadow:
-    -1px -1px 0 #b99654,
-    1px -1px 0 #b99654,
-    -1px 1px 0 #b99654,
-    1px 1px 0 #b99654,
-    0 2px 0 rgba(0, 0, 0, 0.22);
-}
-
-.ju-chess-piece.white {
-  color: #fffaf0;
-  text-shadow:
-    -1px -1px 0 #b99654,
-    1px -1px 0 #b99654,
-    -1px 1px 0 #b99654,
-    1px 1px 0 #b99654,
-    0 2px 0 rgba(80, 44, 26, 0.26);
 }
 
 .ju-promotion-panel {
@@ -149,18 +125,17 @@
   background: #ecd2a2;
   color: #030303;
   cursor: pointer;
-  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", serif;
-  font-size: 28px;
-  line-height: 1;
-  text-shadow:
-    -1px -1px 0 #b99654,
-    1px -1px 0 #b99654,
-    -1px 1px 0 #b99654,
-    1px 1px 0 #b99654;
+}
+
+.ju-promotion-panel .ju-chess-piece {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto;
 }
 
 @media (max-width: 620px) {
   .ju-chess-piece {
-    font-size: clamp(24px, 8.1vw, 42px);
+    width: 100%;
+    height: 100%;
   }
 }
