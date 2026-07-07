@@ -12,11 +12,13 @@ import TournamentDetailPage from './screens/TournamentDetailPage'
 import TournamentsPage from './screens/TournamentsPage'
 
 function NotFound() {
+  const homeUrl = `${import.meta.env.BASE_URL}home`
+
   return (
     <main className="prototype-missing">
       <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="JuChess logo" />
       <h1>Screen not found</h1>
-      <a href="/home">Open JuChess Home</a>
+      <a href={homeUrl}>Open JuChess Home</a>
     </main>
   )
 }

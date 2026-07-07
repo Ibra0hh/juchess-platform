@@ -13,6 +13,7 @@
     "dev:mobile-web": "cd apps/mobile && flutter run -d web-server --web-hostname 127.0.0.1 --web-port 8063",
     "build:web": "npm --workspace apps/web run build",
     "build:admin": "npm --workspace apps/admin run build",
+    "build:pages": "node scripts/build-pages.mjs",
     "lint:web": "npm --workspace apps/web run lint",
     "lint:admin": "npm --workspace apps/admin run lint",
     "mobile:analyze": "cd apps/mobile && flutter analyze",
