@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Chess, type Square } from 'chess.js'
 import './App.css'
 import { appwriteReady } from './lib/appwrite'
@@ -1489,7 +1489,7 @@ function TournamentManageView({
         ))}
       </div>
 
-      <section className="manage-panel">
+      <section className={`manage-panel ${stage === 'bracket' ? 'website-bracket-host' : ''}`}>
         {stage === 'participants' ? (
           <>
             <div className="manage-panel-head">Participants</div>
@@ -1518,13 +1518,7 @@ function TournamentManageView({
           </>
         ) : null}
         {stage === 'bracket' ? (
-          <>
-            <div className="manage-panel-head">
-              <strong>{tournament.status === 'upcoming' ? 'Bracket preview' : 'Live bracket'}</strong>
-              <span>{publishState}</span>
-            </div>
-            <AdminBracketPreview rounds={bracketRounds} />
-          </>
+          <AdminBracketPreview rounds={bracketRounds} title={`${tournament.format} bracket`} />
         ) : null}
         {stage === 'procedure' ? (
           <>
@@ -1556,45 +1550,232 @@ function TournamentManageView({
   )
 }
 
-function AdminBracketPreview({ rounds }: { rounds: AdminBracketRound[] }) {
+function AdminBracketPreview({ rounds, title }: { rounds: AdminBracketRound[]; title: string }) {
+  const [activeRound, setActiveRound] = useState(0)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const trackRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setActiveRound(0)
+    if (scrollRef.current) scrollRef.current.scrollLeft = 0
+  }, [rounds])
+
+  useEffect(() => {
+    const scroll = scrollRef.current
+    const track = trackRef.current
+    if (!scroll || !track) return
+
+    const updateActiveRound = () => {
+      const columns = Array.from(track.querySelectorAll<HTMLElement>('[data-round-index]'))
+      const targetLeft = scroll.scrollLeft + 12
+      let nearest = 0
+      let nearestDistance = Number.POSITIVE_INFINITY
+
+      columns.forEach((column, index) => {
+        const distance = Math.abs(column.offsetLeft - targetLeft)
+        if (distance < nearestDistance) {
+          nearest = index
+          nearestDistance = distance
+        }
+      })
+
+      setActiveRound(nearest)
+    }
+
+    updateActiveRound()
+    scroll.addEventListener('scroll', updateActiveRound, { passive: true })
+    return () => scroll.removeEventListener('scroll', updateActiveRound)
+  }, [rounds])
+
+  useLayoutEffect(() => {
+    const track = trackRef.current
+    if (!track) return
+
+    let frame = 0
+    const draw = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => drawBracketLines(track))
+    }
+
+    draw()
+
+    const resizeObserver = new ResizeObserver(draw)
+    resizeObserver.observe(track)
+    track.querySelectorAll('.bracket-match.rich').forEach((card) => resizeObserver.observe(card))
+    window.addEventListener('resize', draw)
+
+    return () => {
+      cancelAnimationFrame(frame)
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', draw)
+    }
+  }, [rounds])
+
+  const jumpToRound = (roundIndex: number) => {
+    const scroll = scrollRef.current
+    const target = trackRef.current?.querySelector<HTMLElement>(`[data-round-index="${roundIndex}"]`)
+    if (!scroll || !target) return
+
+    setActiveRound(roundIndex)
+    scroll.scrollTo({
+      left: Math.max(0, target.offsetLeft - 18),
+      behavior: 'smooth',
+    })
+  }
+
   return (
-    <div className="admin-bracket-scroll" aria-label="Tournament bracket">
-      <div className="admin-bracket-track">
+    <div className="bracket-panel rich-bracket-panel">
+      <div className="bracket-heading">
+        <h2>{title}</h2>
+      </div>
+
+      <nav className="bracket-round-nav" aria-label="Bracket rounds">
         {rounds.map((round, roundIndex) => (
-          <div className="admin-bracket-column" key={round.name}>
-            <h3>{round.name}</h3>
-            <div className="admin-bracket-column-body">
-              {round.matches.map((match, matchIndex) => (
-                <div
-                  className={`admin-bracket-card ${match.live ? 'live' : match.pending ? 'pending' : match.winner ? 'complete' : 'open'} ${roundIndex === rounds.length - 1 ? 'last-round' : ''}`}
-                  key={`${round.name}-${match.board}-${matchIndex}`}
-                >
-                  {match.live ? <div className="admin-bracket-live"><span />Live</div> : null}
-                  <AdminBracketPlayer name={match.white} score={match.whiteScore} state={bracketPlayerState(match, 'white')} />
-                  <AdminBracketPlayer name={match.black} score={match.blackScore} state={bracketPlayerState(match, 'black')} />
-                </div>
-              ))}
-            </div>
-          </div>
+          <button
+            type="button"
+            className={activeRound === roundIndex ? 'active' : undefined}
+            aria-current={activeRound === roundIndex ? 'true' : undefined}
+            onClick={() => jumpToRound(roundIndex)}
+            key={round.name}
+          >
+            {round.name}
+          </button>
         ))}
+      </nav>
+
+      <div className="bracket-scroll" aria-label={title} ref={scrollRef}>
+        <div className="bracket-track" ref={trackRef}>
+          <svg className="bracket-lines" data-brk-svg aria-hidden="true" />
+          {rounds.map((round, roundIndex) => (
+            <div className="bracket-column" data-round-index={roundIndex} key={round.name}>
+              <h3>{round.name}</h3>
+              <div className="bracket-column-body">
+                {round.matches.map((match, matchIndex) => (
+                  <AdminBracketMatchCard
+                    isLastRound={roundIndex === rounds.length - 1}
+                    key={`${round.name}-${match.white}-${match.black}-${matchIndex}`}
+                    match={match}
+                    matchIndex={matchIndex}
+                    roundIndex={roundIndex}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
 }
 
-function AdminBracketPlayer({
+function AdminBracketMatchCard({
+  isLastRound,
+  match,
+  matchIndex,
+  roundIndex,
+}: {
+  isLastRound: boolean
+  match: AdminBracketMatch
+  matchIndex: number
+  roundIndex: number
+}) {
+  const stateClass = match.live ? 'live' : match.pending ? 'pending' : match.winner ? 'complete' : 'open'
+  const lineState = match.winner === 'white' ? 'a' : match.winner === 'black' ? 'b' : match.live ? 'live' : ''
+
+  return (
+    <div
+      className={`bracket-match rich ${stateClass} ${isLastRound ? 'last-round' : ''}`}
+      data-brk-card={`${roundIndex}-${matchIndex}`}
+      data-win={lineState}
+    >
+      {match.live ? (
+        <div className="bracket-live-tag">
+          <span aria-hidden="true" />
+          Live
+        </div>
+      ) : null}
+      <BracketPlayerRow
+        name={match.white}
+        score={match.live ? '•' : match.whiteScore ?? ''}
+        state={bracketPlayerState(match, 'white')}
+      />
+      <BracketPlayerRow
+        name={match.black}
+        score={match.live ? '•' : match.blackScore ?? ''}
+        state={bracketPlayerState(match, 'black')}
+      />
+    </div>
+  )
+}
+
+function drawBracketLines(track: HTMLDivElement) {
+  const svg = track.querySelector<SVGSVGElement>('[data-brk-svg]')
+  if (!svg) return
+
+  const cards = Array.from(track.querySelectorAll<HTMLElement>('[data-brk-card]'))
+  const cardsByRound = new Map<number, Array<{ element: HTMLElement; index: number; win: string | null }>>()
+
+  cards.forEach((element) => {
+    const [round, index] = (element.dataset.brkCard || '').split('-').map(Number)
+    if (!Number.isFinite(round) || !Number.isFinite(index)) return
+    const entries = cardsByRound.get(round) || []
+    entries.push({ element, index, win: element.dataset.win || null })
+    cardsByRound.set(round, entries)
+  })
+
+  const base = track.getBoundingClientRect()
+  svg.setAttribute('width', String(track.scrollWidth))
+  svg.setAttribute('height', String(track.clientHeight))
+  svg.replaceChildren()
+
+  const namespace = 'http://www.w3.org/2000/svg'
+  const roundIndexes = Array.from(cardsByRound.keys()).sort((a, b) => a - b)
+
+  roundIndexes.forEach((round) => {
+    const currentRound = cardsByRound.get(round) || []
+    const nextRound = cardsByRound.get(round + 1) || []
+    if (!nextRound.length) return
+
+    currentRound.forEach((match) => {
+      const target = nextRound.find((candidate) => candidate.index === Math.floor(match.index / 2))
+      if (!target) return
+
+      const from = match.element.getBoundingClientRect()
+      const to = target.element.getBoundingClientRect()
+      const x1 = from.right - base.left
+      const y1 = from.top - base.top + from.height / 2
+      const x2 = to.left - base.left
+      const y2 = to.top - base.top + to.height / 2
+      const midX = (x1 + x2) / 2
+      const decided = match.win === 'a' || match.win === 'b'
+      const live = match.win === 'live'
+      const path = document.createElementNS(namespace, 'path')
+
+      path.setAttribute('d', `M${x1} ${y1} H${midX} V${y2} H${x2}`)
+      path.setAttribute('fill', 'none')
+      path.setAttribute('stroke', decided ? '#7A2431' : live ? '#A98A3F' : 'rgba(30,43,69,.22)')
+      path.setAttribute('stroke-width', decided ? '2.25' : '1.5')
+      path.setAttribute('stroke-linejoin', 'round')
+      path.setAttribute('stroke-linecap', 'round')
+      if (live) path.setAttribute('stroke-dasharray', '5 3')
+      svg.appendChild(path)
+    })
+  })
+}
+
+function BracketPlayerRow({
   name,
   score,
   state,
 }: {
   name: string
-  score?: string
+  score: string
   state: 'neutral' | 'winner' | 'muted'
 }) {
   return (
-    <div className={`admin-bracket-player ${state}`}>
+    <div className={`bracket-player ${state}`}>
       <span>{name}</span>
-      <strong>{state === 'winner' ? '✓' : score}</strong>
+      <strong>{score}</strong>
     </div>
   )
 }
@@ -2499,7 +2680,7 @@ function winnerName(match?: AdminBracketMatch) {
 }
 
 function bracketPlayerState(match: AdminBracketMatch, side: AdminBracketSide) {
-  if (!match.winner) return match.pending ? 'muted' : 'neutral'
+  if (!match.winner) return 'neutral'
   return match.winner === side ? 'winner' : 'muted'
 }
 

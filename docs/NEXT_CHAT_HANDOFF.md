@@ -115,9 +115,10 @@ Implemented/working:
   admin clicks Publish. After Publish, shuffle is locked for knockout brackets
   and for all other tournament formats.
 - Admin knockout tournament management must label the play tab as Bracket
-  instead of Rounds and should use the same bracket language as web/mobile:
-  round columns, live markers, winner marks, muted pending rows, and connector
-  lines. Non-knockout formats keep Rounds.
+  instead of Rounds and must reuse the website rich bracket structure/classes:
+  `.bracket-panel.rich-bracket-panel`, `.bracket-round-nav`, SVG connector
+  lines, `.bracket-match.rich`, live tags, and website-style player rows.
+  Non-knockout formats keep Rounds.
 - Admin Active tournament management includes a digital chess board powered by
   `chess.js` for legal move entry, live move recording, result selection, undo,
   reset, and board save actions.
