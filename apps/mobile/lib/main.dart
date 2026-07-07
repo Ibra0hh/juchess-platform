@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/enums.dart' as enums;
 import 'package:appwrite/models.dart' as models;
+import 'package:chess/chess.dart' as chess;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -4072,7 +4073,8 @@ class AnalysisBoardScreen extends StatefulWidget {
 
 class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
   bool flipped = false;
-  final moves = <String>['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4'];
+  final moves = <String>[];
+  String result = 'Live';
 
   @override
   Widget build(BuildContext context) {
@@ -4087,7 +4089,18 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
         const SizedBox(height: 14),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: PrototypeChessBoard(flipped: flipped),
+          child: PrototypeChessBoard(
+            flipped: flipped,
+            moves: moves,
+            onChanged: (nextMoves, nextResult) {
+              setState(() {
+                moves
+                  ..clear()
+                  ..addAll(nextMoves);
+                result = nextResult;
+              });
+            },
+          ),
         ),
         const SizedBox(height: 12),
         PrototypeCard(
@@ -4109,8 +4122,12 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    'White to move',
+                  Text(
+                    result == 'Live'
+                        ? moves.length.isEven
+                            ? 'White to move'
+                            : 'Black to move'
+                        : 'Result $result',
                     style: TextStyle(
                       color: Color(0xcc21304e),
                       fontWeight: FontWeight.w800,
@@ -4157,9 +4174,8 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                 child: PrototypeOutlineButton(
                   label: 'Reset',
                   onTap: () => setState(() {
-                    moves
-                      ..clear()
-                      ..addAll(['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4']);
+                    moves.clear();
+                    result = 'Live';
                   }),
                 ),
               ),
@@ -4189,117 +4205,391 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
   }
 }
 
-class PrototypeChessBoard extends StatelessWidget {
-  const PrototypeChessBoard({required this.flipped, super.key});
+class PrototypeChessBoard extends StatefulWidget {
+  const PrototypeChessBoard({
+    required this.flipped,
+    required this.moves,
+    required this.onChanged,
+    super.key,
+  });
 
   final bool flipped;
+  final List<String> moves;
+  final void Function(List<String> moves, String result) onChanged;
+
+  @override
+  State<PrototypeChessBoard> createState() => _PrototypeChessBoardState();
+}
+
+class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
+  static const _files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  static const _promotions = ['q', 'r', 'b', 'n'];
+
+  String? selectedSquare;
+  ({String from, String to, chess.Color color})? pendingPromotion;
+
+  @override
+  void didUpdateWidget(covariant PrototypeChessBoard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.moves.length != widget.moves.length) {
+      selectedSquare = null;
+      pendingPromotion = null;
+    }
+  }
+
+  chess.Chess _gameFromMoves() {
+    final game = chess.Chess();
+    for (final move in widget.moves) {
+      game.move(move);
+    }
+    return game;
+  }
+
+  void _playMove(String from, String to, [String? promotion]) {
+    final game = _gameFromMoves();
+    final moveRequest = {
+      'from': from,
+      'to': to,
+    };
+    if (promotion != null) moveRequest['promotion'] = promotion;
+    final ok = game.move(moveRequest);
+    if (!ok) {
+      setState(() {
+        selectedSquare = null;
+        pendingPromotion = null;
+      });
+      return;
+    }
+
+    final san = game.san_moves().last?.toString();
+    if (san == null || san.isEmpty) return;
+    widget.onChanged([...widget.moves, san], _resultFor(game));
+    setState(() {
+      selectedSquare = null;
+      pendingPromotion = null;
+    });
+  }
+
+  void _handleSquareTap(String square, chess.Chess game, List legalMoves) {
+    if (pendingPromotion != null) return;
+
+    final piece = game.get(square);
+    if (selectedSquare == null) {
+      if (piece != null && piece.color == game.turn) {
+        setState(() => selectedSquare = square);
+      }
+      return;
+    }
+
+    if (selectedSquare == square) {
+      setState(() => selectedSquare = null);
+      return;
+    }
+
+    Map? move;
+    for (final item in legalMoves.cast<Map>()) {
+      if (item['to'] == square) {
+        move = item;
+        break;
+      }
+    }
+
+    if (move != null) {
+      final flags = move['flags']?.toString() ?? '';
+      if (flags.contains('p')) {
+        setState(() {
+          pendingPromotion = (
+            from: selectedSquare!,
+            to: square,
+            color: game.turn,
+          );
+        });
+        return;
+      }
+      _playMove(selectedSquare!, square);
+      return;
+    }
+
+    if (piece != null && piece.color == game.turn) {
+      setState(() => selectedSquare = square);
+      return;
+    }
+
+    setState(() => selectedSquare = null);
+  }
 
   @override
   Widget build(BuildContext context) {
-    const pieces = [
-      '♜',
-      '♞',
-      '♝',
-      '♛',
-      '♚',
-      '♝',
-      '♞',
-      '♜',
-      '♟',
-      '♟',
-      '♟',
-      '♟',
-      '♟',
-      '♟',
-      '♟',
-      '♟',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '♙',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '♘',
-      '',
-      '',
-      '♙',
-      '♙',
-      '♙',
-      '',
-      '',
-      '♙',
-      '♙',
-      '♙',
-      '♖',
-      '♘',
-      '♗',
-      '♕',
-      '♔',
-      '♗',
-      '',
-      '♖',
-    ];
-
-    final squares = flipped ? pieces.reversed.toList() : pieces;
+    final game = _gameFromMoves();
+    final legalMoves = selectedSquare == null
+        ? <Map>[]
+        : game.moves({'square': selectedSquare, 'verbose': true}).cast<Map>();
+    final targets = legalMoves.map((move) => move['to']?.toString()).toSet();
+    final history = game.getHistory({'verbose': true}).cast<Map>().toList();
+    final lastMove = history.isEmpty ? null : history.last;
+    final checkSquare = game.in_check ? _kingSquare(game, game.turn) : null;
+    final ranks = widget.flipped
+        ? const [1, 2, 3, 4, 5, 6, 7, 8]
+        : const [8, 7, 6, 5, 4, 3, 2, 1];
+    final files = widget.flipped ? _files.reversed.toList() : _files;
 
     return AspectRatio(
       aspectRatio: 1,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 8,
-          ),
-          itemCount: 64,
-          itemBuilder: (context, index) {
-            final row = index ~/ 8;
-            final col = index % 8;
-            final dark = (row + col).isOdd;
-            final piece = squares[index];
-            return Container(
-              color: dark ? const Color(0xff9a7b53) : const Color(0xffecdcbb),
-              alignment: Alignment.center,
-              child: Text(
-                piece,
-                style: TextStyle(
-                  fontSize: 28,
-                  color: '♙♖♘♗♕♔'.contains(piece)
-                      ? const Color(0xfff8f1e0)
-                      : const Color(0xff1f252e),
-                  shadows: const [
-                    Shadow(color: Color(0x66000000), offset: Offset(0, 1)),
-                  ],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xffb99654),
+          border: Border.all(color: const Color(0xffb99654), width: 5),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33231812),
+              blurRadius: 28,
+              offset: Offset(0, 16),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: Stack(
+            children: [
+              GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 8,
                 ),
+                itemCount: 64,
+                itemBuilder: (context, index) {
+                  final row = index ~/ 8;
+                  final col = index % 8;
+                  final rank = ranks[row];
+                  final file = files[col];
+                  final square = '$file$rank';
+                  final piece = game.get(square);
+                  final dark = (_files.indexOf(file) + rank).isOdd;
+                  final selected = selectedSquare == square;
+                  final target = targets.contains(square);
+                  final last = lastMove?['from'] == square || lastMove?['to'] == square;
+                  final check = checkSquare == square;
+
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _handleSquareTap(square, game, legalMoves),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 120),
+                      decoration: BoxDecoration(
+                        color: dark
+                            ? const Color(0xff67292b)
+                            : const Color(0xffecd2a2),
+                        border: selected
+                            ? Border.all(
+                                color: const Color(0xfff8edd1),
+                                width: 3,
+                              )
+                            : null,
+                        boxShadow: [
+                          BoxShadow(
+                            color: dark
+                                ? const Color(0x33200a0c)
+                                : const Color(0x2e522d22),
+                            blurRadius: 8,
+                            spreadRadius: -2,
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (last)
+                            Positioned.fill(
+                              child: Container(
+                                margin: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0x44e2b348),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: const Color(0x55a98a3f),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (check)
+                            Positioned.fill(
+                              child: Container(
+                                margin: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0x55b03232),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: const Color(0x997e1522),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (target && piece == null)
+                            Container(
+                              width: 14,
+                              height: 14,
+                              decoration: const BoxDecoration(
+                                color: Color(0x66213045),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          if (target && piece != null)
+                            Container(
+                              margin: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: const Color(0x66213045),
+                                  width: 3,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          if (piece != null) _MobileChessPiece(piece: piece),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+              if (pendingPromotion != null)
+                Positioned(
+                  left: 10,
+                  right: 10,
+                  bottom: 10,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xf8fffcf4),
+                      border: Border.all(color: const Color(0xb8b99654)),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x33213045),
+                          blurRadius: 24,
+                          offset: Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        for (final promotion in _promotions)
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => _playMove(
+                                pendingPromotion!.from,
+                                pendingPromotion!.to,
+                                promotion,
+                              ),
+                              child: _MobileChessPiece(
+                                piece: chess.Piece(
+                                  _pieceTypeFor(promotion),
+                                  pendingPromotion!.color,
+                                ),
+                                compact: true,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  String _resultFor(chess.Chess game) {
+    if (game.in_checkmate) {
+      return game.turn == chess.Color.WHITE ? '0-1' : '1-0';
+    }
+    if (game.in_draw) return '1/2-1/2';
+    return 'Live';
+  }
+
+  String? _kingSquare(chess.Chess game, chess.Color color) {
+    for (final rank in const [8, 7, 6, 5, 4, 3, 2, 1]) {
+      for (final file in _files) {
+        final square = '$file$rank';
+        final piece = game.get(square);
+        if (piece?.type == chess.PieceType.KING && piece?.color == color) {
+          return square;
+        }
+      }
+    }
+    return null;
+  }
+
+  chess.PieceType _pieceTypeFor(String promotion) {
+    switch (promotion) {
+      case 'r':
+        return chess.PieceType.ROOK;
+      case 'b':
+        return chess.PieceType.BISHOP;
+      case 'n':
+        return chess.PieceType.KNIGHT;
+      default:
+        return chess.PieceType.QUEEN;
+    }
+  }
+}
+
+class _MobileChessPiece extends StatelessWidget {
+  const _MobileChessPiece({required this.piece, this.compact = false});
+
+  final chess.Piece piece;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final glyph = _glyphFor(piece);
+    final fill = piece.color == chess.Color.WHITE
+        ? const Color(0xfffbfbfb)
+        : const Color(0xff030303);
+    final stroke = piece.color == chess.Color.WHITE
+        ? const Color(0xffd0ad69)
+        : const Color(0xffb99654);
+    final size = compact ? 32.0 : 34.0;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Text(
+          glyph,
+          style: TextStyle(
+            fontFamily: 'Times New Roman',
+            fontSize: size,
+            height: 1,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 3
+              ..color = stroke,
+          ),
+        ),
+        Text(
+          glyph,
+          style: TextStyle(
+            color: fill,
+            fontFamily: 'Times New Roman',
+            fontSize: size,
+            height: 1,
+            shadows: const [
+              Shadow(color: Color(0x55000000), offset: Offset(0, 2)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _glyphFor(chess.Piece piece) {
+    final white = piece.color == chess.Color.WHITE;
+    if (piece.type == chess.PieceType.KING) return white ? '♔' : '♚';
+    if (piece.type == chess.PieceType.QUEEN) return white ? '♕' : '♛';
+    if (piece.type == chess.PieceType.ROOK) return white ? '♖' : '♜';
+    if (piece.type == chess.PieceType.BISHOP) return white ? '♗' : '♝';
+    if (piece.type == chess.PieceType.KNIGHT) return white ? '♘' : '♞';
+    return white ? '♙' : '♟';
   }
 }
 

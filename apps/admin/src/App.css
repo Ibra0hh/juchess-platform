@@ -1592,6 +1592,150 @@ button {
   font-weight: 800;
 }
 
+.procedure-planner {
+  background: #fff;
+}
+
+.procedure-head label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8b8577;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.procedure-head input {
+  width: 76px;
+  min-height: 34px;
+  border: 1px solid #e6dfd3;
+  border-radius: 8px;
+  color: #14213d;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.procedure-summary,
+.procedure-rules {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 18px 0;
+}
+
+.procedure-summary span,
+.procedure-rules span {
+  border: 1px solid #eee4d5;
+  border-radius: 999px;
+  background: #fdfaf1;
+  color: #4a4f5a;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.procedure-rules {
+  padding-top: 10px;
+}
+
+.procedure-rules span {
+  color: #7d2434;
+  background: #fff7ee;
+}
+
+.procedure-wave {
+  margin: 18px;
+  border: 1px solid #eee4d5;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fffcf4;
+}
+
+.procedure-wave-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eee4d5;
+  background: #faf7f1;
+}
+
+.procedure-wave-head strong {
+  color: #14213d;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.procedure-wave-head span {
+  color: #8b8577;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.procedure-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+.procedure-slot {
+  min-height: 150px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  border: 1px solid rgba(30, 43, 69, 0.12);
+  border-left: 4px solid #7d2434;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px;
+}
+
+.procedure-slot.idle {
+  border-left-color: #d8c9ae;
+  background: rgba(255, 252, 244, 0.65);
+}
+
+.procedure-board-label {
+  width: fit-content;
+  border-radius: 999px;
+  background: #21304e;
+  color: #fff;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.procedure-slot strong {
+  color: #14213d;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.procedure-slot p {
+  margin: 0;
+  color: #4a4f5a;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.procedure-slot em,
+.procedure-slot small {
+  color: #8b8577;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.procedure-slot small {
+  color: #7d2434;
+}
+
 .manage-row {
   display: flex;
   align-items: center;

@@ -833,6 +833,11 @@
   gap: 12px;
 }
 
+.games-ju-board {
+  flex: 1;
+  width: 100%;
+}
+
 .eval-bar {
   width: 18px;
   display: flex;

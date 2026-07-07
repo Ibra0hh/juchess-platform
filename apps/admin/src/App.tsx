@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
-import { Chess, type Square } from 'chess.js'
 import './App.css'
+import { JuChessBoard, type JuChessBoardChange } from './components/JuChessBoard'
+import { buildChessGame, deriveResult } from './components/JuChessRules'
 import { appwriteReady } from './lib/appwrite'
 import {
   blockIdentity,
@@ -89,6 +90,21 @@ type AdminBracketPhase = 'setup' | 'active' | 'completed'
 type LiveBoardState = {
   moves: string[]
   result: string
+}
+
+type ProcedureMatch = {
+  black: string
+  boardLabel: string
+  matchNumber: number
+  roundLabel: string
+  status: string
+  white: string
+}
+
+type ProcedureSlot = {
+  boardNumber: number
+  match?: ProcedureMatch
+  nextMatch?: ProcedureMatch
 }
 
 const DEFAULT_KNOCKOUT_BRACKET_SIZE = 16
@@ -1453,6 +1469,7 @@ function TournamentManageView({
   const playStage = knockout ? 'bracket' : 'rounds'
   const [stage, setStage] = useState(playStage)
   const [selectedBoardKey, setSelectedBoardKey] = useState('')
+  const [physicalBoards, setPhysicalBoards] = useState(3)
   const liveBoardRef = useRef<HTMLElement | null>(null)
   const bracketMatchCount = knockout ? getBracketMatchCount(tournament) : undefined
   const bracketPhase = getBracketPhase(tournament)
@@ -1463,6 +1480,14 @@ function TournamentManageView({
     ? buildPlayableBracketBoards(bracketRounds)
     : buildPlayableBoardsFromPairings(pairings)
   ), [bracketRounds, knockout, pairings])
+  const procedureMatches = useMemo(() => (
+    knockout
+      ? buildProcedureMatchesFromBracket(bracketRounds)
+      : buildProcedureMatchesFromPairings(pairings, tournament.status === 'active' ? 'Live round' : 'Round 1')
+  ), [bracketRounds, knockout, pairings, tournament.status])
+  const procedurePlan = useMemo(() => (
+    buildProcedurePlan(procedureMatches, physicalBoards)
+  ), [physicalBoards, procedureMatches])
   const shuffleLocked = disabled || published
   const publishLocked = disabled || published
 
@@ -1571,15 +1596,12 @@ function TournamentManageView({
           />
         ) : null}
         {stage === 'procedure' ? (
-          <>
-            <div className="manage-panel-head">Tournament procedure</div>
-            {[
-              'Verify all boards are ready before starting the clock.',
-              'Confirm both players present; apply default win after 10 min absence.',
-              'Record results as they finish; resolve disputes before next round.',
-              'Publish standings after every completed round.',
-            ].map((row) => <div key={row} className="manage-row">{row}</div>)}
-          </>
+          <ProcedurePlanner
+            boards={physicalBoards}
+            onBoardsChange={setPhysicalBoards}
+            plan={procedurePlan}
+            totalMatches={procedureMatches.length}
+          />
         ) : null}
         {stage === 'standings' ? (
           <>
@@ -1602,6 +1624,75 @@ function TournamentManageView({
           selectedBoardKey={selectedBoardKey}
         />
       ) : null}
+    </div>
+  )
+}
+
+function ProcedurePlanner({
+  boards,
+  onBoardsChange,
+  plan,
+  totalMatches,
+}: {
+  boards: number
+  onBoardsChange: (boards: number) => void
+  plan: ProcedureSlot[][]
+  totalMatches: number
+}) {
+  return (
+    <div className="procedure-planner">
+      <div className="manage-panel-head procedure-head">
+        <strong>Tournament procedure</strong>
+        <label>
+          Physical boards
+          <input
+            type="number"
+            min={1}
+            max={64}
+            value={boards}
+            onChange={(event) => onBoardsChange(Math.max(1, Number(event.target.value) || 1))}
+          />
+        </label>
+      </div>
+      <div className="procedure-summary">
+        <span>{totalMatches} matches</span>
+        <span>{boards} boards available</span>
+        <span>{plan.length} waves required</span>
+      </div>
+      <div className="procedure-rules">
+        <span>Assign Wave 1 first.</span>
+        <span>When a board finishes, start that board's next listed match.</span>
+        <span>Record result and moves from Bracket or Games before advancing.</span>
+      </div>
+      {plan.map((wave, waveIndex) => (
+        <section className="procedure-wave" key={`wave-${waveIndex + 1}`}>
+          <div className="procedure-wave-head">
+            <strong>Wave {waveIndex + 1}</strong>
+            <span>{wave.filter((slot) => slot.match).length} active boards</span>
+          </div>
+          <div className="procedure-slot-grid">
+            {wave.map((slot) => (
+              <div className={slot.match ? 'procedure-slot' : 'procedure-slot idle'} key={`${waveIndex}-${slot.boardNumber}`}>
+                <div className="procedure-board-label">Board {slot.boardNumber}</div>
+                {slot.match ? (
+                  <>
+                    <strong>{slot.match.roundLabel} · Match {slot.match.matchNumber}</strong>
+                    <p>{slot.match.white} vs {slot.match.black}</p>
+                    <em>{slot.match.status}</em>
+                    <small>
+                      {slot.nextMatch
+                        ? `Next: ${slot.nextMatch.roundLabel} Match ${slot.nextMatch.matchNumber}`
+                        : 'Next: no queued match'}
+                    </small>
+                  </>
+                ) : (
+                  <p>No match assigned</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }
@@ -1898,19 +1989,9 @@ function LiveTournamentBoard({
   selectedBoardKey: string
 }) {
   const [boardStates, setBoardStates] = useState<Record<string, LiveBoardState>>({})
-  const [selected, setSelected] = useState<Square | null>(null)
   const pairing = boards.find((board) => board.boardKey === selectedBoardKey) ?? boards[0]
-  const pairingKey = pairing?.boardKey ?? 'empty'
   const boardState = pairing ? boardStates[pairing.boardKey] ?? EMPTY_LIVE_BOARD_STATE : EMPTY_LIVE_BOARD_STATE
-  const game = useMemo(() => buildChessFromMoves(boardState.moves), [boardState.moves])
-  const selectedTargets = selected
-    ? new Set(game.moves({ square: selected, verbose: true }).map((move) => move.to))
-    : new Set<string>()
   const movePairs = buildMovePairs(boardState.moves)
-
-  useEffect(() => {
-    setSelected(null)
-  }, [pairingKey])
 
   function updateCurrentBoard(nextState: LiveBoardState) {
     if (!pairing) return
@@ -1920,59 +2001,25 @@ function LiveTournamentBoard({
     }))
   }
 
-  function handleSquareClick(square: Square) {
-    if (!pairing) return
-
-    const piece = game.get(square)
-
-    if (!selected) {
-      if (piece && piece.color === game.turn()) setSelected(square)
-      return
-    }
-
-    if (selected === square) {
-      setSelected(null)
-      return
-    }
-
-    const next = new Chess(game.fen())
-
-    try {
-      const move = next.move({ from: selected, to: square, promotion: 'q' })
-      if (move) {
-        updateCurrentBoard({
-          moves: [...boardState.moves, move.san],
-          result: deriveChessResult(next),
-        })
-        setSelected(null)
-        return
-      }
-    } catch {
-      // Illegal moves are ignored; selecting another own piece below still works.
-    }
-
-    if (piece && piece.color === game.turn()) {
-      setSelected(square)
-      return
-    }
-
-    setSelected(null)
+  function handleBoardChange(state: JuChessBoardChange) {
+    updateCurrentBoard({
+      moves: state.moves,
+      result: state.result,
+    })
   }
 
   function undoMove() {
     if (!pairing || !boardState.moves.length) return
     const moves = boardState.moves.slice(0, -1)
-    const next = buildChessFromMoves(moves)
+    const next = buildChessGame(undefined, moves)
     updateCurrentBoard({
       moves,
-      result: deriveChessResult(next),
+      result: deriveResult(next),
     })
-    setSelected(null)
   }
 
   function resetGame() {
     updateCurrentBoard(EMPTY_LIVE_BOARD_STATE)
-    setSelected(null)
   }
 
   function recordResult(value: string) {
@@ -2003,23 +2050,9 @@ function LiveTournamentBoard({
                 ))}
               </select>
             </label>
-            <span className="live-turn">{game.turn() === 'w' ? 'White to move' : 'Black to move'}</span>
+            <span className="live-turn">{boardState.moves.length % 2 === 0 ? 'White to move' : 'Black to move'}</span>
           </div>
-          <div className="digital-board" aria-label="Digital chess board">
-            {game.board().map((rank, rankIndex) => rank.map((piece, fileIndex) => {
-              const square = `${String.fromCharCode(97 + fileIndex)}${8 - rankIndex}` as Square
-              return (
-                <button
-                  type="button"
-                  className={boardSquareClass(square, rankIndex, fileIndex, selected, selectedTargets)}
-                  onClick={() => handleSquareClick(square)}
-                  key={square}
-                >
-                  {piece ? chessPieceLabel(piece.color, piece.type) : ''}
-                </button>
-              )
-            }))}
-          </div>
+          <JuChessBoard moves={boardState.moves} onChange={handleBoardChange} />
         </div>
         <aside className="live-game-side">
           <div className="live-match-card">
@@ -2782,6 +2815,51 @@ function buildPlayableBracketBoards(rounds: AdminBracketRound[]): PlayableBoard[
   ))
 }
 
+function buildProcedureMatchesFromPairings(pairings: Pairing[], roundLabel: string): ProcedureMatch[] {
+  return pairings.map((pairing, index) => ({
+    black: pairing.black,
+    boardLabel: `Board ${pairing.board}`,
+    matchNumber: index + 1,
+    roundLabel,
+    status: hasKnownPlayers(pairing) ? 'Ready' : 'Waiting for player',
+    white: pairing.white,
+  }))
+}
+
+function buildProcedureMatchesFromBracket(rounds: AdminBracketRound[]): ProcedureMatch[] {
+  const targetRound = rounds.find((round) => round.matches.some((match) => match.live)) ?? rounds.find((round) => (
+    round.matches.some((match) => !match.winner && !match.live)
+  )) ?? rounds[0]
+
+  if (!targetRound) return []
+
+  return targetRound.matches.map((match, index) => ({
+    black: match.black,
+    boardLabel: `${targetRound.name} Board ${index + 1}`,
+    matchNumber: index + 1,
+    roundLabel: targetRound.name,
+    status: match.live ? 'Live now' : hasKnownPlayers(match) ? 'Ready' : 'Waiting for player',
+    white: match.white,
+  }))
+}
+
+function buildProcedurePlan(matches: ProcedureMatch[], boardCount: number): ProcedureSlot[][] {
+  const boards = Math.max(1, Math.min(64, Math.floor(boardCount) || 1))
+  const waveCount = Math.max(1, Math.ceil(matches.length / boards))
+
+  return Array.from({ length: waveCount }, (_, waveIndex) => (
+    Array.from({ length: boards }, (_, boardIndex) => {
+      const matchIndex = waveIndex * boards + boardIndex
+      const nextIndex = (waveIndex + 1) * boards + boardIndex
+      return {
+        boardNumber: boardIndex + 1,
+        match: matches[matchIndex],
+        nextMatch: matches[nextIndex],
+      }
+    })
+  ))
+}
+
 function getBracketMatchCount(tournament: AdminTournament) {
   const capacity = typeof tournament.capacity === 'number' && Number.isFinite(tournament.capacity) && tournament.capacity > 0
     ? tournament.capacity
@@ -2936,62 +3014,9 @@ function buildBracketRoundKey(rounds: AdminBracketRound[]) {
     .join('|')
 }
 
-function buildChessFromMoves(moves: string[]) {
-  const game = new Chess()
-
-  moves.forEach((move) => {
-    try {
-      game.move(move)
-    } catch {
-      // Ignore corrupt historical SAN entries and keep the board usable.
-    }
-  })
-
-  return game
-}
-
 function bracketPlayerState(match: AdminBracketMatch, side: AdminBracketSide) {
   if (!match.winner) return 'neutral'
   return match.winner === side ? 'winner' : 'muted'
-}
-
-function deriveChessResult(game: Chess) {
-  if (game.isCheckmate()) return game.turn() === 'w' ? '0-1' : '1-0'
-  if (game.isDraw()) return '1/2-1/2'
-  return 'Live'
-}
-
-function chessPieceLabel(color: string, type: string) {
-  const pieces: Record<string, string> = {
-    bk: '♚',
-    bq: '♛',
-    br: '♜',
-    bb: '♝',
-    bn: '♞',
-    bp: '♟',
-    wk: '♔',
-    wq: '♕',
-    wr: '♖',
-    wb: '♗',
-    wn: '♘',
-    wp: '♙',
-  }
-  return pieces[`${color}${type}`] ?? ''
-}
-
-function boardSquareClass(
-  square: Square,
-  rankIndex: number,
-  fileIndex: number,
-  selected: Square | null,
-  targets: Set<string>,
-) {
-  return [
-    'digital-square',
-    (rankIndex + fileIndex) % 2 ? 'dark' : 'light',
-    selected === square ? 'selected' : '',
-    targets.has(square) ? 'target' : '',
-  ].filter(Boolean).join(' ')
 }
 
 function buildMovePairs(moves: string[]) {

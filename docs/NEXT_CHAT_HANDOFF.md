@@ -134,6 +134,15 @@ Implemented/working:
   the same match in the digital chess board. The board list must come from the
   actual live bracket matches, and move/result state is stored per board so
   switching matches does not erase already-entered moves.
+- The chessboard is now a core shared UI/behavior target. Admin and web use the
+  `JuChessBoard` React component backed by `chess.js`; mobile uses the Dart
+  `chess` package. Keep the wine/cream/gold board style, legal move dots,
+  selected/last/check states, promotion picker, undo/reset, and SAN move lists
+  consistent across all platforms.
+- Admin Procedure now asks for physical board count and generates waves:
+  `Round/Match -> physical Board -> status -> next queued match`. This is the
+  starting point for planning Swiss, arena, knockout, and other format logistics
+  when match count exceeds available boards.
 - Completed and Archived tournament tabs should not show the Registration queue.
 - Flutter app has Appwrite session detection, sign-in, sign-up, sign-out,
   tournament reads, tournament details, registration/cancel behavior, and

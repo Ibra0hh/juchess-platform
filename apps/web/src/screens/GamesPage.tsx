@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { JuChessBoard, type JuChessBoardChange } from '../components/JuChessBoard'
 import SiteHeader from '../components/SiteHeader'
 import {
-  fenBoard,
   findSampleGame,
   sampleGamesBySource,
   type GameSource,
@@ -54,6 +54,8 @@ function GamesPage() {
   const [moveIdx, setMoveIdx] = useState(queryGame ? queryGame.moves.length - 1 : 0)
   const [pgnText, setPgnText] = useState('')
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false)
+  const [workspaceMoves, setWorkspaceMoves] = useState<string[]>([])
+  const [workspaceResult, setWorkspaceResult] = useState('Live')
   const [saved, setSaved] = useState(false)
   const [ran, setRan] = useState(false)
 
@@ -108,12 +110,16 @@ function GamesPage() {
   const boardGame = inReview ? game : inWorkspace ? workspaceGame : null
   const evalNow = getCurrentEval(boardGame, inWorkspace, workspaceLoaded, moveIdx)
   const evalPct = Math.max(6, Math.min(94, 50 + evalNow * 7))
-  const boardCells = fenBoard(boardGame?.fen || startFen)
+  const boardMoves = inReview && game
+    ? game.moves.slice(0, moveIdx + 1)
+    : inWorkspace
+      ? workspaceMoves
+      : []
   const reviewRows = game ? buildMoveRows(game, moveIdx, setMoveIdx) : []
   const classCounts = game ? buildClassCounts(game) : []
   const evalArea = game ? buildEvalArea(game.evals) : ''
   const evalCursorX = game ? buildEvalCursor(game.evals, moveIdx) : 0
-  const workspaceRows = workspaceGame ? buildWorkspaceRows(workspaceGame) : []
+  const workspaceRows = buildWorkspaceRows(workspaceMoves)
 
   const openSource = (nextSource: GameSource) => {
     setSource(nextSource)
@@ -130,12 +136,16 @@ function GamesPage() {
     setSaved(false)
     setRan(mode === 'analysis')
     setWorkspaceLoaded(mode === 'analysis')
+    setWorkspaceMoves(mode === 'analysis' ? selectedGame.moves : [])
+    setWorkspaceResult(selectedGame.result)
     setStep(mode === 'review' ? 'review' : 'workspace')
   }
 
   const openBlankBoard = () => {
     setGame(null)
     setWorkspaceLoaded(false)
+    setWorkspaceMoves([])
+    setWorkspaceResult('Live')
     setSaved(false)
     setRan(false)
     setStep('workspace')
@@ -146,7 +156,15 @@ function GamesPage() {
 
     setGame(sampleGamesBySource['chess.com'][0])
     setWorkspaceLoaded(true)
+    setWorkspaceMoves(sampleGamesBySource['chess.com'][0].moves)
+    setWorkspaceResult(sampleGamesBySource['chess.com'][0].result)
     setRan(false)
+  }
+
+  const updateWorkspaceBoard = (state: JuChessBoardChange) => {
+    setWorkspaceMoves(state.moves)
+    setWorkspaceResult(state.result)
+    setWorkspaceLoaded(true)
   }
 
   return (
@@ -163,20 +181,20 @@ function GamesPage() {
             color="black"
             name={boardGame?.black || 'Black'}
             rating={boardGame?.bRating}
-            badge={boardGame ? boardGame.result : ''}
+            badge={inWorkspace ? workspaceResult : boardGame ? boardGame.result : ''}
           />
 
           <div className="board-wrap">
             <div className="eval-bar" title="Engine evaluation">
               <span style={{ height: `${evalPct}%` }} />
             </div>
-            <div className="chess-board" aria-label="Chess board">
-              {boardCells.map((cell) => (
-                <div className={cell.isDark ? 'dark' : 'light'} key={cell.key}>
-                  <span className={cell.isWhite ? 'white-piece' : 'black-piece'}>{cell.glyph}</span>
-                </div>
-              ))}
-            </div>
+            <JuChessBoard
+              className="games-ju-board"
+              fen={boardMoves.length ? undefined : boardGame?.fen || startFen}
+              interactive={inWorkspace}
+              moves={boardMoves}
+              onChange={inWorkspace ? updateWorkspaceBoard : undefined}
+            />
           </div>
 
           <PlayerBar
@@ -222,6 +240,8 @@ function GamesPage() {
                 setGame(null)
                 setSelectedKey(null)
                 setSource(null)
+                setWorkspaceMoves([])
+                setWorkspaceResult('Live')
               }}
             >
               Game Review
@@ -235,6 +255,8 @@ function GamesPage() {
                 setGame(null)
                 setSelectedKey(null)
                 setSource(null)
+                setWorkspaceMoves([])
+                setWorkspaceResult('Live')
               }}
             >
               New Analysis
@@ -310,12 +332,16 @@ function GamesPage() {
                 setStep('source')
                 setGame(null)
                 setWorkspaceLoaded(false)
+                setWorkspaceMoves([])
+                setWorkspaceResult('Live')
               }}
               onLoad={loadPgn}
               onNew={() => {
                 setWorkspaceLoaded(false)
                 setGame(null)
                 setPgnText('')
+                setWorkspaceMoves([])
+                setWorkspaceResult('Live')
                 setSaved(false)
                 setRan(false)
               }}
@@ -775,14 +801,14 @@ function buildMoveRows(
   return rows
 }
 
-function buildWorkspaceRows(game: SampleGame) {
+function buildWorkspaceRows(moves: string[]) {
   const rows = []
 
-  for (let index = 0; index < game.moves.length; index += 2) {
+  for (let index = 0; index < moves.length; index += 2) {
     rows.push({
       number: index / 2 + 1,
-      whiteMove: game.moves[index],
-      blackMove: game.moves[index + 1] || '',
+      whiteMove: moves[index],
+      blackMove: moves[index + 1] || '',
     })
   }
 

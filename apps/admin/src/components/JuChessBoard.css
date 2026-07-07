@@ -1,0 +1,148 @@
+.ju-chess-board-shell {
+  width: min(100%, 520px);
+}
+
+.ju-chess-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 5px solid #b99654;
+  border-radius: 2px;
+  background: #b99654;
+  box-shadow:
+    0 18px 35px rgba(35, 24, 18, 0.22),
+    inset 0 0 0 1px rgba(255, 239, 198, 0.5);
+}
+
+.ju-chess-square {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.ju-chess-square:disabled {
+  cursor: default;
+}
+
+.ju-chess-square.light {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(183, 137, 70, 0.14)),
+    #ecd2a2;
+  box-shadow: inset 0 0 9px rgba(82, 45, 34, 0.18);
+}
+
+.ju-chess-square.dark {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(35, 5, 10, 0.15)),
+    #67292b;
+  box-shadow: inset 0 0 9px rgba(32, 10, 12, 0.28);
+}
+
+.ju-chess-square.selected {
+  box-shadow:
+    inset 0 0 0 4px rgba(248, 237, 209, 0.96),
+    inset 0 0 0 7px rgba(122, 36, 49, 0.88);
+}
+
+.ju-chess-square.last-move::before,
+.ju-chess-square.check::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.ju-chess-square.last-move::before {
+  background: rgba(226, 179, 72, 0.24);
+  box-shadow: inset 0 0 0 2px rgba(169, 138, 63, 0.36);
+}
+
+.ju-chess-square.check::before {
+  background: rgba(176, 50, 50, 0.28);
+  box-shadow: inset 0 0 0 2px rgba(126, 21, 34, 0.58);
+}
+
+.ju-chess-square.target::after {
+  content: "";
+  position: absolute;
+  width: 18%;
+  height: 18%;
+  border-radius: 50%;
+  background: rgba(30, 43, 69, 0.38);
+  box-shadow: 0 0 0 3px rgba(255, 252, 244, 0.2);
+  pointer-events: none;
+}
+
+.ju-chess-square.target:has(.ju-chess-piece)::after {
+  width: 76%;
+  height: 76%;
+  background: transparent;
+  box-shadow: inset 0 0 0 5px rgba(30, 43, 69, 0.36);
+}
+
+.ju-chess-piece {
+  position: relative;
+  z-index: 1;
+  display: block;
+  font-family: "Times New Roman", "Noto Sans Symbols 2", serif;
+  font-size: clamp(28px, 9vw, 72px);
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-1px);
+  user-select: none;
+}
+
+.ju-chess-piece.black {
+  color: #030303;
+  -webkit-text-stroke: 1.6px #b99654;
+  text-shadow:
+    0 1px 0 #b99654,
+    0 3px 0 rgba(0, 0, 0, 0.18);
+}
+
+.ju-chess-piece.white {
+  color: #fbfbfb;
+  -webkit-text-stroke: 1.7px #d0ad69;
+  text-shadow:
+    0 1px 0 #a57c42,
+    0 3px 0 rgba(80, 44, 26, 0.26);
+}
+
+.ju-promotion-panel {
+  position: absolute;
+  inset: auto 10px 10px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(185, 150, 84, 0.72);
+  border-radius: 10px;
+  background: rgba(255, 252, 244, 0.96);
+  box-shadow: 0 12px 30px rgba(30, 43, 69, 0.18);
+}
+
+.ju-promotion-panel button {
+  min-height: 44px;
+  border: 1px solid rgba(30, 43, 69, 0.14);
+  border-radius: 8px;
+  background: #ecd2a2;
+  color: #030303;
+  cursor: pointer;
+  font-family: "Times New Roman", "Noto Sans Symbols 2", serif;
+  font-size: 30px;
+  -webkit-text-stroke: 1px #b99654;
+}
+
+@media (max-width: 620px) {
+  .ju-chess-piece {
+    font-size: clamp(24px, 10vw, 46px);
+  }
+}

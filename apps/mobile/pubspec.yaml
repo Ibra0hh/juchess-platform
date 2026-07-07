@@ -37,6 +37,7 @@ dependencies:
   appwrite: ^25.2.0
   provider: ^6.1.5+1
   go_router: ^17.3.0
+  chess: ^0.8.1
 
 dev_dependencies:
   flutter_test:
