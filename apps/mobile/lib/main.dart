@@ -5057,12 +5057,12 @@ class NewsList extends StatelessWidget {
       child: Column(
         children: [
           NewsTile(
-            'Rapid Championship round 4 is live',
+            'Swiss round 4 is live',
             'Main Campus · Hall B',
           ),
           SizedBox(height: 10),
           NewsTile(
-            'Masters Six registration opens soon',
+            'Round-robin registration opens soon',
             'Round-robin invitational · 6 players',
           ),
         ],
@@ -6628,5 +6628,5 @@ const bracketRounds = [
 
 const savedAnalyses = [
   SavedAnalysisSeed("King's Indian prep vs Omar", '32 moves · Jun 25'),
-  SavedAnalysisSeed('Rapid Ch. Round 2 endgame', '18 moves · Jun 28'),
+  SavedAnalysisSeed('Rapid round 2 endgame', '18 moves · Jun 28'),
 ];

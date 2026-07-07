@@ -60,8 +60,8 @@ function ProfilePage() {
               <MetricCard label="Rating Delta" value="+86" tone="accent" />
             </div>
             <div className="profile-facts">
-              <FactRow label="Active events" value="4 - leading JU Spring Open" />
-              <FactRow label="Best result" value="1st - Faculty Round-Robin" />
+              <FactRow label="Active events" value="4 - leading Swiss" />
+              <FactRow label="Best result" value="1st - Round-robin" />
               <FactRow label="Favorite opening" value="Ruy Lopez, Closed" />
             </div>
           </section>
@@ -98,7 +98,7 @@ function ProfilePage() {
         <section className="profile-next-round">
           <span aria-hidden="true">{'\u2654'}</span>
           <div>
-            <strong>Next round: JU Spring Open - Round 4 - Board 1 vs Omar Saleh</strong>
+            <strong>Next round: Swiss - Round 4 - Board 1 vs Omar Saleh</strong>
             <p>Fri Jul 3 - 5:00 PM - Student Union Hall B - You play White</p>
           </div>
           <Link to="/tournament/spring-open">Open tournament</Link>

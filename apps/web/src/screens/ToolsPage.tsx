@@ -33,7 +33,7 @@ const toolCards = [
     icon: '\u2656',
     tag: 'Live',
     title: 'Live boards',
-    body: 'Jump into the Spring Open detail page with standings, pairings, games, and round data.',
+    body: 'Jump into the Swiss detail page with standings, pairings, games, and round data.',
     action: 'Open live event',
   },
   {

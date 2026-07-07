@@ -83,7 +83,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
       <span style="font-size:11px;font-weight:600;color:rgba(33,48,78,.55);letter-spacing:.06em;text-transform:uppercase">Featured tournament</span>
       <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:#7d2434;color:#f7f1e3;font-size:10.5px;font-weight:700;letter-spacing:.04em"><span style="width:6px;height:6px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>LIVE</span>
     </div>
-    <div style="font-family:'Source Serif 4',Georgia,serif;font-size:17.5px;font-weight:700;line-height:1.25">University of Jordan Rapid Championship</div>
+    <div style="font-family:'Source Serif 4',Georgia,serif;font-size:17.5px;font-weight:700;line-height:1.25">Swiss</div>
     <div style="font-size:12.5px;color:rgba(33,48,78,.65);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sat, Jul 4 · 4:00 PM</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
       <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">Main Campus · Hall B</span>
@@ -1200,8 +1200,8 @@ class Component extends DCLogic {
     const D={byId:{},list:[]};
     const add=t=>{D.byId[t.id]=t;D.list.push(t);};
 
-    add({id:'rapid',name:'University of Jordan Rapid Championship',fk:'swiss',status:'active',fmt:'Swiss · 7 rounds',tc:'15+10 Rapid',date:'Sat, Jul 4 · 4:00 PM',dates:'Jul 4 – Jul 5, 2026',loc:'Main Campus · Hall B',org:'JU Chess Club',reg:'Closed',capText:'12/16 players',idxs:r(0,12),rounds:this.swiss(r(0,12),3,2),cur:'Round 4 of 7',upNote:'Rounds 5–7 · pairings are published after Round 4'});
-    add({id:'koblitz',name:'JU Blitz Knockout Cup',fk:'ko',status:'active',fmt:'Single elimination',tc:'3+2 Blitz',date:'Thu, Jul 2 · 6:00 PM',dates:'Jul 2, 2026',loc:'Student Union · Room 12',org:'JU Chess Club',reg:'Closed',capText:'16 players',idxs:r(0,16),bracket:this.koRounds(o16,['Round of 16','Quarterfinal','Semifinal','Final'],{done:2,live:2}),cur:'Semifinal'});
+    add({id:'rapid',name:'Swiss',fk:'swiss',status:'active',fmt:'Swiss · 7 rounds',tc:'15+10 Rapid',date:'Sat, Jul 4 · 4:00 PM',dates:'Jul 4 – Jul 5, 2026',loc:'Main Campus · Hall B',org:'JU Chess Club',reg:'Closed',capText:'12/16 players',idxs:r(0,12),rounds:this.swiss(r(0,12),3,2),cur:'Round 4 of 7',upNote:'Rounds 5–7 · pairings are published after Round 4'});
+    add({id:'koblitz',name:'Single elimination',fk:'ko',status:'active',fmt:'Single elimination',tc:'3+2 Blitz',date:'Thu, Jul 2 · 6:00 PM',dates:'Jul 2, 2026',loc:'Student Union · Room 12',org:'JU Chess Club',reg:'Closed',capText:'16 players',idxs:r(0,16),bracket:this.koRounds(o16,['Round of 16','Quarterfinal','Semifinal','Final'],{done:2,live:2}),cur:'Semifinal'});
     add({id:'arena',name:'Summer Bullet Arena',fk:'arena',status:'active',fmt:'Arena · 60 min',tc:'1+0 Bullet',date:'Today · 8:00 PM',dates:'Jul 2, 2026',loc:'Online · Club server',org:'JU Chess Club',reg:'Open during arena',capText:'10 players',idxs:[1,3,4,6,8,10,12,13,15,17],cur:'In progress'});
     add({id:'team',name:'Amman Universities Team Battle',fk:'team',status:'active',fmt:'Team · 4 boards',tc:'10+0 Rapid',date:'Jul 1 – Jul 8 · 5:00 PM',dates:'Jul 1 – Jul 8, 2026',loc:'JU Sports Complex · Hall 2',org:'JU Chess Club',reg:'Closed',capText:'4 teams',idxs:[0,1,2,3,20,21,22,23,24,25,26,27,28,29,30,31],cur:'Match Day 2 of 3'});
     add({id:'league',name:'JU Chess League 2026',fk:'league',status:'active',fmt:'League · 7 weeks',tc:'10+5 Rapid',date:'Tuesdays · 5:30 PM',dates:'Jun 9 – Jul 21, 2026',loc:'Main Campus · Hall B',org:'JU Chess Club',reg:'Closed',capText:'8 players',idxs:[0,2,4,5,7,9,11,14],rounds:this.rrRounds([0,2,4,5,7,9,11,14],n=>'Week '+n,3,{done:1,live:2},false),cur:'Week 4 of 7'});
@@ -1210,15 +1210,15 @@ class Component extends DCLogic {
     const st1=this.swiss(mi,5,null);
     const st1stand=this.stand(mi,st1);
     const qual=st1stand.slice(0,8).map(x=>x.i);
-    add({id:'multi',name:'JU Club Championship 2026',fk:'multi',status:'active',fmt:'Multi-stage · Swiss + Knockout',tc:'15+10 / 10+5',date:'Jun 20 – Jul 11',dates:'Jun 20 – Jul 11, 2026',loc:'Main Campus · Hall A',org:'JU Chess Club',reg:'Closed',capText:'12 players',idxs:mi,st1rounds:st1,st1stand,qual,st2:this.koRounds(o8.map(k=>qual[k]),['Quarterfinal','Semifinal','Final'],{done:0,live:2}),cur:'Stage 2 · Quarterfinal'});
+    add({id:'multi',name:'Multi-stage',fk:'multi',status:'active',fmt:'Multi-stage · Swiss + Knockout',tc:'15+10 / 10+5',date:'Jun 20 – Jul 11',dates:'Jun 20 – Jul 11, 2026',loc:'Main Campus · Hall A',org:'JU Chess Club',reg:'Closed',capText:'12 players',idxs:mi,st1rounds:st1,st1stand,qual,st2:this.koRounds(o8.map(k=>qual[k]),['Quarterfinal','Semifinal','Final'],{done:0,live:2}),cur:'Stage 2 · Quarterfinal'});
 
-    add({id:'masters',name:'Masters Six · Double Round-Robin Invitational',fk:'drr',status:'upcoming',fmt:'Double round-robin',tc:'90+30 Classical',date:'Sun, Jul 12 · 10:00 AM',dates:'Jul 12 – Aug 2, 2026',loc:'Main Campus · Hall A',org:'JU Chess Club',reg:'Invitation only',capText:'6 players',idxs:r(0,6),rounds:this.rrRounds(r(0,6),n=>'Round '+n,0,null,true),cur:'Starts Jul 12'});
+    add({id:'masters',name:'Double round-robin',fk:'drr',status:'upcoming',fmt:'Double round-robin',tc:'90+30 Classical',date:'Sun, Jul 12 · 10:00 AM',dates:'Jul 12 – Aug 2, 2026',loc:'Main Campus · Hall A',org:'JU Chess Club',reg:'Invitation only',capText:'6 players',idxs:r(0,6),rounds:this.rrRounds(r(0,6),n=>'Round '+n,0,null,true),cur:'Starts Jul 12'});
     add({id:'autumn',name:'Autumn Swiss Open',fk:'swiss',status:'upcoming',fmt:'Swiss · 6 rounds',tc:'10+5 Rapid',date:'Sat, Sep 19 · 3:00 PM',dates:'Sep 19 – 20, 2026',loc:'Student Union · Main Hall',org:'JU Chess Club',reg:'Open',capText:'9/24 registered',idxs:[0,2,5,7,9,11,13,16,18],rounds:[],cur:'Registration open'});
 
     const ri=[4,5,6,7,8,9];
-    add({id:'spring',name:'Spring Invitational',fk:'rr',status:'completed',fmt:'Round-robin',tc:'25+10 Rapid',date:'May 16 – May 17',dates:'May 16 – 17, 2026',loc:'Main Campus · Hall A',org:'JU Chess Club',reg:'Closed',capText:'6 players',idxs:ri,rounds:this.rrRounds(ri,n=>'Round '+n,5,null,false),cur:'Finished'});
+    add({id:'spring',name:'Round-robin',fk:'rr',status:'completed',fmt:'Round-robin',tc:'25+10 Rapid',date:'May 16 – May 17',dates:'May 16 – 17, 2026',loc:'Main Campus · Hall A',org:'JU Chess Club',reg:'Closed',capText:'6 players',idxs:ri,rounds:this.rrRounds(ri,n=>'Round '+n,5,null,false),cur:'Finished'});
     const di=[2,3,5,6,8,10,12,14];
-    add({id:'winter',name:'Winter Blitz Cup',fk:'de',status:'completed',fmt:'Double elimination',tc:'5+3 Blitz',date:'Dec 13, 2025',dates:'Dec 13, 2025',loc:'Student Union · Room 12',org:'JU Chess Club',reg:'Closed',capText:'8 players',idxs:di,de:this.de8(di),cur:'Finished'});
+    add({id:'winter',name:'Double elimination',fk:'de',status:'completed',fmt:'Double elimination',tc:'5+3 Blitz',date:'Dec 13, 2025',dates:'Dec 13, 2025',loc:'Student Union · Room 12',org:'JU Chess Club',reg:'Closed',capText:'8 players',idxs:di,de:this.de8(di),cur:'Finished'});
 
     const ai=D.byId.arena.idxs;
     D.arena={
@@ -1735,7 +1735,7 @@ class Component extends DCLogic {
     v.togglePause=()=>{ if(s.flag) return; this.setState({running:!s.running}); };
     v.resetClock=()=>{ const p=this.PRESETS.find(x=>x[0]===s.preset); this.setState({wT:p[1],bT:p[1],inc:p[2],running:false,flag:null,turn:'w'}); };
 
-    const seedSaved=user?[{t:"King's Indian prep vs Omar",sub:'32 moves · Jun 25',on:()=>this.openBoard('mock')},{t:'Rapid Ch. Round 2 endgame',sub:'18 moves · Jun 28',on:()=>this.openBoard('mock')}]:[];
+    const seedSaved=user?[{t:"King's Indian prep vs Omar",sub:'32 moves · Jun 25',on:()=>this.openBoard('mock')},{t:'Rapid round 2 endgame',sub:'18 moves · Jun 28',on:()=>this.openBoard('mock')}]:[];
     v.savedRows=[...seedSaved,...s.saved];
     v.savedEmpty=v.savedRows.length===0;
 
@@ -1749,7 +1749,7 @@ class Component extends DCLogic {
         if((g.w===0||g.b===0)&&g.res!=='live'&&g.res!=='–'){
           const won=(g.w===0&&g.res==='1-0')||(g.b===0&&g.res==='0-1');
           const draw=g.res==='½-½';
-          rg.push({t:'vs '+nm(g.w===0?g.b:g.w),sub:'Rapid Championship · '+rd.label,chip:draw?'Draw':(won?'Won':'Lost'),cBg:draw?'rgba(33,48,78,.08)':(won?'rgba(169,138,63,.16)':'rgba(125,36,52,.1)'),cFg:draw?N:(won?'#79622a':BU)});
+          rg.push({t:'vs '+nm(g.w===0?g.b:g.w),sub:'Swiss · '+rd.label,chip:draw?'Draw':(won?'Won':'Lost'),cBg:draw?'rgba(33,48,78,.08)':(won?'rgba(169,138,63,.16)':'rgba(125,36,52,.1)'),cFg:draw?N:(won?'#79622a':BU)});
         }
       }));
       v.pGames=rg;

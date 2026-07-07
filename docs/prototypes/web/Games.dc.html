@@ -379,7 +379,7 @@ class Component extends DCLogic {
     var srcName = st.source === 'chess.com' ? 'Chess.com' : st.source === 'lichess' ? 'Lichess' : 'Tournament Games';
     var searchTitle = srcName;
     var searchSub = st.source === 'tournament' ? 'Search by player, event, or round' : 'Enter a ' + srcName + ' username';
-    var searchPh = st.source === 'tournament' ? 'e.g. Ibrahim, Spring Open, QF\u2026' : 'e.g. ibrahim_ju';
+    var searchPh = st.source === 'tournament' ? 'e.g. Ibrahim, Swiss, QF\u2026' : 'e.g. ibrahim_ju';
 
     /* list */
     var pool = (window.JU && st.source) ? window.JU.gamesBySource[st.source] : [];

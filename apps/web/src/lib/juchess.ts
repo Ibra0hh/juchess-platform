@@ -106,7 +106,7 @@ export const members: Member[] = [
 export const demoTournaments: Tournament[] = [
   {
     id: 'spring-open',
-    name: 'JU Spring Open 2026',
+    name: 'Swiss',
     status: 'Active',
     date: 'Jun 14 - Jul 12, 2026',
     location: 'Student Union Hall B',
@@ -119,7 +119,7 @@ export const demoTournaments: Tournament[] = [
   },
   {
     id: 'faculty-rr',
-    name: 'Faculty Round-Robin',
+    name: 'Round-robin',
     status: 'Active',
     date: 'May 3 - May 31, 2026',
     location: 'Engineering Lounge',
@@ -132,7 +132,7 @@ export const demoTournaments: Tournament[] = [
   },
   {
     id: 'masters-drr',
-    name: 'Masters Double Round-Robin',
+    name: 'Double round-robin',
     status: 'Active',
     date: 'Jun 1 - Jul 20, 2026',
     location: 'Library Seminar Room 2',
@@ -145,7 +145,7 @@ export const demoTournaments: Tournament[] = [
   },
   {
     id: 'knockout-cup',
-    name: 'JU Knockout Cup',
+    name: 'Single elimination',
     status: 'Active',
     date: 'Jun 20 - Jul 10, 2026',
     location: 'Hall A',
@@ -158,7 +158,7 @@ export const demoTournaments: Tournament[] = [
   },
   {
     id: 'blitz-de',
-    name: 'Summer Blitz Double Elimination',
+    name: 'Double elimination',
     status: 'Active',
     date: 'Jun 26 - Jul 5, 2026',
     location: 'Hall A',
@@ -171,7 +171,7 @@ export const demoTournaments: Tournament[] = [
   },
   {
     id: 'autumn-qualifier',
-    name: 'Autumn Team Qualifier',
+    name: 'Swiss team',
     status: 'Upcoming',
     date: 'Sep 12 - Sep 19, 2026',
     location: 'Student Union Hall B',
@@ -184,7 +184,7 @@ export const demoTournaments: Tournament[] = [
   },
   {
     id: 'beginner-arena',
-    name: 'Beginner Friday Arena',
+    name: 'Arena',
     status: 'Upcoming',
     date: 'Aug 7, 2026',
     location: 'Club Room',
@@ -197,7 +197,7 @@ export const demoTournaments: Tournament[] = [
   },
   {
     id: 'winter-classic',
-    name: 'Winter Classic 2025',
+    name: 'Swiss',
     status: 'Completed',
     date: 'Dec 5 - Dec 19, 2025',
     location: 'Library Seminar Room 2',
@@ -461,12 +461,12 @@ export const sampleGamesBySource: Record<GameSource, SampleGame[]> = {
     makeSampleGame('lichess', 3, 5, 1, '0-1', 'Jun 14, 2026', 'Pirc Defense'),
   ],
   tournament: [
-    makeSampleGame('tournament', 1, 0, 1, '1-0', 'Jul 2, 2026', 'Ruy Lopez: Closed', 'Spring Open - R4'),
-    makeSampleGame('tournament', 6, 2, 3, '1/2-1/2', 'Jul 2, 2026', 'Catalan Opening', 'Spring Open - R4'),
-    makeSampleGame('tournament', 3, 4, 5, '1-0', 'Jul 2, 2026', 'Sicilian: Alapin', 'Spring Open - R4'),
-    makeSampleGame('tournament', 8, 1, 4, '1-0', 'Jun 27, 2026', "Queen's Gambit Accepted", 'Knockout Cup - QF'),
-    makeSampleGame('tournament', 2, 3, 2, '0-1', 'Jun 27, 2026', 'London System', 'Knockout Cup - QF'),
-    makeSampleGame('tournament', 5, 0, 5, '1-0', 'Jun 20, 2026', 'Italian Game: Giuoco Piano', 'Masters DRR - R3'),
+    makeSampleGame('tournament', 1, 0, 1, '1-0', 'Jul 2, 2026', 'Ruy Lopez: Closed', 'Swiss - R4'),
+    makeSampleGame('tournament', 6, 2, 3, '1/2-1/2', 'Jul 2, 2026', 'Catalan Opening', 'Swiss - R4'),
+    makeSampleGame('tournament', 3, 4, 5, '1-0', 'Jul 2, 2026', 'Sicilian: Alapin', 'Swiss - R4'),
+    makeSampleGame('tournament', 8, 1, 4, '1-0', 'Jun 27, 2026', "Queen's Gambit Accepted", 'Single elimination - QF'),
+    makeSampleGame('tournament', 2, 3, 2, '0-1', 'Jun 27, 2026', 'London System', 'Single elimination - QF'),
+    makeSampleGame('tournament', 5, 0, 5, '1-0', 'Jun 20, 2026', 'Italian Game: Giuoco Piano', 'Double round-robin - R3'),
   ],
 }
 

@@ -462,7 +462,7 @@ function SearchStep({
         onKeyDown={(event) => {
           if (event.key === 'Enter') onSearch()
         }}
-        placeholder={isTournament ? 'e.g. Ibrahim, Spring Open, QF...' : 'e.g. ibrahim_ju'}
+        placeholder={isTournament ? 'e.g. Ibrahim, Swiss, QF...' : 'e.g. ibrahim_ju'}
       />
       <button type="button" className="primary-rail-button" onClick={onSearch}>
         Search games

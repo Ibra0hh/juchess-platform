@@ -42,7 +42,7 @@ const players = [
 const tournaments = [
   tournament('seed_tour_knockout', {
     slug: 'knockout-cup',
-    name: 'JU Knockout Cup',
+    name: 'Single elimination',
     status: 'active',
     format: 'Single elimination',
     timeControl: '10+0 Blitz',
@@ -56,7 +56,7 @@ const tournaments = [
   }),
   tournament('seed_tour_double_elim', {
     slug: 'blitz-de',
-    name: 'Summer Blitz Double Elimination',
+    name: 'Double elimination',
     status: 'upcoming',
     format: 'Double elimination',
     timeControl: '5+3 Blitz',
@@ -70,7 +70,7 @@ const tournaments = [
   }),
   tournament('seed_tour_swiss', {
     slug: 'spring-open',
-    name: 'JU Spring Open 2026',
+    name: 'Swiss',
     status: 'active',
     format: 'Swiss',
     timeControl: '15+10 Rapid',
@@ -84,7 +84,7 @@ const tournaments = [
   }),
   tournament('seed_tour_arena', {
     slug: 'beginner-arena',
-    name: 'Beginner Friday Arena',
+    name: 'Arena',
     status: 'upcoming',
     format: 'Arena',
     timeControl: '5+0 Blitz',
@@ -97,7 +97,7 @@ const tournaments = [
   }),
   tournament('seed_tour_multistage', {
     slug: 'campus-multistage',
-    name: 'Campus Multi-stage Championship',
+    name: 'Multi-stage',
     status: 'active',
     format: 'Multi-stage',
     timeControl: '10+5 Rapid',
@@ -111,7 +111,7 @@ const tournaments = [
   }),
   tournament('seed_tour_completed', {
     slug: 'winter-classic',
-    name: 'Winter Classic 2025',
+    name: 'Swiss',
     status: 'completed',
     format: 'Swiss',
     timeControl: '30+30 Classical',

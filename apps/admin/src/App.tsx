@@ -630,17 +630,17 @@ function DashboardScreen({
   ]
 
   const recentActivity = [
-    { icon: '♞', tint: '#F3E4E6', title: 'Autumn Open - Round 3 pairings generated', meta: 'By Amina Osei · Swiss', time: '12m ago' },
-    { icon: '✓', tint: '#EAF6F0', title: 'JU Grand Circuit published to public site', meta: 'Visibility: Public', time: '1h ago' },
-    { icon: '⚑', tint: '#FBEAEA', title: 'Result disputed on Board 4', meta: 'Knight\'s Gambit Cup', time: '2h ago' },
-    { icon: '+', tint: '#EAF0FA', title: '6 new registrations approved', meta: 'Semester League', time: '4h ago' },
-    { icon: '▦', tint: '#FBF1E2', title: 'Winner photos uploaded', meta: 'Spring Invitational', time: 'Yesterday' },
+    { icon: '♞', tint: '#F3E4E6', title: 'Swiss - Round 3 pairings generated', meta: 'By Amina Osei · Swiss', time: '12m ago' },
+    { icon: '✓', tint: '#EAF6F0', title: 'Multi-stage published to public site', meta: 'Visibility: Public', time: '1h ago' },
+    { icon: '⚑', tint: '#FBEAEA', title: 'Result disputed on Board 4', meta: 'Single elimination', time: '2h ago' },
+    { icon: '+', tint: '#EAF0FA', title: '6 new registrations approved', meta: 'League', time: '4h ago' },
+    { icon: '▦', tint: '#FBF1E2', title: 'Winner photos uploaded', meta: 'Single elimination', time: 'Yesterday' },
   ]
 
   const disputes = [
-    { match: 'Board 4 · Rahimi vs Carter', event: 'Knight\'s Gambit Cup', reason: 'Illegal move claim', severity: 'HIGH', tint: '#FBEAEA', color: '#B23A3A' },
-    { match: 'Board 2 · Tan vs Nair', event: 'Autumn Open', reason: 'Clock dispute', severity: 'MED', tint: '#FBF1E2', color: '#C77D0A' },
-    { match: 'Board 7 · Rossi vs Bianchi', event: 'Semester League', reason: 'Score mismatch', severity: 'LOW', tint: '#F0EBE1', color: '#8B8577' },
+    { match: 'Board 4 · Rahimi vs Carter', event: 'Single elimination', reason: 'Illegal move claim', severity: 'HIGH', tint: '#FBEAEA', color: '#B23A3A' },
+    { match: 'Board 2 · Tan vs Nair', event: 'Swiss', reason: 'Clock dispute', severity: 'MED', tint: '#FBF1E2', color: '#C77D0A' },
+    { match: 'Board 7 · Rossi vs Bianchi', event: 'League', reason: 'Score mismatch', severity: 'LOW', tint: '#F0EBE1', color: '#8B8577' },
   ]
 
   return (
@@ -1200,7 +1200,7 @@ function TournamentsScreen({
             <div className="create-step-body">
               {createStep === 0 ? (
                 <div className="create-grid">
-                  <label className="wide">Tournament name<input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="Spring Championship" required /></label>
+                  <label className="wide">Tournament name<input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="Swiss" required /></label>
                   <label className="wide">Description<textarea value={form.description ?? ''} onChange={(event) => update('description', event.target.value)} placeholder="Short description..." rows={3} /></label>
                   <label>Number of players<input type="number" min={2} value={form.capacity ?? ''} onChange={(event) => update('capacity', Number(event.target.value))} /></label>
                   <label>
@@ -2265,7 +2265,7 @@ function PlayersScreen({
       <div className="table-toolbar">
         <div className="filter-row">
           <label className="inline-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filter by name or ID..." /></label>
-          <select><option>All players</option><option>Rapid Championship</option><option>Blitz Cup</option></select>
+          <select><option>All players</option><option>Swiss</option><option>Single elimination</option></select>
           <span>{visiblePlayers.length} of 248 players</span>
         </div>
         <button type="button" className="primary-button"><span>+</span> Add player</button>

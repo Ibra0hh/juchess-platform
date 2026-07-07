@@ -173,7 +173,7 @@
   <div style="position: relative; z-index: 5; background: #16213B; color: rgba(248,243,231,.9); overflow: hidden; border-top: 1px solid rgba(201,174,107,.25); border-bottom: 1px solid rgba(201,174,107,.25);">
     <div style="display: flex; align-items: center; gap: 28px; padding: 13px 26px; font-family: 'Cormorant Garamond', serif; font-size: 18px; letter-spacing: .01em; white-space: nowrap; justify-content: center; flex-wrap: wrap;">
       <span style="color: #C9AE6B;">&#9812;</span><span>Swiss Opens</span>
-      <span style="color: #C9AE6B;">&#9822;</span><span>Knockout Cups</span>
+      <span style="color: #C9AE6B;">&#9822;</span><span>Single elimination</span>
       <span style="color: #C9AE6B;">&#9819;</span><span>Team Matches</span>
       <span style="color: #C9AE6B;">&#9820;</span><span>Arenas &amp; Leagues</span>
       <span style="color: #C9AE6B;">&#9821;</span><span>Game Review</span>
@@ -356,7 +356,7 @@ class Component extends DCLogic {
     ];
 
     /* featured tournament for the hero card */
-    var feat = { href: 'Tournaments.dc.html', name: 'JU Spring Open', statusLabel: 'Live now', format: 'Swiss', timeControl: '15+10 Rapid', date: '\u2014', location: '\u2014', participants: '\u2014', leader: '\u2014', cta: 'View tournament' };
+    var feat = { href: 'Tournaments.dc.html', name: 'Swiss', statusLabel: 'Live now', format: 'Swiss', timeControl: '15+10 Rapid', date: '\u2014', location: '\u2014', participants: '\u2014', leader: '\u2014', cta: 'View tournament' };
     if (window.JU && window.JU.tournaments && window.JU.tournaments.length) {
       var ts = window.JU.tournaments;
       var pick = null;
