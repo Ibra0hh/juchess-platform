@@ -81,6 +81,8 @@ type AdminBracketRound = {
 
 type AdminBracketPhase = 'setup' | 'active' | 'completed'
 
+const DEFAULT_KNOCKOUT_BRACKET_SIZE = 16
+
 const navItems: Array<{ key: Screen; label: string; icon: string }> = [
   { key: 'dashboard', label: 'Dashboard', icon: '▤' },
   { key: 'windows', label: 'App Windows', icon: '▧' },
@@ -1440,7 +1442,8 @@ function TournamentManageView({
   const playStage = knockout ? 'bracket' : 'rounds'
   const [stage, setStage] = useState(playStage)
   const tournamentPlayers = buildTournamentPlayers(shuffleSeed)
-  const pairings = buildPairings(tournamentPlayers)
+  const bracketMatchCount = knockout ? getBracketMatchCount(tournament) : undefined
+  const pairings = buildPairings(tournamentPlayers, bracketMatchCount)
   const bracketPhase = getBracketPhase(tournament)
   const bracketRounds = buildAdminBracketRounds(pairings, bracketPhase)
   const shuffleLocked = disabled || published
@@ -2610,9 +2613,9 @@ function seededShuffle<T>(items: T[], seed: number) {
   return result
 }
 
-function buildPairings(players: Player[]): Pairing[] {
+function buildPairings(players: Player[], targetMatchCount?: number): Pairing[] {
   const half = Math.ceil(players.length / 2)
-  return players.slice(0, half).map((player, index) => {
+  const pairings: Pairing[] = players.slice(0, half).map((player, index) => {
     const opponent = players[index + half]
     return {
       board: index + 1,
@@ -2622,6 +2625,34 @@ function buildPairings(players: Player[]): Pairing[] {
       blackRating: opponent?.rating ?? '-',
     }
   })
+
+  const matchCount = Math.max(pairings.length, targetMatchCount ?? pairings.length)
+  while (pairings.length < matchCount) {
+    const board = pairings.length + 1
+    pairings.push({
+      board,
+      white: `Open seed ${board * 2 - 1}`,
+      whiteRating: '-',
+      black: `Open seed ${board * 2}`,
+      blackRating: '-',
+    })
+  }
+
+  return pairings.slice(0, matchCount)
+}
+
+function getBracketMatchCount(tournament: AdminTournament) {
+  const capacity = typeof tournament.capacity === 'number' && Number.isFinite(tournament.capacity) && tournament.capacity > 0
+    ? tournament.capacity
+    : DEFAULT_KNOCKOUT_BRACKET_SIZE
+  const bracketSize = Math.max(2, nextPowerOfTwo(capacity))
+  return Math.floor(bracketSize / 2)
+}
+
+function nextPowerOfTwo(value: number) {
+  let result = 1
+  while (result < value) result *= 2
+  return result
 }
 
 function getBracketPhase(tournament: AdminTournament): AdminBracketPhase {
@@ -2632,45 +2663,38 @@ function getBracketPhase(tournament: AdminTournament): AdminBracketPhase {
 
 function buildAdminBracketRounds(pairings: Pairing[], phase: AdminBracketPhase): AdminBracketRound[] {
   const firstRound: AdminBracketMatch[] = pairings.map((pairing, index) => (
-    phase === 'setup'
+    phase === 'setup' || !hasKnownPlayers(pairing)
       ? buildOpenMatch(pairing)
       : buildCompletedMatch(pairing, index % 2 === 0 ? 'white' : 'black')
   ))
-  const quarterfinals = buildDerivedBracketMatches({
-    activeBoards: phase === 'active' ? 2 : 0,
-    complete: phase === 'completed',
-    count: 4,
-    source: firstRound,
-    sourceLabel: 'R16',
-  })
-  const semifinals = buildDerivedBracketMatches({
-    activeBoards: 0,
-    complete: phase === 'completed',
-    count: 2,
-    source: quarterfinals,
-    sourceLabel: 'QF',
-  })
-  const final = buildDerivedBracketMatches({
-    activeBoards: 0,
-    complete: phase === 'completed',
-    count: 1,
-    source: semifinals,
-    sourceLabel: 'SF',
-  })
-
-  return [
-    { name: 'Round of 16', matches: firstRound },
-    { name: 'Quarterfinal', matches: quarterfinals },
-    { name: 'Semifinal', matches: semifinals },
-    { name: 'Final', matches: final },
+  const rounds: AdminBracketRound[] = [
+    { name: bracketRoundName(firstRound.length * 2), matches: firstRound },
   ]
+  let currentRound = firstRound
+  let sourceLabel = bracketRoundCode(currentRound.length * 2)
+
+  while (currentRound.length > 1) {
+    const matchCount = Math.ceil(currentRound.length / 2)
+    const nextRound = buildDerivedBracketMatches({
+      activeBoards: phase === 'active' && rounds.length === 1 ? 2 : 0,
+      complete: phase === 'completed',
+      count: matchCount,
+      source: currentRound,
+      sourceLabel,
+    })
+    rounds.push({ name: bracketRoundName(matchCount * 2), matches: nextRound })
+    currentRound = nextRound
+    sourceLabel = bracketRoundCode(matchCount * 2)
+  }
+
+  return rounds
 }
 
 function buildOpenMatch(pairing: Pairing): AdminBracketMatch {
   return {
     ...pairing,
     blackScore: '',
-    pending: pairing.white === 'TBD' || pairing.black === 'TBD',
+    pending: !hasKnownPlayers(pairing),
     whiteScore: '',
   }
 }
@@ -2719,7 +2743,7 @@ function buildDerivedBracketMatches({
       blackRating: '',
     }
 
-    if (complete) return buildCompletedMatch(pairing, index % 2 === 0 ? 'white' : 'black')
+    if (complete && hasKnownPlayers(pairing)) return buildCompletedMatch(pairing, index % 2 === 0 ? 'white' : 'black')
     if (index < activeBoards && hasKnownPlayers(pairing)) return buildLiveMatch(pairing)
     return {
       ...buildOpenMatch(pairing),
@@ -2736,7 +2760,25 @@ function advancerName(match: AdminBracketMatch | undefined, sourceLabel: string,
 }
 
 function hasKnownPlayers(pairing: Pairing) {
-  return !pairing.white.startsWith('Winner ') && !pairing.black.startsWith('Winner ') && pairing.black !== 'TBD'
+  return isKnownBracketPlayer(pairing.white) && isKnownBracketPlayer(pairing.black)
+}
+
+function isKnownBracketPlayer(name: string) {
+  return name !== 'TBD' && !name.startsWith('Winner ') && !name.startsWith('Open seed ')
+}
+
+function bracketRoundName(playersInRound: number) {
+  if (playersInRound === 2) return 'Final'
+  if (playersInRound === 4) return 'Semifinal'
+  if (playersInRound === 8) return 'Quarterfinal'
+  return `Round of ${playersInRound}`
+}
+
+function bracketRoundCode(playersInRound: number) {
+  if (playersInRound === 2) return 'F'
+  if (playersInRound === 4) return 'SF'
+  if (playersInRound === 8) return 'QF'
+  return `R${playersInRound}`
 }
 
 function buildBracketRoundKey(rounds: AdminBracketRound[]) {

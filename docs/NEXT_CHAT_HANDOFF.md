@@ -124,6 +124,9 @@ Implemented/working:
   `Winner QF-*`, and `Winner SF-*` slots; active advances completed Round of
   16 winners into live quarterfinal boards; completed fills winners through the
   final. Round navigation must scroll to the matching column without resetting.
+  A Round of 16 must always render 8 first-round matches; if the demo/admin data
+  has fewer registered players, pad the missing games as `Open seed` slots
+  instead of collapsing the bracket to fewer matches.
 - Admin Active tournament management includes a digital chess board powered by
   `chess.js` for legal move entry, live move recording, result selection, undo,
   reset, and board save actions.

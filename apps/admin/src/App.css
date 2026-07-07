@@ -1796,7 +1796,8 @@ button {
 
 .bracket-scroll {
   margin-top: 20px;
-  overflow-x: auto;
+  max-height: min(760px, 76vh);
+  overflow: auto;
   padding-bottom: 10px;
   cursor: grab;
   scrollbar-width: thin;
@@ -1805,6 +1806,7 @@ button {
 
 .bracket-scroll::-webkit-scrollbar {
   height: 8px;
+  width: 8px;
 }
 
 .bracket-scroll::-webkit-scrollbar-thumb {
