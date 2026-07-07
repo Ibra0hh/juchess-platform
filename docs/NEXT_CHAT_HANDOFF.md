@@ -107,6 +107,11 @@ Implemented/working:
   same Create/Edit modal populated with the selected tournament. Active
   tournament Manage uses a separate prototype-style management view with a back
   button, title/status, controls, nav tabs, and a centered panel.
+- Admin Upcoming tournament rows expose Manage, Edit, Draft, Shuffle, Publish,
+  and Active actions. The Upcoming Manage view uses Shuffle and Publish controls
+  for preparing pairings before the tournament goes live.
+- Admin knockout tournament management must label the play tab as Bracket
+  instead of Rounds. Non-knockout formats keep Rounds.
 - Completed and Archived tournament tabs should not show the Registration queue.
 - Flutter app has Appwrite session detection, sign-in, sign-up, sign-out,
   tournament reads, tournament details, registration/cancel behavior, and

@@ -1022,6 +1022,14 @@ function TournamentsScreen({
     setMessage(`${item.name} media tools are not connected yet.`)
   }
 
+  function handleShufflePairings(item: AdminTournament) {
+    setMessage(`${item.name} pairings shuffled.`)
+  }
+
+  function handlePublishPairings(item: AdminTournament) {
+    setMessage(`${item.name} pairings published.`)
+  }
+
   function openManagePanel(item: AdminTournament) {
     setManageTournamentKey(tournamentKey(item))
     setMessage(null)
@@ -1069,6 +1077,8 @@ function TournamentsScreen({
             setManageTournamentKey('')
           }}
           onMessage={setMessage}
+          onPublish={handlePublishPairings}
+          onShuffle={handleShufflePairings}
           tournament={managedTournament}
         />
         {message ? <div className="prototype-note" role="status">{message}</div> : null}
@@ -1216,6 +1226,8 @@ function TournamentsScreen({
             onEdit={openEditPanel}
             onManage={openManagePanel}
             onPhotos={handlePhotos}
+            onPublish={handlePublishPairings}
+            onShuffle={handleShufflePairings}
             onStatusChange={handleStatusChange}
             rows={filtered}
           />
@@ -1245,6 +1257,8 @@ function TournamentTable({
   onEdit,
   onManage,
   onPhotos,
+  onPublish,
+  onShuffle,
   onStatusChange,
   rows,
 }: {
@@ -1252,6 +1266,8 @@ function TournamentTable({
   onEdit: (item: AdminTournament) => void
   onManage: (item: AdminTournament) => void
   onPhotos: (item: AdminTournament) => void
+  onPublish: (item: AdminTournament) => void
+  onShuffle: (item: AdminTournament) => void
   onStatusChange: (item: AdminTournament, status: TournamentTab) => Promise<void>
   rows: AdminTournament[]
 }) {
@@ -1288,6 +1304,8 @@ function TournamentTable({
                     onEdit={onEdit}
                     onManage={onManage}
                     onPhotos={onPhotos}
+                    onPublish={onPublish}
+                    onShuffle={onShuffle}
                     onStatusChange={onStatusChange}
                   />
                 </div>
@@ -1306,6 +1324,8 @@ function TournamentActionButtons({
   onEdit,
   onManage,
   onPhotos,
+  onPublish,
+  onShuffle,
   onStatusChange,
 }: {
   disabled: boolean
@@ -1313,6 +1333,8 @@ function TournamentActionButtons({
   onEdit: (item: AdminTournament) => void
   onManage: (item: AdminTournament) => void
   onPhotos: (item: AdminTournament) => void
+  onPublish: (item: AdminTournament) => void
+  onShuffle: (item: AdminTournament) => void
   onStatusChange: (item: AdminTournament, status: TournamentTab) => Promise<void>
 }) {
   if (item.status === 'draft') {
@@ -1327,8 +1349,11 @@ function TournamentActionButtons({
   if (item.status === 'upcoming') {
     return (
       <>
+        <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onManage(item)}>Manage</button>
         <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onEdit(item)}>Edit</button>
         <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => void onStatusChange(item, 'draft')}>Draft</button>
+        <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onShuffle(item)}>Shuffle</button>
+        <button type="button" className="mini-button" disabled={disabled} onClick={() => onPublish(item)}>Publish</button>
         <button type="button" className="mini-button" disabled={disabled} onClick={() => void onStatusChange(item, 'active')}>Active</button>
       </>
     )
@@ -1367,15 +1392,21 @@ function TournamentManageView({
   onBack,
   onComplete,
   onMessage,
+  onPublish,
+  onShuffle,
   tournament,
 }: {
   disabled: boolean
   onBack: () => void
   onComplete: (item: AdminTournament) => void
   onMessage: (message: string) => void
+  onPublish: (item: AdminTournament) => void
+  onShuffle: (item: AdminTournament) => void
   tournament: AdminTournament
 }) {
-  const [stage, setStage] = useState('rounds')
+  const knockout = isKnockoutTournament(tournament)
+  const playStage = knockout ? 'bracket' : 'rounds'
+  const [stage, setStage] = useState(playStage)
   const pairings = demoPlayers.slice(0, 8).map((player, index) => ({
     board: index + 1,
     white: player.name,
@@ -1383,6 +1414,18 @@ function TournamentManageView({
     black: demoPlayers[(index + 8) % demoPlayers.length]?.name ?? 'TBD',
     blackRating: demoPlayers[(index + 8) % demoPlayers.length]?.rating ?? '-',
   }))
+  const bracketMatches = pairings.slice(0, 4).map((pairing, index) => ({
+    round: index < 2 ? 'Semifinal' : 'Final path',
+    board: pairing.board,
+    white: pairing.white,
+    black: pairing.black,
+  }))
+
+  useEffect(() => {
+    setStage(playStage)
+  }, [playStage, tournament.rowId, tournament.id])
+
+  const manageMode = tournament.status === 'upcoming' ? 'Prepare Tournament' : 'Live Tournament'
 
   return (
     <div className="tournament-manage-view">
@@ -1393,16 +1436,26 @@ function TournamentManageView({
             <h2>{tournament.name}</h2>
             <StatusPill status={tournament.status} />
           </div>
+          <span className="manage-mode">{manageMode}</span>
           <p>{tournament.format} · {tournament.capacity || 'open'} players · {tournament.timeControl}</p>
         </div>
         <div className="manage-controls">
-          <button type="button" className="mini-button" disabled={disabled} onClick={() => onMessage('Round closed.')}>End current round</button>
-          <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onComplete(tournament)}>Complete tournament</button>
+          {tournament.status === 'upcoming' ? (
+            <>
+              <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onShuffle(tournament)}>Shuffle</button>
+              <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onPublish(tournament)}>Publish</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="mini-button" disabled={disabled} onClick={() => onMessage('Round closed.')}>End current round</button>
+              <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onComplete(tournament)}>Complete tournament</button>
+            </>
+          )}
         </div>
       </div>
 
       <div className="manage-nav">
-        {['participants', 'rounds', 'procedure', 'standings'].map((item) => (
+        {['participants', playStage, 'procedure', 'standings'].map((item) => (
           <button key={item} type="button" className={stage === item ? 'active' : undefined} onClick={() => setStage(item)}>
             {capitalize(item)}
           </button>
@@ -1424,7 +1477,7 @@ function TournamentManageView({
         {stage === 'rounds' ? (
           <>
             <div className="manage-panel-head">
-              <strong>Live — current round</strong>
+              <strong>{tournament.status === 'upcoming' ? 'Round 1 pairings' : 'Live — current round'}</strong>
               <span>{pairings.length} boards</span>
             </div>
             {pairings.map((pairing) => (
@@ -1433,6 +1486,22 @@ function TournamentManageView({
                 <strong>{pairing.white}<small>{pairing.whiteRating}</small></strong>
                 <em>vs</em>
                 <strong>{pairing.black}<small>{pairing.blackRating}</small></strong>
+              </div>
+            ))}
+          </>
+        ) : null}
+        {stage === 'bracket' ? (
+          <>
+            <div className="manage-panel-head">
+              <strong>{tournament.status === 'upcoming' ? 'Bracket preview' : 'Live bracket'}</strong>
+              <span>{bracketMatches.length} matches</span>
+            </div>
+            {bracketMatches.map((match) => (
+              <div key={`${match.round}-${match.board}`} className="bracket-manage-row">
+                <span>{match.round}</span>
+                <strong>{match.white}</strong>
+                <em>vs</em>
+                <strong>{match.black}</strong>
               </div>
             ))}
           </>
@@ -2094,6 +2163,10 @@ function adminRoleLabel(role: AdminRole) {
 
 function tournamentKey(item: AdminTournament) {
   return item.rowId ?? item.id
+}
+
+function isKnockoutTournament(item: AdminTournament) {
+  return /knockout|single elimination|double elimination|elimination/i.test(item.format)
 }
 
 function tournamentToEditForm(item: AdminTournament): TournamentInput {
