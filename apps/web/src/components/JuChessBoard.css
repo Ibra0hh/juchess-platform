@@ -104,14 +104,17 @@
   position: relative;
   z-index: 1;
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 96%;
+  height: 96%;
+  margin: auto;
   overflow: hidden;
   object-fit: contain;
+  object-position: center;
   pointer-events: none;
   user-select: none;
   animation: none;
   transition: none;
+  transform: none;
 }
 
 .ju-promotion-panel {
