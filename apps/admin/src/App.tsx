@@ -6,7 +6,6 @@ import {
   blockIp,
   createAdminProfile,
   createTournament,
-  deleteTournament,
   formatAdminError,
   getAdminSession,
   loadAdminProfiles,
@@ -794,6 +793,8 @@ function TournamentsScreen({
   const [tab, setTab] = useState<TournamentTab>('draft')
   const [showCreate, setShowCreate] = useState(false)
   const [createStep, setCreateStep] = useState(0)
+  const [editingTournament, setEditingTournament] = useState<AdminTournament | null>(null)
+  const [manageTournamentKey, setManageTournamentKey] = useState('')
   const [form, setForm] = useState<TournamentInput>(() => createInitialTournamentForm())
   const [timeCategory, setTimeCategory] = useState('Rapid')
   const [timeMinutes, setTimeMinutes] = useState('15')
@@ -816,9 +817,12 @@ function TournamentsScreen({
   }
   const filtered = tournaments.filter((item) => item.status === tab)
   const selectedTournament = filtered.find((item) => tournamentKey(item) === selectedTournamentKey) ?? filtered[0] ?? null
-  const selectedTournamentRowId = selectedTournament?.rowId
+  const managedTournament = tournaments.find((item) => tournamentKey(item) === manageTournamentKey) ?? null
   const createEnabled = tab === 'draft'
   const canSaveDraft = Boolean(form.name.trim()) && !submitting
+  const isEditing = Boolean(editingTournament)
+  const showRegistrationQueue = tab !== 'completed' && tab !== 'archived' && !managedTournament
+  const selectedTournamentRowId = showRegistrationQueue ? selectedTournament?.rowId : undefined
 
   useEffect(() => {
     if (!filtered.length) {
@@ -833,10 +837,16 @@ function TournamentsScreen({
 
   useEffect(() => {
     if (tab !== 'draft' && showCreate) {
-      setShowCreate(false)
-      setCreateStep(0)
+      if (!isEditing) {
+        setShowCreate(false)
+        setCreateStep(0)
+      }
     }
-  }, [showCreate, tab])
+  }, [isEditing, showCreate, tab])
+
+  useEffect(() => {
+    setManageTournamentKey('')
+  }, [tab])
 
   useEffect(() => {
     let alive = true
@@ -868,6 +878,7 @@ function TournamentsScreen({
   }
 
   function resetCreateForm() {
+    setEditingTournament(null)
     setCreateStep(0)
     setForm(createInitialTournamentForm())
     setTimeCategory('Rapid')
@@ -888,9 +899,37 @@ function TournamentsScreen({
     setMessage(null)
   }
 
+  function openEditPanel(item: AdminTournament) {
+    setEditingTournament(item)
+    setCreateStep(0)
+    setForm(tournamentToEditForm(item))
+    syncTimeStateFromControl(item.timeControl)
+    setShowCreate(true)
+    setMessage(null)
+  }
+
   function closeCreatePanel() {
     setShowCreate(false)
     setCreateStep(0)
+    setEditingTournament(null)
+  }
+
+  function syncTimeStateFromControl(value: string) {
+    const match = value.match(/^(\d+)\+(\d+)\s*(.*)$/)
+    if (!match) {
+      setTimeCategory(value || 'Rapid')
+      setTimeMinutes('15')
+      setTimeIncrement('10')
+      setTimeDelay('0')
+      setGamesPerMatch('1')
+      return
+    }
+
+    setTimeMinutes(match[1])
+    setTimeIncrement(match[2])
+    setTimeCategory(match[3] || 'Rapid')
+    setTimeDelay('0')
+    setGamesPerMatch('1')
   }
 
   function setTimeSelection(next: Partial<{ category: string; minutes: string; increment: string; delay: string; games: string }>) {
@@ -923,7 +962,7 @@ function TournamentsScreen({
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!createEnabled) {
+    if (!isEditing && !createEnabled) {
       setMessage('Create tournament is available only in Draft.')
       setShowCreate(false)
       return
@@ -933,14 +972,23 @@ function TournamentsScreen({
     setMessage(null)
 
     try {
-      await createTournament({
+      const payload: TournamentInput = {
         ...form,
-        slug: buildTournamentSlug(form.name),
-        status: 'draft',
+        slug: isEditing ? form.slug : buildTournamentSlug(form.name),
+        status: isEditing ? form.status : 'draft',
         timeControl: `${timeMinutes || '0'}+${timeIncrement || '0'} ${timeCategory}`,
-        createdByProfileId: session.profile?.$id,
-      })
-      setMessage('Tournament saved as draft.')
+      }
+
+      if (editingTournament?.rowId) {
+        await updateTournament(editingTournament.rowId, payload)
+        setMessage('Tournament updated.')
+      } else {
+        await createTournament({
+          ...payload,
+          createdByProfileId: session.profile?.$id,
+        })
+        setMessage('Tournament saved as draft.')
+      }
       resetCreateForm()
       closeCreatePanel()
       await onChanged()
@@ -970,44 +1018,13 @@ function TournamentsScreen({
     }
   }
 
-  async function handleTournamentUpdate(item: AdminTournament, input: Partial<TournamentInput>) {
-    if (!item.rowId) {
-      setMessage('Only cloud tournaments can be edited.')
-      return
-    }
-
-    setSubmitting(true)
-    setMessage(null)
-    try {
-      await updateTournament(item.rowId, input)
-      setMessage('Tournament updated.')
-      await onChanged()
-    } catch (error) {
-      setMessage(formatAdminError(error))
-    } finally {
-      setSubmitting(false)
-    }
+  function handlePhotos(item: AdminTournament) {
+    setMessage(`${item.name} media tools are not connected yet.`)
   }
 
-  async function handleDelete(item: AdminTournament) {
-    if (!item.rowId) {
-      setMessage('Only cloud tournaments can be deleted.')
-      return
-    }
-
-    if (!window.confirm(`Delete ${item.name}?`)) return
-
-    setSubmitting(true)
+  function openManagePanel(item: AdminTournament) {
+    setManageTournamentKey(tournamentKey(item))
     setMessage(null)
-    try {
-      await deleteTournament(item.rowId)
-      setMessage('Tournament deleted.')
-      await onChanged()
-    } catch (error) {
-      setMessage(formatAdminError(error))
-    } finally {
-      setSubmitting(false)
-    }
   }
 
   async function handleRegistrationStatus(item: AdminRegistration, status: AdminRegistrationStatus) {
@@ -1041,6 +1058,24 @@ function TournamentsScreen({
     }
   }
 
+  if (managedTournament) {
+    return (
+      <div className="tournament-screen">
+        <TournamentManageView
+          disabled={submitting}
+          onBack={() => setManageTournamentKey('')}
+          onComplete={(item) => {
+            void handleStatusChange(item, 'completed')
+            setManageTournamentKey('')
+          }}
+          onMessage={setMessage}
+          tournament={managedTournament}
+        />
+        {message ? <div className="prototype-note" role="status">{message}</div> : null}
+      </div>
+    )
+  }
+
   return (
     <div className="tournament-screen">
       <div className="center-tabs">
@@ -1067,8 +1102,8 @@ function TournamentsScreen({
           <form className="create-modal" onClick={(event) => event.stopPropagation()} onSubmit={handleCreate}>
             <header className="create-modal-head">
               <div>
-                <strong>Create tournament</strong>
-                <span>Draft setup wizard</span>
+                <strong>{isEditing ? 'Edit tournament' : 'Create tournament'}</strong>
+                <span>{isEditing ? 'Tournament setup' : 'Draft setup wizard'}</span>
               </div>
               <button type="button" aria-label="Close create tournament" onClick={closeCreatePanel}>×</button>
             </header>
@@ -1165,7 +1200,7 @@ function TournamentsScreen({
                   </button>
                 ) : (
                   <button type="submit" className="primary-action" disabled={!canSaveDraft}>
-                    {submitting ? 'Saving...' : 'Save Draft'}
+                    {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Save Draft'}
                   </button>
                 )}
               </div>
@@ -1178,53 +1213,47 @@ function TournamentsScreen({
         {filtered.length ? (
           <TournamentTable
             disabled={submitting}
-            onDelete={handleDelete}
-            onSelect={setSelectedTournamentKey}
+            onEdit={openEditPanel}
+            onManage={openManagePanel}
+            onPhotos={handlePhotos}
             onStatusChange={handleStatusChange}
             rows={filtered}
-            selectedKey={selectedTournament ? tournamentKey(selectedTournament) : ''}
           />
         ) : (
           <EmptyState title={emptyTitle(tab)} body="Create one to get started." />
         )}
       </section>
-      <TournamentManagementPanel
-        disabled={submitting}
-        onSelectedChange={setSelectedTournamentKey}
-        onSubmit={handleTournamentUpdate}
-        selectedTournament={selectedTournament}
-        selectedTournamentKey={selectedTournament ? tournamentKey(selectedTournament) : ''}
-        tournaments={filtered}
-      />
-      <RegistrationQueue
-        actionId={registrationActionId}
-        loading={registrationsLoading}
-        onCheckInChange={handleRegistrationCheckIn}
-        onSelectedChange={setSelectedTournamentKey}
-        onStatusChange={handleRegistrationStatus}
-        registrations={registrations}
-        selectedTournament={selectedTournament}
-        selectedTournamentKey={selectedTournament ? tournamentKey(selectedTournament) : ''}
-        tournaments={filtered}
-      />
+      {showRegistrationQueue ? (
+        <RegistrationQueue
+          actionId={registrationActionId}
+          loading={registrationsLoading}
+          onCheckInChange={handleRegistrationCheckIn}
+          onSelectedChange={setSelectedTournamentKey}
+          onStatusChange={handleRegistrationStatus}
+          registrations={registrations}
+          selectedTournament={selectedTournament}
+          selectedTournamentKey={selectedTournament ? tournamentKey(selectedTournament) : ''}
+          tournaments={filtered}
+        />
+      ) : null}
     </div>
   )
 }
 
 function TournamentTable({
   disabled,
-  onDelete,
-  onSelect,
+  onEdit,
+  onManage,
+  onPhotos,
   onStatusChange,
   rows,
-  selectedKey,
 }: {
   disabled: boolean
-  onDelete: (item: AdminTournament) => Promise<void>
-  onSelect: (key: string) => void
+  onEdit: (item: AdminTournament) => void
+  onManage: (item: AdminTournament) => void
+  onPhotos: (item: AdminTournament) => void
   onStatusChange: (item: AdminTournament, status: TournamentTab) => Promise<void>
   rows: AdminTournament[]
-  selectedKey: string
 }) {
   return (
     <div className="table-scroll">
@@ -1242,191 +1271,196 @@ function TournamentTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((item) => {
-            const key = tournamentKey(item)
-            return (
-              <tr key={key} className={selectedKey === key ? 'selected-row' : undefined}>
-                <td><strong>{item.name}</strong></td>
-                <td>{item.location || 'Not set'}</td>
-                <td><span className="tag">{item.format}</span></td>
-                <td><b>{item.timeControl}</b></td>
-                <td className="mono center">{item.players}/{item.capacity || 'open'}</td>
-                <td><StatusPill status={item.status} /></td>
-                <td><strong>{formatDate(item.startsAt)}</strong><small>{formatTime(item.startsAt)}</small></td>
-                <td className="right">
-                  <select
-                    aria-label={`Update ${item.name} status`}
-                    className="mini-select"
+          {rows.map((item) => (
+            <tr key={tournamentKey(item)}>
+              <td><strong>{item.name}</strong></td>
+              <td>{item.location || 'Not set'}</td>
+              <td><span className="tag">{item.format}</span></td>
+              <td><b>{item.timeControl}</b></td>
+              <td className="mono center">{item.players}/{item.capacity || 'open'}</td>
+              <td><StatusPill status={item.status} /></td>
+              <td><strong>{formatDate(item.startsAt)}</strong><small>{formatTime(item.startsAt)}</small></td>
+              <td className="right">
+                <div className="tournament-action-row">
+                  <TournamentActionButtons
                     disabled={disabled || !item.rowId}
-                    value={item.status}
-                    onChange={(event) => void onStatusChange(item, event.target.value as TournamentTab)}
-                  >
-                    {tournamentTabs.map((status) => (
-                      <option key={status} value={status}>{capitalize(status)}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="mini-button ghost"
-                    onClick={() => onSelect(key)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="mini-button ghost danger"
-                    disabled={disabled || !item.rowId}
-                    onClick={() => void onDelete(item)}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
+                    item={item}
+                    onEdit={onEdit}
+                    onManage={onManage}
+                    onPhotos={onPhotos}
+                    onStatusChange={onStatusChange}
+                  />
+                </div>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   )
 }
 
-function TournamentManagementPanel({
+function TournamentActionButtons({
   disabled,
-  onSelectedChange,
-  onSubmit,
-  selectedTournament,
-  selectedTournamentKey,
-  tournaments,
+  item,
+  onEdit,
+  onManage,
+  onPhotos,
+  onStatusChange,
 }: {
   disabled: boolean
-  onSelectedChange: (key: string) => void
-  onSubmit: (item: AdminTournament, input: Partial<TournamentInput>) => Promise<void>
-  selectedTournament: AdminTournament | null
-  selectedTournamentKey: string
-  tournaments: AdminTournament[]
+  item: AdminTournament
+  onEdit: (item: AdminTournament) => void
+  onManage: (item: AdminTournament) => void
+  onPhotos: (item: AdminTournament) => void
+  onStatusChange: (item: AdminTournament, status: TournamentTab) => Promise<void>
 }) {
-  const [editForm, setEditForm] = useState<TournamentInput>(() => (
-    selectedTournament ? tournamentToEditForm(selectedTournament) : createInitialTournamentForm()
-  ))
-
-  useEffect(() => {
-    setEditForm(selectedTournament ? tournamentToEditForm(selectedTournament) : createInitialTournamentForm())
-  }, [selectedTournamentKey, selectedTournament])
-
-  function updateEdit<K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) {
-    setEditForm((current) => ({ ...current, [key]: value }))
+  if (item.status === 'draft') {
+    return (
+      <>
+        <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onEdit(item)}>Edit</button>
+        <button type="button" className="mini-button" disabled={disabled} onClick={() => void onStatusChange(item, 'upcoming')}>Publish</button>
+      </>
+    )
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!selectedTournament) return
-
-    await onSubmit(selectedTournament, {
-      name: editForm.name,
-      status: editForm.status,
-      format: editForm.format,
-      timeControl: editForm.timeControl,
-      capacity: editForm.capacity,
-      location: editForm.location,
-      description: editForm.description,
-      startsAt: editForm.startsAt,
-    })
+  if (item.status === 'upcoming') {
+    return (
+      <>
+        <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onEdit(item)}>Edit</button>
+        <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => void onStatusChange(item, 'draft')}>Draft</button>
+        <button type="button" className="mini-button" disabled={disabled} onClick={() => void onStatusChange(item, 'active')}>Active</button>
+      </>
+    )
   }
 
-  const canSave = Boolean(selectedTournament?.rowId) && Boolean(editForm.name.trim()) && !disabled
+  if (item.status === 'active') {
+    return (
+      <>
+        <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onManage(item)}>Manage</button>
+        <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onEdit(item)}>Edit</button>
+        <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => void onStatusChange(item, 'upcoming')}>Upcoming</button>
+        <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => void onStatusChange(item, 'completed')}>Complete</button>
+      </>
+    )
+  }
+
+  if (item.status === 'completed') {
+    return (
+      <>
+        <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onEdit(item)}>Edit</button>
+        <button type="button" className="mini-button" disabled={disabled} onClick={() => onPhotos(item)}>Photos</button>
+        <button type="button" className="mini-button warn" disabled={disabled} onClick={() => void onStatusChange(item, 'archived')}>Archive</button>
+      </>
+    )
+  }
 
   return (
-    <section className="panel-card table-card tournament-management-panel">
-      <div className="panel-head">
-        <strong>Tournament management</strong>
-        <span>{selectedTournament ? selectedTournament.name : 'No tournament selected'}</span>
+    <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => void onStatusChange(item, 'completed')}>
+      Completed
+    </button>
+  )
+}
+
+function TournamentManageView({
+  disabled,
+  onBack,
+  onComplete,
+  onMessage,
+  tournament,
+}: {
+  disabled: boolean
+  onBack: () => void
+  onComplete: (item: AdminTournament) => void
+  onMessage: (message: string) => void
+  tournament: AdminTournament
+}) {
+  const [stage, setStage] = useState('rounds')
+  const pairings = demoPlayers.slice(0, 8).map((player, index) => ({
+    board: index + 1,
+    white: player.name,
+    whiteRating: player.rating,
+    black: demoPlayers[(index + 8) % demoPlayers.length]?.name ?? 'TBD',
+    blackRating: demoPlayers[(index + 8) % demoPlayers.length]?.rating ?? '-',
+  }))
+
+  return (
+    <div className="tournament-manage-view">
+      <button type="button" className="manage-back-button" onClick={onBack}>← Back to tournaments</button>
+      <div className="manage-hero">
+        <div>
+          <div className="manage-title-row">
+            <h2>{tournament.name}</h2>
+            <StatusPill status={tournament.status} />
+          </div>
+          <p>{tournament.format} · {tournament.capacity || 'open'} players · {tournament.timeControl}</p>
+        </div>
+        <div className="manage-controls">
+          <button type="button" className="mini-button" disabled={disabled} onClick={() => onMessage('Round closed.')}>End current round</button>
+          <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onComplete(tournament)}>Complete tournament</button>
+        </div>
       </div>
-      <div className="management-toolbar">
-        <label>
-          Tournament
-          <select
-            value={selectedTournamentKey}
-            onChange={(event) => onSelectedChange(event.target.value)}
-            disabled={!tournaments.length}
-          >
-            {tournaments.map((item) => (
-              <option key={tournamentKey(item)} value={tournamentKey(item)}>
-                {item.name}
-              </option>
+
+      <div className="manage-nav">
+        {['participants', 'rounds', 'procedure', 'standings'].map((item) => (
+          <button key={item} type="button" className={stage === item ? 'active' : undefined} onClick={() => setStage(item)}>
+            {capitalize(item)}
+          </button>
+        ))}
+      </div>
+
+      <section className="manage-panel">
+        {stage === 'participants' ? (
+          <>
+            <div className="manage-panel-head">Participants</div>
+            {demoPlayers.slice(0, 8).map((player, index) => (
+              <div key={player.id} className="manage-row">
+                <strong>{index + 1}. {player.name}</strong>
+                <span>{player.rating}</span>
+              </div>
             ))}
-          </select>
-        </label>
-        {selectedTournament ? (
-          <div className="management-meta">
-            <StatusPill status={selectedTournament.status} />
-            <span>{selectedTournament.players}/{selectedTournament.capacity || 'open'} players</span>
-            <span>{formatDate(selectedTournament.startsAt)} {formatTime(selectedTournament.startsAt)}</span>
-          </div>
+          </>
         ) : null}
-      </div>
-      {!selectedTournament ? (
-        <EmptyState title="No tournament selected" body="Choose a tournament tab with events to manage." />
-      ) : !selectedTournament.rowId ? (
-        <EmptyState title="Cloud tournament required" body="Only cloud-backed tournaments can be edited here." />
-      ) : (
-        <form className="management-edit-form" onSubmit={handleSubmit}>
-          <label className="wide">
-            Tournament name
-            <input value={editForm.name} onChange={(event) => updateEdit('name', event.target.value)} required />
-          </label>
-          <label>
-            Status
-            <select value={editForm.status} onChange={(event) => updateEdit('status', event.target.value as TournamentStatus)}>
-              {tournamentTabs.map((status) => (
-                <option key={status} value={status}>{capitalize(status)}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Format
-            <select value={editForm.format} onChange={(event) => updateEdit('format', event.target.value)}>
-              {formatOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.value}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Number of players
-            <input
-              type="number"
-              min={2}
-              value={editForm.capacity ?? ''}
-              onChange={(event) => updateEdit('capacity', event.target.value ? Number(event.target.value) : undefined)}
-            />
-          </label>
-          <label>
-            Location / platform
-            <input value={editForm.location ?? ''} onChange={(event) => updateEdit('location', event.target.value)} />
-          </label>
-          <label>
-            Time control
-            <input value={editForm.timeControl} onChange={(event) => updateEdit('timeControl', event.target.value)} />
-          </label>
-          <label>
-            Start date / time
-            <input
-              type="datetime-local"
-              value={toDateTimeLocalValue(editForm.startsAt)}
-              onChange={(event) => updateEdit('startsAt', fromDateTimeLocalValue(event.target.value))}
-            />
-          </label>
-          <label className="wide">
-            Description
-            <textarea value={editForm.description ?? ''} onChange={(event) => updateEdit('description', event.target.value)} rows={3} />
-          </label>
-          <div className="management-actions wide">
-            <button type="submit" className="primary-action" disabled={!canSave}>
-              {disabled ? 'Saving...' : 'Save changes'}
-            </button>
-          </div>
-        </form>
-      )}
-    </section>
+        {stage === 'rounds' ? (
+          <>
+            <div className="manage-panel-head">
+              <strong>Live — current round</strong>
+              <span>{pairings.length} boards</span>
+            </div>
+            {pairings.map((pairing) => (
+              <div key={pairing.board} className="pairing-row">
+                <span>#{pairing.board}</span>
+                <strong>{pairing.white}<small>{pairing.whiteRating}</small></strong>
+                <em>vs</em>
+                <strong>{pairing.black}<small>{pairing.blackRating}</small></strong>
+              </div>
+            ))}
+          </>
+        ) : null}
+        {stage === 'procedure' ? (
+          <>
+            <div className="manage-panel-head">Tournament procedure</div>
+            {[
+              'Verify all boards are ready before starting the clock.',
+              'Confirm both players present; apply default win after 10 min absence.',
+              'Record results as they finish; resolve disputes before next round.',
+              'Publish standings after every completed round.',
+            ].map((row) => <div key={row} className="manage-row">{row}</div>)}
+          </>
+        ) : null}
+        {stage === 'standings' ? (
+          <>
+            <div className="manage-panel-head">Live standings</div>
+            {demoPlayers.slice(0, 8).map((player, index) => (
+              <div key={player.id} className="manage-row standings-row">
+                <strong>{index + 1}. {player.name}</strong>
+                <span>{(7 - index * 0.5).toFixed(1)} pts</span>
+              </div>
+            ))}
+          </>
+        ) : null}
+      </section>
+    </div>
   )
 }
 

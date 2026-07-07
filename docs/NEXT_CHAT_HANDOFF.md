@@ -102,9 +102,12 @@ Implemented/working:
 - Admin create tournament Basic information step must not show:
   end date/time, Chess.com/Lichess.com/Main Campus chips, visibility controls,
   or access controls.
-- Admin Tournaments includes an inline Tournament management panel below the
-  tournament table. It edits the selected cloud tournament through
-  `updateTournament` using the same admin table/panel visual style.
+- Admin Tournaments must follow the prototype table/action pattern. Do not use
+  an inline edit form under the tournament table. Tournament Edit opens the
+  same Create/Edit modal populated with the selected tournament. Active
+  tournament Manage uses a separate prototype-style management view with a back
+  button, title/status, controls, nav tabs, and a centered panel.
+- Completed and Archived tournament tabs should not show the Registration queue.
 - Flutter app has Appwrite session detection, sign-in, sign-up, sign-out,
   tournament reads, tournament details, registration/cancel behavior, and
   prototype-style mobile screens.
