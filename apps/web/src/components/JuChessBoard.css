@@ -6,6 +6,7 @@
   position: relative;
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
   aspect-ratio: 1;
   overflow: hidden;
   border: 5px solid #b99654;
@@ -20,10 +21,14 @@
   position: relative;
   display: grid;
   place-items: center;
+  overflow: hidden;
   min-width: 0;
+  min-height: 0;
   border: 0;
   padding: 0;
   cursor: pointer;
+  line-height: 1;
+  touch-action: manipulation;
 }
 
 .ju-chess-square:disabled {
@@ -90,29 +95,37 @@
 .ju-chess-piece {
   position: relative;
   z-index: 1;
-  display: block;
-  font-family: "Times New Roman", "Noto Sans Symbols 2", serif;
-  font-size: clamp(28px, 9vw, 72px);
-  font-weight: 900;
-  line-height: 1;
-  transform: translateY(-1px);
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", serif;
+  font-size: clamp(26px, 7.4vw, 52px);
+  font-weight: 700;
+  line-height: 0.86;
+  text-align: center;
   user-select: none;
 }
 
 .ju-chess-piece.black {
   color: #030303;
-  -webkit-text-stroke: 1.6px #b99654;
   text-shadow:
-    0 1px 0 #b99654,
-    0 3px 0 rgba(0, 0, 0, 0.18);
+    -1px -1px 0 #b99654,
+    1px -1px 0 #b99654,
+    -1px 1px 0 #b99654,
+    1px 1px 0 #b99654,
+    0 2px 0 rgba(0, 0, 0, 0.22);
 }
 
 .ju-chess-piece.white {
-  color: #fbfbfb;
-  -webkit-text-stroke: 1.7px #d0ad69;
+  color: #fffaf0;
   text-shadow:
-    0 1px 0 #a57c42,
-    0 3px 0 rgba(80, 44, 26, 0.26);
+    -1px -1px 0 #b99654,
+    1px -1px 0 #b99654,
+    -1px 1px 0 #b99654,
+    1px 1px 0 #b99654,
+    0 2px 0 rgba(80, 44, 26, 0.26);
 }
 
 .ju-promotion-panel {
@@ -136,13 +149,18 @@
   background: #ecd2a2;
   color: #030303;
   cursor: pointer;
-  font-family: "Times New Roman", "Noto Sans Symbols 2", serif;
-  font-size: 30px;
-  -webkit-text-stroke: 1px #b99654;
+  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", serif;
+  font-size: 28px;
+  line-height: 1;
+  text-shadow:
+    -1px -1px 0 #b99654,
+    1px -1px 0 #b99654,
+    -1px 1px 0 #b99654,
+    1px 1px 0 #b99654;
 }
 
 @media (max-width: 620px) {
   .ju-chess-piece {
-    font-size: clamp(24px, 10vw, 46px);
+    font-size: clamp(24px, 8.1vw, 42px);
   }
 }

@@ -22,7 +22,7 @@ type SourceDef = {
   tone: 'green' | 'blue' | 'wine'
 }
 
-const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR'
+const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
 const sourceDefs: SourceDef[] = [
   { key: 'chess.com', name: 'Chess.com', sub: 'Import by username', icon: 'C', tone: 'green' },
