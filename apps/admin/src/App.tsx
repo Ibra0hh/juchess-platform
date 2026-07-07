@@ -79,6 +79,8 @@ type AdminBracketRound = {
   matches: AdminBracketMatch[]
 }
 
+type AdminBracketPhase = 'setup' | 'active' | 'completed'
+
 const navItems: Array<{ key: Screen; label: string; icon: string }> = [
   { key: 'dashboard', label: 'Dashboard', icon: '▤' },
   { key: 'windows', label: 'App Windows', icon: '▧' },
@@ -1439,7 +1441,8 @@ function TournamentManageView({
   const [stage, setStage] = useState(playStage)
   const tournamentPlayers = buildTournamentPlayers(shuffleSeed)
   const pairings = buildPairings(tournamentPlayers)
-  const bracketRounds = buildAdminBracketRounds(pairings, published || tournament.status !== 'upcoming', tournament.status === 'active')
+  const bracketPhase = getBracketPhase(tournament)
+  const bracketRounds = buildAdminBracketRounds(pairings, bracketPhase)
   const shuffleLocked = disabled || published
   const publishLocked = disabled || published
 
@@ -1554,11 +1557,12 @@ function AdminBracketPreview({ rounds, title }: { rounds: AdminBracketRound[]; t
   const [activeRound, setActiveRound] = useState(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const trackRef = useRef<HTMLDivElement | null>(null)
+  const roundKey = buildBracketRoundKey(rounds)
 
   useEffect(() => {
     setActiveRound(0)
     if (scrollRef.current) scrollRef.current.scrollLeft = 0
-  }, [rounds])
+  }, [roundKey])
 
   useEffect(() => {
     const scroll = scrollRef.current
@@ -1585,7 +1589,7 @@ function AdminBracketPreview({ rounds, title }: { rounds: AdminBracketRound[]; t
     updateActiveRound()
     scroll.addEventListener('scroll', updateActiveRound, { passive: true })
     return () => scroll.removeEventListener('scroll', updateActiveRound)
-  }, [rounds])
+  }, [roundKey])
 
   useLayoutEffect(() => {
     const track = trackRef.current
@@ -1609,7 +1613,7 @@ function AdminBracketPreview({ rounds, title }: { rounds: AdminBracketRound[]; t
       resizeObserver.disconnect()
       window.removeEventListener('resize', draw)
     }
-  }, [rounds])
+  }, [roundKey])
 
   const jumpToRound = (roundIndex: number) => {
     const scroll = scrollRef.current
@@ -2620,17 +2624,39 @@ function buildPairings(players: Player[]): Pairing[] {
   })
 }
 
-function buildAdminBracketRounds(pairings: Pairing[], published: boolean, active: boolean): AdminBracketRound[] {
-  const firstRound: AdminBracketMatch[] = pairings.map((pairing, index) => ({
-    ...pairing,
-    live: active && index < 2,
-    whiteScore: active && index >= 2 ? '1' : '',
-    blackScore: active && index >= 2 ? '0' : '',
-    winner: active && index >= 2 ? 'white' : undefined,
-  }))
-  const quarterfinals = buildDerivedBracketMatches(firstRound, published, active, 4)
-  const semifinals = buildDerivedBracketMatches(quarterfinals, published, active, 2)
-  const final = buildDerivedBracketMatches(semifinals, published, false, 1)
+function getBracketPhase(tournament: AdminTournament): AdminBracketPhase {
+  if (tournament.status === 'active') return 'active'
+  if (tournament.status === 'completed') return 'completed'
+  return 'setup'
+}
+
+function buildAdminBracketRounds(pairings: Pairing[], phase: AdminBracketPhase): AdminBracketRound[] {
+  const firstRound: AdminBracketMatch[] = pairings.map((pairing, index) => (
+    phase === 'setup'
+      ? buildOpenMatch(pairing)
+      : buildCompletedMatch(pairing, index % 2 === 0 ? 'white' : 'black')
+  ))
+  const quarterfinals = buildDerivedBracketMatches({
+    activeBoards: phase === 'active' ? 2 : 0,
+    complete: phase === 'completed',
+    count: 4,
+    source: firstRound,
+    sourceLabel: 'R16',
+  })
+  const semifinals = buildDerivedBracketMatches({
+    activeBoards: 0,
+    complete: phase === 'completed',
+    count: 2,
+    source: quarterfinals,
+    sourceLabel: 'QF',
+  })
+  const final = buildDerivedBracketMatches({
+    activeBoards: 0,
+    complete: phase === 'completed',
+    count: 1,
+    source: semifinals,
+    sourceLabel: 'SF',
+  })
 
   return [
     { name: 'Round of 16', matches: firstRound },
@@ -2640,43 +2666,83 @@ function buildAdminBracketRounds(pairings: Pairing[], published: boolean, active
   ]
 }
 
-function buildDerivedBracketMatches(
-  source: AdminBracketMatch[],
-  published: boolean,
-  active: boolean,
-  count: number,
-): AdminBracketMatch[] {
+function buildOpenMatch(pairing: Pairing): AdminBracketMatch {
+  return {
+    ...pairing,
+    blackScore: '',
+    pending: pairing.white === 'TBD' || pairing.black === 'TBD',
+    whiteScore: '',
+  }
+}
+
+function buildCompletedMatch(pairing: Pairing, winner: AdminBracketSide): AdminBracketMatch {
+  return {
+    ...pairing,
+    blackScore: winner === 'black' ? '1' : '0',
+    pending: false,
+    whiteScore: winner === 'white' ? '1' : '0',
+    winner,
+  }
+}
+
+function buildLiveMatch(pairing: Pairing): AdminBracketMatch {
+  return {
+    ...pairing,
+    blackScore: '',
+    live: true,
+    pending: false,
+    whiteScore: '',
+  }
+}
+
+function buildDerivedBracketMatches({
+  activeBoards,
+  complete,
+  count,
+  source,
+  sourceLabel,
+}: {
+  activeBoards: number
+  complete: boolean
+  count: number
+  source: AdminBracketMatch[]
+  sourceLabel: string
+}): AdminBracketMatch[] {
   return Array.from({ length: count }, (_, index) => {
     const a = source[index * 2]
     const b = source[index * 2 + 1]
-    const white = published ? winnerName(a) : 'TBD'
-    const black = published ? winnerName(b) : 'TBD'
-
-    return {
+    const pairing = {
       board: index + 1,
-      white,
+      white: advancerName(a, sourceLabel, index * 2 + 1),
       whiteRating: '',
-      black,
+      black: advancerName(b, sourceLabel, index * 2 + 2),
       blackRating: '',
-      live: active && index === 0 && white !== 'TBD' && black !== 'TBD',
-      pending: white === 'TBD' || black === 'TBD',
-      whiteScore: '',
-      blackScore: '',
-      winner: undefined,
     }
-  }).map((match, index) => ({
-    ...match,
-    board: index + 1,
-    white: match.white === 'TBD' ? `Winner ${index * 2 + 1}` : match.white,
-    black: match.black === 'TBD' ? `Winner ${index * 2 + 2}` : match.black,
-  }))
+
+    if (complete) return buildCompletedMatch(pairing, index % 2 === 0 ? 'white' : 'black')
+    if (index < activeBoards && hasKnownPlayers(pairing)) return buildLiveMatch(pairing)
+    return {
+      ...buildOpenMatch(pairing),
+      pending: !hasKnownPlayers(pairing),
+    }
+  })
 }
 
-function winnerName(match?: AdminBracketMatch) {
-  if (!match) return 'TBD'
+function advancerName(match: AdminBracketMatch | undefined, sourceLabel: string, matchNumber: number) {
+  if (!match) return `Winner ${sourceLabel}-${matchNumber}`
   if (match.winner === 'white') return match.white
   if (match.winner === 'black') return match.black
-  return 'TBD'
+  return `Winner ${sourceLabel}-${matchNumber}`
+}
+
+function hasKnownPlayers(pairing: Pairing) {
+  return !pairing.white.startsWith('Winner ') && !pairing.black.startsWith('Winner ') && pairing.black !== 'TBD'
+}
+
+function buildBracketRoundKey(rounds: AdminBracketRound[]) {
+  return rounds
+    .map((round) => `${round.name}:${round.matches.map((match) => `${match.white}-${match.black}-${match.winner ?? ''}-${match.live ? 'live' : ''}`).join(',')}`)
+    .join('|')
 }
 
 function bracketPlayerState(match: AdminBracketMatch, side: AdminBracketSide) {

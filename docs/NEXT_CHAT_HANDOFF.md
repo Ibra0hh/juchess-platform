@@ -119,6 +119,11 @@ Implemented/working:
   `.bracket-panel.rich-bracket-panel`, `.bracket-round-nav`, SVG connector
   lines, `.bracket-match.rich`, live tags, and website-style player rows.
   Non-knockout formats keep Rounds.
+- Admin knockout bracket progression must be logically coherent:
+  setup/upcoming shows real Round of 16 pairings and downstream `Winner R16-*`,
+  `Winner QF-*`, and `Winner SF-*` slots; active advances completed Round of
+  16 winners into live quarterfinal boards; completed fills winners through the
+  final. Round navigation must scroll to the matching column without resetting.
 - Admin Active tournament management includes a digital chess board powered by
   `chess.js` for legal move entry, live move recording, result selection, undo,
   reset, and board save actions.
