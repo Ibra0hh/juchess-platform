@@ -4373,8 +4373,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _handleSquareTap(square, game, legalMoves),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
+                    child: Container(
                       decoration: BoxDecoration(
                         color: dark
                             ? const Color(0xff602830)
@@ -4401,12 +4400,11 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
                           if (last)
                             Positioned.fill(
                               child: Container(
-                                margin: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0x44e2b348),
-                                  borderRadius: BorderRadius.circular(4),
+                                  color: const Color(0x29e2b348),
                                   border: Border.all(
-                                    color: const Color(0x55a98a3f),
+                                    color: const Color(0x51a98a3f),
+                                    width: 2,
                                   ),
                                 ),
                               ),
@@ -4414,12 +4412,11 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
                           if (check)
                             Positioned.fill(
                               child: Container(
-                                margin: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0x55b03232),
-                                  borderRadius: BorderRadius.circular(4),
+                                  color: const Color(0x2eb03232),
                                   border: Border.all(
                                     color: const Color(0x997e1522),
+                                    width: 2,
                                   ),
                                 ),
                               ),

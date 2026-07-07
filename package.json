@@ -14,6 +14,7 @@
     "build:web": "npm --workspace apps/web run build",
     "build:admin": "npm --workspace apps/admin run build",
     "build:pages": "node scripts/build-pages.mjs",
+    "seed:appwrite-demo": "node scripts/seed-appwrite-demo-data.mjs",
     "lint:web": "npm --workspace apps/web run lint",
     "lint:admin": "npm --workspace apps/admin run lint",
     "mobile:analyze": "cd apps/mobile && flutter analyze",

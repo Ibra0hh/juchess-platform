@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { demoTournaments, loadTournaments, members, type Member, type Tournament } from '../lib/juchess'
+import { loadTournaments, members, type Member, type Tournament } from '../lib/juchess'
 import './TournamentDetailPage.css'
 
 type DetailTab = 'registration' | 'players' | 'rounds' | 'games' | 'table'
@@ -192,7 +192,7 @@ function TournamentDetailPage() {
   }, [id])
 
   const tournament = useMemo(
-    () => tournaments.find((item) => item.id === id) || demoTournaments.find((item) => item.id === id) || null,
+    () => tournaments.find((item) => item.id === id) || null,
     [id, tournaments],
   )
 

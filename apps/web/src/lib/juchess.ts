@@ -487,7 +487,7 @@ export type TournamentLoadResult = {
 export async function loadTournaments(): Promise<TournamentLoadResult> {
   if (!appwriteReady) {
     return {
-      tournaments: demoTournaments,
+      tournaments: [],
       source: 'unavailable',
       error: new Error('Cloud connection is not configured for this app.'),
     }
@@ -516,7 +516,7 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
     }
   } catch (error) {
     console.warn('JuChess cloud tournament read failed.', error)
-    return { tournaments: demoTournaments, source: 'unavailable', error }
+    return { tournaments: [], source: 'unavailable', error }
   }
 }
 
