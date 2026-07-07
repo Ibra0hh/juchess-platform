@@ -10,6 +10,7 @@ import {
   formatAdminError,
   getAdminSession,
   loadAdminProfiles,
+  loadTournamentRegistrations,
   loadBlockLists,
   loadAdminTournaments,
   signInAdmin,
@@ -17,7 +18,10 @@ import {
   unblockIdentity,
   unblockIp,
   updateAdminStatus,
+  updateRegistrationStatus,
   updateTournament,
+  type AdminRegistration,
+  type AdminRegistrationStatus,
   type AdminProfile,
   type AdminProfileLoadResult,
   type AdminRole,
@@ -30,10 +34,10 @@ import {
   type IpBlock,
   type TournamentInput,
 } from './lib/adminData'
-import { adminQueues } from './lib/juchess'
+import { adminQueues, type TournamentStatus } from './lib/juchess'
 
 type Screen = 'dashboard' | 'windows' | 'tournaments' | 'players' | 'news' | 'announcements'
-type TournamentTab = 'upcoming' | 'active' | 'completed'
+type TournamentTab = TournamentStatus
 type TournamentDataSource = 'cloud' | 'unavailable'
 type WindowKey = 'home' | 'tournaments' | 'games' | 'tools' | 'profile' | 'auth'
 type DeviceKey = 'ios' | 'android' | 'tablet' | 'web'
@@ -60,6 +64,8 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
   { key: 'news', label: 'News', icon: '◫' },
   { key: 'announcements', label: 'Announcements', icon: '◈' },
 ]
+
+const tournamentTabs: TournamentTab[] = ['draft', 'upcoming', 'active', 'completed', 'archived']
 
 const pageText: Record<Screen, { title: string; sub: string }> = {
   dashboard: { title: 'Dashboard', sub: 'Live overview of your club operations' },
@@ -754,28 +760,85 @@ function TournamentsScreen({
   session: AdminSession
   tournaments: AdminTournament[]
 }) {
-  const [tab, setTab] = useState<TournamentTab>('upcoming')
+  const [tab, setTab] = useState<TournamentTab>('draft')
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState<TournamentInput>({
     slug: '',
     name: '',
-    status: 'upcoming',
+    status: 'draft',
     format: 'Swiss',
     timeControl: '15+10 Rapid',
     capacity: 16,
   })
+  const [selectedTournamentKey, setSelectedTournamentKey] = useState('')
+  const [registrations, setRegistrations] = useState<AdminRegistration[]>([])
+  const [registrationsLoading, setRegistrationsLoading] = useState(false)
+  const [registrationActionId, setRegistrationActionId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-  const counts = {
+  const counts: Record<TournamentTab, number> = {
+    draft: tournaments.filter((item) => item.status === 'draft').length,
     upcoming: tournaments.filter((item) => item.status === 'upcoming').length,
     active: tournaments.filter((item) => item.status === 'active').length,
     completed: tournaments.filter((item) => item.status === 'completed').length,
+    archived: tournaments.filter((item) => item.status === 'archived').length,
   }
   const filtered = tournaments.filter((item) => item.status === tab)
+  const selectedTournament = filtered.find((item) => tournamentKey(item) === selectedTournamentKey) ?? filtered[0] ?? null
+  const selectedTournamentRowId = selectedTournament?.rowId
+
+  useEffect(() => {
+    if (!filtered.length) {
+      if (selectedTournamentKey) setSelectedTournamentKey('')
+      return
+    }
+
+    if (!filtered.some((item) => tournamentKey(item) === selectedTournamentKey)) {
+      setSelectedTournamentKey(tournamentKey(filtered[0]))
+    }
+  }, [filtered, selectedTournamentKey])
+
+  useEffect(() => {
+    let alive = true
+
+    async function loadQueue() {
+      if (!selectedTournamentRowId) {
+        setRegistrations([])
+        setRegistrationsLoading(false)
+        return
+      }
+
+      setRegistrationsLoading(true)
+      const result = await loadTournamentRegistrations(selectedTournamentRowId)
+      if (!alive) return
+      setRegistrations(result.registrations)
+      if (result.error) setMessage('Registration queue is unavailable right now.')
+      setRegistrationsLoading(false)
+    }
+
+    void loadQueue()
+
+    return () => {
+      alive = false
+    }
+  }, [selectedTournamentRowId])
 
   function update<K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) {
     setForm((current) => ({ ...current, [key]: value }))
+  }
+
+  async function refreshRegistrationQueue() {
+    if (!selectedTournamentRowId) {
+      setRegistrations([])
+      return
+    }
+
+    setRegistrationsLoading(true)
+    const result = await loadTournamentRegistrations(selectedTournamentRowId)
+    setRegistrations(result.registrations)
+    if (result.error) setMessage('Registration queue is unavailable right now.')
+    setRegistrationsLoading(false)
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -846,10 +909,41 @@ function TournamentsScreen({
     }
   }
 
+  async function handleRegistrationStatus(item: AdminRegistration, status: AdminRegistrationStatus) {
+    setRegistrationActionId(item.rowId)
+    setMessage(null)
+
+    try {
+      await updateRegistrationStatus(item.rowId, { status })
+      setMessage('Registration updated.')
+      await refreshRegistrationQueue()
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setRegistrationActionId(null)
+    }
+  }
+
+  async function handleRegistrationCheckIn(item: AdminRegistration, checkedIn: boolean) {
+    setRegistrationActionId(item.rowId)
+    setMessage(null)
+
+    try {
+      await updateRegistrationStatus(item.rowId, { checkedIn })
+      setMessage(checkedIn ? 'Player checked in.' : 'Check-in cleared.')
+      await refreshRegistrationQueue()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setRegistrationActionId(null)
+    }
+  }
+
   return (
     <div className="tournament-screen">
       <div className="center-tabs">
-        {(['upcoming', 'active', 'completed'] as TournamentTab[]).map((item) => (
+        {tournamentTabs.map((item) => (
           <button key={item} type="button" className={tab === item ? 'active' : undefined} onClick={() => setTab(item)}>
             {capitalize(item)} <span>{counts[item]}</span>
           </button>
@@ -870,7 +964,7 @@ function TournamentsScreen({
           <form className="prototype-form" onSubmit={handleCreate}>
             <label>Name<input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="JU Rapid Championship" required /></label>
             <label>Slug<input value={form.slug} onChange={(event) => update('slug', event.target.value)} placeholder="ju-rapid-2026" required /></label>
-            <label>Status<select value={form.status} onChange={(event) => update('status', event.target.value as TournamentInput['status'])}><option value="upcoming">Upcoming</option><option value="active">Active</option><option value="completed">Completed</option></select></label>
+            <label>Status<select value={form.status} onChange={(event) => update('status', event.target.value as TournamentInput['status'])}>{tournamentTabs.map((item) => <option key={item} value={item}>{capitalize(item)}</option>)}</select></label>
             <label>Capacity<input type="number" min={2} value={form.capacity ?? ''} onChange={(event) => update('capacity', Number(event.target.value))} /></label>
             <label>Format<input value={form.format} onChange={(event) => update('format', event.target.value)} required /></label>
             <label>Time control<input value={form.timeControl} onChange={(event) => update('timeControl', event.target.value)} required /></label>
@@ -897,6 +991,17 @@ function TournamentsScreen({
           <EmptyState title={emptyTitle(tab)} body="Create one to get started." />
         )}
       </section>
+      <RegistrationQueue
+        actionId={registrationActionId}
+        loading={registrationsLoading}
+        onCheckInChange={handleRegistrationCheckIn}
+        onSelectedChange={setSelectedTournamentKey}
+        onStatusChange={handleRegistrationStatus}
+        registrations={registrations}
+        selectedTournament={selectedTournament}
+        selectedTournamentKey={selectedTournament ? tournamentKey(selectedTournament) : ''}
+        tournaments={filtered}
+      />
     </div>
   )
 }
@@ -945,9 +1050,9 @@ function TournamentTable({
                   value={item.status}
                   onChange={(event) => void onStatusChange(item, event.target.value as TournamentTab)}
                 >
-                  <option value="upcoming">Upcoming</option>
-                  <option value="active">Active</option>
-                  <option value="completed">Completed</option>
+                  {tournamentTabs.map((status) => (
+                    <option key={status} value={status}>{capitalize(status)}</option>
+                  ))}
                 </select>
                 <button
                   type="button"
@@ -963,6 +1068,121 @@ function TournamentTable({
         </tbody>
       </table>
     </div>
+  )
+}
+
+function RegistrationQueue({
+  actionId,
+  loading,
+  onCheckInChange,
+  onSelectedChange,
+  onStatusChange,
+  registrations,
+  selectedTournament,
+  selectedTournamentKey,
+  tournaments,
+}: {
+  actionId: string | null
+  loading: boolean
+  onCheckInChange: (item: AdminRegistration, checkedIn: boolean) => Promise<void>
+  onSelectedChange: (key: string) => void
+  onStatusChange: (item: AdminRegistration, status: AdminRegistrationStatus) => Promise<void>
+  registrations: AdminRegistration[]
+  selectedTournament: AdminTournament | null
+  selectedTournamentKey: string
+  tournaments: AdminTournament[]
+}) {
+  return (
+    <section className="panel-card table-card registration-panel">
+      <div className="panel-head">
+        <strong>Registration queue</strong>
+        <span>{selectedTournament ? selectedTournament.name : 'No tournament selected'}</span>
+      </div>
+      <div className="registration-toolbar">
+        <label>
+          Tournament
+          <select
+            value={selectedTournamentKey}
+            onChange={(event) => onSelectedChange(event.target.value)}
+            disabled={!tournaments.length}
+          >
+            {tournaments.map((item) => (
+              <option key={tournamentKey(item)} value={tournamentKey(item)}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span>
+          {registrations.length} registration{registrations.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      {!selectedTournament ? (
+        <EmptyState title="No tournament selected" body="Choose a tournament tab with events to review registrations." />
+      ) : !selectedTournament.rowId ? (
+        <EmptyState title="Cloud tournament required" body="Only cloud-backed tournaments can show registration rows." />
+      ) : loading ? (
+        <div className="empty-row">Loading registrations...</div>
+      ) : registrations.length ? (
+        <div className="table-scroll">
+          <table className="prototype-table registration-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>University ID</th>
+                <th>Rating</th>
+                <th>Status</th>
+                <th>Seed</th>
+                <th>Check-in</th>
+                <th className="right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {registrations.map((item) => {
+                const busy = actionId === item.rowId
+                return (
+                  <tr key={item.rowId} className={item.status === 'cancelled' ? 'muted-row' : undefined}>
+                    <td>
+                      <strong>{item.playerName}</strong>
+                      <small>{item.email || item.profileId}</small>
+                    </td>
+                    <td>{item.universityId || 'Not set'}</td>
+                    <td className="mono center">{item.rating ?? '-'}</td>
+                    <td><StatusPill status={item.status} /></td>
+                    <td className="mono center">{item.seed ?? '-'}</td>
+                    <td>{item.checkedIn ? 'Checked in' : 'Not checked in'}</td>
+                    <td className="right">
+                      <select
+                        aria-label={`Update ${item.playerName} registration status`}
+                        className="mini-select"
+                        disabled={busy}
+                        value={item.status}
+                        onChange={(event) => void onStatusChange(item, event.target.value as AdminRegistrationStatus)}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="waitlisted">Waitlisted</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="mini-button ghost"
+                        disabled={busy || item.status === 'cancelled'}
+                        onClick={() => void onCheckInChange(item, !item.checkedIn)}
+                      >
+                        {item.checkedIn ? 'Undo check-in' : 'Check in'}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState title="No registrations yet" body="Players will appear here after they register." />
+      )}
+    </section>
   )
 }
 
@@ -1479,19 +1699,27 @@ function adminRoleLabel(role: AdminRole) {
   return 'Admin'
 }
 
+function tournamentKey(item: AdminTournament) {
+  return item.rowId ?? item.id
+}
+
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 function tabDescription(tab: TournamentTab) {
+  if (tab === 'draft') return 'Unpublished tournaments being prepared'
   if (tab === 'active') return 'Tournaments currently being run'
   if (tab === 'completed') return 'Finished tournaments and media'
+  if (tab === 'archived') return 'Hidden or retired tournament records'
   return 'Prepare registrations, pairings and publishing'
 }
 
 function emptyTitle(tab: TournamentTab) {
+  if (tab === 'draft') return 'No draft tournaments'
   if (tab === 'active') return 'Nothing live'
   if (tab === 'completed') return 'No completed events'
+  if (tab === 'archived') return 'No archived tournaments'
   return 'No upcoming tournaments'
 }
 

@@ -33,7 +33,7 @@
       "fields": {
         "slug": "string|required|unique",
         "name": "string|required",
-        "status": "enum:draft,upcoming,active,completed,cancelled",
+        "status": "enum:draft,upcoming,active,completed,archived",
         "format": "string|required",
         "timeControl": "string|required",
         "roundsTotal": "integer",

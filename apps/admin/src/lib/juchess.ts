@@ -1,4 +1,4 @@
-export type TournamentStatus = 'active' | 'upcoming' | 'completed'
+export type TournamentStatus = 'draft' | 'upcoming' | 'active' | 'completed' | 'archived'
 
 export const tableIds = {
   adminProfiles: 'admin_profiles',

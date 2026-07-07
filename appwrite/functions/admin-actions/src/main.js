@@ -252,6 +252,7 @@ export default async ({ req, res, log, error }) => {
         'POST /blocks/ip',
         'POST /blocks/ip/:id/unblock',
         'POST /registrations/:id/confirm',
+        'POST /registrations/:id/status',
         'POST /games/:id/result',
         'POST /profiles/:id/role',
         'POST /profiles/:id/status',
@@ -591,19 +592,37 @@ export default async ({ req, res, log, error }) => {
       return res.json({ ok: true, action: 'deleteTournament', rowId: segments[1] });
     }
 
-    if (method === 'POST' && segments[0] === 'registrations' && segments[1] && segments[2] === 'confirm') {
+    if (
+      method === 'POST' &&
+      segments[0] === 'registrations' &&
+      segments[1] &&
+      ['confirm', 'status'].includes(segments[2])
+    ) {
+      if (body.status && !['pending', 'confirmed', 'waitlisted', 'cancelled'].includes(body.status)) {
+        return badRequest(res, 'Unsupported registration status.');
+      }
+
+      const nextStatus = body.status ?? 'confirmed';
       const row = await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.registrations,
         rowId: segments[1],
         data: cleanObject({
-          status: body.status ?? 'confirmed',
+          status: nextStatus,
           seed: body.seed,
-          checkedIn: body.checkedIn,
+          checkedIn: nextStatus === 'cancelled' ? false : body.checkedIn,
         }),
       });
 
-      return res.json({ ok: true, action: 'confirmRegistration', row });
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'updateRegistration',
+        targetTable: tableIds.registrations,
+        targetRowId: row.$id,
+        payload: { status: nextStatus, seed: body.seed, checkedIn: nextStatus === 'cancelled' ? false : body.checkedIn },
+      });
+
+      return res.json({ ok: true, action: 'updateRegistration', row });
     }
 
     if (method === 'POST' && segments[0] === 'games' && segments[1] && segments[2] === 'result') {

@@ -28,7 +28,7 @@ export type AdminSession = {
 type AppwriteTournamentRow = Models.Row & {
   slug?: string
   name?: string
-  status?: 'draft' | 'upcoming' | 'active' | 'completed' | 'cancelled'
+  status?: 'draft' | 'upcoming' | 'active' | 'completed' | 'archived' | 'cancelled'
   format?: string
   timeControl?: string
   roundsTotal?: number
@@ -42,7 +42,18 @@ type AppwriteTournamentRow = Models.Row & {
 
 type AppwriteRegistrationRow = Models.Row & {
   tournamentId?: string
+  profileId?: string
   status?: 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
+  seed?: number
+  checkInCode?: string
+  checkedIn?: boolean
+}
+
+type AppwriteProfileRow = Models.Row & {
+  displayName?: string
+  email?: string
+  universityId?: string
+  rating?: number
 }
 
 export type AdminTournament = {
@@ -59,6 +70,27 @@ export type AdminTournament = {
   startsAt?: string
   location?: string
   description?: string
+}
+
+export type AdminRegistrationStatus = 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
+
+export type AdminRegistration = {
+  rowId: string
+  tournamentId: string
+  profileId: string
+  playerName: string
+  email?: string
+  universityId?: string
+  rating?: number
+  status: AdminRegistrationStatus
+  seed?: number
+  checkInCode?: string
+  checkedIn: boolean
+}
+
+export type RegistrationLoadResult = {
+  registrations: AdminRegistration[]
+  error?: unknown
 }
 
 export type TournamentInput = {
@@ -264,6 +296,47 @@ export async function deleteTournament(rowId: string) {
   return response.rowId
 }
 
+export async function loadTournamentRegistrations(tournamentRowId: string): Promise<RegistrationLoadResult> {
+  if (!appwriteReady || !tournamentRowId) return { registrations: [] }
+
+  try {
+    const response = await tablesDB.listRows<AppwriteRegistrationRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.registrations,
+      queries: [Query.equal('tournamentId', tournamentRowId), Query.limit(500)],
+      total: false,
+      ttl: 15,
+    })
+    const profiles = await loadProfilesById(response.rows.map((row) => row.profileId).filter(Boolean) as string[])
+
+    return {
+      registrations: response.rows
+        .map((row) => mapRegistration(row, profiles))
+        .filter((row): row is AdminRegistration => Boolean(row))
+        .sort(compareRegistrationRows),
+    }
+  } catch (error) {
+    return { registrations: [], error }
+  }
+}
+
+export async function updateRegistrationStatus(
+  rowId: string,
+  input: {
+    status?: AdminRegistrationStatus
+    seed?: number
+    checkedIn?: boolean
+  },
+) {
+  const response = await runAdminAction<{ row: AppwriteRegistrationRow }>({
+    method: ExecutionMethod.POST,
+    path: `/registrations/${rowId}/confirm`,
+    body: cleanBlockInput(input),
+  })
+
+  return response.row
+}
+
 export async function loadBlockLists(): Promise<BlockListLoadResult> {
   if (!appwriteReady) return { identityBlocks: [], ipBlocks: [] }
 
@@ -391,12 +464,36 @@ async function loadRegistrationCounts() {
   return counts
 }
 
+async function loadProfilesById(profileIds: string[]) {
+  const uniqueIds = Array.from(new Set(profileIds.filter(Boolean)))
+  const profiles = new Map<string, AppwriteProfileRow>()
+  if (!uniqueIds.length) return profiles
+
+  try {
+    const response = await tablesDB.listRows<AppwriteProfileRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.profiles,
+      queries: [Query.limit(500)],
+      total: false,
+      ttl: 30,
+    })
+
+    response.rows.forEach((row) => {
+      if (uniqueIds.includes(row.$id)) profiles.set(row.$id, row)
+    })
+  } catch (error) {
+    console.warn('Admin profile lookup for registrations failed.', error)
+  }
+
+  return profiles
+}
+
 function mapTournament(
   row: AppwriteTournamentRow,
   participantCounts: Map<string, number>,
 ): AdminTournament | null {
   if (!row.name || !row.slug || !row.format || !row.timeControl) return null
-  const status = row.status === 'draft' || row.status === 'cancelled' ? 'upcoming' : row.status
+  const status = row.status === 'cancelled' ? 'archived' : row.status
   if (!status) return null
 
   return {
@@ -416,18 +513,56 @@ function mapTournament(
   }
 }
 
+function mapRegistration(
+  row: AppwriteRegistrationRow,
+  profiles: Map<string, AppwriteProfileRow>,
+): AdminRegistration | null {
+  if (!row.tournamentId || !row.profileId) return null
+  const profile = profiles.get(row.profileId)
+
+  return {
+    rowId: row.$id,
+    tournamentId: row.tournamentId,
+    profileId: row.profileId,
+    playerName: profile?.displayName || row.profileId,
+    email: profile?.email,
+    universityId: profile?.universityId,
+    rating: profile?.rating,
+    status: row.status ?? 'pending',
+    seed: row.seed,
+    checkInCode: row.checkInCode,
+    checkedIn: Boolean(row.checkedIn),
+  }
+}
+
+function compareRegistrationRows(a: AdminRegistration, b: AdminRegistration) {
+  const statusRank: Record<AdminRegistrationStatus, number> = {
+    pending: 0,
+    confirmed: 1,
+    waitlisted: 2,
+    cancelled: 3,
+  }
+
+  return statusRank[a.status] - statusRank[b.status] ||
+    (a.seed ?? 9999) - (b.seed ?? 9999) ||
+    a.playerName.localeCompare(b.playerName)
+}
+
 function formatRound(row: AppwriteTournamentRow) {
   if (row.currentRound && row.roundsTotal) return `Round ${row.currentRound} of ${row.roundsTotal}`
   if (row.currentRound) return `Round ${row.currentRound}`
   if (row.status === 'completed') return 'Final'
   if (row.status === 'upcoming' || row.status === 'draft') return 'Registration'
+  if (row.status === 'archived' || row.status === 'cancelled') return 'Archived'
   return 'In progress'
 }
 
 function statusOrder(status: TournamentStatus) {
-  if (status === 'active') return 0
+  if (status === 'draft') return 0
   if (status === 'upcoming') return 1
-  return 2
+  if (status === 'active') return 2
+  if (status === 'completed') return 3
+  return 4
 }
 
 async function runAdminAction<T>({

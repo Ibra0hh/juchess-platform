@@ -653,15 +653,40 @@ button {
   color: #b23a3a;
 }
 
+.status-pill.draft {
+  background: #eef1f6;
+  color: #33415f;
+}
+
 .status-pill.upcoming {
   background: #fbf1e2;
   color: #c77d0a;
+}
+
+.status-pill.pending {
+  background: #fbf1e2;
+  color: #c77d0a;
+}
+
+.status-pill.waitlisted {
+  background: #eef1f6;
+  color: #33415f;
+}
+
+.status-pill.cancelled {
+  background: #f0ebe1;
+  color: #8b8577;
 }
 
 .status-pill.completed,
 .status-pill.lifted {
   background: #eaf6f0;
   color: #2e7d5b;
+}
+
+.status-pill.archived {
+  background: #f0ebe1;
+  color: #6b6350;
 }
 
 .status-pill.suspended {
@@ -1081,6 +1106,51 @@ button {
 
 .table-card {
   padding: 0;
+}
+
+.registration-panel {
+  margin-top: 16px;
+}
+
+.registration-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f4f0e8;
+  background: #fffaf0;
+}
+
+.registration-toolbar label {
+  display: grid;
+  gap: 6px;
+  min-width: min(100%, 320px);
+  color: #21304e;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.registration-toolbar select {
+  min-height: 38px;
+  border: 1.5px solid #e4dac5;
+  border-radius: 9px;
+  background: #fff;
+  color: #14213d;
+  padding: 0 12px;
+  font-weight: 800;
+}
+
+.registration-toolbar span {
+  color: #8b8577;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.registration-table {
+  min-width: 940px;
 }
 
 .table-scroll {
@@ -1583,7 +1653,8 @@ button {
   }
 
   .table-toolbar,
-  .selection-bar {
+  .selection-bar,
+  .registration-toolbar {
     align-items: stretch;
     flex-direction: column;
   }

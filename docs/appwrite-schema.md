@@ -76,7 +76,7 @@ Club tournament/event definitions.
 Fields:
 - `slug` string, required, unique.
 - `name` string, required.
-- `status` enum: `draft`, `upcoming`, `active`, `completed`, `cancelled`.
+- `status` enum: `draft`, `upcoming`, `active`, `completed`, `archived`.
 - `format` string, required.
 - `timeControl` string, required.
 - `roundsTotal` integer, optional.
@@ -267,6 +267,7 @@ Implemented routes:
 - `PATCH /tournaments/:id`
 - `DELETE /tournaments/:id`
 - `POST /registrations/:id/confirm`
+- `POST /registrations/:id/status`
 - `POST /games/:id/result`
 - `POST /profiles/:id/role`
 - `POST /profiles/:id/status`
