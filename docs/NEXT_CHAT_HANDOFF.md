@@ -108,11 +108,19 @@ Implemented/working:
   same Create/Edit modal populated with the selected tournament. Active
   tournament Manage uses a separate prototype-style management view with a back
   button, title/status, controls, nav tabs, and a centered panel.
-- Admin Upcoming tournament rows expose Manage, Edit, Draft, Shuffle, Publish,
-  and Active actions. The Upcoming Manage view uses Shuffle and Publish controls
-  for preparing pairings before the tournament goes live.
+- Admin Upcoming tournament rows expose Manage, Edit, Draft, and Active
+  actions. Shuffle and Publish must exist only inside the Upcoming tournament
+  management screen.
+- Admin Upcoming tournament management can shuffle pairings/brackets until the
+  admin clicks Publish. After Publish, shuffle is locked for knockout brackets
+  and for all other tournament formats.
 - Admin knockout tournament management must label the play tab as Bracket
-  instead of Rounds. Non-knockout formats keep Rounds.
+  instead of Rounds and should use the same bracket language as web/mobile:
+  round columns, live markers, winner marks, muted pending rows, and connector
+  lines. Non-knockout formats keep Rounds.
+- Admin Active tournament management includes a digital chess board powered by
+  `chess.js` for legal move entry, live move recording, result selection, undo,
+  reset, and board save actions.
 - Completed and Archived tournament tabs should not show the Registration queue.
 - Flutter app has Appwrite session detection, sign-in, sign-up, sign-out,
   tournament reads, tournament details, registration/cancel behavior, and
