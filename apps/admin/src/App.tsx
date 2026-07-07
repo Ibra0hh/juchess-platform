@@ -66,6 +66,39 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
 ]
 
 const tournamentTabs: TournamentTab[] = ['draft', 'upcoming', 'active', 'completed', 'archived']
+const createSteps = ['Basic information', 'Tournament format', 'Time control', 'Public preview', 'Review'] as const
+const locationOptions = ['Chess.com', 'Lichess.com', 'Main Campus', 'Custom']
+const accessOptions = ['Open', 'Members only', 'Invitational', 'University students only']
+const formatOptions = [
+  { value: 'Swiss', icon: '♟', layout: 'Standings + current pairings' },
+  { value: 'Round robin', icon: '◍', layout: 'Standings + schedule' },
+  { value: 'Double round robin', icon: '◎', layout: 'Double cycle standings' },
+  { value: 'Single elimination', icon: '▲', layout: 'Bracket only' },
+  { value: 'Double elimination', icon: '⧗', layout: 'Winners + losers bracket' },
+  { value: 'League', icon: '▤', layout: 'League table + fixtures' },
+  { value: 'Team', icon: '⚑', layout: 'Team boards + match points' },
+  { value: 'Arena', icon: '⚡', layout: 'Leaderboard + streaks' },
+  { value: 'Multi-stage', icon: '⬒', layout: 'Stage tabs + finals bracket' },
+] as const
+const timeOptions = [
+  { label: 'Classical', minutes: '90', increment: '30' },
+  { label: 'Rapid', minutes: '15', increment: '10' },
+  { label: 'Blitz', minutes: '5', increment: '3' },
+  { label: 'Bullet', minutes: '1', increment: '0' },
+  { label: 'Custom', minutes: '15', increment: '10' },
+] as const
+
+function createInitialTournamentForm(): TournamentInput {
+  return {
+    slug: '',
+    name: '',
+    status: 'draft',
+    format: 'Swiss',
+    timeControl: '15+10 Rapid',
+    capacity: 16,
+    location: 'Chess.com',
+  }
+}
 
 const pageText: Record<Screen, { title: string; sub: string }> = {
   dashboard: { title: 'Dashboard', sub: 'Live overview of your club operations' },
@@ -762,14 +795,15 @@ function TournamentsScreen({
 }) {
   const [tab, setTab] = useState<TournamentTab>('draft')
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState<TournamentInput>({
-    slug: '',
-    name: '',
-    status: 'draft',
-    format: 'Swiss',
-    timeControl: '15+10 Rapid',
-    capacity: 16,
-  })
+  const [createStep, setCreateStep] = useState(0)
+  const [form, setForm] = useState<TournamentInput>(() => createInitialTournamentForm())
+  const [timeCategory, setTimeCategory] = useState('Rapid')
+  const [timeMinutes, setTimeMinutes] = useState('15')
+  const [timeIncrement, setTimeIncrement] = useState('10')
+  const [timeDelay, setTimeDelay] = useState('0')
+  const [gamesPerMatch, setGamesPerMatch] = useState('1')
+  const [accessMode, setAccessMode] = useState('Open')
+  const [customLocation, setCustomLocation] = useState('')
   const [selectedTournamentKey, setSelectedTournamentKey] = useState('')
   const [registrations, setRegistrations] = useState<AdminRegistration[]>([])
   const [registrationsLoading, setRegistrationsLoading] = useState(false)
@@ -787,6 +821,22 @@ function TournamentsScreen({
   const filtered = tournaments.filter((item) => item.status === tab)
   const selectedTournament = filtered.find((item) => tournamentKey(item) === selectedTournamentKey) ?? filtered[0] ?? null
   const selectedTournamentRowId = selectedTournament?.rowId
+  const createEnabled = tab === 'draft'
+  const selectedFormat = formatOptions.find((option) => option.value === form.format) ?? formatOptions[0]
+  const createWarnings = buildCreateWarnings(form, timeMinutes)
+  const canSaveDraft = Boolean(form.name.trim()) && !submitting
+  const reviewRows = [
+    { label: 'Name', value: form.name || '-' },
+    { label: 'Format', value: form.format },
+    { label: 'Players', value: String(form.capacity || '-') },
+    { label: 'Location', value: form.location === 'Custom' ? customLocation || 'Custom' : form.location || '-' },
+    { label: 'Time control', value: form.timeControl || '-' },
+    { label: 'Games/match', value: gamesPerMatch || '-' },
+    { label: 'Start', value: form.startsAt ? `${formatDate(form.startsAt)} ${formatTime(form.startsAt)}` : '-' },
+    { label: 'Visibility', value: 'Draft only' },
+    { label: 'Access', value: accessMode },
+    { label: 'Slug', value: buildTournamentSlugBase(form.name) },
+  ]
 
   useEffect(() => {
     if (!filtered.length) {
@@ -798,6 +848,13 @@ function TournamentsScreen({
       setSelectedTournamentKey(tournamentKey(filtered[0]))
     }
   }, [filtered, selectedTournamentKey])
+
+  useEffect(() => {
+    if (tab !== 'draft' && showCreate) {
+      setShowCreate(false)
+      setCreateStep(0)
+    }
+  }, [showCreate, tab])
 
   useEffect(() => {
     let alive = true
@@ -828,6 +885,49 @@ function TournamentsScreen({
     setForm((current) => ({ ...current, [key]: value }))
   }
 
+  function resetCreateForm() {
+    setCreateStep(0)
+    setForm(createInitialTournamentForm())
+    setTimeCategory('Rapid')
+    setTimeMinutes('15')
+    setTimeIncrement('10')
+    setTimeDelay('0')
+    setGamesPerMatch('1')
+    setAccessMode('Open')
+    setCustomLocation('')
+  }
+
+  function openCreatePanel() {
+    if (!createEnabled) {
+      setMessage('Create tournament is available only in Draft.')
+      return
+    }
+
+    resetCreateForm()
+    setShowCreate(true)
+    setMessage(null)
+  }
+
+  function closeCreatePanel() {
+    setShowCreate(false)
+    setCreateStep(0)
+  }
+
+  function setTimeSelection(next: Partial<{ category: string; minutes: string; increment: string; delay: string; games: string }>) {
+    const category = next.category ?? timeCategory
+    const minutes = next.minutes ?? timeMinutes
+    const increment = next.increment ?? timeIncrement
+    const delay = next.delay ?? timeDelay
+    const games = next.games ?? gamesPerMatch
+
+    setTimeCategory(category)
+    setTimeMinutes(minutes)
+    setTimeIncrement(increment)
+    setTimeDelay(delay)
+    setGamesPerMatch(games)
+    update('timeControl', `${minutes || '0'}+${increment || '0'} ${category}`)
+  }
+
   async function refreshRegistrationQueue() {
     if (!selectedTournamentRowId) {
       setRegistrations([])
@@ -843,24 +943,27 @@ function TournamentsScreen({
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!createEnabled) {
+      setMessage('Create tournament is available only in Draft.')
+      setShowCreate(false)
+      return
+    }
+
     setSubmitting(true)
     setMessage(null)
 
     try {
-      await createTournament({ ...form, createdByProfileId: session.profile?.$id })
-      setMessage('Tournament created.')
-      setForm((current) => ({
-        ...current,
-        slug: '',
-        name: '',
-        currentRound: undefined,
-        description: '',
-        endsAt: undefined,
-        location: '',
-        roundsTotal: undefined,
-        startsAt: undefined,
-      }))
-      setShowCreate(false)
+      await createTournament({
+        ...form,
+        location: form.location === 'Custom' ? customLocation || 'Custom' : form.location,
+        slug: buildTournamentSlug(form.name),
+        status: 'draft',
+        timeControl: `${timeMinutes || '0'}+${timeIncrement || '0'} ${timeCategory}`,
+        createdByProfileId: session.profile?.$id,
+      })
+      setMessage('Tournament saved as draft.')
+      resetCreateForm()
+      closeCreatePanel()
       await onChanged()
     } catch (error) {
       setMessage(formatAdminError(error))
@@ -951,32 +1054,207 @@ function TournamentsScreen({
       </div>
       <div className="table-toolbar">
         <span>{tabDescription(tab)} · {dataSource === 'cloud' ? 'Live cloud' : 'Cloud unavailable'}</span>
-        <button type="button" className="primary-button" onClick={() => setShowCreate((value) => !value)}>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={!createEnabled}
+          onClick={openCreatePanel}
+          title={createEnabled ? 'Create a draft tournament' : 'Switch to Draft to create a tournament'}
+        >
           <span>+</span> Create tournament
         </button>
       </div>
       {showCreate ? (
-        <section className="panel-card create-panel">
-          <div className="panel-head">
-            <strong>Create tournament</strong>
-            <span>Function write</span>
-          </div>
-          <form className="prototype-form" onSubmit={handleCreate}>
-            <label>Name<input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="JU Rapid Championship" required /></label>
-            <label>Slug<input value={form.slug} onChange={(event) => update('slug', event.target.value)} placeholder="ju-rapid-2026" required /></label>
-            <label>Status<select value={form.status} onChange={(event) => update('status', event.target.value as TournamentInput['status'])}>{tournamentTabs.map((item) => <option key={item} value={item}>{capitalize(item)}</option>)}</select></label>
-            <label>Capacity<input type="number" min={2} value={form.capacity ?? ''} onChange={(event) => update('capacity', Number(event.target.value))} /></label>
-            <label>Format<input value={form.format} onChange={(event) => update('format', event.target.value)} required /></label>
-            <label>Time control<input value={form.timeControl} onChange={(event) => update('timeControl', event.target.value)} required /></label>
-            <label>Location<input value={form.location ?? ''} onChange={(event) => update('location', event.target.value)} /></label>
-            <label>Starts at<input type="datetime-local" value={toDateTimeLocalValue(form.startsAt)} onChange={(event) => update('startsAt', fromDateTimeLocalValue(event.target.value))} /></label>
-            <label>Ends at<input type="datetime-local" value={toDateTimeLocalValue(form.endsAt)} onChange={(event) => update('endsAt', fromDateTimeLocalValue(event.target.value))} /></label>
-            <label>Rounds<input type="number" min={1} value={form.roundsTotal ?? ''} onChange={(event) => update('roundsTotal', numberInput(event.target.value))} /></label>
-            <label>Current round<input type="number" min={0} value={form.currentRound ?? ''} onChange={(event) => update('currentRound', numberInput(event.target.value))} /></label>
-            <label className="wide">Description<textarea value={form.description ?? ''} onChange={(event) => update('description', event.target.value)} rows={3} /></label>
-            <button type="submit" disabled={submitting}>{submitting ? 'Creating...' : 'Save tournament'}</button>
+        <div className="create-modal-backdrop" onClick={closeCreatePanel}>
+          <form className="create-modal" onClick={(event) => event.stopPropagation()} onSubmit={handleCreate}>
+            <header className="create-modal-head">
+              <div>
+                <strong>Create tournament</strong>
+                <span>Draft setup wizard</span>
+              </div>
+              <button type="button" aria-label="Close create tournament" onClick={closeCreatePanel}>×</button>
+            </header>
+            <nav className="create-step-tabs" aria-label="Create tournament steps">
+              {createSteps.map((step, index) => (
+                <button
+                  key={step}
+                  type="button"
+                  className={createStep === index ? 'active' : undefined}
+                  onClick={() => setCreateStep(index)}
+                >
+                  {step}
+                </button>
+              ))}
+            </nav>
+            <div className="create-step-body">
+              {createStep === 0 ? (
+                <div className="create-grid">
+                  <label className="wide">Tournament name<input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="Spring Championship" required /></label>
+                  <label className="wide">Description<textarea value={form.description ?? ''} onChange={(event) => update('description', event.target.value)} placeholder="Short description..." rows={3} /></label>
+                  <label>Number of players<input type="number" min={2} value={form.capacity ?? ''} onChange={(event) => update('capacity', Number(event.target.value))} /></label>
+                  <div className="create-field">
+                    <span>Location / platform</span>
+                    <div className="create-chip-row">
+                      {locationOptions.map((location) => (
+                        <button
+                          key={location}
+                          type="button"
+                          className={form.location === location ? 'active' : undefined}
+                          onClick={() => update('location', location)}
+                        >
+                          {location}
+                        </button>
+                      ))}
+                    </div>
+                    {form.location === 'Custom' ? (
+                      <input
+                        aria-label="Custom location"
+                        value={customLocation}
+                        onChange={(event) => setCustomLocation(event.target.value)}
+                        placeholder="Type venue / platform..."
+                      />
+                    ) : null}
+                  </div>
+                  <label>Start date / time<input type="datetime-local" value={toDateTimeLocalValue(form.startsAt)} onChange={(event) => update('startsAt', fromDateTimeLocalValue(event.target.value))} /></label>
+                  <label>End date / time<input type="datetime-local" value={toDateTimeLocalValue(form.endsAt)} onChange={(event) => update('endsAt', fromDateTimeLocalValue(event.target.value))} /></label>
+                  <label>Registration deadline<input type="datetime-local" /></label>
+                  <div className="create-field">
+                    <span>Visibility</span>
+                    <div className="create-chip-row">
+                      <button type="button" className="active">Draft</button>
+                      <button type="button" disabled>Private</button>
+                      <button type="button" disabled>Public</button>
+                    </div>
+                  </div>
+                  <div className="create-field wide">
+                    <span>Access</span>
+                    <div className="create-chip-row">
+                      {accessOptions.map((access) => (
+                        <button
+                          key={access}
+                          type="button"
+                          className={accessMode === access ? 'active' : undefined}
+                          onClick={() => setAccessMode(access)}
+                        >
+                          {access}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="create-upload wide">
+                    <span>Tournament design image</span>
+                    <strong>Attach design later from tournament media</strong>
+                  </div>
+                </div>
+              ) : null}
+              {createStep === 1 ? (
+                <div>
+                  <div className="create-section-label">Choose a tournament format</div>
+                  <div className="format-card-grid">
+                    {formatOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={form.format === option.value ? 'active' : undefined}
+                        onClick={() => update('format', option.value)}
+                      >
+                        <span>{option.icon}</span>
+                        <strong>{option.value}</strong>
+                        <small>{option.layout}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {createStep === 2 ? (
+                <div className="create-grid">
+                  <div className="create-field wide">
+                    <span>Time control category</span>
+                    <div className="create-chip-row">
+                      {timeOptions.map((option) => (
+                        <button
+                          key={option.label}
+                          type="button"
+                          className={timeCategory === option.label ? 'active' : undefined}
+                          onClick={() => setTimeSelection({ category: option.label, minutes: option.minutes, increment: option.increment })}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <label>Initial minutes<input value={timeMinutes} onChange={(event) => setTimeSelection({ minutes: event.target.value })} placeholder="15" /></label>
+                  <label>Increment (seconds)<input value={timeIncrement} onChange={(event) => setTimeSelection({ increment: event.target.value })} placeholder="10" /></label>
+                  <label>Delay (seconds)<input value={timeDelay} onChange={(event) => setTimeSelection({ delay: event.target.value })} placeholder="0" /></label>
+                  <label>Games per match<input value={gamesPerMatch} onChange={(event) => setTimeSelection({ games: event.target.value })} placeholder="1" /></label>
+                </div>
+              ) : null}
+              {createStep === 3 ? (
+                <div>
+                  <div className="create-section-label">How it appears publicly ({form.format})</div>
+                  <div className="preview-surface-grid">
+                    <article>
+                      <strong>Mobile app</strong>
+                      <span>{selectedFormat.layout}</span>
+                      <p>Compact tournament header with tabs for registration, players, rounds, games and standings.</p>
+                    </article>
+                    <article>
+                      <strong>Public website</strong>
+                      <span>{selectedFormat.layout}</span>
+                      <p>Full tournament page with the same tabs and format-specific content.</p>
+                    </article>
+                    <article>
+                      <strong>Live dashboard</strong>
+                      <span>{selectedFormat.layout}</span>
+                      <p>Admin-ready view for pairing progress, player counts and tournament status.</p>
+                    </article>
+                  </div>
+                </div>
+              ) : null}
+              {createStep === 4 ? (
+                <div>
+                  <div className="review-grid">
+                    {reviewRows.map((row) => (
+                      <div key={row.label}>
+                        <span>{row.label}</span>
+                        <strong>{row.value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={createWarnings.length ? 'create-warning' : 'create-ok'}>
+                    <strong>{createWarnings.length ? 'Warnings' : 'Ready to save'}</strong>
+                    {createWarnings.length ? (
+                      createWarnings.map((warning) => <span key={warning}>• {warning}</span>)
+                    ) : (
+                      <span>All required draft fields are present.</span>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <footer className="create-modal-actions">
+              <button
+                type="button"
+                className="secondary-action"
+                disabled={createStep === 0}
+                onClick={() => setCreateStep((step) => Math.max(0, step - 1))}
+              >
+                ← Back
+              </button>
+              <div>
+                {createStep < createSteps.length - 1 ? (
+                  <button type="button" className="dark-action" onClick={() => setCreateStep((step) => Math.min(createSteps.length - 1, step + 1))}>
+                    Next →
+                  </button>
+                ) : (
+                  <button type="submit" className="primary-action" disabled={!canSaveDraft}>
+                    {submitting ? 'Saving...' : 'Save Draft'}
+                  </button>
+                )}
+              </div>
+            </footer>
           </form>
-        </section>
+        </div>
       ) : null}
       {message ? <div className="prototype-note" role="status">{message}</div> : null}
       <section className="panel-card table-card">
@@ -1723,6 +2001,39 @@ function emptyTitle(tab: TournamentTab) {
   return 'No upcoming tournaments'
 }
 
+function buildTournamentSlug(name: string) {
+  return `${buildTournamentSlugBase(name)}-${Date.now().toString(36)}`
+}
+
+function buildTournamentSlugBase(name: string) {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return base || 'draft-tournament'
+}
+
+function buildCreateWarnings(form: TournamentInput, timeMinutes: string) {
+  const warnings: string[] = []
+  const capacity = Number(form.capacity || 0)
+
+  if (!form.name.trim()) warnings.push('Tournament name is missing')
+  if (capacity < 4) warnings.push('Not enough players (minimum 4)')
+  if (capacity > 0 && capacity % 2 !== 0) warnings.push('Odd number of players - one player will get a bye')
+  if (/elimination/i.test(form.format) && capacity > 0 && !isPowerOfTwo(capacity)) {
+    warnings.push('Elimination brackets work best with 8, 16 or 32 players')
+  }
+  if (!timeMinutes.trim()) warnings.push('Missing time control')
+
+  return warnings
+}
+
+function isPowerOfTwo(value: number) {
+  return Number.isInteger(value) && value > 0 && (value & (value - 1)) === 0
+}
+
 function formatDate(value?: string) {
   if (!value) return 'Not set'
   const date = new Date(value)
@@ -1750,12 +2061,6 @@ function fromDateTimeLocalValue(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return undefined
   return date.toISOString()
-}
-
-function numberInput(value: string) {
-  if (value === '') return undefined
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 function buildPreviewUrl(windowKey: WindowKey, device: DeviceKey, guestMode: boolean, previewEmail: string) {
