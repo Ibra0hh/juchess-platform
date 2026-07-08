@@ -2572,7 +2572,6 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       items.add(const DetailTab('games', 'Games'));
     } else {
       items.add(const DetailTab('rounds', 'Rounds'));
-      items.add(const DetailTab('games', 'Games'));
       items.add(const DetailTab('main', 'Standings'));
     }
     if (!items.any((item) => item.key == tab)) tab = 'overview';
