@@ -791,11 +791,13 @@ function mapAppwriteTournament(
   const status = mapStatus(row.status)
   if (!status) return null
   const format = normalizeTournamentFormat(row.format)
+  const name = row.name?.trim() || format
+  const slug = row.slug?.trim() || formatRouteId(name) || row.$id
 
   return {
     rowId: row.$id,
-    id: formatRouteId(format),
-    name: format,
+    id: slug,
+    name,
     status,
     date: formatDateRange(row.startsAt, row.endsAt),
     location: row.location || 'University of Jordan',

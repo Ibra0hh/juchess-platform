@@ -194,7 +194,7 @@ const timeOptions = [
 function createInitialTournamentForm(): TournamentInput {
   return {
     slug: '',
-    name: 'Swiss',
+    name: '',
     status: 'draft',
     format: 'Swiss',
     timeControl: '15+10 Rapid',
@@ -930,7 +930,7 @@ function TournamentsScreen({
   const selectedTournament = filtered.find((item) => tournamentKey(item) === selectedTournamentKey) ?? filtered[0] ?? null
   const managedTournament = tournaments.find((item) => tournamentKey(item) === manageTournamentKey) ?? null
   const createEnabled = tab === 'draft'
-  const canSaveDraft = Boolean(form.format.trim()) && !submitting
+  const canSaveDraft = Boolean(form.name.trim() && form.format.trim()) && !submitting
   const isEditing = Boolean(editingTournament)
   const showRegistrationQueue = tab !== 'completed' && tab !== 'archived' && !managedTournament
   const selectedTournamentRowId = showRegistrationQueue ? selectedTournament?.rowId : undefined
@@ -1012,7 +1012,7 @@ function TournamentsScreen({
   function update<K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) {
     setForm((current) => {
       if (key === 'format' && typeof value === 'string') {
-        return { ...current, format: value, name: value }
+        return { ...current, format: value }
       }
 
       return { ...current, [key]: value }
@@ -1110,14 +1110,23 @@ function TournamentsScreen({
       return
     }
 
+    const name = form.name.trim()
+    const format = form.format.trim()
+    if (!name || !format) {
+      setMessage('Tournament name and format are required.')
+      return
+    }
+
     setSubmitting(true)
     setMessage(null)
 
     try {
       const payload: TournamentInput = {
         ...form,
-        name: form.format,
-        slug: buildTournamentSlugBase(form.format),
+        name,
+        format,
+        slug: form.slug.trim()
+          || buildUniqueTournamentSlugBase(name, tournaments, editingTournament?.rowId),
         status: isEditing ? form.status : 'draft',
         timeControl: `${timeMinutes || '0'}+${timeIncrement || '0'} ${timeCategory}`,
       }
@@ -1346,7 +1355,15 @@ function TournamentsScreen({
             <div className="create-step-body">
               {createStep === 0 ? (
                 <div className="create-grid">
-                  <label className="wide">Tournament name<input value={form.format} readOnly required /></label>
+                  <label className="wide">
+                    Tournament name
+                    <input
+                      value={form.name}
+                      onChange={(event) => update('name', event.target.value)}
+                      placeholder="Spring Rapid Open"
+                      required
+                    />
+                  </label>
                   <label className="wide">Description<textarea value={form.description ?? ''} onChange={(event) => update('description', event.target.value)} placeholder="Short description..." rows={3} /></label>
                   <label>Number of players<input type="number" min={2} value={form.capacity ?? ''} onChange={(event) => update('capacity', Number(event.target.value))} /></label>
                   <label>
@@ -4496,8 +4513,8 @@ function buildMovePairs(moves: string[]) {
 
 function tournamentToEditForm(item: AdminTournament): TournamentInput {
   return {
-    slug: buildTournamentSlugBase(item.format),
-    name: item.format,
+    slug: item.slug || buildTournamentSlugBase(item.name || item.format),
+    name: item.name,
     status: item.status,
     format: item.format,
     timeControl: item.timeControl,
@@ -4536,6 +4553,22 @@ function buildTournamentSlugBase(name: string) {
     .replace(/^-+|-+$/g, '')
 
   return base || 'draft-tournament'
+}
+
+function buildUniqueTournamentSlugBase(name: string, tournaments: AdminTournament[], currentRowId?: string) {
+  const base = buildTournamentSlugBase(name)
+  const existing = new Set(
+    tournaments
+      .filter((tournament) => tournament.rowId !== currentRowId)
+      .map((tournament) => tournament.slug),
+  )
+  let slug = base
+  let suffix = 2
+  while (existing.has(slug)) {
+    slug = `${base}-${suffix}`
+    suffix += 1
+  }
+  return slug
 }
 
 function formatDate(value?: string) {

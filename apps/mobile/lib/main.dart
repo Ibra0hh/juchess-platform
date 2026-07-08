@@ -488,6 +488,15 @@ class AppwriteService {
       return null;
     }
     final displayFormat = normalizeTournamentFormat(format);
+    final rawName = data['name']?.toString().trim();
+    final displayName =
+        rawName == null || rawName.isEmpty ? displayFormat : rawName;
+    final rawSlug = data['slug']?.toString().trim();
+    final fallbackId = tournamentFormatId(displayName);
+    final tournamentId =
+        rawSlug == null || rawSlug.isEmpty
+            ? (fallbackId.isEmpty ? row.$id : fallbackId)
+            : rawSlug;
 
     final roundsTotal = _asInt(data['roundsTotal']);
     final currentRound = _asInt(data['currentRound']);
@@ -510,8 +519,8 @@ class AppwriteService {
 
     return TournamentSeed(
       rowId: row.$id,
-      id: tournamentFormatId(displayFormat),
-      name: displayFormat,
+      id: tournamentId,
+      name: displayName,
       meta: '${_formatDate(startsAt)} · $location',
       chips: [
         roundsTotal == null

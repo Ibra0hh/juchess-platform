@@ -605,13 +605,14 @@ function mapTournament(
   const status = row.status === 'cancelled' ? 'archived' : row.status
   if (!status) return null
   const format = normalizeTournamentFormat(row.format)
-  const slug = formatRouteId(format)
+  const name = row.name?.trim() || format
+  const slug = row.slug?.trim() || formatRouteId(name) || row.$id
 
   return {
     id: slug,
     rowId: row.$id,
     slug,
-    name: format,
+    name,
     status,
     players: participantCounts.get(row.$id) ?? 0,
     capacity: row.capacity ?? 0,
