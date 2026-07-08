@@ -2959,7 +2959,7 @@ class _TournamentBracketViewState extends State<TournamentBracketView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_controller.hasClients) return;
       final max = _controller.position.maxScrollExtent;
-      final target = (index * 186.0).clamp(0.0, max);
+      final target = (index * BracketMetrics.scrollStep).clamp(0.0, max);
       unawaited(
         _controller.animateTo(
           target,
@@ -2972,6 +2972,12 @@ class _TournamentBracketViewState extends State<TournamentBracketView> {
 
   @override
   Widget build(BuildContext context) {
+    final maxMatches = widget.rounds.fold<int>(
+      1,
+      (value, round) => math.max(value, round.games.length),
+    );
+    final compactLayout = BracketMetrics.shouldUseCompactLayout(widget.rounds);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: Column(
@@ -3003,16 +3009,18 @@ class _TournamentBracketViewState extends State<TournamentBracketView> {
               children: [
                 for (var i = 0; i < widget.rounds.length; i++) ...[
                   BracketColumn(
+                    compactLayout: compactLayout,
+                    maxMatches: maxMatches,
                     round: widget.rounds[i],
                     roundIndex: i,
-                    maxMatches: widget.rounds.first.games.length,
                   ),
                   if (i != widget.rounds.length - 1)
                     BracketConnector(
+                      compactLayout: compactLayout,
+                      maxMatches: maxMatches,
                       roundIndex: i,
                       sourceMatches: widget.rounds[i].games,
                       targetMatches: widget.rounds[i + 1].games.length,
-                      maxMatches: widget.rounds.first.games.length,
                     ),
                 ],
               ],
@@ -3032,29 +3040,82 @@ class _TournamentBracketViewState extends State<TournamentBracketView> {
 class BracketMetrics {
   const BracketMetrics._();
 
-  static const matchHeight = 90.0;
-  static const baseGap = 12.0;
+  static const columnWidth = 184.0;
+  static const matchHeight = 92.0;
+  static const baseGap = 13.0;
   static const basePitch = matchHeight + baseGap;
-  static const labelBand = 29.0;
-  static const connectorWidth = 46.0;
+  static const labelBand = 31.0;
+  static const connectorWidth = 52.0;
+  static const scrollStep = columnWidth + connectorWidth;
 
   static double roundOffset(int roundIndex) {
     final step = 1 << roundIndex;
     return basePitch * (step - 1) / 2;
   }
 
-  static double matchTop(int roundIndex, int matchIndex) {
+  static double matchTop(
+    int roundIndex,
+    int matchIndex, {
+    required bool compactLayout,
+    required int matchCount,
+    required int maxMatches,
+  }) {
+    if (compactLayout) {
+      return compactMatchTop(
+        maxMatches: maxMatches,
+        matchCount: matchCount,
+        matchIndex: matchIndex,
+      );
+    }
+
     return labelBand +
         roundOffset(roundIndex) +
         matchIndex * basePitch * (1 << roundIndex);
   }
 
-  static double matchCenter(int roundIndex, int matchIndex) {
-    return matchTop(roundIndex, matchIndex) + matchHeight / 2;
+  static double matchCenter(
+    int roundIndex,
+    int matchIndex, {
+    required bool compactLayout,
+    required int matchCount,
+    required int maxMatches,
+  }) {
+    return matchTop(
+          roundIndex,
+          matchIndex,
+          compactLayout: compactLayout,
+          matchCount: matchCount,
+          maxMatches: maxMatches,
+        ) +
+        matchHeight / 2;
   }
 
   static double boardHeight(int maxMatches) {
-    return labelBand + maxMatches * basePitch - baseGap;
+    return labelBand + math.max(1, maxMatches) * basePitch - baseGap;
+  }
+
+  static double compactMatchTop({
+    required int maxMatches,
+    required int matchCount,
+    required int matchIndex,
+  }) {
+    final safeMatchCount = math.max(1, matchCount);
+    final availableHeight = boardHeight(maxMatches) - labelBand;
+    final groupHeight =
+        safeMatchCount * matchHeight + (safeMatchCount - 1) * baseGap;
+    final offset = math.max(0.0, (availableHeight - groupHeight) / 2);
+    return labelBand + offset + matchIndex * basePitch;
+  }
+
+  static bool shouldUseCompactLayout(List<RoundSeed> rounds) {
+    for (var i = 0; i < rounds.length - 1; i++) {
+      final current = rounds[i].games.length;
+      final next = rounds[i + 1].games.length;
+      if (current == 0 || next == 0) continue;
+      if (next >= current) return true;
+      if (next > (current / 2).ceil()) return true;
+    }
+    return false;
   }
 }
 
@@ -3097,20 +3158,22 @@ class BracketRoundChip extends StatelessWidget {
 
 class BracketColumn extends StatelessWidget {
   const BracketColumn({
+    required this.compactLayout,
+    required this.maxMatches,
     required this.round,
     required this.roundIndex,
-    required this.maxMatches,
     super.key,
   });
 
+  final bool compactLayout;
+  final int maxMatches;
   final RoundSeed round;
   final int roundIndex;
-  final int maxMatches;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 172,
+      width: BracketMetrics.columnWidth,
       height: BracketMetrics.boardHeight(maxMatches),
       child: Stack(
         clipBehavior: Clip.none,
@@ -3131,7 +3194,13 @@ class BracketColumn extends StatelessWidget {
           ),
           for (var i = 0; i < round.games.length; i++)
             Positioned(
-              top: BracketMetrics.matchTop(roundIndex, i),
+              top: BracketMetrics.matchTop(
+                roundIndex,
+                i,
+                compactLayout: compactLayout,
+                matchCount: round.games.length,
+                maxMatches: maxMatches,
+              ),
               left: 0,
               right: 0,
               height: BracketMetrics.matchHeight,
@@ -3145,17 +3214,19 @@ class BracketColumn extends StatelessWidget {
 
 class BracketConnector extends StatelessWidget {
   const BracketConnector({
+    required this.compactLayout,
+    required this.maxMatches,
     required this.roundIndex,
     required this.sourceMatches,
     required this.targetMatches,
-    required this.maxMatches,
     super.key,
   });
 
+  final bool compactLayout;
+  final int maxMatches;
   final int roundIndex;
   final List<MatchSeed> sourceMatches;
   final int targetMatches;
-  final int maxMatches;
 
   @override
   Widget build(BuildContext context) {
@@ -3164,6 +3235,8 @@ class BracketConnector extends StatelessWidget {
       height: BracketMetrics.boardHeight(maxMatches),
       child: CustomPaint(
         painter: BracketConnectorPainter(
+          compactLayout: compactLayout,
+          maxMatches: maxMatches,
           roundIndex: roundIndex,
           sourceMatches: sourceMatches,
           targetMatches: targetMatches,
@@ -3175,11 +3248,15 @@ class BracketConnector extends StatelessWidget {
 
 class BracketConnectorPainter extends CustomPainter {
   const BracketConnectorPainter({
+    required this.compactLayout,
+    required this.maxMatches,
     required this.roundIndex,
     required this.sourceMatches,
     required this.targetMatches,
   });
 
+  final bool compactLayout;
+  final int maxMatches;
   final int roundIndex;
   final List<MatchSeed> sourceMatches;
   final int targetMatches;
@@ -3220,8 +3297,20 @@ class BracketConnectorPainter extends CustomPainter {
       final targetIndex = match.nextIndex ?? (sourceIndex ~/ 2);
       if (targetIndex >= targetMatches) continue;
 
-      final sourceY = BracketMetrics.matchCenter(roundIndex, sourceIndex);
-      final targetY = BracketMetrics.matchCenter(roundIndex + 1, targetIndex);
+      final sourceY = BracketMetrics.matchCenter(
+        roundIndex,
+        sourceIndex,
+        compactLayout: compactLayout,
+        matchCount: sourceMatches.length,
+        maxMatches: maxMatches,
+      );
+      final targetY = BracketMetrics.matchCenter(
+        roundIndex + 1,
+        targetIndex,
+        compactLayout: compactLayout,
+        matchCount: targetMatches,
+        maxMatches: maxMatches,
+      );
       final midX = size.width / 2;
       final paint = switch (match.result.toLowerCase()) {
         'live' => livePaint,
@@ -3231,9 +3320,7 @@ class BracketConnectorPainter extends CustomPainter {
 
       final path = Path()
         ..moveTo(0, sourceY)
-        ..lineTo(midX, sourceY)
-        ..lineTo(midX, targetY)
-        ..lineTo(size.width, targetY);
+        ..cubicTo(midX, sourceY, midX, targetY, size.width, targetY);
       canvas.drawPath(path, paint);
       canvas.drawCircle(Offset(size.width, targetY), 2.0, endPaint);
     }
@@ -3243,7 +3330,9 @@ class BracketConnectorPainter extends CustomPainter {
   bool shouldRepaint(covariant BracketConnectorPainter oldDelegate) {
     return oldDelegate.roundIndex != roundIndex ||
         oldDelegate.sourceMatches != sourceMatches ||
-        oldDelegate.targetMatches != targetMatches;
+        oldDelegate.targetMatches != targetMatches ||
+        oldDelegate.compactLayout != compactLayout ||
+        oldDelegate.maxMatches != maxMatches;
   }
 }
 
@@ -3258,11 +3347,23 @@ class BracketMatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final borderColor = _live
+        ? const Color(0x807d2434)
+        : _whiteWon || _blackWon
+        ? const Color(0x66a98a3f)
+        : const Color(0x2421304e);
     return Container(
       decoration: BoxDecoration(
-        color: PrototypeColors.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0x2e21304e)),
+        color: _live ? const Color(0xfffff7ee) : const Color(0xfffffcf4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1221304e),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -3282,7 +3383,7 @@ class BracketMatchCard extends StatelessWidget {
           if (_live)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: const BoxDecoration(
                 color: Color(0x127d2434),
                 border: Border(top: BorderSide(color: Color(0x337d2434))),
@@ -3342,7 +3443,7 @@ class BracketPlayerRow extends StatelessWidget {
       child: Opacity(
         opacity: opacity,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
           decoration: BoxDecoration(
             border: bottomBorder
                 ? const Border(bottom: BorderSide(color: Color(0x1421304e)))

@@ -2049,6 +2049,11 @@ function AdminBracketPreview({
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const trackRef = useRef<HTMLDivElement | null>(null)
   const roundKey = useMemo(() => buildBracketRoundKey(rounds), [rounds])
+  const panelClassName = [
+    'bracket-panel',
+    'rich-bracket-panel',
+    bracketView ? `bracket-view-${bracketView}` : 'bracket-view-single',
+  ].join(' ')
 
   useEffect(() => {
     setActiveRound(0)
@@ -2120,7 +2125,7 @@ function AdminBracketPreview({
   }
 
   return (
-    <div className="bracket-panel rich-bracket-panel">
+    <div className={panelClassName}>
       <div className="bracket-heading">
         <h2>{title}</h2>
         {bracketView && onBracketViewChange ? (
@@ -2317,10 +2322,10 @@ function drawBracketLines(track: HTMLDivElement) {
       const live = match.win === 'live'
       const path = document.createElementNS(namespace, 'path')
 
-      path.setAttribute('d', `M${x1} ${y1} H${midX} V${y2} H${x2}`)
+      path.setAttribute('d', `M${x1} ${y1} C${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`)
       path.setAttribute('fill', 'none')
-      path.setAttribute('stroke', decided ? '#7A2431' : live ? '#A98A3F' : 'rgba(30,43,69,.22)')
-      path.setAttribute('stroke-width', decided ? '2.25' : '1.5')
+      path.setAttribute('stroke', decided ? '#7A2431' : live ? '#A98A3F' : 'rgba(30,43,69,.18)')
+      path.setAttribute('stroke-width', decided ? '2.15' : '1.35')
       path.setAttribute('stroke-linejoin', 'round')
       path.setAttribute('stroke-linecap', 'round')
       if (live) path.setAttribute('stroke-dasharray', '5 3')
