@@ -37,7 +37,22 @@ const players = [
   player('seed_profile_14', 'Lina Shami', 'lina_shami', 'lina.seed@juchess.test', 1270, '+962790000014'),
   player('seed_profile_15', 'Fadi Rimawi', 'fadi_rimawi', 'fadi.seed@juchess.test', 1245, '+962790000015'),
   player('seed_profile_16', 'Dana Aqel', 'dana_aqel', 'dana.seed@juchess.test', 1220, '+962790000016'),
+  player('seed_profile_17', 'Nour Alami', 'nour_alami', 'nour.seed@juchess.test', 1198, '+962790000017'),
+  player('seed_profile_18', 'Tamer Qasem', 'tamer_qasem', 'tamer.seed@juchess.test', 1184, '+962790000018'),
+  player('seed_profile_19', 'Salma Nouri', 'salma_nouri', 'salma.seed@juchess.test', 1166, '+962790000019'),
+  player('seed_profile_20', 'Adam Kareem', 'adam_kareem', 'adam.seed@juchess.test', 1148, '+962790000020'),
 ]
+
+const tournamentPlayerCounts = {
+  seed_tour_swiss: 20,
+  seed_tour_completed: 16,
+  seed_tour_double_round_robin: 18,
+  seed_tour_knockout: 16,
+  seed_tour_double_elim: 20,
+  seed_tour_multistage: 18,
+  seed_tour_team: 16,
+  seed_tour_arena: 20,
+}
 
 const tournaments = [
   tournament('seed_tour_swiss', {
@@ -51,7 +66,7 @@ const tournaments = [
     startsAt: '2026-07-20T13:00:00.000Z',
     endsAt: '2026-08-10T17:00:00.000Z',
     location: 'Student Union Hall B',
-    capacity: 16,
+    capacity: tournamentPlayerCounts.seed_tour_swiss,
     description: 'Swiss test tournament.',
   }),
   tournament('seed_tour_completed', {
@@ -65,7 +80,7 @@ const tournaments = [
     startsAt: '2026-07-22T13:00:00.000Z',
     endsAt: '2026-08-05T17:00:00.000Z',
     location: 'Engineering Lounge',
-    capacity: 16,
+    capacity: tournamentPlayerCounts.seed_tour_completed,
     description: 'Round robin test tournament.',
   }),
   tournament('seed_tour_double_round_robin', {
@@ -79,7 +94,7 @@ const tournaments = [
     startsAt: '2026-07-24T13:00:00.000Z',
     endsAt: '2026-08-21T17:00:00.000Z',
     location: 'Library Seminar Room 2',
-    capacity: 16,
+    capacity: tournamentPlayerCounts.seed_tour_double_round_robin,
     description: 'Double round robin test tournament.',
   }),
   tournament('seed_tour_knockout', {
@@ -93,7 +108,7 @@ const tournaments = [
     startsAt: '2026-07-26T15:00:00.000Z',
     endsAt: '2026-08-02T18:00:00.000Z',
     location: 'Hall A',
-    capacity: 16,
+    capacity: tournamentPlayerCounts.seed_tour_knockout,
     description: 'Single elimination test tournament.',
   }),
   tournament('seed_tour_double_elim', {
@@ -107,7 +122,7 @@ const tournaments = [
     startsAt: '2026-07-28T15:00:00.000Z',
     endsAt: '2026-08-08T18:00:00.000Z',
     location: 'Hall A',
-    capacity: 16,
+    capacity: tournamentPlayerCounts.seed_tour_double_elim,
     description: 'Double elimination test tournament.',
   }),
   tournament('seed_tour_multistage', {
@@ -121,7 +136,7 @@ const tournaments = [
     startsAt: '2026-07-30T14:00:00.000Z',
     endsAt: '2026-08-20T18:00:00.000Z',
     location: 'Library Seminar Room 2',
-    capacity: 16,
+    capacity: tournamentPlayerCounts.seed_tour_multistage,
     description: 'Multi-stage test tournament.',
   }),
   tournament('seed_tour_team', {
@@ -135,7 +150,7 @@ const tournaments = [
     startsAt: '2026-08-01T13:00:00.000Z',
     endsAt: '2026-08-15T17:00:00.000Z',
     location: 'Hall A',
-    capacity: 16,
+    capacity: tournamentPlayerCounts.seed_tour_team,
     description: 'Team test tournament.',
   }),
   tournament('seed_tour_arena', {
@@ -149,35 +164,36 @@ const tournaments = [
     startsAt: '2026-08-03T15:00:00.000Z',
     endsAt: '2026-08-03T17:00:00.000Z',
     location: 'Club Room',
-    capacity: 16,
+    capacity: tournamentPlayerCounts.seed_tour_arena,
     description: 'Arena test tournament.',
   }),
 ]
 
 const registrations = [
-  ...registrationsFor('swiss', 'seed_tour_swiss', players.slice(0, 12)),
-  ...registrationsFor('winter', 'seed_tour_completed', players.slice(0, 10)),
-  ...registrationsFor('drr', 'seed_tour_double_round_robin', players.slice(0, 10)),
-  ...registrationsFor('ko', 'seed_tour_knockout', players.slice(0, 14)),
-  ...registrationsFor('de', 'seed_tour_double_elim', players.slice(0, 12)),
-  ...registrationsFor('multi', 'seed_tour_multistage', players.slice(0, 16)),
-  ...registrationsFor('team', 'seed_tour_team', players.slice(0, 16)),
-  ...registrationsFor('arena', 'seed_tour_arena', players.slice(0, 10)),
+  ...registrationsFor('swiss', 'seed_tour_swiss', players.slice(0, tournamentPlayerCounts.seed_tour_swiss)),
+  ...registrationsFor('winter', 'seed_tour_completed', players.slice(0, tournamentPlayerCounts.seed_tour_completed)),
+  ...registrationsFor('drr', 'seed_tour_double_round_robin', players.slice(0, tournamentPlayerCounts.seed_tour_double_round_robin)),
+  ...registrationsFor('ko', 'seed_tour_knockout', players.slice(0, tournamentPlayerCounts.seed_tour_knockout)),
+  ...registrationsFor('de', 'seed_tour_double_elim', players.slice(0, tournamentPlayerCounts.seed_tour_double_elim)),
+  ...registrationsFor('multi', 'seed_tour_multistage', players.slice(0, tournamentPlayerCounts.seed_tour_multistage)),
+  ...registrationsFor('team', 'seed_tour_team', players.slice(0, tournamentPlayerCounts.seed_tour_team)),
+  ...registrationsFor('arena', 'seed_tour_arena', players.slice(0, tournamentPlayerCounts.seed_tour_arena)),
 ]
 
 const games = []
 
 const standings = [
-  standing('seed_std_swiss_01', 'seed_tour_swiss', 'seed_profile_01', 1, 0, 0, 0, 0, 0, 0),
-  standing('seed_std_swiss_02', 'seed_tour_swiss', 'seed_profile_03', 2, 0, 0, 0, 0, 0, 0),
-  standing('seed_std_swiss_03', 'seed_tour_swiss', 'seed_profile_02', 3, 0, 0, 0, 0, 0, 0),
-  standing('seed_std_arena_01', 'seed_tour_arena', 'seed_profile_08', 1, 0, 0, 0, 0, 0, 0),
-  standing('seed_std_multi_01', 'seed_tour_multistage', 'seed_profile_01', 1, 0, 0, 0, 0, 0, 0),
-  standing('seed_std_multi_02', 'seed_tour_multistage', 'seed_profile_07', 2, 0, 0, 0, 0, 0, 0),
-  standing('seed_std_rr_01', 'seed_tour_completed', 'seed_profile_02', 1, 0, 0, 0, 0, 0, 0),
-  standing('seed_std_drr_01', 'seed_tour_double_round_robin', 'seed_profile_01', 1, 0, 0, 0, 0, 0, 0),
-  standing('seed_std_team_01', 'seed_tour_team', 'seed_profile_01', 1, 0, 0, 0, 0, 0, 0),
+  ...standingsFor('swiss', 'seed_tour_swiss', players.slice(0, tournamentPlayerCounts.seed_tour_swiss)),
+  ...standingsFor('rr', 'seed_tour_completed', players.slice(0, tournamentPlayerCounts.seed_tour_completed)),
+  ...standingsFor('drr', 'seed_tour_double_round_robin', players.slice(0, tournamentPlayerCounts.seed_tour_double_round_robin)),
+  ...standingsFor('ko', 'seed_tour_knockout', players.slice(0, tournamentPlayerCounts.seed_tour_knockout)),
+  ...standingsFor('de', 'seed_tour_double_elim', players.slice(0, tournamentPlayerCounts.seed_tour_double_elim)),
+  ...standingsFor('multi', 'seed_tour_multistage', players.slice(0, tournamentPlayerCounts.seed_tour_multistage)),
+  ...standingsFor('team', 'seed_tour_team', players.slice(0, tournamentPlayerCounts.seed_tour_team)),
+  ...standingsFor('arena', 'seed_tour_arena', players.slice(0, tournamentPlayerCounts.seed_tour_arena)),
 ]
+
+const seededTournamentIds = tournaments.map((row) => row.rowId)
 
 const deprecatedRows = [
   [tableIds.tournaments, 'seed_tour_league'],
@@ -203,14 +219,6 @@ const deprecatedRows = [
   ...Array.from({ length: 8 }, (_, index) => [
     tableIds.registrations,
     `seed_reg_league_${String(index + 1).padStart(2, '0')}`,
-  ]),
-  ...Array.from({ length: 2 }, (_, index) => [
-    tableIds.registrations,
-    `seed_reg_ko_${String(index + 15).padStart(2, '0')}`,
-  ]),
-  ...Array.from({ length: 2 }, (_, index) => [
-    tableIds.registrations,
-    `seed_reg_winter_${String(index + 11).padStart(2, '0')}`,
   ]),
 ]
 
@@ -258,6 +266,10 @@ if (!apiKey) {
 const { Client, Query, TablesDB } = await loadAppwriteSdk()
 const client = new Client().setEndpoint(endpoint).setProject(projectId).setKey(apiKey)
 const tablesDB = new TablesDB(client)
+
+for (const tournamentId of seededTournamentIds) {
+  await deleteRowsByTournament(tableIds.games, tournamentId)
+}
 
 for (const [tableId, rows, uniqueField] of plan) {
   for (const row of rows) {
@@ -412,6 +424,23 @@ function registrationsFor(prefix, tournamentId, profileRows, status = 'confirmed
       checkedIn: status === 'confirmed',
     },
   }))
+}
+
+function standingsFor(prefix, tournamentId, profileRows) {
+  return profileRows.map((profileRow, index) => (
+    standing(
+      `seed_std_${prefix}_${String(index + 1).padStart(2, '0')}`,
+      tournamentId,
+      profileRow.rowId,
+      index + 1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+    )
+  ))
 }
 
 function game(rowId, tournamentId, round, board, whiteProfileId, blackProfileId, status, result, pgn) {
