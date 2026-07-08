@@ -1841,13 +1841,12 @@ function AdminBracketPreview({
 
     const updateActiveRound = () => {
       const columns = Array.from(track.querySelectorAll<HTMLElement>('[data-round-index]'))
-      const viewportCenter = scroll.scrollLeft + scroll.clientWidth / 2
+      const targetLeft = scroll.scrollLeft + 12
       let nearest = 0
       let nearestDistance = Number.POSITIVE_INFINITY
 
       columns.forEach((column, index) => {
-        const columnCenter = column.offsetLeft + column.offsetWidth / 2
-        const distance = Math.abs(columnCenter - viewportCenter)
+        const distance = Math.abs(column.offsetLeft - targetLeft)
         if (distance < nearestDistance) {
           nearest = index
           nearestDistance = distance
@@ -1893,14 +1892,9 @@ function AdminBracketPreview({
 
     setActiveRound(roundIndex)
     scroll.scrollTo({
-      left: Math.max(0, target.offsetLeft - (scroll.clientWidth - target.offsetWidth) / 2),
+      left: Math.max(0, target.offsetLeft - 18),
       behavior: 'smooth',
     })
-  }
-
-  const jumpBy = (direction: -1 | 1) => {
-    const nextRound = Math.max(0, Math.min(rounds.length - 1, activeRound + direction))
-    jumpToRound(nextRound)
   }
 
   return (
@@ -1923,39 +1917,19 @@ function AdminBracketPreview({
         ) : null}
       </div>
 
-      <div className="bracket-navigation">
-        <button
-          type="button"
-          className="bracket-nav-arrow"
-          aria-label="Previous bracket round"
-          disabled={activeRound === 0}
-          onClick={() => jumpBy(-1)}
-        >
-          ‹
-        </button>
-        <nav className="bracket-round-nav" aria-label="Bracket rounds">
-          {rounds.map((round, roundIndex) => (
-            <button
-              type="button"
-              className={activeRound === roundIndex ? 'active' : undefined}
-              aria-current={activeRound === roundIndex ? 'true' : undefined}
-              onClick={() => jumpToRound(roundIndex)}
-              key={round.name}
-            >
-              {round.name}
-            </button>
-          ))}
-        </nav>
-        <button
-          type="button"
-          className="bracket-nav-arrow"
-          aria-label="Next bracket round"
-          disabled={activeRound >= rounds.length - 1}
-          onClick={() => jumpBy(1)}
-        >
-          ›
-        </button>
-      </div>
+      <nav className="bracket-round-nav" aria-label="Bracket rounds">
+        {rounds.map((round, roundIndex) => (
+          <button
+            type="button"
+            className={activeRound === roundIndex ? 'active' : undefined}
+            aria-current={activeRound === roundIndex ? 'true' : undefined}
+            onClick={() => jumpToRound(roundIndex)}
+            key={round.name}
+          >
+            {round.name}
+          </button>
+        ))}
+      </nav>
 
       <div className="bracket-scroll" aria-label={title} ref={scrollRef}>
         <div className="bracket-track" ref={trackRef}>
@@ -2123,8 +2097,8 @@ function drawBracketLines(track: HTMLDivElement) {
 
       path.setAttribute('d', `M${x1} ${y1} H${midX} V${y2} H${x2}`)
       path.setAttribute('fill', 'none')
-      path.setAttribute('stroke', decided ? '#F0C36F' : live ? '#C78B95' : 'rgba(255,250,240,.24)')
-      path.setAttribute('stroke-width', decided ? '2.4' : '1.8')
+      path.setAttribute('stroke', decided ? '#7A2431' : live ? '#A98A3F' : 'rgba(30,43,69,.22)')
+      path.setAttribute('stroke-width', decided ? '2.25' : '1.5')
       path.setAttribute('stroke-linejoin', 'round')
       path.setAttribute('stroke-linecap', 'round')
       if (live) path.setAttribute('stroke-dasharray', '5 3')
