@@ -1534,6 +1534,8 @@ class _PrototypeShellState extends State<PrototypeShell> {
         final tablet = constraints.maxWidth >= 720;
 
         if (tablet) {
+          final compactRail = constraints.maxHeight < 620;
+
           return Scaffold(
             backgroundColor: PrototypeColors.pageBg,
             body: Center(
@@ -1554,56 +1556,10 @@ class _PrototypeShellState extends State<PrototypeShell> {
                   ),
                   child: Row(
                     children: [
-                      NavigationRail(
-                        backgroundColor: PrototypeColors.header,
+                      _TabletNavRail(
                         selectedIndex: state.tab,
-                        onDestinationSelected: state.selectTab,
-                        labelType: NavigationRailLabelType.all,
-                        indicatorColor: PrototypeColors.burgundy,
-                        selectedIconTheme: const IconThemeData(
-                          color: PrototypeColors.cream,
-                        ),
-                        selectedLabelTextStyle: const TextStyle(
-                          color: PrototypeColors.burgundy,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        leading: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          child: ClipOval(
-                            child: Image.asset(
-                              'assets/juchess-logo.png',
-                              width: 46,
-                              height: 46,
-                            ),
-                          ),
-                        ),
-                        destinations: const [
-                          NavigationRailDestination(
-                            icon: Icon(Icons.home_outlined),
-                            selectedIcon: Icon(Icons.home),
-                            label: Text('Home'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.emoji_events_outlined),
-                            selectedIcon: Icon(Icons.emoji_events),
-                            label: Text('Tournaments'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.grid_view_outlined),
-                            selectedIcon: Icon(Icons.grid_view),
-                            label: Text('Games'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.tune),
-                            selectedIcon: Icon(Icons.tune),
-                            label: Text('Tools'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.person_outline),
-                            selectedIcon: Icon(Icons.person),
-                            label: Text('Profile'),
-                          ),
-                        ],
+                        onSelected: state.selectTab,
+                        compact: compactRail,
                       ),
                       Expanded(child: pages[state.tab]),
                     ],
@@ -1701,6 +1657,139 @@ class _PrototypeShellState extends State<PrototypeShell> {
       },
     );
   }
+}
+
+class _TabletNavRail extends StatelessWidget {
+  const _TabletNavRail({
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.compact,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final bool compact;
+
+  static const _items = [
+    _TabletNavItem('Home', Icons.home_outlined, Icons.home),
+    _TabletNavItem(
+      'Tournaments',
+      Icons.emoji_events_outlined,
+      Icons.emoji_events,
+    ),
+    _TabletNavItem('Games', Icons.grid_view_outlined, Icons.grid_view),
+    _TabletNavItem('Tools', Icons.tune, Icons.tune),
+    _TabletNavItem('Profile', Icons.person_outline, Icons.person),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: compact ? 96 : 142,
+      color: PrototypeColors.header,
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: compact ? 10 : 18),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/juchess-logo.png',
+                width: compact ? 38 : 46,
+                height: compact ? 38 : 46,
+              ),
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: compact ? 10 : 16),
+              child: Column(
+                children: [
+                  for (var index = 0; index < _items.length; index += 1)
+                    _TabletNavButton(
+                      item: _items[index],
+                      selected: selectedIndex == index,
+                      compact: compact,
+                      onTap: () => onSelected(index),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabletNavButton extends StatelessWidget {
+  const _TabletNavButton({
+    required this.item,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final _TabletNavItem item;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = selected ? item.selectedIcon : item.icon;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : 12,
+          vertical: compact ? 6 : 9,
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: compact ? 54 : 70,
+              height: compact ? 42 : 48,
+              decoration: BoxDecoration(
+                color: selected ? PrototypeColors.burgundy : Colors.transparent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Icon(
+                icon,
+                color: selected
+                    ? PrototypeColors.cream
+                    : const Color(0xff4c4042),
+                size: compact ? 23 : 26,
+              ),
+            ),
+            SizedBox(height: compact ? 4 : 7),
+            Text(
+              item.label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: selected
+                    ? PrototypeColors.burgundy
+                    : const Color(0xff2c2225),
+                fontSize: compact ? 11 : 14,
+                height: 1.05,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TabletNavItem {
+  const _TabletNavItem(this.label, this.icon, this.selectedIcon);
+
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
 }
 
 class AppScroll extends StatelessWidget {
