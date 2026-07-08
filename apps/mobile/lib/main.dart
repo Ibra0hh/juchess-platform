@@ -323,7 +323,7 @@ class AppwriteService {
         Query.limit(500),
       ],
       total: false,
-      ttl: 30,
+      ttl: 0,
     );
 
     return response.rows
@@ -375,7 +375,7 @@ class AppwriteService {
       tableId: AppConfig.tournamentsTableId,
       queries: [Query.limit(100)],
       total: false,
-      ttl: 30,
+      ttl: 0,
     );
 
     final rows =
@@ -420,7 +420,7 @@ class AppwriteService {
         tableId: tableId,
         queries: [Query.limit(1000)],
         total: false,
-        ttl: 30,
+        ttl: 0,
       );
       return response.rows;
     } catch (_) {
@@ -451,6 +451,7 @@ class AppwriteService {
           'status': 'pending',
         },
         permissions: [
+          Permission.read(Role.any()),
           Permission.read(Role.user(user.$id)),
           Permission.update(Role.user(user.$id)),
         ],

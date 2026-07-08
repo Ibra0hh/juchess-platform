@@ -281,7 +281,6 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
         tableId: tableIds.tournaments,
         queries: [Query.limit(100)],
         total: false,
-        ttl: 15,
       }),
       loadRegistrationCounts(),
       loadPublishedGameCounts(),
@@ -358,6 +357,16 @@ export async function publishTournamentPairings(rowId: string, games: PairingPub
   return response.rows
 }
 
+export async function unpublishTournamentPairings(rowId: string) {
+  const response = await runAdminAction<{ deleted: number }>({
+    method: ExecutionMethod.POST,
+    path: `/tournaments/${rowId}/pairings/unpublish`,
+    body: {},
+  })
+
+  return response.deleted
+}
+
 export async function loadTournamentRegistrations(tournamentRowId: string): Promise<RegistrationLoadResult> {
   if (!appwriteReady || !tournamentRowId) return { registrations: [] }
 
@@ -367,7 +376,6 @@ export async function loadTournamentRegistrations(tournamentRowId: string): Prom
       tableId: tableIds.registrations,
       queries: [Query.equal('tournamentId', tournamentRowId), Query.limit(500)],
       total: false,
-      ttl: 15,
     })
     const profiles = await loadProfilesById(response.rows.map((row) => row.profileId).filter(Boolean) as string[])
 
@@ -512,7 +520,6 @@ async function loadRegistrationCounts() {
       tableId: tableIds.registrations,
       queries: [Query.limit(500)],
       total: false,
-      ttl: 15,
     })
 
     response.rows.forEach((row) => {
@@ -535,7 +542,6 @@ async function loadPublishedGameCounts() {
       tableId: tableIds.games,
       queries: [Query.limit(1000)],
       total: false,
-      ttl: 15,
     })
 
     response.rows.forEach((row) => {
@@ -573,7 +579,6 @@ async function loadProfilesById(profileIds: string[]) {
       tableId: tableIds.profiles,
       queries: [Query.limit(500)],
       total: false,
-      ttl: 30,
     })
 
     response.rows.forEach((row) => {

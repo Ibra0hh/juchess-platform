@@ -1,4 +1,4 @@
-import { Account, Client, ID, Query, TablesDB, Teams, Users } from 'node-appwrite';
+import { Account, Client, ID, Permission, Query, Role, TablesDB, Teams, Users } from 'node-appwrite';
 
 const tableIds = {
   adminProfiles: 'admin_profiles',
@@ -243,6 +243,7 @@ export default async ({ req, res, log, error }) => {
         'PATCH /tournaments/:id',
         'DELETE /tournaments/:id',
         'POST /tournaments/:id/pairings/publish',
+        'POST /tournaments/:id/pairings/unpublish',
         'POST /profiles/lookup',
         'GET /admin/session',
         'GET /admin/admins',
@@ -661,6 +662,7 @@ export default async ({ req, res, log, error }) => {
             status: game.status && ['scheduled', 'live'].includes(game.status) ? game.status : 'scheduled',
             result: '*',
           }),
+          permissions: [Permission.read(Role.any())],
         });
         rows.push(row);
       }
@@ -681,6 +683,48 @@ export default async ({ req, res, log, error }) => {
       });
 
       return res.json({ ok: true, action: 'publishTournamentPairings', rows });
+    }
+
+    if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'pairings' && segments[3] === 'unpublish') {
+      const tournamentId = segments[1];
+
+      await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: tournamentId,
+      });
+
+      const existing = await tablesDB.listRows({
+        databaseId,
+        tableId: tableIds.games,
+        queries: [Query.equal('tournamentId', tournamentId), Query.limit(500)],
+        total: false,
+      });
+
+      for (const row of existing.rows) {
+        await tablesDB.deleteRow({
+          databaseId,
+          tableId: tableIds.games,
+          rowId: row.$id,
+        });
+      }
+
+      await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: tournamentId,
+        data: { currentRound: null },
+      }).catch(() => undefined);
+
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'unpublishTournamentPairings',
+        targetTable: tableIds.tournaments,
+        targetRowId: tournamentId,
+        payload: { games: existing.rows.length },
+      });
+
+      return res.json({ ok: true, action: 'unpublishTournamentPairings', deleted: existing.rows.length });
     }
 
     if (method === 'DELETE' && segments[0] === 'tournaments' && segments[1]) {

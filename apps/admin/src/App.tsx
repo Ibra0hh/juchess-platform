@@ -22,6 +22,7 @@ import {
   updateAdminStatus,
   updateRegistrationStatus,
   updateTournament,
+  unpublishTournamentPairings,
   type AdminRegistration,
   type AdminRegistrationStatus,
   type AdminProfile,
@@ -1184,6 +1185,30 @@ function TournamentsScreen({
     }
   }
 
+  async function handleUnpublishPairings(item: AdminTournament) {
+    if (!item.rowId) {
+      setMessage('Only cloud tournaments can unpublish pairings.')
+      return
+    }
+
+    if (item.publishedGames <= 0) {
+      setMessage(`${item.name} is not published.`)
+      return
+    }
+
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      const deleted = await unpublishTournamentPairings(item.rowId)
+      setMessage(`${item.name} unpublished. ${deleted} games removed and shuffle is unlocked.`)
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   function openManagePanel(item: AdminTournament) {
     setManageTournamentKey(tournamentKey(item))
     setMessage(null)
@@ -1233,6 +1258,7 @@ function TournamentsScreen({
           onMessage={setMessage}
           onPublish={handlePublishPairings}
           onShuffle={handleShufflePairings}
+          onUnpublish={handleUnpublishPairings}
           participants={managedRegistrations}
           participantsLoading={managedRegistrationsLoading}
           published={managedTournament.publishedGames > 0}
@@ -1541,6 +1567,7 @@ function TournamentManageView({
   onMessage,
   onPublish,
   onShuffle,
+  onUnpublish,
   participants,
   participantsLoading,
   published,
@@ -1553,6 +1580,7 @@ function TournamentManageView({
   onMessage: (message: string) => void
   onPublish: (item: AdminTournament, games: PairingPublishInput[]) => void
   onShuffle: (item: AdminTournament) => void
+  onUnpublish: (item: AdminTournament) => void
   participants: AdminRegistration[]
   participantsLoading: boolean
   published: boolean
@@ -1645,6 +1673,11 @@ function TournamentManageView({
               <button type="button" className="mini-button dark" disabled={publishLocked} onClick={() => onPublish(tournament, publishableGames)}>
                 {published ? 'Published' : 'Publish'}
               </button>
+              {published ? (
+                <button type="button" className="mini-button warn" disabled={disabled} onClick={() => onUnpublish(tournament)}>
+                  Unpublish
+                </button>
+              ) : null}
             </>
           ) : (
             <>

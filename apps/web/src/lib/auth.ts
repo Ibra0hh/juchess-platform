@@ -204,6 +204,7 @@ async function createProfileForUser(user: Models.User, input: SignUpInput) {
         status: 'pending',
       },
       permissions: [
+        Permission.read(Role.any()),
         Permission.read(Role.user(user.$id)),
         Permission.update(Role.user(user.$id)),
       ],

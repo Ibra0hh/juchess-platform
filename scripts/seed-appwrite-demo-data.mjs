@@ -263,7 +263,7 @@ if (!apiKey) {
   process.exit(1)
 }
 
-const { Client, Query, TablesDB } = await loadAppwriteSdk()
+const { Client, Permission, Query, Role, TablesDB } = await loadAppwriteSdk()
 const client = new Client().setEndpoint(endpoint).setProject(projectId).setKey(apiKey)
 const tablesDB = new TablesDB(client)
 
@@ -296,6 +296,7 @@ async function upsertRow(tableId, row, uniqueField) {
       tableId,
       rowId: existingRowId,
       data: row.data,
+      permissions: row.permissions,
     })
     return { action: 'updated', rowId: existingRowId }
   }
@@ -305,6 +306,7 @@ async function upsertRow(tableId, row, uniqueField) {
     tableId,
     rowId: row.rowId,
     data: row.data,
+    permissions: row.permissions,
   })
   return { action: 'created', rowId: row.rowId }
 }
@@ -399,6 +401,7 @@ function player(rowId, displayName, universityId, email, rating, phone) {
       role: 'member',
       status: 'active',
     },
+    permissions: [Permission.read(Role.any())],
   }
 }
 
@@ -458,6 +461,7 @@ function game(rowId, tournamentId, round, board, whiteProfileId, blackProfileId,
       startedAt: status === 'scheduled' ? undefined : '2026-07-08T12:00:00.000Z',
       finishedAt: status === 'completed' ? '2026-07-08T13:00:00.000Z' : undefined,
     }),
+    permissions: [Permission.read(Role.any())],
   }
 }
 

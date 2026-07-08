@@ -546,43 +546,23 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
   }
 
   try {
-    const [response, registrationResponse, profileResponse, gameResponse] = await Promise.all([
-      tablesDB.listRows<AppwriteTournamentRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.tournaments,
-        queries: [Query.limit(100)],
-        total: false,
-        ttl: 30,
-      }),
-      tablesDB.listRows<AppwriteRegistrationRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.registrations,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 30,
-      }),
-      tablesDB.listRows<AppwriteProfileRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.profiles,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 30,
-      }),
-      tablesDB.listRows<AppwriteGameRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.games,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 30,
-      }),
+    const response = await tablesDB.listRows<AppwriteTournamentRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.tournaments,
+      queries: [Query.limit(100)],
+      total: false,
+    })
+
+    const [registrationRows, profileRows, gameRows] = await Promise.all([
+      safeListRows<AppwriteRegistrationRow>(tableIds.registrations, [Query.limit(1000)], 'registrations'),
+      safeListRows<AppwriteProfileRow>(tableIds.profiles, [Query.limit(1000)], 'profiles'),
+      safeListRows<AppwriteGameRow>(tableIds.games, [Query.limit(1000)], 'games'),
     ])
 
-    const profiles = mapProfiles(profileResponse.rows)
-    const playersByTournament = groupRegisteredPlayers(registrationResponse.rows, profiles)
-    const gamesByTournament = groupPublishedGames(gameResponse.rows, profiles)
-    const participantCounts = new Map(
-      Array.from(playersByTournament.entries()).map(([tournamentId, players]) => [tournamentId, players.length]),
-    )
+    const profiles = mapProfiles(profileRows)
+    const playersByTournament = groupRegisteredPlayers(registrationRows, profiles)
+    const gamesByTournament = groupPublishedGames(gameRows, profiles)
+    const participantCounts = groupRegistrationCounts(registrationRows)
 
     const rows = uniqueTournamentsByFormat(response.rows
       .map((row) => mapAppwriteTournament(row, participantCounts, playersByTournament, gamesByTournament))
@@ -596,6 +576,22 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
   } catch (error) {
     console.warn('JuChess cloud tournament read failed.', error)
     return { tournaments: [], source: 'unavailable', error }
+  }
+}
+
+async function safeListRows<T extends Models.Row>(tableId: string, queries: string[], label: string) {
+  try {
+    const response = await tablesDB.listRows<T>({
+      databaseId: appwriteConfig.databaseId,
+      tableId,
+      queries,
+      total: false,
+    })
+
+    return response.rows
+  } catch (error) {
+    console.warn(`JuChess cloud ${label} read failed.`, error)
+    return []
   }
 }
 
@@ -618,6 +614,17 @@ function mapProfiles(rows: AppwriteProfileRow[]) {
     })
   })
   return profiles
+}
+
+function groupRegistrationCounts(rows: AppwriteRegistrationRow[]) {
+  const counts = new Map<string, number>()
+
+  rows.forEach((row) => {
+    if (!row.tournamentId || row.status === 'cancelled') return
+    counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
+  })
+
+  return counts
 }
 
 function groupRegisteredPlayers(rows: AppwriteRegistrationRow[], profiles: Map<string, Member>) {
