@@ -273,6 +273,41 @@ const demoPlayers: Player[] = [
   },
 ]
 
+const seededTournamentPlayers: Player[] = [
+  ['seed_profile_01', 'Ibrahim Ahmad', 1810],
+  ['seed_profile_02', 'Omar Saleh', 1740],
+  ['seed_profile_03', 'Leen Haddad', 1685],
+  ['seed_profile_04', 'Yazan Khaled', 1602],
+  ['seed_profile_05', 'Sara Nasser', 1550],
+  ['seed_profile_06', 'Mohammad Al-Khatib', 1490],
+  ['seed_profile_07', 'Rania Odeh', 1465],
+  ['seed_profile_08', 'Khaled Mansour', 1430],
+  ['seed_profile_09', 'Tala Suleiman', 1395],
+  ['seed_profile_10', 'Hasan Qasem', 1370],
+  ['seed_profile_11', 'Noor Barakat', 1340],
+  ['seed_profile_12', 'Zaid Hamdan', 1310],
+  ['seed_profile_13', 'Amr Zaidan', 1295],
+  ['seed_profile_14', 'Lina Shami', 1270],
+  ['seed_profile_15', 'Fadi Rimawi', 1245],
+  ['seed_profile_16', 'Dana Aqel', 1220],
+  ['seed_profile_17', 'Nour Alami', 1198],
+  ['seed_profile_18', 'Tamer Qasem', 1184],
+  ['seed_profile_19', 'Salma Nouri', 1166],
+  ['seed_profile_20', 'Adam Kareem', 1148],
+].map(([profileId, name, rating], index) => ({
+  id: profileId as string,
+  profileId: profileId as string,
+  name: name as string,
+  initials: initialsForName(name as string),
+  universityId: `seed-${String(index + 1).padStart(2, '0')}`,
+  email: `${(name as string).toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/\.+$/g, '')}@juchess.test`,
+  phone: '',
+  rating: rating as number,
+  record: '0-0-0',
+  avatarColor: demoPlayers[index % demoPlayers.length]?.avatarColor ?? '#21304e',
+  tournaments: 1,
+}))
+
 const windowModel: Array<{ key: WindowKey; label: string; icon: string; sections: string[] }> = [
   { key: 'home', label: 'Home', icon: '⌂', sections: ['Header', 'Featured tournament', 'Quick tools', 'Club leaderboard', 'News'] },
   { key: 'tournaments', label: 'Tournaments', icon: '♞', sections: ['Tabs', 'Tournament cards', 'Detail hero', 'Registration'] },
@@ -1637,8 +1672,11 @@ function TournamentManageView({
       ? []
       : knockout
       ? buildProcedureMatchesFromBracket(allBracketRounds)
-      : buildProcedureMatchesFromPairings(currentRoundPairings, pairingRoundLabel(tournament, currentRoundPairings[0]?.round ?? 1))
-  ), [allBracketRounds, currentRoundPairings, knockout, stage, tournament])
+      : buildProcedureMatchesFromPairings(
+        roundRobin ? pairings : currentRoundPairings,
+        tournament,
+      )
+  ), [allBracketRounds, currentRoundPairings, knockout, pairings, roundRobin, stage, tournament])
   const procedurePlan = useMemo(() => (
     stage === 'procedure' ? buildProcedurePlan(procedureMatches, physicalBoards) : []
   ), [physicalBoards, procedureMatches, stage])
@@ -1862,7 +1900,7 @@ function ProcedurePlanner({
       <div className="procedure-rules">
         <span>Assign Wave 1 first.</span>
         <span>When a board finishes, start that board's next listed match.</span>
-        <span>Record result and moves from Bracket or Games before advancing.</span>
+        <span>Record result and moves from Bracket or Rounds before advancing.</span>
       </div>
       {plan.map((wave, waveIndex) => (
         <section className="procedure-wave" key={`wave-${waveIndex + 1}`}>
@@ -3032,7 +3070,7 @@ function isDoubleRoundRobinTournament(item: AdminTournament) {
 }
 
 function buildTournamentPlayers(tournament: AdminTournament, seed: number, registrations: AdminRegistration[]) {
-  const count = effectiveAdminPlayerCount(tournament, registrations.length)
+  const count = targetAdminPlayerCount(tournament, registrations.length)
   const players = registrations
     .slice(0, count)
     .map((registration, index) => ({
@@ -3048,19 +3086,26 @@ function buildTournamentPlayers(tournament: AdminTournament, seed: number, regis
       avatarColor: demoPlayers[index % demoPlayers.length]?.avatarColor ?? '#21304e',
       tournaments: 1,
     }))
-  if (!seed) return players
-  return seededShuffle(players, seed)
+
+  const usedProfileIds = new Set(players.map((player) => player.profileId ?? player.id))
+  const usedNames = new Set(players.map((player) => player.name.toLowerCase()))
+  const fillers = seededTournamentPlayers
+    .filter((player) => !usedProfileIds.has(player.profileId ?? player.id) && !usedNames.has(player.name.toLowerCase()))
+    .slice(0, Math.max(0, count - players.length))
+
+  const result = [...players, ...fillers]
+  if (!seed) return result
+  return seededShuffle(result, seed)
 }
 
-function effectiveAdminPlayerCount(tournament: AdminTournament, availablePlayers: number) {
-  const declared = tournament.players > 0
-    ? tournament.players
-    : tournament.capacity && tournament.capacity > 0
-      ? tournament.capacity
+function targetAdminPlayerCount(tournament: AdminTournament, availablePlayers: number) {
+  const declared = tournament.capacity && tournament.capacity > 0
+    ? tournament.capacity
+    : tournament.players > 0
+      ? tournament.players
       : availablePlayers
 
-  if (availablePlayers <= 0) return 0
-  return Math.max(0, Math.min(availablePlayers, declared))
+  return Math.max(0, declared)
 }
 
 function seededShuffle<T>(items: T[], seed: number) {
@@ -3284,12 +3329,12 @@ function buildPlayableBracketBoards(rounds: AdminBracketRound[]): PlayableBoard[
   ))
 }
 
-function buildProcedureMatchesFromPairings(pairings: Pairing[], roundLabel: string): ProcedureMatch[] {
-  return pairings.map((pairing, index) => ({
+function buildProcedureMatchesFromPairings(pairings: Pairing[], tournament: AdminTournament): ProcedureMatch[] {
+  return pairings.map((pairing) => ({
     black: pairing.black,
-    boardLabel: `Board ${pairing.board}`,
-    matchNumber: index + 1,
-    roundLabel,
+    boardLabel: `${pairingRoundLabel(tournament, pairing.round ?? 1)} Board ${pairing.board}`,
+    matchNumber: pairing.board,
+    roundLabel: pairingRoundLabel(tournament, pairing.round ?? 1),
     status: hasKnownPlayers(pairing) ? 'Ready' : 'Waiting for player',
     white: pairing.white,
   }))
