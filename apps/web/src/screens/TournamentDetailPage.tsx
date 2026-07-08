@@ -255,7 +255,6 @@ function TournamentDetailPage() {
         { key: 'registration', label: 'Registration' },
         { key: 'players', label: 'Players' },
         { key: 'rounds', label: 'Rounds' },
-        { key: 'games', label: 'Games' },
         { key: 'table', label: 'Standings' },
       ]
   const activeTab = tabs.some((item) => item.key === tab) ? tab : 'registration'
