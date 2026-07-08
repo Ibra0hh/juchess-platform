@@ -7465,15 +7465,15 @@ List<RoundSeed> _buildLoserRounds(
 ) {
   final rounds = <RoundSeed>[];
   var pool = [...firstPool];
+  final complete = event.status == 'active' || event.status == 'completed';
 
-  void reducePool() {
+  void reducePool({bool feedsDropIn = false}) {
     if (pool.length < 2) return;
     final pairable = pool.length.isEven
         ? pool
         : pool.sublist(0, pool.length - 1);
     final carry = pool.length.isEven ? <String>[] : <String>[pool.last];
     final roundNumber = rounds.length + 1;
-    final complete = event.status == 'active' || event.status == 'completed';
     final games = <MatchSeed>[];
     final winners = <String>[];
 
@@ -7483,6 +7483,7 @@ List<RoundSeed> _buildLoserRounds(
         pairable[index],
         pairable[index + 1],
         complete ? (matchIndex.isEven ? '1-0' : '0-1') : '-',
+        nextIndex: feedsDropIn ? matchIndex : matchIndex ~/ 2,
       );
       games.add(match);
       winners.add(
@@ -7496,9 +7497,38 @@ List<RoundSeed> _buildLoserRounds(
     pool = [...winners, ...carry];
   }
 
+  void pairDropIns(List<String> incoming) {
+    if (incoming.isEmpty) return;
+    if (pool.isEmpty) {
+      pool = [...incoming];
+      return;
+    }
+
+    final pairCount = math.min(pool.length, incoming.length);
+    final roundNumber = rounds.length + 1;
+    final games = <MatchSeed>[];
+    final winners = <String>[];
+
+    for (var index = 0; index < pairCount; index++) {
+      final match = MatchSeed(
+        pool[index],
+        incoming[index],
+        complete ? (index.isEven ? '1-0' : '0-1') : '-',
+        nextIndex: index ~/ 2,
+      );
+      games.add(match);
+      winners.add(
+        complete ? _matchWinner(match) : 'Winner L$roundNumber-${index + 1}',
+      );
+    }
+
+    rounds.add(RoundSeed('L-Round $roundNumber', games));
+    pool = [...winners, ...pool.skip(pairCount), ...incoming.skip(pairCount)];
+  }
+
   for (final incoming in incomingPools) {
-    reducePool();
-    pool = [...pool, ...incoming];
+    reducePool(feedsDropIn: incoming.isNotEmpty);
+    pairDropIns(incoming);
   }
   while (pool.length > 1) {
     reducePool();

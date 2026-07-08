@@ -3812,20 +3812,32 @@ function buildAdminLoserRounds(
   phase: AdminBracketPhase,
 ): AdminBracketRound[] {
   const rounds: AdminBracketRound[] = []
-  let pool = firstPool
+  let pool = [...firstPool]
+  const complete = phase === 'active' || phase === 'completed'
 
-  const reducePool = () => {
+  const buildLoserMatch = (
+    white: string,
+    black: string,
+    index: number,
+    next: number,
+    targetSlot: AdminBracketSide,
+  ) => buildBracketMatchForPhase(
+    makeBracketPairing(white, black, index + 1, next, '', '', undefined, undefined, targetSlot),
+    complete ? 'completed' : 'setup',
+    index % 2 === 0 ? 'white' : 'black',
+  )
+
+  const reducePool = (feedsDropIn = false) => {
     if (pool.length < 2) return
     const pairable = pool.length % 2 === 0 ? pool : pool.slice(0, -1)
     const carry = pool.length % 2 === 0 ? [] : [pool[pool.length - 1]]
     const roundNumber = rounds.length + 1
-    const complete = phase === 'active' || phase === 'completed'
-    const matches = pairEntrants(pairable).map(([white, black], index) => (
-      buildBracketMatchForPhase(
-        makeBracketPairing(white, black, index + 1),
-        complete ? 'completed' : 'setup',
-        index % 2 === 0 ? 'white' : 'black',
-      )
+    const matches = pairEntrants(pairable).map(([white, black], index) => buildLoserMatch(
+      white,
+      black,
+      index,
+      feedsDropIn ? index : Math.floor(index / 2),
+      feedsDropIn ? 'white' : index % 2 === 0 ? 'white' : 'black',
     ))
     const winners = matches.map((match, index) => (
       match.winner ? adminWinnerName(match, `L${roundNumber}`, index + 1) : `Winner L${roundNumber}-${index + 1}`
@@ -3834,21 +3846,55 @@ function buildAdminLoserRounds(
     pool = [...winners, ...carry]
   }
 
+  const pairDropIns = (incoming: string[]) => {
+    if (!incoming.length) return
+    if (!pool.length) {
+      pool = [...incoming]
+      return
+    }
+
+    const pairCount = Math.min(pool.length, incoming.length)
+    const roundNumber = rounds.length + 1
+    const matches = Array.from({ length: pairCount }, (_, index) => buildLoserMatch(
+      pool[index],
+      incoming[index],
+      index,
+      Math.floor(index / 2),
+      index % 2 === 0 ? 'white' : 'black',
+    ))
+    const winners = matches.map((match, index) => (
+      match.winner ? adminWinnerName(match, `L${roundNumber}`, index + 1) : `Winner L${roundNumber}-${index + 1}`
+    ))
+    rounds.push({ name: `L-Round ${roundNumber}`, matches })
+    pool = [
+      ...winners,
+      ...pool.slice(pairCount),
+      ...incoming.slice(pairCount),
+    ]
+  }
+
   incomingPools.forEach((incoming) => {
-    reducePool()
-    pool = [...pool, ...incoming]
+    reducePool(incoming.length > 0)
+    pairDropIns(incoming)
   })
 
   while (pool.length > 1) {
     reducePool()
   }
 
-  return rounds.map((round, index) => ({
-    ...round,
-    name: index === rounds.length - 1 && round.matches.length === 1
-      ? 'L-Semifinal'
-      : `L-Round ${index + 1}`,
-  }))
+  const lastRoundIndex = rounds.length - 1
+  return rounds.map((round, index) => {
+    const finalFeed = index === lastRoundIndex
+    return {
+      ...round,
+      matches: finalFeed
+        ? round.matches.map((match) => ({ ...match, next: 0, targetSlot: 'black' as AdminBracketSide }))
+        : round.matches,
+      name: finalFeed && round.matches.length === 1
+        ? 'L-Semifinal'
+        : `L-Round ${index + 1}`,
+    }
+  })
 }
 
 function adminWinnerName(match: AdminBracketMatch | undefined, sourceLabel: string, matchNumber: number) {
