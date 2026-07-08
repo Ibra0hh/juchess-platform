@@ -591,12 +591,23 @@
     'Team': 'Aug 1 - Aug 15, 2026',
     'Arena': 'Aug 3, 2026'
   };
+  var participantCounts = {
+    'Swiss': 12,
+    'Round robin': 10,
+    'Double round robin': 10,
+    'Single elimination': 16,
+    'Double elimination': 12,
+    'Multi-stage': 16,
+    'Team': 16,
+    'Arena': 10
+  };
   tournaments = tournaments
     .filter(function (t) { return tournamentOrder.indexOf(t.format) !== -1; })
     .map(function (t) {
       t.status = 'Upcoming';
       t.round = 'Registration open';
       t.date = upcomingDates[t.format] || t.date;
+      t.participants = participantCounts[t.format] || t.participants;
       return t;
     })
     .sort(function (a, b) { return tournamentOrder.indexOf(a.format) - tournamentOrder.indexOf(b.format); });

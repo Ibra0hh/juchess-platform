@@ -51,7 +51,7 @@ const tournaments = [
     startsAt: '2026-07-20T13:00:00.000Z',
     endsAt: '2026-08-10T17:00:00.000Z',
     location: 'Student Union Hall B',
-    capacity: 32,
+    capacity: 16,
     description: 'Swiss test tournament.',
   }),
   tournament('seed_tour_completed', {
@@ -65,7 +65,7 @@ const tournaments = [
     startsAt: '2026-07-22T13:00:00.000Z',
     endsAt: '2026-08-05T17:00:00.000Z',
     location: 'Engineering Lounge',
-    capacity: 6,
+    capacity: 16,
     description: 'Round robin test tournament.',
   }),
   tournament('seed_tour_double_round_robin', {
@@ -79,7 +79,7 @@ const tournaments = [
     startsAt: '2026-07-24T13:00:00.000Z',
     endsAt: '2026-08-21T17:00:00.000Z',
     location: 'Library Seminar Room 2',
-    capacity: 6,
+    capacity: 16,
     description: 'Double round robin test tournament.',
   }),
   tournament('seed_tour_knockout', {
@@ -121,7 +121,7 @@ const tournaments = [
     startsAt: '2026-07-30T14:00:00.000Z',
     endsAt: '2026-08-20T18:00:00.000Z',
     location: 'Library Seminar Room 2',
-    capacity: 24,
+    capacity: 16,
     description: 'Multi-stage test tournament.',
   }),
   tournament('seed_tour_team', {
@@ -149,15 +149,15 @@ const tournaments = [
     startsAt: '2026-08-03T15:00:00.000Z',
     endsAt: '2026-08-03T17:00:00.000Z',
     location: 'Club Room',
-    capacity: 48,
+    capacity: 16,
     description: 'Arena test tournament.',
   }),
 ]
 
 const registrations = [
   ...registrationsFor('swiss', 'seed_tour_swiss', players.slice(0, 12)),
-  ...registrationsFor('winter', 'seed_tour_completed', players.slice(0, 6)),
-  ...registrationsFor('drr', 'seed_tour_double_round_robin', players.slice(0, 6)),
+  ...registrationsFor('winter', 'seed_tour_completed', players.slice(0, 10)),
+  ...registrationsFor('drr', 'seed_tour_double_round_robin', players.slice(0, 10)),
   ...registrationsFor('ko', 'seed_tour_knockout', players.slice(0, 14)),
   ...registrationsFor('de', 'seed_tour_double_elim', players.slice(0, 12)),
   ...registrationsFor('multi', 'seed_tour_multistage', players.slice(0, 16)),
@@ -209,9 +209,9 @@ const deprecatedRows = [
     tableIds.registrations,
     `seed_reg_ko_${String(index + 15).padStart(2, '0')}`,
   ]),
-  ...Array.from({ length: 6 }, (_, index) => [
+  ...Array.from({ length: 2 }, (_, index) => [
     tableIds.registrations,
-    `seed_reg_winter_${String(index + 7).padStart(2, '0')}`,
+    `seed_reg_winter_${String(index + 11).padStart(2, '0')}`,
   ]),
 ]
 
