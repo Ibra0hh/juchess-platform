@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import './App.css'
 import { JuChessBoard, type JuChessBoardChange } from './components/JuChessBoard'
 import { buildChessGame, deriveResult } from './components/JuChessRules'
@@ -108,6 +108,8 @@ type AdminBracketConfig =
     }
 
 type AdminBracketPhase = 'setup' | 'active' | 'completed'
+
+const EMPTY_ADMIN_BRACKET_ROUNDS: AdminBracketRound[] = []
 
 type LiveBoardState = {
   moves: string[]
@@ -1610,26 +1612,31 @@ function TournamentManageView({
   const allBracketRounds = useMemo(() => (
     bracketConfig ? getAllAdminBracketRounds(bracketConfig) : []
   ), [bracketConfig])
+  const liveBoardRounds = tournament.status === 'active' ? allBracketRounds : EMPTY_ADMIN_BRACKET_ROUNDS
   const playableBoards = useMemo(() => (knockout
-    ? buildPlayableBracketBoards(allBracketRounds)
+    ? buildPlayableBracketBoards(liveBoardRounds)
     : buildPlayableBoardsFromPairings(pairings)
-  ), [allBracketRounds, knockout, pairings])
+  ), [liveBoardRounds, knockout, pairings])
   const procedureMatches = useMemo(() => (
-    knockout
+    stage !== 'procedure'
+      ? []
+      : knockout
       ? buildProcedureMatchesFromBracket(allBracketRounds)
       : buildProcedureMatchesFromPairings(pairings, tournament.status === 'active' ? 'Live round' : 'Round 1')
-  ), [allBracketRounds, knockout, pairings, tournament.status])
+  ), [allBracketRounds, knockout, pairings, stage, tournament.status])
   const procedurePlan = useMemo(() => (
-    buildProcedurePlan(procedureMatches, physicalBoards)
-  ), [physicalBoards, procedureMatches])
+    stage === 'procedure' ? buildProcedurePlan(procedureMatches, physicalBoards) : []
+  ), [physicalBoards, procedureMatches, stage])
   const publishableGames = useMemo(() => buildPublishableGames(knockout ? firstBracketRoundPairings(allBracketRounds) : pairings), [allBracketRounds, knockout, pairings])
-  const publishableBracketSnapshot = useMemo(() => (
-    knockout && generatedBracketConfig
-      ? buildPublishedAdminBracketSnapshot(generatedBracketConfig, tournament, tournamentPlayers.length)
-      : undefined
-  ), [generatedBracketConfig, knockout, tournament, tournamentPlayers.length])
   const shuffleLocked = disabled || participantsLoading || published
   const publishLocked = disabled || participantsLoading || published || !publishableGames.length
+
+  function publishPairings() {
+    const bracketSnapshot = knockout && generatedBracketConfig
+      ? buildPublishedAdminBracketSnapshot(generatedBracketConfig, tournament, tournamentPlayers.length)
+      : undefined
+    onPublish(tournament, publishableGames, bracketSnapshot)
+  }
 
   useEffect(() => {
     setStage(playStage)
@@ -1679,7 +1686,7 @@ function TournamentManageView({
               <button type="button" className="mini-button ghost" disabled={shuffleLocked} onClick={() => onShuffle(tournament)}>
                 Shuffle
               </button>
-              <button type="button" className="mini-button dark" disabled={publishLocked} onClick={() => onPublish(tournament, publishableGames, publishableBracketSnapshot)}>
+              <button type="button" className="mini-button dark" disabled={publishLocked} onClick={publishPairings}>
                 {published ? 'Published' : 'Publish'}
               </button>
               {published ? (
@@ -1871,7 +1878,7 @@ function AdminBracketPreview({
   const [activeRound, setActiveRound] = useState(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const trackRef = useRef<HTMLDivElement | null>(null)
-  const roundKey = buildBracketRoundKey(rounds)
+  const roundKey = useMemo(() => buildBracketRoundKey(rounds), [rounds])
 
   useEffect(() => {
     setActiveRound(0)
@@ -1905,24 +1912,25 @@ function AdminBracketPreview({
     return () => scroll.removeEventListener('scroll', updateActiveRound)
   }, [roundKey])
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const track = trackRef.current
     if (!track) return
 
     let frame = 0
+    let timeout = 0
     const draw = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => drawBracketLines(track))
     }
 
-    draw()
+    timeout = window.setTimeout(draw, 0)
 
     const resizeObserver = new ResizeObserver(draw)
     resizeObserver.observe(track)
-    track.querySelectorAll('.bracket-match.rich').forEach((card) => resizeObserver.observe(card))
     window.addEventListener('resize', draw)
 
     return () => {
+      window.clearTimeout(timeout)
       cancelAnimationFrame(frame)
       resizeObserver.disconnect()
       window.removeEventListener('resize', draw)
@@ -2003,7 +2011,7 @@ function AdminBracketPreview({
   )
 }
 
-function AdminBracketMatchCard({
+const AdminBracketMatchCard = memo(function AdminBracketMatchCard({
   boardKey,
   isLastRound,
   match,
@@ -2081,7 +2089,7 @@ function AdminBracketMatchCard({
       {content}
     </div>
   )
-}
+})
 
 function drawBracketLines(track: HTMLDivElement) {
   const svg = track.querySelector<SVGSVGElement>('[data-brk-svg]')
