@@ -1888,6 +1888,17 @@ function ProcedurePlanner({
   plan: ProcedureSlot[][]
   totalMatches: number
 }) {
+  const boardCount = Math.max(1, Math.min(64, Math.floor(boards) || 1))
+  const boardQueues = Array.from({ length: boardCount }, (_, boardIndex) => {
+    const boardNumber = boardIndex + 1
+    const slots = plan.flatMap((wave, waveIndex) => {
+      const slot = wave.find((item) => item.boardNumber === boardNumber)
+      return slot?.match ? [{ match: slot.match, queueNumber: waveIndex + 1 }] : []
+    })
+
+    return { boardNumber, slots }
+  })
+
   return (
     <div className="procedure-planner">
       <div className="manage-panel-head procedure-head">
@@ -1898,48 +1909,40 @@ function ProcedurePlanner({
             type="number"
             min={1}
             max={64}
-            value={boards}
-            onChange={(event) => onBoardsChange(Math.max(1, Number(event.target.value) || 1))}
+            value={boardCount}
+            onChange={(event) => onBoardsChange(Math.max(1, Math.min(64, Math.floor(Number(event.target.value) || 1))))}
           />
         </label>
       </div>
       <div className="procedure-summary">
         <span>{totalMatches} matches</span>
-        <span>{boards} boards available</span>
-        <span>{plan.length} waves required</span>
+        <span>{boardCount} boards available</span>
+        <span>{plan.length} queue steps</span>
       </div>
       <div className="procedure-rules">
-        <span>Assign Wave 1 first.</span>
-        <span>When a board finishes, start that board's next listed match.</span>
+        <span>Start the first row on every board.</span>
+        <span>Each board continues from top to bottom.</span>
         <span>Record result and moves from Bracket or Rounds before advancing.</span>
       </div>
-      {plan.map((wave, waveIndex) => (
-        <section className="procedure-wave" key={`wave-${waveIndex + 1}`}>
-          <div className="procedure-wave-head">
-            <strong>Wave {waveIndex + 1}</strong>
-            <span>{wave.filter((slot) => slot.match).length} active boards</span>
-          </div>
-          <div className="procedure-slot-grid">
-            {wave.map((slot) => (
-              <div className={slot.match ? 'procedure-slot' : 'procedure-slot idle'} key={`${waveIndex}-${slot.boardNumber}`}>
-                <div className="procedure-board-label">Board {slot.boardNumber}</div>
-                {slot.match ? (
-                  <>
-                    <strong>{slot.match.roundLabel} · Match {slot.match.matchNumber}</strong>
-                    <p>{slot.match.white} vs {slot.match.black}</p>
-                    <em>{slot.match.status}</em>
-                    <small>
-                      {slot.nextMatch
-                        ? `Next: ${slot.nextMatch.roundLabel} Match ${slot.nextMatch.matchNumber}`
-                        : 'Next: no queued match'}
-                    </small>
-                  </>
-                ) : (
-                  <p>No match assigned</p>
-                )}
-              </div>
-            ))}
-          </div>
+      {boardQueues.map((queue) => (
+        <section className="pairing-round-block procedure-board-block" key={`board-${queue.boardNumber}`}>
+          <div className="pairing-round-title procedure-board-title">Board {queue.boardNumber}</div>
+          {queue.slots.length > 0 ? queue.slots.map(({ match, queueNumber }) => (
+            <div className="pairing-row procedure-board-row" key={`${queue.boardNumber}-${queueNumber}-${match.roundLabel}-${match.matchNumber}`}>
+              <span>{String(queueNumber).padStart(2, '0')}</span>
+              <strong>
+                {match.white}
+                <small>{match.roundLabel} · Match {match.matchNumber}</small>
+              </strong>
+              <em>vs</em>
+              <strong>
+                {match.black}
+                <small>{match.status}</small>
+              </strong>
+            </div>
+          )) : (
+            <div className="empty-row">No match assigned to this board.</div>
+          )}
         </section>
       ))}
     </div>
