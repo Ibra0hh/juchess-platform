@@ -66,9 +66,18 @@ class _OrientationPolicyState extends State<OrientationPolicy>
 }
 
 class AppConfig {
-  static const endpoint = String.fromEnvironment('APPWRITE_ENDPOINT');
-  static const projectId = String.fromEnvironment('APPWRITE_PROJECT_ID');
-  static const databaseId = String.fromEnvironment('APPWRITE_DATABASE_ID');
+  static const endpoint = String.fromEnvironment(
+    'APPWRITE_ENDPOINT',
+    defaultValue: 'https://cloud.appwrite.io/v1',
+  );
+  static const projectId = String.fromEnvironment(
+    'APPWRITE_PROJECT_ID',
+    defaultValue: 'juchess-platform',
+  );
+  static const databaseId = String.fromEnvironment(
+    'APPWRITE_DATABASE_ID',
+    defaultValue: 'juchess',
+  );
   static const profilesTableId = String.fromEnvironment(
     'APPWRITE_PROFILES_TABLE_ID',
     defaultValue: 'profiles',
@@ -96,12 +105,13 @@ class AppConfig {
 }
 
 class AppwriteService {
-  AppwriteService() {
-    if (AppConfig.endpoint.isNotEmpty && AppConfig.projectId.isNotEmpty) {
+  AppwriteService({this.enabled = true}) {
+    if (ready) {
       client.setEndpoint(AppConfig.endpoint).setProject(AppConfig.projectId);
     }
   }
 
+  final bool enabled;
   final Client client = Client();
   late final Account account = Account(client);
   late final TablesDB tablesDB = TablesDB(client);
@@ -109,6 +119,7 @@ class AppwriteService {
   late final Functions functions = Functions(client);
 
   bool get ready =>
+      enabled &&
       AppConfig.endpoint.isNotEmpty &&
       AppConfig.projectId.isNotEmpty &&
       AppConfig.databaseId.isNotEmpty;
@@ -471,7 +482,11 @@ class AppwriteService {
     final rawStatus = data['status']?.toString() ?? 'upcoming';
 
     if (format == null || timeControl == null) return null;
-    if (rawStatus == 'draft' || rawStatus == 'cancelled') return null;
+    if (rawStatus == 'draft' ||
+        rawStatus == 'cancelled' ||
+        rawStatus == 'archived') {
+      return null;
+    }
     final displayFormat = normalizeTournamentFormat(format);
 
     final roundsTotal = _asInt(data['roundsTotal']);
@@ -1326,13 +1341,15 @@ String _formatDate(String? value) {
 }
 
 class JuChessApp extends StatelessWidget {
-  const JuChessApp({super.key});
+  const JuChessApp({this.connectCloud = true, super.key});
+
+  final bool connectCloud;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider(create: (_) => AppwriteService()),
+        Provider(create: (_) => AppwriteService(enabled: connectCloud)),
         ChangeNotifierProvider(
           create: (context) => AppState(context.read<AppwriteService>()),
         ),

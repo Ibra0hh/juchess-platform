@@ -3,7 +3,7 @@ import 'package:juchess_mobile/main.dart';
 
 void main() {
   testWidgets('JuChess home screen renders', (WidgetTester tester) async {
-    await tester.pumpWidget(const JuChessApp());
+    await tester.pumpWidget(const JuChessApp(connectCloud: false));
 
     expect(find.text('JuChess'), findsOneWidget);
     expect(find.text('University of Jordan Chess Club'), findsOneWidget);

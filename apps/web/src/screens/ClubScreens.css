@@ -315,22 +315,30 @@
 }
 
 .profile-rating-card button,
+.profile-rating-card a,
 .recent-panel a,
 .profile-next-round a {
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-weight: 600;
 }
 
-.profile-rating-card button {
+.profile-rating-card button,
+.profile-rating-card a {
   height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--wine);
   background: transparent;
   border: 1px solid rgba(30, 43, 69, 0.28);
   border-radius: 8px;
   cursor: pointer;
+  padding: 0 14px;
+  text-decoration: none;
 }
 
-.profile-rating-card button:hover {
+.profile-rating-card button:hover,
+.profile-rating-card a:hover {
   background: rgba(122, 36, 49, 0.06);
   border-color: var(--wine);
 }

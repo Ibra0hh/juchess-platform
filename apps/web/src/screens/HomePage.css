@@ -30,10 +30,6 @@
   background: #5f1b26;
 }
 
-.home-screen .main-nav .nav-tools {
-  display: none;
-}
-
 .home-screen main {
   position: relative;
 }
@@ -82,12 +78,12 @@
 
 .home-fall-layer span {
   position: absolute;
-  top: 0;
+  top: 16%;
   left: var(--fall-left);
   color: #16213b;
   font-size: var(--fall-size);
-  opacity: 0;
-  animation: home-fall var(--fall-duration) linear var(--fall-delay) infinite;
+  opacity: var(--fall-opacity);
+  transform: translateY(0);
 }
 
 .home-hero-grid {
@@ -1046,7 +1042,7 @@
 
 @media (max-width: 980px) {
   .home-screen .main-nav {
-    display: none;
+    display: flex;
   }
 
   .home-hero-grid {

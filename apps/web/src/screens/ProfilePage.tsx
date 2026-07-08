@@ -6,8 +6,9 @@ import './ClubScreens.css'
 
 function ProfilePage() {
   const navigate = useNavigate()
-  const { profile, signOut, user } = useAuth()
+  const { loading, profile, signOut, user } = useAuth()
   const defaultMember = members[0]
+  const authenticated = Boolean(user || profile)
   const displayName = profile?.displayName || user?.name || defaultMember.name
   const rating = profile?.rating || defaultMember.rating
   const username = profile?.email?.split('@')[0] || defaultMember.universityId
@@ -17,6 +18,49 @@ function ProfilePage() {
   const handleSignOut = async () => {
     await signOut()
     navigate('/home')
+  }
+
+  if (loading) {
+    return (
+      <div className="club-screen" data-screen-label="Profile">
+        <SiteHeader active="profile" />
+        <main className="profile-main">
+          <section className="profile-identity">
+            <div className="profile-avatar">JU</div>
+            <div className="profile-copy">
+              <div className="profile-name-line">
+                <h1>Checking profile</h1>
+              </div>
+              <p className="profile-handle">Loading your club session...</p>
+            </div>
+          </section>
+        </main>
+      </div>
+    )
+  }
+
+  if (!authenticated) {
+    return (
+      <div className="club-screen" data-screen-label="Profile">
+        <SiteHeader active="profile" />
+        <main className="profile-main">
+          <section className="profile-identity">
+            <div className="profile-avatar">JU</div>
+            <div className="profile-copy">
+              <div className="profile-name-line">
+                <h1>Guest profile</h1>
+                <span>Signed out</span>
+              </div>
+              <p className="profile-handle">Sign in to see your real tournaments, games, rating, and next board assignment.</p>
+            </div>
+            <div className="profile-rating-card">
+              <Link to="/sign-in">Sign in</Link>
+              <Link to="/sign-up">Create account</Link>
+            </div>
+          </section>
+        </main>
+      </div>
+    )
   }
 
   return (

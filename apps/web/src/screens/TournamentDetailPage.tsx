@@ -32,7 +32,7 @@ type StandingRow = {
   draws: number
   losses: number
   tieBreak: number
-  status: 'Playing' | 'Finished' | 'Qualified' | 'Final'
+  status: 'Registered' | 'Playing' | 'Finished' | 'Qualified' | 'Final'
 }
 
 type GameCard = {
@@ -347,7 +347,7 @@ function RegistrationTab({
   tournament: Tournament
   detail: ReturnType<typeof buildDetail>
 }) {
-  const leader = detail.standings[0]
+  const leader = detail.standings.find((row) => row.points > 0 || row.status === 'Playing')
 
   return (
     <section className="detail-tab-panel">
@@ -1603,25 +1603,56 @@ function StatusBadge({ status }: { status: Tournament['status'] }) {
 function buildDetail(tournament: Tournament) {
   const selectedMembers = tournament.registeredPlayers ?? []
   const publishedGames = tournament.publishedGames ?? []
+  const stats = new Map<string, { points: number; wins: number; draws: number; losses: number; playing: boolean }>()
+
+  selectedMembers.forEach((member) => {
+    stats.set(member.id, { points: 0, wins: 0, draws: 0, losses: 0, playing: false })
+  })
+
+  publishedGames.forEach((game) => {
+    const white = stats.get(game.white.id) ?? { points: 0, wins: 0, draws: 0, losses: 0, playing: false }
+    const black = stats.get(game.black.id) ?? { points: 0, wins: 0, draws: 0, losses: 0, playing: false }
+
+    if (game.status === 'live') {
+      white.playing = true
+      black.playing = true
+    } else if (game.status === 'completed') {
+      if (game.result === '1-0') {
+        white.points += 1
+        white.wins += 1
+        black.losses += 1
+      } else if (game.result === '0-1') {
+        black.points += 1
+        black.wins += 1
+        white.losses += 1
+      } else if (game.result === '1/2-1/2') {
+        white.points += 0.5
+        black.points += 0.5
+        white.draws += 1
+        black.draws += 1
+      }
+    }
+
+    stats.set(game.white.id, white)
+    stats.set(game.black.id, black)
+  })
 
   const standings = selectedMembers.map((member, index) => {
-    const rank = index + 1
-    const points = Math.max(0.5, Number((4 - index * 0.5).toFixed(1)))
-    const wins = Math.max(0, Math.floor(points))
-    const draws = points % 1 ? 1 : 0
-    const losses = Math.max(0, 4 - wins - draws)
+    const row = stats.get(member.id) ?? { points: 0, wins: 0, draws: 0, losses: 0, playing: false }
 
     return {
       member,
-      rank,
-      points,
-      wins,
-      draws,
-      losses,
-      tieBreak: Number((10.5 - index * 0.65).toFixed(1)),
-      status: tournament.format === 'Multi-stage' && rank <= 8 ? 'Qualified' : rank <= 2 ? 'Playing' : 'Finished',
-    } satisfies StandingRow
-  })
+      rank: index + 1,
+      points: row.points,
+      wins: row.wins,
+      draws: row.draws,
+      losses: row.losses,
+      tieBreak: 0,
+      status: row.playing ? 'Playing' : row.wins || row.draws || row.losses ? 'Finished' : 'Registered',
+      seedOrder: index,
+    } satisfies StandingRow & { seedOrder: number }
+  }).sort((a, b) => b.points - a.points || b.wins - a.wins || a.seedOrder - b.seedOrder)
+    .map(({ seedOrder: _seedOrder, ...row }, index) => ({ ...row, rank: index + 1 }))
 
   const games = publishedGames.map(gameToCard)
 

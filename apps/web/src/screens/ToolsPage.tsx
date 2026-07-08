@@ -49,7 +49,7 @@ const toolCards = [
     icon: '\u2654',
     tag: 'Player',
     title: 'Player profile',
-    body: 'Open the sample player record with recent games, rating context, and club activity.',
+    body: 'Open your player record with recent games, rating context, and club activity.',
     action: 'Open profile',
   },
 ] as const
@@ -66,7 +66,7 @@ function ToolsPage() {
             <h1 id="tools-title">Chess tools</h1>
             <p>
               A focused launch pad for review, analysis, live tournament boards, rankings, and player records across
-              the Chess Club JU prototype.
+              JuChess.
             </p>
             <div className="tools-summary" aria-label="Club tool summary">
               <SummaryBox label="Review games" value={totalGames} />

@@ -284,41 +284,6 @@ const demoPlayers: Player[] = [
   },
 ]
 
-const seededTournamentPlayers: Player[] = [
-  ['seed_profile_01', 'Ibrahim Ahmad', 1810],
-  ['seed_profile_02', 'Omar Saleh', 1740],
-  ['seed_profile_03', 'Leen Haddad', 1685],
-  ['seed_profile_04', 'Yazan Khaled', 1602],
-  ['seed_profile_05', 'Sara Nasser', 1550],
-  ['seed_profile_06', 'Mohammad Al-Khatib', 1490],
-  ['seed_profile_07', 'Rania Odeh', 1465],
-  ['seed_profile_08', 'Khaled Mansour', 1430],
-  ['seed_profile_09', 'Tala Suleiman', 1395],
-  ['seed_profile_10', 'Hasan Qasem', 1370],
-  ['seed_profile_11', 'Noor Barakat', 1340],
-  ['seed_profile_12', 'Zaid Hamdan', 1310],
-  ['seed_profile_13', 'Amr Zaidan', 1295],
-  ['seed_profile_14', 'Lina Shami', 1270],
-  ['seed_profile_15', 'Fadi Rimawi', 1245],
-  ['seed_profile_16', 'Dana Aqel', 1220],
-  ['seed_profile_17', 'Nour Alami', 1198],
-  ['seed_profile_18', 'Tamer Qasem', 1184],
-  ['seed_profile_19', 'Salma Nouri', 1166],
-  ['seed_profile_20', 'Adam Kareem', 1148],
-].map(([profileId, name, rating], index) => ({
-  id: profileId as string,
-  profileId: profileId as string,
-  name: name as string,
-  initials: initialsForName(name as string),
-  universityId: `seed-${String(index + 1).padStart(2, '0')}`,
-  email: `${(name as string).toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/\.+$/g, '')}@juchess.test`,
-  phone: '',
-  rating: rating as number,
-  record: '0-0-0',
-  avatarColor: demoPlayers[index % demoPlayers.length]?.avatarColor ?? '#21304e',
-  tournaments: 1,
-}))
-
 const windowModel: Array<{ key: WindowKey; label: string; icon: string; sections: string[] }> = [
   { key: 'home', label: 'Home', icon: '⌂', sections: ['Header', 'Featured tournament', 'Quick tools', 'Club leaderboard', 'News'] },
   { key: 'tournaments', label: 'Tournaments', icon: '♞', sections: ['Tabs', 'Tournament cards', 'Detail hero', 'Registration'] },
@@ -1701,6 +1666,9 @@ function TournamentManageView({
     knockout ? firstBracketRoundPairings(allBracketRounds) : pairings,
     tournament.status === 'active' && swissFlow ? 'live' : 'scheduled',
   ), [allBracketRounds, knockout, pairings, swissFlow, tournament.status])
+  const hasStartedGames = allBracketRounds.some((round) => (
+    round.matches.some((match) => match.live || match.winner)
+  ))
   const canPublishPairings = tournament.status === 'upcoming' ? !swissFlow : tournament.status === 'active' && swissFlow
   const canShufflePairings = tournament.status === 'upcoming' || (tournament.status === 'active' && swissFlow)
   const shuffleLocked = disabled || participantsLoading || published || !canShufflePairings
@@ -1894,13 +1862,18 @@ function TournamentManageView({
         ) : null}
         {stage === 'standings' ? (
           <>
-            <div className="manage-panel-head">Live standings</div>
-            {demoPlayers.slice(0, 8).map((player, index) => (
+            <div className="manage-panel-head">
+              <strong>Live standings</strong>
+              <span>{hasStartedGames ? 'Results in progress' : 'No results recorded yet'}</span>
+            </div>
+            {tournamentPlayers.length ? tournamentPlayers.map((player, index) => (
               <div key={player.id} className="manage-row standings-row">
                 <strong>{index + 1}. {player.name}</strong>
-                <span>{(7 - index * 0.5).toFixed(1)} pts</span>
+                <span>0 pts</span>
               </div>
-            ))}
+            )) : (
+              <EmptyState title="No standings yet" body="Standings will update after real game results are saved." />
+            )}
           </>
         ) : null}
       </section>
@@ -3329,15 +3302,8 @@ function buildTournamentPlayers(tournament: AdminTournament, seed: number, regis
       tournaments: 1,
     }))
 
-  const usedProfileIds = new Set(players.map((player) => player.profileId ?? player.id))
-  const usedNames = new Set(players.map((player) => player.name.toLowerCase()))
-  const fillers = seededTournamentPlayers
-    .filter((player) => !usedProfileIds.has(player.profileId ?? player.id) && !usedNames.has(player.name.toLowerCase()))
-    .slice(0, Math.max(0, count - players.length))
-
-  const result = [...players, ...fillers]
-  if (!seed) return result
-  return seededShuffle(result, seed)
+  if (!seed) return players
+  return seededShuffle(players, seed)
 }
 
 function targetAdminPlayerCount(tournament: AdminTournament, availablePlayers: number) {
@@ -3596,7 +3562,7 @@ function buildProcedureMatchesFromPairings(pairings: Pairing[], tournament: Admi
       status: playable ? 'Ready' : 'Waiting for player',
       white: pairing.white,
     }
-  })
+  }).filter(isProcedureMatchPlayable)
 }
 
 function buildProcedureMatchesFromBracket(rounds: AdminBracketRound[]): ProcedureMatch[] {
@@ -3618,7 +3584,7 @@ function buildProcedureMatchesFromBracket(rounds: AdminBracketRound[]): Procedur
       status: match.live ? 'Live now' : match.winner ? 'Complete' : playable ? 'Ready' : 'Waiting for player',
       white: match.white,
     }
-  })
+  }).filter(isProcedureMatchPlayable)
 }
 
 function isProcedureMatchPlayable(match: ProcedureMatch) {
