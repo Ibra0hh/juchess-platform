@@ -59,6 +59,14 @@ type AppwriteGameRow = Models.Row & {
   result?: '1-0' | '0-1' | '1/2-1/2' | '*'
 }
 
+type AppwriteAnnouncementRow = Models.Row & {
+  title?: string
+  body?: string
+  audience?: 'public' | 'members' | 'organizers' | 'admins'
+  status?: 'draft' | 'published' | 'archived'
+  publishedAt?: string
+}
+
 export type Member = {
   id: string
   name: string
@@ -75,6 +83,14 @@ export type TournamentGame = {
   black: Member
   status: 'scheduled' | 'live' | 'completed' | 'forfeit'
   result: '1-0' | '0-1' | '1/2-1/2' | '*'
+}
+
+export type Announcement = {
+  id: string
+  title: string
+  body: string
+  date: string
+  publishedAt?: string
 }
 
 export type BoardCell = {
@@ -536,6 +552,12 @@ export type TournamentLoadResult = {
   error?: unknown
 }
 
+export type AnnouncementLoadResult = {
+  announcements: Announcement[]
+  source: 'cloud' | 'unavailable'
+  error?: unknown
+}
+
 export async function loadTournaments(): Promise<TournamentLoadResult> {
   if (!appwriteReady) {
     return {
@@ -579,6 +601,40 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
   }
 }
 
+export async function loadAnnouncements(): Promise<AnnouncementLoadResult> {
+  if (!appwriteReady) {
+    return {
+      announcements: [],
+      source: 'unavailable',
+      error: new Error('Cloud connection is not configured for this app.'),
+    }
+  }
+
+  try {
+    const response = await tablesDB.listRows<AppwriteAnnouncementRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.announcements,
+      queries: [
+        Query.equal('audience', 'public'),
+        Query.equal('status', 'published'),
+        Query.orderDesc('publishedAt'),
+        Query.limit(6),
+      ],
+      total: false,
+    })
+
+    return {
+      announcements: response.rows
+        .map(mapAnnouncement)
+        .filter((item): item is Announcement => Boolean(item)),
+      source: 'cloud',
+    }
+  } catch (error) {
+    console.warn('JuChess cloud announcement read failed.', error)
+    return { announcements: [], source: 'unavailable', error }
+  }
+}
+
 async function safeListRows<T extends Models.Row>(tableId: string, queries: string[], label: string) {
   try {
     const response = await tablesDB.listRows<T>({
@@ -592,6 +648,18 @@ async function safeListRows<T extends Models.Row>(tableId: string, queries: stri
   } catch (error) {
     console.warn(`JuChess cloud ${label} read failed.`, error)
     return []
+  }
+}
+
+function mapAnnouncement(row: AppwriteAnnouncementRow): Announcement | null {
+  if (!row.title || !row.body) return null
+
+  return {
+    id: row.$id,
+    title: row.title,
+    body: row.body,
+    date: formatDate(row.publishedAt),
+    publishedAt: row.publishedAt,
   }
 }
 

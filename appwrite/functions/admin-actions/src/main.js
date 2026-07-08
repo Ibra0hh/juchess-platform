@@ -840,6 +840,7 @@ export default async ({ req, res, log, error }) => {
           publishedAt: body.publishedAt ?? new Date().toISOString(),
           createdByProfileId: body.createdByProfileId ?? actor.$id,
         }),
+        permissions: [Permission.read(Role.any())],
       });
 
       return res.json({ ok: true, action: 'createAnnouncement', row });

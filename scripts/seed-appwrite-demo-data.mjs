@@ -241,6 +241,7 @@ const announcements = [
       publishedAt: '2026-07-08T12:00:00.000Z',
       createdByProfileId: actorProfileId,
     },
+    permissions: [Permission.read(Role.any())],
   },
 ]
 

@@ -45,7 +45,7 @@ function SiteHeader({ active, profilePreview }: SiteHeaderProps) {
           <Link to="/games" className={active === 'games' ? 'active' : undefined}>
             Games
           </Link>
-          <Link to="/tools" className={active === 'tools' ? 'active' : undefined}>
+          <Link to="/tools" className={active === 'tools' ? 'active nav-tools' : 'nav-tools'}>
             Tools
           </Link>
           <Link to="/leaderboard" className={active === 'leaderboard' ? 'active' : undefined}>
