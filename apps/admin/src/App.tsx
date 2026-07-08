@@ -479,7 +479,7 @@ function App() {
         <PlayersScreen blocks={blocks} session={session} onBlocksChanged={refreshBlocks} />
       ) : null}
       {screen === 'news' ? <NewsScreen /> : null}
-      {screen === 'announcements' ? <AnnouncementsScreen /> : null}
+      {screen === 'announcements' ? <AnnouncementsScreen tournaments={tournaments} /> : null}
       {screen === 'adminAccess' ? (
         <AdminAccessScreen
           adminProfiles={adminProfiles}
@@ -2970,8 +2970,11 @@ const broadcastChannels = [
 
 type BroadcastChannel = typeof broadcastChannels[number]['key']
 
-function AnnouncementsScreen() {
-  const [audience, setAudience] = useState('All users')
+function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournament[] }) {
+  const eligibleTournaments = useMemo(() => (
+    tournaments.filter((item) => item.status === 'upcoming' || item.status === 'active')
+  ), [tournaments])
+  const [selectedTournamentKey, setSelectedTournamentKey] = useState('')
   const [channels, setChannels] = useState<Record<BroadcastChannel, boolean>>({
     app: true,
     email: true,
@@ -2980,9 +2983,21 @@ function AnnouncementsScreen() {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const selectedChannels = broadcastChannels.filter((item) => channels[item.key])
+  const selectedTournament = eligibleTournaments.find((item) => tournamentKey(item) === selectedTournamentKey) ?? eligibleTournaments[0] ?? null
   const channelLabel = selectedChannels.length
     ? selectedChannels.map((item) => item.label).join(' + ')
     : 'No channel selected'
+
+  useEffect(() => {
+    if (!eligibleTournaments.length) {
+      if (selectedTournamentKey) setSelectedTournamentKey('')
+      return
+    }
+
+    if (!eligibleTournaments.some((item) => tournamentKey(item) === selectedTournamentKey)) {
+      setSelectedTournamentKey(tournamentKey(eligibleTournaments[0]))
+    }
+  }, [eligibleTournaments, selectedTournamentKey])
 
   function toggleChannel(channel: BroadcastChannel) {
     setChannels((current) => ({
@@ -2998,10 +3013,18 @@ function AnnouncementsScreen() {
           <strong>Broadcast composer</strong>
           <span>{channelLabel}</span>
         </div>
-        <div className="audience-tabs">
-          {['All users', 'Tournament participants', 'Club members', 'Specific players'].map((item) => (
-            <button key={item} type="button" className={audience === item ? 'active' : undefined} onClick={() => setAudience(item)}>{item}</button>
-          ))}
+        <div className="audience-tabs tournament-audience-tabs">
+          {eligibleTournaments.length ? eligibleTournaments.map((item) => {
+            const key = tournamentKey(item)
+            return (
+              <button key={key} type="button" className={selectedTournament && tournamentKey(selectedTournament) === key ? 'active' : undefined} onClick={() => setSelectedTournamentKey(key)}>
+                <strong>{item.name}</strong>
+                <small>{item.status === 'active' ? 'Live' : 'Upcoming'} · {item.players}/{item.capacity || 'open'} players · {item.format}</small>
+              </button>
+            )
+          }) : (
+            <div className="empty-row">No upcoming or live tournaments available.</div>
+          )}
         </div>
         <div className="channel-picker" aria-label="Broadcast delivery channels">
           {broadcastChannels.map((item) => (
@@ -3021,12 +3044,19 @@ function AnnouncementsScreen() {
         <div className="post-form">
           <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Announcement title" />
           <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write the message..." />
-          <button type="button" className="primary-button" disabled={!selectedChannels.length}>Send announcement</button>
+          <button type="button" className="primary-button" disabled={!selectedChannels.length || !selectedTournament}>Send announcement</button>
         </div>
       </section>
       <section className="panel-card">
         <div className="panel-title">Delivery status</div>
-        <QueueRow icon="◈" tint="#EAF0FA" label="Audience" count={audience === 'All users' ? 248 : 32} action="Ready" onClick={() => undefined} />
+        <QueueRow
+          icon="◈"
+          tint="#EAF0FA"
+          label={selectedTournament ? selectedTournament.name : 'Tournament audience'}
+          count={selectedTournament?.players ?? 0}
+          action={selectedTournament ? selectedTournament.status === 'active' ? 'Live' : 'Upcoming' : 'Choose'}
+          onClick={() => undefined}
+        />
         <QueueRow icon="▣" tint="#FBF1E2" label="Selected channels" count={selectedChannels.length} action={selectedChannels.length ? channelLabel : 'Choose'} onClick={() => undefined} />
         {broadcastChannels.map((item) => (
           <QueueRow

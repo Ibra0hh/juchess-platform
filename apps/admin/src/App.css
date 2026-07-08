@@ -2872,6 +2872,39 @@ button {
   color: #fff;
 }
 
+.tournament-audience-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tournament-audience-tabs button {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.tournament-audience-tabs button strong {
+  color: inherit;
+  font-size: 13px;
+}
+
+.tournament-audience-tabs button small {
+  color: #8b8577;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.tournament-audience-tabs button.active small {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.tournament-audience-tabs .empty-row {
+  grid-column: 1 / -1;
+  border: 1px solid #f4f0e8;
+  border-radius: 9px;
+  background: #fffaf0;
+}
+
 .channel-picker {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2932,6 +2965,10 @@ button {
   }
 
   .channel-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .tournament-audience-tabs {
     grid-template-columns: 1fr;
   }
 
