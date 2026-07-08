@@ -1646,20 +1646,62 @@ button {
   background: #fff7ee;
 }
 
-.procedure-board-block {
+.procedure-wave-block {
   margin-top: 14px;
 }
 
-.procedure-board-block:first-of-type {
+.procedure-wave-block:first-of-type {
   margin-top: 18px;
 }
 
-.procedure-board-title {
+.procedure-wave-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   background: rgba(245, 239, 227, 0.78);
 }
 
-.procedure-board-row > span {
+.procedure-wave-title span {
+  color: #8b8577;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.procedure-wave-row {
+  width: 100%;
+  border-inline: 0;
+  border-top: 0;
+  background: #fff;
+  font: inherit;
+  text-align: initial;
+}
+
+.procedure-wave-row > span {
   color: #7d2434;
+}
+
+.procedure-wave-row.selectable {
+  cursor: pointer;
+}
+
+.procedure-wave-row.selectable:hover,
+.procedure-wave-row.selected-board {
+  background: #fff7ee;
+}
+
+.procedure-wave-row.selected-board {
+  box-shadow: inset 4px 0 0 #7d2434;
+}
+
+.procedure-wave-row.idle {
+  background: rgba(253, 250, 241, 0.66);
+}
+
+.procedure-wave-row.idle strong {
+  color: #8b8577;
 }
 
 .manage-row {
