@@ -1967,7 +1967,8 @@ button {
 .bracket-column h3 {
   min-height: 30px;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   margin: 0;
   padding: 0 4px 10px;
@@ -1979,6 +1980,24 @@ button {
   text-align: center;
   text-transform: uppercase;
   white-space: normal;
+}
+
+.bracket-column h3 span {
+  display: block;
+}
+
+.bracket-column h3 em {
+  max-width: 220px;
+  display: block;
+  margin-top: 4px;
+  color: rgba(30, 43, 69, 0.5);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: none;
 }
 
 .bracket-column-body {
@@ -2064,8 +2083,25 @@ button {
   min-height: 520px;
 }
 
+.rich-bracket-panel.bracket-view-losers .bracket-column-minor h3 {
+  color: rgba(122, 36, 49, 0.74);
+}
+
+.rich-bracket-panel.bracket-view-losers .bracket-column-major h3 {
+  color: rgba(30, 43, 69, 0.78);
+}
+
+.rich-bracket-panel.bracket-view-losers .bracket-column-major h3 em {
+  color: rgba(122, 36, 49, 0.62);
+}
+
 .rich-bracket-panel.bracket-view-losers .bracket-match.rich {
   border-left-color: rgba(169, 138, 63, 0.72);
+}
+
+.rich-bracket-panel.bracket-view-losers .bracket-column-major .bracket-match.rich {
+  border-left-color: rgba(122, 36, 49, 0.72);
+  background: #fffaf1;
 }
 
 .rich-bracket-panel.bracket-view-losers .bracket-match.rich.pending {
