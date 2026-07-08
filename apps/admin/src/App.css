@@ -2046,11 +2046,22 @@ button {
 }
 
 .rich-bracket-panel.bracket-view-losers .bracket-column h3 {
-  color: rgba(122, 36, 49, 0.68);
+  color: rgba(122, 36, 49, 0.72);
+  letter-spacing: 0.09em;
 }
 
 .rich-bracket-panel.bracket-view-losers .bracket-track {
-  gap: clamp(60px, 5.5vw, 90px);
+  gap: clamp(72px, 7vw, 116px);
+  padding-right: 86px;
+}
+
+.rich-bracket-panel.bracket-view-losers .bracket-column {
+  width: 268px;
+}
+
+.rich-bracket-panel.bracket-view-losers .bracket-column-body {
+  gap: 24px;
+  min-height: 520px;
 }
 
 .rich-bracket-panel.bracket-view-losers .bracket-match.rich {

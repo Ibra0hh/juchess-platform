@@ -150,7 +150,7 @@ const bracketConfigs: Record<string, BracketConfig> = {
         ],
       },
       losers: {
-        rounds: ['Quarterfinal Qualifier', 'Quarterfinal', 'Semifinal Qualifier', 'Semifinal', 'Final Qualifier', 'Final'],
+        rounds: ['Quarterfinal survival', 'Quarterfinal', 'Semifinal survival', 'Semifinal', 'Final survival', 'Final'],
         matches: [
           [
             { a: 'Zaid Hamdan', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a', next: 0 },
@@ -810,7 +810,7 @@ function buildDoubleEliminationBrackets(
       loserRounds[loserRounds.length - 1].round,
       1,
     )
-    : firstLoserPool[0] ?? 'Losers qualifier'
+    : firstLoserPool[0] ?? 'Lower bracket survivor'
   const losersFinalLive = tournament.status === 'Active' && !/grand|reset/i.test(tournament.round)
   const losersFinal = makeBracketMatch(winnersFinalLoser, loserChampion, {
     complete: tournament.status === 'Completed',
@@ -926,7 +926,7 @@ function normalizeLowerBracketRounds(
     return preferredLabels[index] ?? fallbackLabels[index] ?? round.round
   })
   const rawToLabel = new Map(labels.map((label, index) => [`L${index + 1}`, label]))
-  const codeToIndex = new Map(labels.map((label, index) => [bracketRoundCode(label).toUpperCase(), index]))
+  const codeToIndex = buildLowerBracketCodeIndex(labels)
   const lastRoundIndex = rounds.length - 1
 
   return rounds.map((round, index) => ({
@@ -1007,7 +1007,7 @@ function normalizePublishedLowerBracketRounds(
     return preferredLabels[index] ?? fallbackLabels[index] ?? round.name
   })
   const rawToLabel = new Map(labels.map((label, index) => [`L${index + 1}`, label]))
-  const codeToIndex = new Map(labels.map((label, index) => [bracketRoundCode(label).toUpperCase(), index]))
+  const codeToIndex = buildLowerBracketCodeIndex(labels)
 
   return rounds.map((round, index) => ({
     ...round,
@@ -1018,6 +1018,17 @@ function normalizePublishedLowerBracketRounds(
     })),
     name: labels[index] ?? round.name,
   }))
+}
+
+function buildLowerBracketCodeIndex(labels: string[]) {
+  const entries: Array<[string, number]> = []
+  labels.forEach((label, index) => {
+    entries.push([bracketRoundCode(label).toUpperCase(), index])
+    if (/survival/i.test(label)) {
+      entries.push([bracketRoundCode(label.replace(/survival/ig, 'Qualifier')).toUpperCase(), index])
+    }
+  })
+  return new Map(entries)
 }
 
 function rewritePublishedLowerBracketPlaceholder(
@@ -1048,8 +1059,8 @@ function buildLowerBracketRoundLabels(matchCounts: number[], includesFinalRound 
     const nextSame = matchCounts[index + 1] === matchCount
     const previousSame = matchCounts[index - 1] === matchCount
     if (includesFinalRound && index === matchCounts.length - 1) return 'Final'
-    if (index === matchCounts.length - 1) return 'Final Qualifier'
-    if (nextSame && !previousSame) return `${stage} Qualifier`
+    if (index === matchCounts.length - 1) return 'Final survival'
+    if (nextSame && !previousSame) return `${stage} survival`
     return stage
   })
 }
@@ -1063,8 +1074,8 @@ function buildLowerBracketRoundLabelsFromWinnerRounds(winnerRoundLabels: string[
   if (!stages.length) return []
 
   return [
-    ...stages.flatMap((stage) => [`${stage} Qualifier`, stage]),
-    'Final Qualifier',
+    ...stages.flatMap((stage) => [`${stage} survival`, stage]),
+    'Final survival',
   ]
 }
 
@@ -1222,12 +1233,14 @@ function bracketRoundName(playersInRound: number) {
 }
 
 function bracketRoundCode(label: string) {
+  const survival = /survival/i.test(label)
   const qualifier = /qualifier/i.test(label)
-  if (/quarterfinal/i.test(label)) return qualifier ? 'QFQ' : 'QF'
-  if (/semifinal/i.test(label)) return qualifier ? 'SFQ' : 'SF'
-  if (/final/i.test(label)) return qualifier ? 'FQ' : 'F'
+  const suffix = survival ? 'S' : qualifier ? 'Q' : ''
+  if (/quarterfinal/i.test(label)) return `QF${suffix}`
+  if (/semifinal/i.test(label)) return `SF${suffix}`
+  if (/final/i.test(label)) return `F${suffix}`
   const count = /round of\s*(\d+)/i.exec(label)?.[1]
-  return count ? qualifier ? `R${count}Q` : `R${count}` : label.replace(/[^A-Za-z0-9]+/g, '').slice(0, 6) || 'R'
+  return count ? `R${count}${suffix}` : label.replace(/[^A-Za-z0-9]+/g, '').slice(0, 6) || 'R'
 }
 
 function activeBracketRoundIndex(labels: string[], tournament: Tournament) {

@@ -3770,7 +3770,7 @@ function buildAdminDoubleEliminationBrackets(
   const winnersFinalMatch = winnersFinal?.matches[0]
   const loserFinalOpponent = loserRounds.length
     ? adminWinnerName(loserRounds[loserRounds.length - 1].matches[0], loserRounds[loserRounds.length - 1].name, 1)
-    : firstLoserPool[0] ?? 'Losers qualifier'
+    : firstLoserPool[0] ?? 'Lower bracket survivor'
   const loserFinalPairing = makeBracketPairing(
     adminLoserName(winnersFinalMatch, winnersFinal?.name ?? 'W-Final', 1),
     loserFinalOpponent,
@@ -4016,7 +4016,7 @@ function normalizeAdminLowerBracketRounds(
     return preferredLabels[index] ?? fallbackLabels[index] ?? round.name
   })
   const rawToLabel = new Map(labels.map((label, index) => [`L${index + 1}`, label]))
-  const codeToIndex = new Map(labels.map((label, index) => [bracketRoundCodeFromName(label).toUpperCase(), index]))
+  const codeToIndex = buildLowerBracketCodeIndex(labels)
   const lastRoundIndex = rounds.length - 1
 
   return rounds.map((round, index) => {
@@ -4030,6 +4030,17 @@ function normalizeAdminLowerBracketRounds(
       name: labels[index] ?? round.name,
     }
   })
+}
+
+function buildLowerBracketCodeIndex(labels: string[]) {
+  const entries: Array<[string, number]> = []
+  labels.forEach((label, index) => {
+    entries.push([bracketRoundCodeFromName(label).toUpperCase(), index])
+    if (/survival/i.test(label)) {
+      entries.push([bracketRoundCodeFromName(label.replace(/survival/ig, 'Qualifier')).toUpperCase(), index])
+    }
+  })
+  return new Map(entries)
 }
 
 function rewriteAdminLowerBracketPlaceholders(
@@ -4088,8 +4099,8 @@ function buildLowerBracketRoundLabels(matchCounts: number[], includesFinalRound 
     const nextSame = matchCounts[index + 1] === matchCount
     const previousSame = matchCounts[index - 1] === matchCount
     if (includesFinalRound && index === matchCounts.length - 1) return 'Final'
-    if (index === matchCounts.length - 1) return 'Final Qualifier'
-    if (nextSame && !previousSame) return `${stage} Qualifier`
+    if (index === matchCounts.length - 1) return 'Final survival'
+    if (nextSame && !previousSame) return `${stage} survival`
     return stage
   })
 }
@@ -4103,8 +4114,8 @@ function buildLowerBracketRoundLabelsFromWinnerRounds(winnerRoundLabels: string[
   if (!stages.length) return []
 
   return [
-    ...stages.flatMap((stage) => [`${stage} Qualifier`, stage]),
-    'Final Qualifier',
+    ...stages.flatMap((stage) => [`${stage} survival`, stage]),
+    'Final survival',
   ]
 }
 
@@ -4249,13 +4260,15 @@ function bracketRoundName(playersInRound: number) {
 }
 
 function bracketRoundCodeFromName(label: string) {
+  const survival = /survival/i.test(label)
   const qualifier = /qualifier/i.test(label)
+  const suffix = survival ? 'S' : qualifier ? 'Q' : ''
   if (/play[-\s]?in/i.test(label)) return 'PI'
-  if (/quarterfinal/i.test(label)) return qualifier ? 'QFQ' : 'QF'
-  if (/semifinal/i.test(label)) return qualifier ? 'SFQ' : 'SF'
-  if (/final/i.test(label)) return qualifier ? 'FQ' : 'F'
+  if (/quarterfinal/i.test(label)) return `QF${suffix}`
+  if (/semifinal/i.test(label)) return `SF${suffix}`
+  if (/final/i.test(label)) return `F${suffix}`
   const count = /round of\s*(\d+)/i.exec(label)?.[1]
-  if (count) return qualifier ? `R${count}Q` : `R${count}`
+  if (count) return `R${count}${suffix}`
   const loserRound = /l-round\s*(\d+)/i.exec(label)?.[1]
   if (loserRound) return `L${loserRound}`
   return label.replace(/[^A-Za-z0-9]+/g, '').slice(0, 6) || 'R'

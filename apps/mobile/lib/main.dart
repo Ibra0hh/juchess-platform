@@ -7437,7 +7437,7 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
       ? _matchWinner(loserRounds.last.games.first)
       : firstLoserPool.isNotEmpty
       ? firstLoserPool.first
-      : 'Losers qualifier';
+      : 'Lower bracket survivor';
   final loserFinal = MatchSeed(
     _matchLoser(winnersFinalMatch, winnersFinal?.label ?? 'W-Final', 1),
     loserFinalOpponent,
@@ -7535,18 +7535,24 @@ String _bracketRoundName(int playersInRound) {
 
 String _bracketRoundCode(String label) {
   final lower = label.toLowerCase();
+  final survival = lower.contains('survival');
   final qualifier = lower.contains('qualifier');
-  if (lower.contains('quarterfinal')) return qualifier ? 'QFQ' : 'QF';
-  if (lower.contains('semifinal')) return qualifier ? 'SFQ' : 'SF';
+  final suffix = survival
+      ? 'S'
+      : qualifier
+          ? 'Q'
+          : '';
+  if (lower.contains('quarterfinal')) return 'QF$suffix';
+  if (lower.contains('semifinal')) return 'SF$suffix';
   if (lower.contains('final')) {
-    return qualifier ? 'FQ' : 'F';
+    return 'F$suffix';
   }
   final roundMatch = RegExp(
     r'round of\s*(\d+)',
     caseSensitive: false,
   ).firstMatch(label);
   if (roundMatch != null) {
-    return qualifier ? 'R${roundMatch.group(1)}Q' : 'R${roundMatch.group(1)}';
+    return 'R${roundMatch.group(1)}$suffix';
   }
   final loserMatch = RegExp(
     r'l-round\s*(\d+)',
@@ -7709,10 +7715,7 @@ List<RoundSeed> _normalizeLowerBracketRounds(
   final rawToLabel = {
     for (var i = 0; i < labels.length; i++) 'L${i + 1}': labels[i],
   };
-  final codeToIndex = {
-    for (var i = 0; i < labels.length; i++)
-      _bracketRoundCode(labels[i]).toUpperCase(): i,
-  };
+  final codeToIndex = _lowerBracketCodeIndex(labels);
   final lastRoundIndex = rounds.length - 1;
 
   return [
@@ -7730,6 +7733,20 @@ List<RoundSeed> _normalizeLowerBracketRounds(
           ),
       ]),
   ];
+}
+
+Map<String, int> _lowerBracketCodeIndex(List<String> labels) {
+  final codes = <String, int>{};
+  for (var i = 0; i < labels.length; i++) {
+    codes[_bracketRoundCode(labels[i]).toUpperCase()] = i;
+    if (labels[i].toLowerCase().contains('survival')) {
+      codes[_bracketRoundCode(labels[i].replaceAll(
+        RegExp('survival', caseSensitive: false),
+        'Qualifier',
+      )).toUpperCase()] = i;
+    }
+  }
+  return codes;
 }
 
 MatchSeed _rewriteLowerBracketMatch(
@@ -7837,8 +7854,8 @@ List<String> _lowerBracketRoundLabelsFromWinnerRounds(
   if (stages.isEmpty) return const [];
 
   return [
-    for (final stage in stages) ...['$stage Qualifier', stage],
-    'Final Qualifier',
+    for (final stage in stages) ...['$stage survival', stage],
+    'Final survival',
   ];
 }
 
@@ -7859,8 +7876,8 @@ String _lowerBracketRoundLabel(
       index + 1 < matchCounts.length && matchCounts[index + 1] == matchCount;
   final previousSame = index > 0 && matchCounts[index - 1] == matchCount;
   if (includesFinalRound && index == matchCounts.length - 1) return 'Final';
-  if (index == matchCounts.length - 1) return 'Final Qualifier';
-  if (nextSame && !previousSame) return '$stage Qualifier';
+  if (index == matchCounts.length - 1) return 'Final survival';
+  if (nextSame && !previousSame) return '$stage survival';
   return stage;
 }
 
@@ -7991,7 +8008,7 @@ const doubleEliminationWinnersRounds = [
 ];
 
 const doubleEliminationLosersRounds = [
-  RoundSeed('Quarterfinal Qualifier', [
+  RoundSeed('Quarterfinal survival', [
     MatchSeed('Zaid Hamdan', 'Hasan Qasem', '1-0', nextIndex: 0),
     MatchSeed('Noor Barakat', 'Khaled Mansour', '1-0', nextIndex: 1),
     MatchSeed('Tala Suleiman', 'Rania Odeh', '1-0', nextIndex: 2),
@@ -8003,7 +8020,7 @@ const doubleEliminationLosersRounds = [
     MatchSeed('Mohammad Al-Khatib', 'Tala Suleiman', '1-0'),
     MatchSeed('Amr Zaidan', 'Lina Shami', '1-0'),
   ]),
-  RoundSeed('Semifinal Qualifier', [
+  RoundSeed('Semifinal survival', [
     MatchSeed('Sara Nasser', 'Yazan Khaled', '1-0', nextIndex: 0),
     MatchSeed('Mohammad Al-Khatib', 'Amr Zaidan', '1-0', nextIndex: 1),
   ]),
@@ -8011,7 +8028,7 @@ const doubleEliminationLosersRounds = [
     MatchSeed('Leen Haddad', 'Sara Nasser', '0-1'),
     MatchSeed('Dana Aqel', 'Mohammad Al-Khatib', '0-1'),
   ]),
-  RoundSeed('Final Qualifier', [
+  RoundSeed('Final survival', [
     MatchSeed('Sara Nasser', 'Mohammad Al-Khatib', '1-0'),
   ]),
   RoundSeed('Final', [MatchSeed('Omar Saleh', 'Sara Nasser', 'live')]),

@@ -278,7 +278,7 @@
         ]
       },
       losers: {
-        rounds: ['Quarterfinal Qualifier', 'Quarterfinal', 'Semifinal Qualifier', 'Semifinal', 'Final Qualifier', 'Final'],
+        rounds: ['Quarterfinal survival', 'Quarterfinal', 'Semifinal survival', 'Semifinal', 'Final survival', 'Final'],
         matches: [
           [
             { a: 'Zaid Hamdan', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a', next: 0 },
@@ -319,14 +319,14 @@
       doneGames: [mkGame(51, 0, 2, '1-0', 'Jul 1', 'Vienna', 'W-SF'), mkGame(52, 1, 7, '1-0', 'Jul 1', 'Pirc', 'W-SF')],
       results: [
         { round: 'Winners Final \u00B7 Jul 3', rows: ['Ibrahim Ahmad 1\u20130 Omar Saleh'] },
-        { round: 'Final Qualifier \u00B7 Jul 3', rows: ['Sara Nasser 1\u20130 Mohammad Al-Khatib'] },
+        { round: 'Final survival \u00B7 Jul 3', rows: ['Sara Nasser 1\u20130 Mohammad Al-Khatib'] },
         { round: 'Winners Semifinal \u00B7 Jul 1', rows: ['Ibrahim Ahmad 1\u20130 Leen Haddad', 'Omar Saleh 1\u20130 Dana Aqel'] }
       ],
       schedule: [
         { when: 'Fri Jun 26 \u00B7 6:00 PM', what: 'W-Round of 16', where: 'Hall A', done: true },
         { when: 'Sun Jun 28 \u00B7 6:00 PM', what: 'W-Quarterfinal \u00B7 Quarterfinal', where: 'Hall A', done: true },
-        { when: 'Tue Jun 30 \u00B7 6:00 PM', what: 'Semifinal Qualifier', where: 'Hall A', done: true },
-        { when: 'Fri Jul 3 \u00B7 7:00 PM', what: 'W-Final \u00B7 Final Qualifier', where: 'Hall A', done: true },
+        { when: 'Tue Jun 30 \u00B7 6:00 PM', what: 'Semifinal survival', where: 'Hall A', done: true },
+        { when: 'Fri Jul 3 \u00B7 7:00 PM', what: 'W-Final \u00B7 Final survival', where: 'Hall A', done: true },
         { when: 'Sun Jul 5 \u00B7 6:00 PM', what: 'Final \u00B7 Grand Final', where: 'Hall A', now: true }
       ]
     },
