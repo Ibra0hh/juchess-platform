@@ -465,31 +465,38 @@ function RoundsTab({
         ) : null}
         <div className="round-list">
           {visibleRounds.map((round) => (
-            <article className={`round-card ${round.state}`} key={round.label}>
-              <div className="round-card-heading">
-                <div>
-                  <h3>{round.label}</h3>
-                  <small>{round.note}</small>
+            <article className={`round-admin-panel ${round.state}`} key={round.label}>
+              <div className="round-admin-head">
+                <strong>{round.label} pairings</strong>
+                <span>{roundAdminStatus(round, tournament)}</span>
+              </div>
+              {round.games.map((game) => (
+                <div className="round-admin-pairing" key={`${round.label}-${game.board}`}>
+                  <span>#{game.board}</span>
+                  <strong>
+                    {game.white.name}
+                    <small>{game.white.rating}</small>
+                  </strong>
+                  <em>vs</em>
+                  <strong>
+                    {game.black.name}
+                    <small>{game.black.rating}</small>
+                  </strong>
                 </div>
-                <span>{round.state === 'live' ? 'Live' : round.state === 'next' ? 'Next' : 'Done'}</span>
-              </div>
-              <div className="round-pairings">
-                {round.games.map((game) => (
-                  <div className="round-pairing" key={`${round.label}-${game.board}`}>
-                    <span>Board {game.board}</span>
-                    <strong>
-                      {game.white.name} vs {game.black.name}
-                    </strong>
-                    <em>{game.result}</em>
-                  </div>
-                ))}
-              </div>
+              ))}
             </article>
           ))}
         </div>
       </div>
     </section>
   )
+}
+
+function roundAdminStatus(round: RoundGroup, tournament: Tournament) {
+  if (tournament.status === 'Upcoming') return 'Draft pairings'
+  if (round.state === 'live') return 'Live current round'
+  if (round.state === 'next') return 'Next round'
+  return 'Recorded round'
 }
 
 function GamesTab({

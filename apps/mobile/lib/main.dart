@@ -3182,9 +3182,7 @@ class _TournamentRoundsTabState extends State<_TournamentRoundsTab> {
   @override
   Widget build(BuildContext context) {
     final showStageNav = _hasStageRounds(widget.event);
-    final rounds = widget.event.status == 'upcoming'
-        ? <RoundSeed>[]
-        : _roundsForStage(widget.event, _stageTab);
+    final rounds = _roundsForStage(widget.event, _stageTab);
     if (rounds.isEmpty) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -3207,33 +3205,173 @@ class _TournamentRoundsTabState extends State<_TournamentRoundsTab> {
             const SizedBox(height: 12),
           ],
           ...rounds.map(
-            (round) => PrototypeCard(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    round.label,
-                    style: const TextStyle(
-                      color: PrototypeColors.burgundy,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                  ...round.games.map(
-                    (game) => MatchLine(
-                      white: game.white,
-                      black: game.black,
-                      result: game.result,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            (round) => TournamentRoundPanel(event: widget.event, round: round),
           ),
         ],
       ),
+    );
+  }
+}
+
+class TournamentRoundPanel extends StatelessWidget {
+  const TournamentRoundPanel({
+    required this.event,
+    required this.round,
+    super.key,
+  });
+
+  final TournamentSeed event;
+  final RoundSeed round;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+            decoration: const BoxDecoration(
+              color: Color(0xfffaf7f1),
+              border: Border(bottom: BorderSide(color: Color(0xffe6dfd3))),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${round.label} pairings',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: PrototypeColors.navy,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  _roundPanelStatus(event, round),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    color: Color(0xff8b8577),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          for (var index = 0; index < round.games.length; index++)
+            TournamentPairingRow(
+              board: index + 1,
+              bottomBorder: index != round.games.length - 1,
+              match: round.games[index],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class TournamentPairingRow extends StatelessWidget {
+  const TournamentPairingRow({
+    required this.board,
+    required this.bottomBorder,
+    required this.match,
+    super.key,
+  });
+
+  final int board;
+  final bool bottomBorder;
+  final MatchSeed match;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        border: bottomBorder
+            ? const Border(bottom: BorderSide(color: Color(0xfff4f0e8)))
+            : null,
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 34,
+            child: Text(
+              '#$board',
+              style: const TextStyle(
+                color: Color(0xff8b8577),
+                fontFamily: 'monospace',
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          Expanded(
+            child: TournamentPairingPlayer(alignEnd: true, name: match.white),
+          ),
+          const SizedBox(
+            width: 44,
+            child: Text(
+              'vs',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: PrototypeColors.burgundy,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          Expanded(child: TournamentPairingPlayer(name: match.black)),
+        ],
+      ),
+    );
+  }
+}
+
+class TournamentPairingPlayer extends StatelessWidget {
+  const TournamentPairingPlayer({
+    required this.name,
+    this.alignEnd = false,
+    super.key,
+  });
+
+  final bool alignEnd;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      children: [
+        Text(
+          name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: alignEnd ? TextAlign.right : TextAlign.left,
+          style: const TextStyle(
+            color: PrototypeColors.navy,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            height: 1.15,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${_ratingForPlayerName(name)}',
+          style: const TextStyle(
+            color: Color(0xff8b8577),
+            fontFamily: 'monospace',
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -3410,8 +3548,55 @@ bool _hasStageRounds(TournamentSeed event) {
 }
 
 List<RoundSeed> _roundsForStage(TournamentSeed event, String stageTab) {
+  if (event.status == 'upcoming') {
+    return [_upcomingRoundForEvent(event, stageTab)];
+  }
   if (!_hasStageRounds(event)) return sampleRounds;
   return stageTab == 'stage-two' ? stageTwoRounds : stageOneRounds;
+}
+
+RoundSeed _upcomingRoundForEvent(TournamentSeed event, String stageTab) {
+  final label = _hasStageRounds(event)
+      ? stageTab == 'stage-two'
+            ? 'Stage Two - Round 1'
+            : 'Stage One - Round 1'
+      : 'Round 1';
+  final rotation = stageTab == 'stage-two' ? 2 : 1;
+  return RoundSeed(label, _pairingsForEvent(event, rotation));
+}
+
+List<MatchSeed> _pairingsForEvent(TournamentSeed event, int rotation) {
+  final declared = event.players > 0
+      ? event.players
+      : event.capacity ?? clubPlayers.length;
+  final count = math.max(2, math.min(clubPlayers.length, declared));
+  final players = clubPlayers.take(count).toList();
+  final shift = players.isEmpty ? 0 : rotation % players.length;
+  final rotated = [...players.skip(shift), ...players.take(shift)];
+  final shown = rotated.take(math.min(8, rotated.length)).toList();
+  final matches = <MatchSeed>[];
+
+  for (var index = 0; index + 1 < shown.length; index += 2) {
+    matches.add(MatchSeed(shown[index].name, shown[index + 1].name, '-'));
+  }
+
+  return matches;
+}
+
+String _roundPanelStatus(TournamentSeed event, RoundSeed round) {
+  if (event.status == 'upcoming') return 'Draft pairings';
+  if (round.games.any((game) => game.result == 'live')) {
+    return 'Live current round';
+  }
+  if (round.games.every((game) => game.result == '-')) return 'Next round';
+  return 'Recorded round';
+}
+
+int _ratingForPlayerName(String name) {
+  for (final player in clubPlayers) {
+    if (player.name == name) return player.rating;
+  }
+  return 1200;
 }
 
 bool _hasBracketTab(TournamentSeed event) {

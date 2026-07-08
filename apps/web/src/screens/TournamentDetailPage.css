@@ -542,8 +542,87 @@
 
 .round-list {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding: 16px;
+}
+
+.round-admin-panel {
+  overflow: hidden;
+  border: 1px solid #e6dfd3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.round-admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px;
+  border-bottom: 1px solid #e6dfd3;
+  background: #faf7f1;
+  color: #14213d;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.round-admin-head span {
+  color: #8b8577;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.round-admin-panel.live .round-admin-head span {
+  color: #7a2431;
+}
+
+.round-admin-pairing {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 60px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-bottom: 1px solid #f4f0e8;
+}
+
+.round-admin-pairing:last-child {
+  border-bottom: 0;
+}
+
+.round-admin-pairing > span {
+  color: #8b8577;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.round-admin-pairing strong {
+  min-width: 0;
+  color: #14213d;
+  font-size: 13.5px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.round-admin-pairing strong:first-of-type {
+  text-align: right;
+}
+
+.round-admin-pairing small {
+  display: block;
+  margin-top: 1px;
+  color: #8b8577;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.round-admin-pairing em {
+  color: #7a2431;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  text-align: center;
 }
 
 .round-card {
@@ -1022,6 +1101,25 @@
 
   .round-list {
     padding: 12px;
+  }
+
+  .round-admin-head {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 13px 14px;
+  }
+
+  .round-admin-pairing {
+    grid-template-columns: 38px minmax(0, 1fr) 38px minmax(0, 1fr);
+    padding: 12px 14px;
+  }
+
+  .round-admin-pairing strong {
+    font-size: 12.5px;
+  }
+
+  .round-admin-pairing small {
+    font-size: 10.5px;
   }
 
   .round-card-heading {
