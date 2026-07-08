@@ -57,6 +57,7 @@ type BracketMatch = {
   sb?: number
   w?: 'a' | 'b'
   live?: boolean
+  next?: number
 }
 
 type BracketDefinition = {
@@ -114,50 +115,64 @@ const bracketConfigs: Record<string, BracketConfig> = {
     title: 'Double elimination bracket',
     brackets: {
       winners: {
-        rounds: ['Round 1', 'Round 2', 'Semifinal', 'W-Final'],
+        rounds: ['W-Round of 16', 'W-Quarterfinal', 'W-Semifinal', 'W-Final'],
         matches: [
+          [
+            { a: 'Ibrahim Ahmad', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
+            { a: 'Sara Nasser', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a' },
+            { a: 'Leen Haddad', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
+            { a: 'Yazan Khaled', b: 'Khaled Mansour', sa: 1, sb: 0, w: 'a' },
+            { a: 'Omar Saleh', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
+            { a: 'Mohammad Al-Khatib', b: 'Rania Odeh', sa: 1, sb: 0, w: 'a' },
+            { a: 'Amr Zaidan', b: 'Lina Shami', sa: 1, sb: 0, w: 'a' },
+            { a: 'Dana Aqel', b: 'Fadi Rimawi', sa: 1, sb: 0, w: 'a' },
+          ],
+          [
+            { a: 'Ibrahim Ahmad', b: 'Sara Nasser', sa: 1, sb: 0, w: 'a' },
+            { a: 'Leen Haddad', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a' },
+            { a: 'Omar Saleh', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' },
+            { a: 'Dana Aqel', b: 'Amr Zaidan', sa: 1, sb: 0, w: 'a' },
+          ],
+          [
+            { a: 'Ibrahim Ahmad', b: 'Leen Haddad', sa: 1, sb: 0, w: 'a' },
+            { a: 'Omar Saleh', b: 'Dana Aqel', sa: 1, sb: 0, w: 'a' },
+          ],
+          [{ a: 'Ibrahim Ahmad', b: 'Omar Saleh', sa: 1, sb: 0, w: 'a' }],
+        ],
+      },
+      losers: {
+        rounds: ['L-Round 1', 'L-Round 2', 'L-Round 3', 'L-Round 4', 'L-Semifinal', 'L-Final'],
+        matches: [
+          [
+            { a: 'Zaid Hamdan', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a', next: 0 },
+            { a: 'Noor Barakat', b: 'Khaled Mansour', sa: 1, sb: 0, w: 'a', next: 1 },
+            { a: 'Tala Suleiman', b: 'Rania Odeh', sa: 1, sb: 0, w: 'a', next: 2 },
+            { a: 'Lina Shami', b: 'Fadi Rimawi', sa: 1, sb: 0, w: 'a', next: 3 },
+          ],
           [
             { a: 'Sara Nasser', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
             { a: 'Yazan Khaled', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
             { a: 'Mohammad Al-Khatib', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
-            { a: 'Rania Odeh', b: 'Hasan Qasem', sa: 0, sb: 1, w: 'b' },
+            { a: 'Amr Zaidan', b: 'Lina Shami', sa: 1, sb: 0, w: 'a' },
           ],
           [
-            { a: 'Ibrahim Ahmad', b: 'Sara Nasser', sa: 1, sb: 0, w: 'a' },
-            { a: 'Omar Saleh', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a' },
-            { a: 'Leen Haddad', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' },
-            { a: 'Khaled Mansour', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a' },
+            { a: 'Sara Nasser', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a', next: 0 },
+            { a: 'Mohammad Al-Khatib', b: 'Amr Zaidan', sa: 1, sb: 0, w: 'a', next: 1 },
           ],
           [
-            { a: 'Ibrahim Ahmad', b: 'Omar Saleh', sa: 1, sb: 0, w: 'a' },
-            { a: 'Leen Haddad', b: 'Khaled Mansour', sa: 1, sb: 0, w: 'a' },
+            { a: 'Leen Haddad', b: 'Sara Nasser', sa: 0, sb: 1, w: 'b' },
+            { a: 'Dana Aqel', b: 'Mohammad Al-Khatib', sa: 0, sb: 1, w: 'b' },
           ],
-          [{ a: 'Ibrahim Ahmad', b: 'Leen Haddad', live: true }],
-        ],
-      },
-      losers: {
-        rounds: ['L-Round 1', 'L-Round 2', 'L-Round 3', 'L-Final'],
-        matches: [
-          [
-            { a: 'Zaid Hamdan', b: 'Noor Barakat', sa: 0, sb: 1, w: 'b' },
-            { a: 'Tala Suleiman', b: 'Rania Odeh', sa: 1, sb: 0, w: 'a' },
-          ],
-          [
-            { a: 'Sara Nasser', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
-            { a: 'Yazan Khaled', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
-            { a: 'Mohammad Al-Khatib', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a' },
-          ],
-          [
-            { a: 'Omar Saleh', b: 'Sara Nasser', live: true },
-            { a: 'Khaled Mansour', b: 'Yazan Khaled', live: true },
-            { a: 'Mohammad Al-Khatib', b: 'bye', sa: 1, sb: 0, w: 'a' },
-          ],
-          [{ a: 'TBD', b: 'TBD' }],
+          [{ a: 'Sara Nasser', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' }],
+          [{ a: 'Omar Saleh', b: 'Sara Nasser', live: true }],
         ],
       },
       final: {
-        rounds: ['Grand Final'],
-        matches: [[{ a: 'Winners champion', b: 'Losers champion' }]],
+        rounds: ['Grand Final', 'Reset if needed'],
+        matches: [
+          [{ a: 'Ibrahim Ahmad', b: 'Winner L-Final' }],
+          [{ a: 'Winner Grand Final', b: 'Reset only if needed' }],
+        ],
       },
     },
   },
@@ -779,6 +794,7 @@ function BracketMatchCard({
     <div
       className={`bracket-match rich ${stateClass} ${isLastRound ? 'last-round' : ''}`}
       data-brk-card={`${roundIndex}-${matchIndex}`}
+      data-target={match.next ?? ''}
       data-win={lineState}
     >
       {match.live ? (
@@ -830,7 +846,10 @@ function drawBracketLines(track: HTMLDivElement) {
     if (!nextRound.length) return
 
     currentRound.forEach((match) => {
-      const target = nextRound.find((candidate) => candidate.index === Math.floor(match.index / 2))
+      const targetData = match.element.dataset.target
+      const parsedTarget = targetData ? Number(targetData) : Number.NaN
+      const targetIndex = Number.isFinite(parsedTarget) ? parsedTarget : Math.floor(match.index / 2)
+      const target = nextRound.find((candidate) => candidate.index === targetIndex)
       if (!target) return
 
       const from = match.element.getBoundingClientRect()
@@ -886,8 +905,10 @@ function isPendingMatch(match: BracketMatch) {
   return (
     match.a === 'TBD'
     || match.b === 'TBD'
-    || match.a === 'Winners champion'
-    || match.b === 'Losers champion'
+    || match.a.startsWith('Winner ')
+    || match.b.startsWith('Winner ')
+    || match.a.startsWith('Reset ')
+    || match.b.startsWith('Reset ')
   )
 }
 

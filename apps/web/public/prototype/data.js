@@ -247,71 +247,87 @@
     },
     {
       id: 'double-elimination', name: 'Double elimination', format: 'Double elimination', status: 'Active',
-      timeControl: '5+3 Blitz', date: 'Jun 26 \u2013 Jul 5, 2026', location: 'Hall A', participants: 12,
-      round: 'Losers Round 3', desc: 'Twelve blitz players, two lives each. Lose once, drop to the losers bracket; lose twice, you\u2019re out.',
+      timeControl: '5+3 Blitz', date: 'Jun 26 \u2013 Jul 5, 2026', location: 'Hall A', participants: 16,
+      round: 'Losers Final', desc: 'Sixteen blitz players, two lives each. Lose once, drop to the losers bracket; lose twice, you\u2019re out.',
       winners: {
-        rounds: ['Round 1', 'Round 2', 'Semifinal', 'W-Final'],
+        rounds: ['W-Round of 16', 'W-Quarterfinal', 'W-Semifinal', 'W-Final'],
         matches: [
           [
-            { a: 'Sara Nasser', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
-            { a: 'Yazan Khaled', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
-            { a: 'Mohammad Al-Khatib', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
-            { a: 'Rania Odeh', b: 'Hasan Qasem', sa: 0, sb: 1, w: 'b' }
+            { a: 'Ibrahim Ahmad', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
+            { a: 'Sara Nasser', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a' },
+            { a: 'Leen Haddad', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
+            { a: 'Yazan Khaled', b: 'Khaled Mansour', sa: 1, sb: 0, w: 'a' },
+            { a: 'Omar Saleh', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
+            { a: 'Mohammad Al-Khatib', b: 'Rania Odeh', sa: 1, sb: 0, w: 'a' },
+            { a: 'Amr Zaidan', b: 'Lina Shami', sa: 1, sb: 0, w: 'a' },
+            { a: 'Dana Aqel', b: 'Fadi Rimawi', sa: 1, sb: 0, w: 'a' }
           ],
           [
             { a: 'Ibrahim Ahmad', b: 'Sara Nasser', sa: 1, sb: 0, w: 'a' },
-            { a: 'Omar Saleh', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a' },
-            { a: 'Leen Haddad', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' },
-            { a: 'Khaled Mansour', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a' }
+            { a: 'Leen Haddad', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a' },
+            { a: 'Omar Saleh', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' },
+            { a: 'Dana Aqel', b: 'Amr Zaidan', sa: 1, sb: 0, w: 'a' }
           ],
           [
-            { a: 'Ibrahim Ahmad', b: 'Omar Saleh', sa: 1, sb: 0, w: 'a' },
-            { a: 'Leen Haddad', b: 'Khaled Mansour', sa: 1, sb: 0, w: 'a' }
+            { a: 'Ibrahim Ahmad', b: 'Leen Haddad', sa: 1, sb: 0, w: 'a' },
+            { a: 'Omar Saleh', b: 'Dana Aqel', sa: 1, sb: 0, w: 'a' }
           ],
           [
-            { a: 'Ibrahim Ahmad', b: 'Leen Haddad', live: true }
+            { a: 'Ibrahim Ahmad', b: 'Omar Saleh', sa: 1, sb: 0, w: 'a' }
           ]
         ]
       },
       losers: {
-        rounds: ['L-Round 1', 'L-Round 2', 'L-Round 3', 'L-Final'],
+        rounds: ['L-Round 1', 'L-Round 2', 'L-Round 3', 'L-Round 4', 'L-Semifinal', 'L-Final'],
         matches: [
           [
-            { a: 'Zaid Hamdan', b: 'Noor Barakat', sa: 0, sb: 1, w: 'b' },
-            { a: 'Tala Suleiman', b: 'Rania Odeh', sa: 1, sb: 0, w: 'a' }
+            { a: 'Zaid Hamdan', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a', next: 0 },
+            { a: 'Noor Barakat', b: 'Khaled Mansour', sa: 1, sb: 0, w: 'a', next: 1 },
+            { a: 'Tala Suleiman', b: 'Rania Odeh', sa: 1, sb: 0, w: 'a', next: 2 },
+            { a: 'Lina Shami', b: 'Fadi Rimawi', sa: 1, sb: 0, w: 'a', next: 3 }
           ],
           [
-            { a: 'Sara Nasser', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
-            { a: 'Yazan Khaled', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
-            { a: 'Mohammad Al-Khatib', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a' }
+            { a: 'Sara Nasser', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
+            { a: 'Yazan Khaled', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
+            { a: 'Mohammad Al-Khatib', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
+            { a: 'Amr Zaidan', b: 'Lina Shami', sa: 1, sb: 0, w: 'a' }
           ],
           [
-            { a: 'Omar Saleh', b: 'Sara Nasser', live: true },
-            { a: 'Khaled Mansour', b: 'Yazan Khaled', live: true },
-            { a: 'Mohammad Al-Khatib', b: 'bye', sa: 1, sb: 0, w: 'a' }
+            { a: 'Sara Nasser', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a', next: 0 },
+            { a: 'Mohammad Al-Khatib', b: 'Amr Zaidan', sa: 1, sb: 0, w: 'a', next: 1 }
           ],
           [
-            { a: 'TBD', b: 'TBD' }
+            { a: 'Leen Haddad', b: 'Sara Nasser', sa: 0, sb: 1, w: 'b' },
+            { a: 'Dana Aqel', b: 'Mohammad Al-Khatib', sa: 0, sb: 1, w: 'b' }
+          ],
+          [
+            { a: 'Sara Nasser', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' }
+          ],
+          [
+            { a: 'Omar Saleh', b: 'Sara Nasser', live: true }
           ]
         ]
       },
       finals: {
-        rounds: ['Grand Final'],
-        matches: [[{ a: 'Winners champion', b: 'Losers champion' }]]
+        rounds: ['Grand Final', 'Reset if needed'],
+        matches: [
+          [{ a: 'Ibrahim Ahmad', b: 'Winner L-Final' }],
+          [{ a: 'Winner Grand Final', b: 'Reset only if needed' }]
+        ]
       },
-      liveGames: [live(108, 0, 2, 1, 'W-Final'), live(109, 1, 4, 2, 'L-R3'), live(110, 7, 3, 3, 'L-R3')],
-      doneGames: [mkGame(51, 0, 1, '1-0', 'Jul 1', 'Vienna', 'W-SF'), mkGame(52, 2, 7, '1-0', 'Jul 1', 'Pirc', 'W-SF')],
+      liveGames: [live(108, 1, 4, 1, 'L-Final')],
+      doneGames: [mkGame(51, 0, 2, '1-0', 'Jul 1', 'Vienna', 'W-SF'), mkGame(52, 1, 7, '1-0', 'Jul 1', 'Pirc', 'W-SF')],
       results: [
-        { round: 'Winners Semifinal \u00B7 Jul 1', rows: ['Ibrahim Ahmad 1\u20130 Omar Saleh', 'Leen Haddad 1\u20130 Khaled Mansour'] },
-        { round: 'Losers Round 2 \u00B7 Jun 30', rows: ['Sara Nasser 1\u20130 Noor Barakat', 'Yazan Khaled 1\u20130 Tala Suleiman', 'Mohammad Al-Khatib 1\u20130 Hasan Qasem'] },
-        { round: 'Winners Round 2 \u00B7 Jun 28', rows: ['Ibrahim Ahmad 1\u20130 Sara Nasser', 'Omar Saleh 1\u20130 Yazan Khaled', 'Leen Haddad 1\u20130 Mohammad Al-Khatib', 'Khaled Mansour 1\u20130 Hasan Qasem'] }
+        { round: 'Winners Final \u00B7 Jul 3', rows: ['Ibrahim Ahmad 1\u20130 Omar Saleh'] },
+        { round: 'Losers Semifinal \u00B7 Jul 3', rows: ['Sara Nasser 1\u20130 Mohammad Al-Khatib'] },
+        { round: 'Winners Semifinal \u00B7 Jul 1', rows: ['Ibrahim Ahmad 1\u20130 Leen Haddad', 'Omar Saleh 1\u20130 Dana Aqel'] }
       ],
       schedule: [
-        { when: 'Fri Jun 26 \u00B7 6:00 PM', what: 'Winners Round 1', where: 'Hall A', done: true },
-        { when: 'Sun Jun 28 \u00B7 6:00 PM', what: 'Winners Round 2 \u00B7 Losers Round 1', where: 'Hall A', done: true },
-        { when: 'Tue Jun 30 \u00B7 6:00 PM', what: 'Losers Round 2', where: 'Hall A', done: true },
-        { when: 'Fri Jul 3 \u00B7 7:00 PM', what: 'Winners Final \u00B7 Losers Round 3', where: 'Hall A', now: true },
-        { when: 'Sun Jul 5 \u00B7 6:00 PM', what: 'Losers Final \u00B7 Grand Final', where: 'Hall A' }
+        { when: 'Fri Jun 26 \u00B7 6:00 PM', what: 'W-Round of 16', where: 'Hall A', done: true },
+        { when: 'Sun Jun 28 \u00B7 6:00 PM', what: 'W-Quarterfinal \u00B7 L-Round 2', where: 'Hall A', done: true },
+        { when: 'Tue Jun 30 \u00B7 6:00 PM', what: 'L-Round 3', where: 'Hall A', done: true },
+        { when: 'Fri Jul 3 \u00B7 7:00 PM', what: 'W-Final \u00B7 L-Semifinal', where: 'Hall A', done: true },
+        { when: 'Sun Jul 5 \u00B7 6:00 PM', what: 'L-Final \u00B7 Grand Final', where: 'Hall A', now: true }
       ]
     },
     {

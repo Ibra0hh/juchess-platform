@@ -461,7 +461,7 @@
                 <div style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: rgba(30,43,69,.6); padding: 0 4px 10px; text-align: center;">{{ col.name }}</div>
                 <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 12px;">
                   <sc-for list="{{ col.matches }}" as="m" hint-placeholder-count="2">
-                    <div data-brk-card="{{ m.cid }}" data-win="{{ m.win }}" style="position: relative; z-index: 1; background: {{ m.bg }}; border: 1px solid {{ m.bd }}; border-left: 3px solid {{ m.accent }}; border-radius: 8px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(30,43,69,.06);">
+                    <div data-brk-card="{{ m.cid }}" data-target="{{ m.next }}" data-win="{{ m.win }}" style="position: relative; z-index: 1; background: {{ m.bg }}; border: 1px solid {{ m.bd }}; border-left: 3px solid {{ m.accent }}; border-radius: 8px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(30,43,69,.06);">
                       <sc-if value="{{ m.tag }}" hint-placeholder-val="{{ false }}">
                         <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 6px;"><span class="ju-pulse" style="width: 5px; height: 5px; border-radius: 50%; background: #7A2431;"></span><span style="font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #7A2431;">{{ m.tag }}</span></div>
                       </sc-if>
@@ -510,9 +510,9 @@ class Component extends DCLogic {
         name: name, idx: ri,
         matches: (br.matches[ri] || []).map(function (m, mi) {
           var aWin = m.w === 'a', bWin = m.w === 'b';
-          var tbd = m.a === 'TBD' || m.b === 'TBD' || m.a === 'Winners champion';
+          var tbd = m.a === 'TBD' || m.b === 'TBD' || m.a.indexOf('Winner ') === 0 || m.b.indexOf('Winner ') === 0 || m.a.indexOf('Reset ') === 0 || m.b.indexOf('Reset ') === 0;
           return {
-            mi: mi, cid: ri + '-' + mi, win: m.w || (m.live ? 'live' : ''),
+            mi: mi, cid: ri + '-' + mi, next: m.next == null ? '' : m.next, win: m.w || (m.live ? 'live' : ''),
             a: m.a, b: m.b,
             sa: m.live ? '\u2022' : (m.sa === undefined ? '' : m.sa),
             sb: m.live ? '\u2022' : (m.sb === undefined ? '' : m.sb),
@@ -841,8 +841,8 @@ class Component extends DCLogic {
     var byCol = {};
     cards.forEach(function (el) {
       var p = el.getAttribute('data-brk-card').split('-');
-      var c = +p[0], i = +p[1];
-      (byCol[c] = byCol[c] || []).push({ el: el, i: i, win: el.getAttribute('data-win') });
+      var c = +p[0], i = +p[1], target = el.getAttribute('data-target');
+      (byCol[c] = byCol[c] || []).push({ el: el, i: i, target: target, win: el.getAttribute('data-win') });
     });
     var cols = Object.keys(byCol).map(Number).sort(function (a, b) { return a - b; });
     var base = inner.getBoundingClientRect();
@@ -854,8 +854,9 @@ class Component extends DCLogic {
       var next = byCol[c + 1];
       if (!next) return;
       byCol[c].forEach(function (m) {
+        var targetIndex = m.target === '' || m.target == null ? Math.floor(m.i / 2) : Number(m.target);
         var target = null;
-        for (var k = 0; k < next.length; k++) if (next[k].i === Math.floor(m.i / 2)) { target = next[k]; break; }
+        for (var k = 0; k < next.length; k++) if (next[k].i === targetIndex) { target = next[k]; break; }
         if (!target) return;
         var r1 = m.el.getBoundingClientRect(), r2 = target.el.getBoundingClientRect();
         var x1 = r1.right - base.left, y1 = r1.top - base.top + r1.height / 2;

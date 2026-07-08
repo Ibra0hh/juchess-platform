@@ -376,15 +376,15 @@ class AppwriteService {
 
     final rows =
         uniqueTournamentsByFormat(
-            response.rows
-                .map((row) => _mapTournament(row, counts))
-                .whereType<TournamentSeed>())
-          ..sort((a, b) {
-            final status = _statusOrder(
-              a.status,
-            ).compareTo(_statusOrder(b.status));
-            return status == 0 ? a.name.compareTo(b.name) : status;
-          });
+          response.rows
+              .map((row) => _mapTournament(row, counts))
+              .whereType<TournamentSeed>(),
+        )..sort((a, b) {
+          final status = _statusOrder(
+            a.status,
+          ).compareTo(_statusOrder(b.status));
+          return status == 0 ? a.name.compareTo(b.name) : status;
+        });
 
     return rows;
   }
@@ -472,7 +472,9 @@ class AppwriteService {
       name: displayFormat,
       meta: '${_formatDate(startsAt)} · $location',
       chips: [
-        roundsTotal == null ? displayFormat : '$displayFormat · $roundsTotal rounds',
+        roundsTotal == null
+            ? displayFormat
+            : '$displayFormat · $roundsTotal rounds',
         timeControl,
         capacity == null
             ? '$displayedPlayers players'
@@ -980,8 +982,10 @@ String normalizeTournamentFormat(String value) {
   if (RegExp(r'^round[-\s]?robin$', caseSensitive: false).hasMatch(trimmed)) {
     return 'Round robin';
   }
-  if (RegExp(r'^double\s+round[-\s]?robin$', caseSensitive: false)
-      .hasMatch(trimmed)) {
+  if (RegExp(
+    r'^double\s+round[-\s]?robin$',
+    caseSensitive: false,
+  ).hasMatch(trimmed)) {
     return 'Double round robin';
   }
   return trimmed;
@@ -2526,6 +2530,9 @@ class _TournamentMainTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (_mainTabLabel(event) == 'Bracket') {
+      if (_isDoubleElimination(event)) {
+        return const TournamentDoubleEliminationBracketView();
+      }
       return const TournamentBracketView(rounds: bracketRounds);
     }
 
@@ -2549,6 +2556,62 @@ class _TournamentMainTab extends StatelessWidget {
           }).toList(),
         ),
       ),
+    );
+  }
+}
+
+class TournamentDoubleEliminationBracketView extends StatefulWidget {
+  const TournamentDoubleEliminationBracketView({super.key});
+
+  @override
+  State<TournamentDoubleEliminationBracketView> createState() =>
+      _TournamentDoubleEliminationBracketViewState();
+}
+
+class _TournamentDoubleEliminationBracketViewState
+    extends State<TournamentDoubleEliminationBracketView> {
+  int _selectedView = 0;
+
+  List<RoundSeed> get _rounds {
+    return switch (_selectedView) {
+      1 => doubleEliminationLosersRounds,
+      2 => doubleEliminationFinalRounds,
+      _ => doubleEliminationWinnersRounds,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const views = ['Winners', 'Losers', 'Final'];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (var i = 0; i < views.length; i++) ...[
+                  GestureDetector(
+                    onTap: () => setState(() => _selectedView = i),
+                    child: DetailTabPill(
+                      views[i],
+                      selected: i == _selectedView,
+                    ),
+                  ),
+                  if (i != views.length - 1) const SizedBox(width: 7),
+                ],
+              ],
+            ),
+          ),
+        ),
+        TournamentBracketView(
+          key: ValueKey('double-bracket-$_selectedView'),
+          rounds: _rounds,
+        ),
+      ],
     );
   }
 }
@@ -2829,31 +2892,30 @@ class BracketConnectorPainter extends CustomPainter {
       ..color = const Color(0x667d2434)
       ..style = PaintingStyle.fill;
 
-    for (var i = 0; i < targetMatches; i++) {
-      final firstSource = i * 2;
-      if (firstSource >= sourceMatches.length) break;
+    for (
+      var sourceIndex = 0;
+      sourceIndex < sourceMatches.length;
+      sourceIndex++
+    ) {
+      final match = sourceMatches[sourceIndex];
+      final targetIndex = match.nextIndex ?? (sourceIndex ~/ 2);
+      if (targetIndex >= targetMatches) continue;
 
-      final targetY = BracketMetrics.matchCenter(roundIndex + 1, i);
+      final sourceY = BracketMetrics.matchCenter(roundIndex, sourceIndex);
+      final targetY = BracketMetrics.matchCenter(roundIndex + 1, targetIndex);
       final midX = size.width / 2;
+      final paint = switch (match.result.toLowerCase()) {
+        'live' => livePaint,
+        '1-0' || '0-1' => decidedPaint,
+        _ => mutedPaint,
+      };
 
-      for (final sourceIndex in [firstSource, firstSource + 1]) {
-        if (sourceIndex >= sourceMatches.length) continue;
-        final sourceY = BracketMetrics.matchCenter(roundIndex, sourceIndex);
-        final match = sourceMatches[sourceIndex];
-        final paint = switch (match.result.toLowerCase()) {
-          'live' => livePaint,
-          '1-0' || '0-1' => decidedPaint,
-          _ => mutedPaint,
-        };
-
-        final path = Path()
-          ..moveTo(0, sourceY)
-          ..lineTo(midX, sourceY)
-          ..lineTo(midX, targetY)
-          ..lineTo(size.width, targetY);
-        canvas.drawPath(path, paint);
-      }
-
+      final path = Path()
+        ..moveTo(0, sourceY)
+        ..lineTo(midX, sourceY)
+        ..lineTo(midX, targetY)
+        ..lineTo(size.width, targetY);
+      canvas.drawPath(path, paint);
       canvas.drawCircle(Offset(size.width, targetY), 2.0, endPaint);
     }
   }
@@ -3325,6 +3387,10 @@ List<RoundSeed> _roundsForStage(TournamentSeed event, String stageTab) {
 bool _hasBracketTab(TournamentSeed event) {
   final lower = event.format.toLowerCase();
   return lower.contains('knockout') || lower.contains('elimination');
+}
+
+bool _isDoubleElimination(TournamentSeed event) {
+  return event.format.toLowerCase().contains('double elimination');
 }
 
 class TournamentInfoTile extends StatelessWidget {
@@ -4155,8 +4221,8 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                   Text(
                     result == 'Live'
                         ? moves.length.isEven
-                            ? 'White to move'
-                            : 'Black to move'
+                              ? 'White to move'
+                              : 'Black to move'
                         : 'Result $result',
                     style: TextStyle(
                       color: Color(0xcc21304e),
@@ -4277,10 +4343,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
 
   void _playMove(String from, String to, [String? promotion]) {
     final game = _gameFromMoves();
-    final moveRequest = {
-      'from': from,
-      'to': to,
-    };
+    final moveRequest = {'from': from, 'to': to};
     if (promotion != null) moveRequest['promotion'] = promotion;
     final ok = game.move(moveRequest);
     if (!ok) {
@@ -4397,7 +4460,8 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
                   final dark = (_files.indexOf(file) + rank).isOdd;
                   final selected = selectedSquare == square;
                   final target = targets.contains(square);
-                  final last = lastMove?['from'] == square || lastMove?['to'] == square;
+                  final last =
+                      lastMove?['from'] == square || lastMove?['to'] == square;
                   final check = checkSquare == square;
 
                   return GestureDetector(
@@ -4571,10 +4635,12 @@ class _MobileChessPiece extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final constrainedSide = math.min(
-          constraints.maxWidth.isFinite ? constraints.maxWidth : 42.0,
-          constraints.maxHeight.isFinite ? constraints.maxHeight : 42.0,
-        ).toDouble();
+        final constrainedSide = math
+            .min(
+              constraints.maxWidth.isFinite ? constraints.maxWidth : 42.0,
+              constraints.maxHeight.isFinite ? constraints.maxHeight : 42.0,
+            )
+            .toDouble();
         final base = compact ? 42.0 : math.max(34.0, constrainedSide);
 
         return SizedBox(
@@ -5086,10 +5152,7 @@ class NewsList extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          NewsTile(
-            'Swiss round 4 is live',
-            'Main Campus · Hall B',
-          ),
+          NewsTile('Swiss round 4 is live', 'Main Campus · Hall B'),
           SizedBox(height: 10),
           NewsTile(
             'Round robin registration opens soon',
@@ -6548,11 +6611,12 @@ class RoundSeed {
 }
 
 class MatchSeed {
-  const MatchSeed(this.white, this.black, this.result);
+  const MatchSeed(this.white, this.black, this.result, {this.nextIndex});
 
   final String white;
   final String black;
   final String result;
+  final int? nextIndex;
 }
 
 class SavedAnalysisSeed {
@@ -6654,6 +6718,64 @@ const bracketRounds = [
     MatchSeed('Omar Saleh', 'Leen Haddad', 'live'),
   ]),
   RoundSeed('Final', [MatchSeed('TBD', 'TBD', '-')]),
+];
+
+const doubleEliminationWinnersRounds = [
+  RoundSeed('W-Round of 16', [
+    MatchSeed('Ibrahim Ahmad', 'Zaid Hamdan', '1-0'),
+    MatchSeed('Sara Nasser', 'Hasan Qasem', '1-0'),
+    MatchSeed('Leen Haddad', 'Noor Barakat', '1-0'),
+    MatchSeed('Yazan Khaled', 'Khaled Mansour', '1-0'),
+    MatchSeed('Omar Saleh', 'Tala Suleiman', '1-0'),
+    MatchSeed('Mohammad Al-Khatib', 'Rania Odeh', '1-0'),
+    MatchSeed('Amr Zaidan', 'Lina Shami', '1-0'),
+    MatchSeed('Dana Aqel', 'Fadi Rimawi', '1-0'),
+  ]),
+  RoundSeed('W-Quarterfinal', [
+    MatchSeed('Ibrahim Ahmad', 'Sara Nasser', '1-0'),
+    MatchSeed('Leen Haddad', 'Yazan Khaled', '1-0'),
+    MatchSeed('Omar Saleh', 'Mohammad Al-Khatib', '1-0'),
+    MatchSeed('Dana Aqel', 'Amr Zaidan', '1-0'),
+  ]),
+  RoundSeed('W-Semifinal', [
+    MatchSeed('Ibrahim Ahmad', 'Leen Haddad', '1-0'),
+    MatchSeed('Omar Saleh', 'Dana Aqel', '1-0'),
+  ]),
+  RoundSeed('W-Final', [MatchSeed('Ibrahim Ahmad', 'Omar Saleh', '1-0')]),
+];
+
+const doubleEliminationLosersRounds = [
+  RoundSeed('L-Round 1', [
+    MatchSeed('Zaid Hamdan', 'Hasan Qasem', '1-0', nextIndex: 0),
+    MatchSeed('Noor Barakat', 'Khaled Mansour', '1-0', nextIndex: 1),
+    MatchSeed('Tala Suleiman', 'Rania Odeh', '1-0', nextIndex: 2),
+    MatchSeed('Lina Shami', 'Fadi Rimawi', '1-0', nextIndex: 3),
+  ]),
+  RoundSeed('L-Round 2', [
+    MatchSeed('Sara Nasser', 'Zaid Hamdan', '1-0'),
+    MatchSeed('Yazan Khaled', 'Noor Barakat', '1-0'),
+    MatchSeed('Mohammad Al-Khatib', 'Tala Suleiman', '1-0'),
+    MatchSeed('Amr Zaidan', 'Lina Shami', '1-0'),
+  ]),
+  RoundSeed('L-Round 3', [
+    MatchSeed('Sara Nasser', 'Yazan Khaled', '1-0', nextIndex: 0),
+    MatchSeed('Mohammad Al-Khatib', 'Amr Zaidan', '1-0', nextIndex: 1),
+  ]),
+  RoundSeed('L-Round 4', [
+    MatchSeed('Leen Haddad', 'Sara Nasser', '0-1'),
+    MatchSeed('Dana Aqel', 'Mohammad Al-Khatib', '0-1'),
+  ]),
+  RoundSeed('L-Semifinal', [
+    MatchSeed('Sara Nasser', 'Mohammad Al-Khatib', '1-0'),
+  ]),
+  RoundSeed('L-Final', [MatchSeed('Omar Saleh', 'Sara Nasser', 'live')]),
+];
+
+const doubleEliminationFinalRounds = [
+  RoundSeed('Grand Final', [MatchSeed('Ibrahim Ahmad', 'Winner L-Final', '-')]),
+  RoundSeed('Reset if needed', [
+    MatchSeed('Winner Grand Final', 'Reset only if needed', '-'),
+  ]),
 ];
 
 const savedAnalyses = [
