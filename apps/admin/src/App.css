@@ -2256,12 +2256,15 @@ button {
 }
 
 .live-board-panel {
-  max-width: 980px;
-  margin: 18px auto 0;
+  margin: 0;
   overflow: hidden;
-  border: 1px solid #e6dfd3;
-  border-radius: 12px;
-  background: #fff;
+  border-top: 1px solid #e6dfd3;
+  background: #fffaf1;
+}
+
+.bracket-panel + .live-board-panel,
+.pairing-round-block + .live-board-panel {
+  margin-top: 0;
 }
 
 .live-board-layout {

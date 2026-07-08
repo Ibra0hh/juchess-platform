@@ -1200,12 +1200,12 @@ function TournamentsScreen({
       return
     }
 
-    if (isSwissTournament(item) && item.status !== 'active') {
-      setMessage('Swiss pairings are published after the tournament is moved to Active.')
+    if (usesSwissPublishFlow(item) && item.status !== 'active') {
+      setMessage(`${item.name} pairings are published after the tournament is moved to Active.`)
       return
     }
 
-    if (!isSwissTournament(item) && item.status !== 'upcoming') {
+    if (!usesSwissPublishFlow(item) && item.status !== 'upcoming') {
       setMessage(`${item.name} pairings are published from Upcoming management.`)
       return
     }
@@ -1636,7 +1636,7 @@ function TournamentManageView({
   tournament: AdminTournament
 }) {
   const knockout = isKnockoutTournament(tournament)
-  const swiss = isSwissTournament(tournament)
+  const swissFlow = usesSwissPublishFlow(tournament)
   const roundRobin = isRoundRobinTournament(tournament)
   const playStage = knockout ? 'bracket' : 'rounds'
   const [stage, setStage] = useState(playStage)
@@ -1682,10 +1682,10 @@ function TournamentManageView({
   ), [physicalBoards, procedureMatches, stage])
   const publishableGames = useMemo(() => buildPublishableGames(
     knockout ? firstBracketRoundPairings(allBracketRounds) : pairings,
-    tournament.status === 'active' && swiss ? 'live' : 'scheduled',
-  ), [allBracketRounds, knockout, pairings, swiss, tournament.status])
-  const canPublishPairings = tournament.status === 'upcoming' ? !swiss : tournament.status === 'active' && swiss
-  const canShufflePairings = tournament.status === 'upcoming' || (tournament.status === 'active' && swiss)
+    tournament.status === 'active' && swissFlow ? 'live' : 'scheduled',
+  ), [allBracketRounds, knockout, pairings, swissFlow, tournament.status])
+  const canPublishPairings = tournament.status === 'upcoming' ? !swissFlow : tournament.status === 'active' && swissFlow
+  const canShufflePairings = tournament.status === 'upcoming' || (tournament.status === 'active' && swissFlow)
   const shuffleLocked = disabled || participantsLoading || published || !canShufflePairings
   const publishLocked = disabled || participantsLoading || published || !publishableGames.length || !canPublishPairings
 
@@ -1726,8 +1726,8 @@ function TournamentManageView({
   const manageMode = tournament.status === 'upcoming' ? 'Prepare Tournament' : 'Live Tournament'
   const publishState = published
     ? 'Published - shuffle locked'
-    : swiss && tournament.status === 'upcoming'
-    ? 'Swiss pairings publish after moving to Active'
+    : swissFlow && tournament.status === 'upcoming'
+    ? `${tournament.format} pairings publish after moving to Active`
     : roundRobin
     ? `${pairingRounds.length} rounds ready`
     : 'Draft pairings'
@@ -1745,7 +1745,7 @@ function TournamentManageView({
           <p>{tournament.format} · {tournament.capacity || 'open'} players · {tournament.timeControl}</p>
         </div>
         <div className="manage-controls">
-          {tournament.status === 'upcoming' || (tournament.status === 'active' && swiss) ? (
+          {tournament.status === 'upcoming' || (tournament.status === 'active' && swissFlow) ? (
             <>
               <button type="button" className="mini-button ghost" disabled={shuffleLocked} onClick={() => onShuffle(tournament)}>
                 Shuffle
@@ -1821,17 +1821,37 @@ function TournamentManageView({
             )) : (
               <EmptyState title="No pairings yet" body="Add at least two registered players before publishing pairings." />
             )}
+            {tournament.status === 'active' && playableBoards.length ? (
+              <LiveTournamentBoard
+                boards={playableBoards}
+                onBoardSelect={selectLiveBoard}
+                onMessage={onMessage}
+                panelRef={liveBoardRef}
+                selectedBoardKey={selectedBoardKey}
+              />
+            ) : null}
           </>
         ) : null}
         {stage === 'bracket' ? (
-          <AdminBracketPreview
-            bracketView={bracketConfig?.type === 'double' ? bracketView : undefined}
-            onBracketViewChange={bracketConfig?.type === 'double' ? setBracketView : undefined}
-            onSelectMatch={tournament.status === 'active' ? selectLiveBoard : undefined}
-            rounds={activeBracketRounds}
-            selectedBoardKey={selectedBoardKey}
-            title={bracketConfig?.title ?? `${tournament.format} bracket`}
-          />
+          <>
+            <AdminBracketPreview
+              bracketView={bracketConfig?.type === 'double' ? bracketView : undefined}
+              onBracketViewChange={bracketConfig?.type === 'double' ? setBracketView : undefined}
+              onSelectMatch={tournament.status === 'active' ? selectLiveBoard : undefined}
+              rounds={activeBracketRounds}
+              selectedBoardKey={selectedBoardKey}
+              title={bracketConfig?.title ?? `${tournament.format} bracket`}
+            />
+            {tournament.status === 'active' && playableBoards.length ? (
+              <LiveTournamentBoard
+                boards={playableBoards}
+                onBoardSelect={selectLiveBoard}
+                onMessage={onMessage}
+                panelRef={liveBoardRef}
+                selectedBoardKey={selectedBoardKey}
+              />
+            ) : null}
+          </>
         ) : null}
         {stage === 'procedure' ? (
           <ProcedurePlanner
@@ -1853,15 +1873,6 @@ function TournamentManageView({
           </>
         ) : null}
       </section>
-      {tournament.status === 'active' ? (
-        <LiveTournamentBoard
-          boards={playableBoards}
-          onBoardSelect={selectLiveBoard}
-          onMessage={onMessage}
-          panelRef={liveBoardRef}
-          selectedBoardKey={selectedBoardKey}
-        />
-      ) : null}
     </div>
   )
 }
@@ -3057,6 +3068,14 @@ function isSwissTournament(item: AdminTournament) {
   return /^swiss$/i.test(item.format.trim())
 }
 
+function isMultiStageTournament(item: AdminTournament) {
+  return /multi[-\s]?stage|stage/i.test(item.format.trim())
+}
+
+function usesSwissPublishFlow(item: AdminTournament) {
+  return isSwissTournament(item) || isMultiStageTournament(item)
+}
+
 function isRoundRobinTournament(item: AdminTournament) {
   return isSingleRoundRobinTournament(item) || isDoubleRoundRobinTournament(item)
 }
@@ -3279,6 +3298,7 @@ function groupPairingsByRound(pairings: Pairing[]) {
 }
 
 function pairingRoundLabel(tournament: AdminTournament, round: number) {
+  if (isMultiStageTournament(tournament)) return `Stage One Swiss Round ${round}`
   if (isSwissTournament(tournament)) return `Swiss Round ${round}`
   return `Round ${round}`
 }
