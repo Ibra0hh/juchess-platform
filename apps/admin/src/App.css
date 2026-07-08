@@ -1816,8 +1816,8 @@ button {
   text-align: center;
 }
 
-.website-bracket-host {
-  overflow: hidden;
+.manage-panel.website-bracket-host {
+  max-width: min(100%, 1360px);
 }
 
 .website-bracket-host .bracket-panel {
@@ -1918,10 +1918,12 @@ button {
 }
 
 .bracket-scroll {
-  margin-top: 20px;
+  margin: 18px -6px 0;
   overflow-x: auto;
-  padding-bottom: 10px;
+  overflow-y: hidden;
+  padding: 6px 6px 14px;
   cursor: grab;
+  overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(30, 43, 69, 0.3) transparent;
 }
@@ -1939,7 +1941,8 @@ button {
   min-width: max-content;
   display: flex;
   align-items: stretch;
-  gap: 46px;
+  gap: clamp(54px, 5vw, 82px);
+  padding: 0 52px 2px 2px;
   position: relative;
 }
 
@@ -1954,21 +1957,28 @@ button {
 }
 
 .bracket-column {
-  width: 238px;
+  width: 252px;
   display: flex;
   flex: none;
   flex-direction: column;
+  overflow: visible;
 }
 
 .bracket-column h3 {
+  min-height: 30px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   margin: 0;
   padding: 0 4px 10px;
   color: rgba(30, 43, 69, 0.58);
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.25;
   letter-spacing: 0.12em;
   text-align: center;
   text-transform: uppercase;
+  white-space: normal;
 }
 
 .bracket-column-body {
@@ -1976,17 +1986,19 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  gap: 16px;
+  gap: 18px;
+  min-height: 456px;
 }
 
 .bracket-match.rich {
   position: relative;
   z-index: 1;
-  min-height: 84px;
+  width: 100%;
+  min-height: 86px;
   margin: 0;
   display: block;
   appearance: none;
-  padding: 12px 13px;
+  padding: 12px 14px;
   border: 1px solid rgba(30, 43, 69, 0.14);
   border-left: 3px solid rgba(30, 43, 69, 0.2);
   border-radius: 8px;
@@ -2035,6 +2047,10 @@ button {
 
 .rich-bracket-panel.bracket-view-losers .bracket-column h3 {
   color: rgba(122, 36, 49, 0.68);
+}
+
+.rich-bracket-panel.bracket-view-losers .bracket-track {
+  gap: clamp(60px, 5.5vw, 90px);
 }
 
 .rich-bracket-panel.bracket-view-losers .bracket-match.rich {
