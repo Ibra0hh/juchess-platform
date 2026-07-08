@@ -259,7 +259,6 @@ function TournamentDetailPage() {
         { key: 'registration', label: 'Registration' },
         { key: 'players', label: 'Players' },
         { key: 'table', label: 'Bracket' },
-        { key: 'games', label: 'Games' },
       ]
     : [
         { key: 'registration', label: 'Registration' },
