@@ -686,11 +686,16 @@ export default async ({ req, res, log, error }) => {
         rows.push(row);
       }
 
+      const roundsTotal = Math.max(...games.map((game) => Number(game.round)).filter(Number.isFinite));
       await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.tournaments,
         rowId: tournamentId,
-        data: { currentRound: 1, bracketSnapshot },
+        data: cleanObject({
+          currentRound: 1,
+          roundsTotal: roundsTotal > 1 ? roundsTotal : undefined,
+          bracketSnapshot,
+        }),
       }).catch(() => undefined);
 
       await writeAudit(tablesDB, databaseId, {
@@ -698,7 +703,7 @@ export default async ({ req, res, log, error }) => {
         action: 'publishTournamentPairings',
         targetTable: tableIds.tournaments,
         targetRowId: tournamentId,
-        payload: { games: rows.length, bracketSnapshot: Boolean(bracketSnapshot) },
+        payload: { games: rows.length, roundsTotal, bracketSnapshot: Boolean(bracketSnapshot) },
       });
 
       return res.json({ ok: true, action: 'publishTournamentPairings', rows });

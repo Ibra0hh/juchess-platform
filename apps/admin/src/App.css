@@ -1766,6 +1766,20 @@ button {
   border-bottom: 1px solid #f4f0e8;
 }
 
+.pairing-round-block + .pairing-round-block {
+  border-top: 8px solid #f5efe3;
+}
+
+.pairing-round-title {
+  padding: 10px 22px 8px;
+  background: rgba(245, 239, 227, 0.55);
+  color: #7d2434;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .pairing-row > span {
   color: #8b8577;
   font-family: "JetBrains Mono", monospace;

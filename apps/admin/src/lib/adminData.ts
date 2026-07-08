@@ -92,6 +92,8 @@ export type AdminTournament = {
   format: string
   timeControl: string
   round: string
+  roundsTotal?: number
+  currentRound?: number
   startsAt?: string
   location?: string
   description?: string
@@ -616,6 +618,8 @@ function mapTournament(
     format,
     timeControl: row.timeControl,
     round: formatRound(row),
+    roundsTotal: row.roundsTotal,
+    currentRound: row.currentRound,
     startsAt: row.startsAt,
     location: row.location,
     description: row.description,

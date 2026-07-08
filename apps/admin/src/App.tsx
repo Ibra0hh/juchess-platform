@@ -64,6 +64,7 @@ type Player = {
 type AdminBracketSide = 'white' | 'black'
 
 type Pairing = {
+  round?: number
   board: number
   white: string
   whiteProfileId?: string
@@ -1164,6 +1165,16 @@ function TournamentsScreen({
       return
     }
 
+    if (isSwissTournament(item) && item.status !== 'active') {
+      setMessage('Swiss pairings are published after the tournament is moved to Active.')
+      return
+    }
+
+    if (!isSwissTournament(item) && item.status !== 'upcoming') {
+      setMessage(`${item.name} pairings are published from Upcoming management.`)
+      return
+    }
+
     if (item.publishedGames > 0) {
       setMessage(`${item.name} is published. Shuffle is locked.`)
       return
@@ -1590,6 +1601,8 @@ function TournamentManageView({
   tournament: AdminTournament
 }) {
   const knockout = isKnockoutTournament(tournament)
+  const swiss = isSwissTournament(tournament)
+  const roundRobin = isRoundRobinTournament(tournament)
   const playStage = knockout ? 'bracket' : 'rounds'
   const [stage, setStage] = useState(playStage)
   const [bracketView, setBracketView] = useState<AdminBracketView>('winners')
@@ -1598,7 +1611,9 @@ function TournamentManageView({
   const liveBoardRef = useRef<HTMLElement | null>(null)
   const bracketPhase = getBracketPhase(tournament)
   const tournamentPlayers = useMemo(() => buildTournamentPlayers(tournament, shuffleSeed, participants), [participants, shuffleSeed, tournament])
-  const pairings = useMemo(() => buildPairings(tournamentPlayers), [tournamentPlayers])
+  const pairings = useMemo(() => buildTournamentPairingSchedule(tournament, tournamentPlayers, shuffleSeed), [shuffleSeed, tournament, tournamentPlayers])
+  const currentRoundPairings = useMemo(() => currentRoundPairingsForTournament(tournament, pairings), [pairings, tournament])
+  const pairingRounds = useMemo(() => groupPairingsByRound(pairings), [pairings])
   const savedBracketConfig = useMemo(() => (
     published ? parsePublishedAdminBracketSnapshot(tournament.bracketSnapshot) : null
   ), [published, tournament.bracketSnapshot])
@@ -1615,21 +1630,26 @@ function TournamentManageView({
   const liveBoardRounds = tournament.status === 'active' ? allBracketRounds : EMPTY_ADMIN_BRACKET_ROUNDS
   const playableBoards = useMemo(() => (knockout
     ? buildPlayableBracketBoards(liveBoardRounds)
-    : buildPlayableBoardsFromPairings(pairings)
-  ), [liveBoardRounds, knockout, pairings])
+    : buildPlayableBoardsFromPairings(currentRoundPairings)
+  ), [currentRoundPairings, liveBoardRounds, knockout])
   const procedureMatches = useMemo(() => (
     stage !== 'procedure'
       ? []
       : knockout
       ? buildProcedureMatchesFromBracket(allBracketRounds)
-      : buildProcedureMatchesFromPairings(pairings, tournament.status === 'active' ? 'Live round' : 'Round 1')
-  ), [allBracketRounds, knockout, pairings, stage, tournament.status])
+      : buildProcedureMatchesFromPairings(currentRoundPairings, pairingRoundLabel(tournament, currentRoundPairings[0]?.round ?? 1))
+  ), [allBracketRounds, currentRoundPairings, knockout, stage, tournament])
   const procedurePlan = useMemo(() => (
     stage === 'procedure' ? buildProcedurePlan(procedureMatches, physicalBoards) : []
   ), [physicalBoards, procedureMatches, stage])
-  const publishableGames = useMemo(() => buildPublishableGames(knockout ? firstBracketRoundPairings(allBracketRounds) : pairings), [allBracketRounds, knockout, pairings])
-  const shuffleLocked = disabled || participantsLoading || published
-  const publishLocked = disabled || participantsLoading || published || !publishableGames.length
+  const publishableGames = useMemo(() => buildPublishableGames(
+    knockout ? firstBracketRoundPairings(allBracketRounds) : pairings,
+    tournament.status === 'active' && swiss ? 'live' : 'scheduled',
+  ), [allBracketRounds, knockout, pairings, swiss, tournament.status])
+  const canPublishPairings = tournament.status === 'upcoming' ? !swiss : tournament.status === 'active' && swiss
+  const canShufflePairings = tournament.status === 'upcoming' || (tournament.status === 'active' && swiss)
+  const shuffleLocked = disabled || participantsLoading || published || !canShufflePairings
+  const publishLocked = disabled || participantsLoading || published || !publishableGames.length || !canPublishPairings
 
   function publishPairings() {
     const bracketSnapshot = knockout && generatedBracketConfig
@@ -1666,7 +1686,13 @@ function TournamentManageView({
   }
 
   const manageMode = tournament.status === 'upcoming' ? 'Prepare Tournament' : 'Live Tournament'
-  const publishState = published ? 'Published - shuffle locked' : 'Draft pairings'
+  const publishState = published
+    ? 'Published - shuffle locked'
+    : swiss && tournament.status === 'upcoming'
+    ? 'Swiss pairings publish after moving to Active'
+    : roundRobin
+    ? `${pairingRounds.length} rounds ready`
+    : 'Draft pairings'
 
   return (
     <div className="tournament-manage-view">
@@ -1681,14 +1707,20 @@ function TournamentManageView({
           <p>{tournament.format} · {tournament.capacity || 'open'} players · {tournament.timeControl}</p>
         </div>
         <div className="manage-controls">
-          {tournament.status === 'upcoming' ? (
+          {tournament.status === 'upcoming' || (tournament.status === 'active' && swiss) ? (
             <>
               <button type="button" className="mini-button ghost" disabled={shuffleLocked} onClick={() => onShuffle(tournament)}>
                 Shuffle
               </button>
-              <button type="button" className="mini-button dark" disabled={publishLocked} onClick={publishPairings}>
-                {published ? 'Published' : 'Publish'}
-              </button>
+              {canPublishPairings ? (
+                <button type="button" className="mini-button dark" disabled={publishLocked} onClick={publishPairings}>
+                  {published ? 'Published' : 'Publish'}
+                </button>
+              ) : (
+                <button type="button" className="mini-button dark" disabled>
+                  Publish in Active
+                </button>
+              )}
               {published ? (
                 <button type="button" className="mini-button warn" disabled={disabled} onClick={() => onUnpublish(tournament)}>
                   Unpublish
@@ -1731,17 +1763,22 @@ function TournamentManageView({
         {stage === 'rounds' ? (
           <>
             <div className="manage-panel-head">
-              <strong>{tournament.status === 'upcoming' ? 'Round 1 pairings' : 'Live — current round'}</strong>
+              <strong>{roundRobin ? 'Full round schedule' : tournament.status === 'upcoming' ? 'Round 1 pairings' : 'Live — current round'}</strong>
               <span>{publishState}</span>
             </div>
             {participantsLoading ? (
               <div className="empty-row">Loading pairings...</div>
-            ) : pairings.length ? pairings.map((pairing) => (
-              <div key={pairing.board} className="pairing-row">
-                <span>#{pairing.board}</span>
-                <strong>{pairing.white}<small>{pairing.whiteRating}</small></strong>
-                <em>vs</em>
-                <strong>{pairing.black}<small>{pairing.blackRating}</small></strong>
+            ) : pairingRounds.length ? pairingRounds.map((round) => (
+              <div className="pairing-round-block" key={round.round}>
+                <div className="pairing-round-title">{pairingRoundLabel(tournament, round.round)}</div>
+                {round.pairings.map((pairing) => (
+                  <div key={`${pairing.round ?? 1}-${pairing.board}`} className="pairing-row">
+                    <span>#{pairing.board}</span>
+                    <strong>{pairing.white}<small>{pairing.whiteRating}</small></strong>
+                    <em>vs</em>
+                    <strong>{pairing.black}<small>{pairing.blackRating}</small></strong>
+                  </div>
+                ))}
               </div>
             )) : (
               <EmptyState title="No pairings yet" body="Add at least two registered players before publishing pairings." />
@@ -2978,6 +3015,22 @@ function isDoubleEliminationTournament(item: AdminTournament) {
   return /double elimination/i.test(item.format)
 }
 
+function isSwissTournament(item: AdminTournament) {
+  return /^swiss$/i.test(item.format.trim())
+}
+
+function isRoundRobinTournament(item: AdminTournament) {
+  return isSingleRoundRobinTournament(item) || isDoubleRoundRobinTournament(item)
+}
+
+function isSingleRoundRobinTournament(item: AdminTournament) {
+  return /^round robin$/i.test(item.format.trim())
+}
+
+function isDoubleRoundRobinTournament(item: AdminTournament) {
+  return /^double round robin$/i.test(item.format.trim())
+}
+
 function buildTournamentPlayers(tournament: AdminTournament, seed: number, registrations: AdminRegistration[]) {
   const count = effectiveAdminPlayerCount(tournament, registrations.length)
   const players = registrations
@@ -3025,38 +3078,183 @@ function seededShuffle<T>(items: T[], seed: number) {
   return result
 }
 
-function buildPairings(players: Player[]): Pairing[] {
+function buildTournamentPairingSchedule(tournament: AdminTournament, players: Player[], seed: number): Pairing[] {
+  if (isRoundRobinTournament(tournament)) {
+    return buildRoundRobinPairings(players, {
+      doubleCycle: isDoubleRoundRobinTournament(tournament),
+      seed,
+    })
+  }
+
+  return buildPairings(players, seed, currentRoundNumber(tournament))
+}
+
+function buildPairings(players: Player[], seed = 0, round = 1): Pairing[] {
   const half = Math.ceil(players.length / 2)
+  const colorCounts = new Map<string, { white: number; black: number }>()
+
   return players.slice(0, half).map((player, index) => {
     const opponent = players[index + half]
-    return {
-      board: index + 1,
-      white: player.name,
-      whiteProfileId: player.profileId ?? player.id,
-      whiteRating: player.rating,
-      black: opponent?.name ?? 'TBD',
-      blackProfileId: opponent?.profileId ?? opponent?.id,
-      blackRating: opponent?.rating ?? '-',
-    }
+    return buildColorAwarePairing(player, opponent, index + 1, round, seed, colorCounts)
   })
+}
+
+function buildRoundRobinPairings(
+  players: Player[],
+  { doubleCycle, seed }: { doubleCycle: boolean; seed: number },
+): Pairing[] {
+  if (players.length < 2) return []
+
+  const entrants: Array<Player | null> = players.length % 2 === 0 ? [...players] : [...players, null]
+  let rotation = [...entrants]
+  const roundCount = entrants.length - 1
+  const firstCycle: Pairing[] = []
+  const colorCounts = new Map<string, { white: number; black: number }>()
+
+  for (let round = 1; round <= roundCount; round += 1) {
+    let board = 1
+    for (let index = 0; index < entrants.length / 2; index += 1) {
+      const first = rotation[index]
+      const second = rotation[rotation.length - 1 - index]
+      if (first && second) {
+        firstCycle.push(buildColorAwarePairing(first, second, board, round, seed + round * 37 + index, colorCounts))
+        board += 1
+      }
+    }
+
+    rotation = [rotation[0], rotation[rotation.length - 1], ...rotation.slice(1, -1)]
+  }
+
+  if (!doubleCycle) return firstCycle
+
+  return [
+    ...firstCycle,
+    ...firstCycle.map((pairing) => ({
+      ...pairing,
+      round: (pairing.round ?? 1) + roundCount,
+      white: pairing.black,
+      whiteProfileId: pairing.blackProfileId,
+      whiteRating: pairing.blackRating,
+      black: pairing.white,
+      blackProfileId: pairing.whiteProfileId,
+      blackRating: pairing.whiteRating,
+    })),
+  ]
+}
+
+function buildColorAwarePairing(
+  first: Player,
+  second: Player | undefined,
+  board: number,
+  round: number,
+  seed: number,
+  colorCounts: Map<string, { white: number; black: number }>,
+): Pairing {
+  if (!second) {
+    return {
+      round,
+      board,
+      white: first.name,
+      whiteProfileId: first.profileId ?? first.id,
+      whiteRating: first.rating,
+      black: 'TBD',
+      blackRating: '-',
+    }
+  }
+
+  const firstKey = first.profileId ?? first.id
+  const secondKey = second.profileId ?? second.id
+  const firstColors = colorCounts.get(firstKey) ?? { white: 0, black: 0 }
+  const secondColors = colorCounts.get(secondKey) ?? { white: 0, black: 0 }
+  const firstWhiteNeed = firstColors.black - firstColors.white
+  const secondWhiteNeed = secondColors.black - secondColors.white
+  const firstGetsWhite = firstWhiteNeed === secondWhiteNeed
+    ? seededBoolean(seed, round * 101 + board * 17)
+    : firstWhiteNeed > secondWhiteNeed
+
+  const white = firstGetsWhite ? first : second
+  const black = firstGetsWhite ? second : first
+
+  recordPairingColors(colorCounts, white, black)
+
+  return {
+    round,
+    board,
+    white: white.name,
+    whiteProfileId: white.profileId ?? white.id,
+    whiteRating: white.rating,
+    black: black.name,
+    blackProfileId: black.profileId ?? black.id,
+    blackRating: black.rating,
+  }
+}
+
+function recordPairingColors(colorCounts: Map<string, { white: number; black: number }>, white: Player, black: Player) {
+  const whiteKey = white.profileId ?? white.id
+  const blackKey = black.profileId ?? black.id
+  const whiteColors = colorCounts.get(whiteKey) ?? { white: 0, black: 0 }
+  const blackColors = colorCounts.get(blackKey) ?? { white: 0, black: 0 }
+  colorCounts.set(whiteKey, { ...whiteColors, white: whiteColors.white + 1 })
+  colorCounts.set(blackKey, { ...blackColors, black: blackColors.black + 1 })
+}
+
+function seededBoolean(seed: number, salt: number) {
+  let state = Math.max(1, (seed + 1) * 1103515245 + salt * 12345)
+  state = (state * 9301 + 49297) % 233280
+  return state % 2 === 0
+}
+
+function currentRoundNumber(tournament: AdminTournament) {
+  if (tournament.currentRound && tournament.currentRound > 0) return tournament.currentRound
+  const parsed = /round\s*(\d+)/i.exec(tournament.round)?.[1]
+  return parsed ? Number(parsed) : 1
+}
+
+function currentRoundPairingsForTournament(tournament: AdminTournament, pairings: Pairing[]) {
+  const round = currentRoundNumber(tournament)
+  const current = pairings.filter((pairing) => (pairing.round ?? 1) === round)
+  return current.length ? current : pairings.filter((pairing) => (pairing.round ?? 1) === 1)
+}
+
+function groupPairingsByRound(pairings: Pairing[]) {
+  const groups = new Map<number, Pairing[]>()
+  pairings.forEach((pairing) => {
+    const round = pairing.round ?? 1
+    const list = groups.get(round) ?? []
+    list.push(pairing)
+    groups.set(round, list)
+  })
+
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([round, roundPairings]) => ({
+      round,
+      pairings: roundPairings.sort((a, b) => a.board - b.board),
+    }))
+}
+
+function pairingRoundLabel(tournament: AdminTournament, round: number) {
+  if (isSwissTournament(tournament)) return `Swiss Round ${round}`
+  return `Round ${round}`
 }
 
 function firstBracketRoundPairings(rounds: AdminBracketRound[]): Pairing[] {
   return (rounds[0]?.matches ?? []).map((match, index) => ({
     ...match,
+    round: 1,
     board: index + 1,
   }))
 }
 
-function buildPublishableGames(pairings: Pairing[]): PairingPublishInput[] {
+function buildPublishableGames(pairings: Pairing[], status: 'scheduled' | 'live' = 'scheduled'): PairingPublishInput[] {
   return pairings
     .filter((pairing) => pairing.whiteProfileId && pairing.blackProfileId && pairing.whiteProfileId !== pairing.blackProfileId)
     .map((pairing) => ({
-      round: 1,
+      round: pairing.round ?? 1,
       board: pairing.board,
       whiteProfileId: pairing.whiteProfileId as string,
       blackProfileId: pairing.blackProfileId as string,
-      status: 'scheduled',
+      status,
       result: '*',
     }))
 }
@@ -3067,7 +3265,7 @@ function buildPlayableBoardsFromPairings(pairings: Pairing[]): PlayableBoard[] {
     .map((pairing) => ({
       ...pairing,
       boardKey: `pairing:${pairing.board}`,
-      boardLabel: `Board ${pairing.board}`,
+      boardLabel: (pairing.round ?? 1) > 1 ? `Round ${pairing.round} Board ${pairing.board}` : `Board ${pairing.board}`,
     }))
 }
 
