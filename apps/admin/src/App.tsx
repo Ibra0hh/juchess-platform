@@ -1621,6 +1621,9 @@ function TournamentManageView({
   const swissFlow = usesSwissPublishFlow(tournament)
   const roundRobin = isRoundRobinTournament(tournament)
   const playStage = knockout ? 'bracket' : 'rounds'
+  const manageStages = knockout
+    ? ['participants', playStage, 'procedure']
+    : ['participants', playStage, 'procedure', 'standings']
   const [stage, setStage] = useState(playStage)
   const [bracketView, setBracketView] = useState<AdminBracketView>('winners')
   const [selectedBoardKey, setSelectedBoardKey] = useState('')
@@ -1765,7 +1768,7 @@ function TournamentManageView({
       </div>
 
       <div className="manage-nav">
-        {['participants', playStage, 'procedure', 'standings'].map((item) => (
+        {manageStages.map((item) => (
           <button key={item} type="button" className={stage === item ? 'active' : undefined} onClick={() => setStage(item)}>
             {capitalize(item)}
           </button>
