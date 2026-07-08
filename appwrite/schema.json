@@ -43,6 +43,7 @@
         "location": "string",
         "capacity": "integer",
         "description": "string",
+        "bracketSnapshot": "longtext",
         "createdByProfileId": "string|required"
       }
     },

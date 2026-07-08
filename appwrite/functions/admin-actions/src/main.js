@@ -49,6 +49,20 @@ function cleanObject(value) {
   );
 }
 
+function normalizeBracketSnapshot(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+
+  try {
+    const parsed = JSON.parse(serialized);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!['single', 'double'].includes(parsed.type)) return null;
+    return serialized;
+  } catch {
+    return null;
+  }
+}
+
 function routeSegments(path = '/') {
   return path.split('/').filter(Boolean);
 }
@@ -602,6 +616,7 @@ export default async ({ req, res, log, error }) => {
           location: body.location,
           capacity: body.capacity,
           description: body.description,
+          bracketSnapshot: body.bracketSnapshot,
         }),
       });
 
@@ -611,8 +626,12 @@ export default async ({ req, res, log, error }) => {
     if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'pairings' && segments[3] === 'publish') {
       const tournamentId = segments[1];
       const games = Array.isArray(body.games) ? body.games : [];
+      const bracketSnapshot = normalizeBracketSnapshot(body.bracketSnapshot);
       if (games.length === 0) {
         return badRequest(res, 'No pairings were provided to publish.');
+      }
+      if (body.bracketSnapshot !== undefined && !bracketSnapshot) {
+        return badRequest(res, 'Bracket snapshot must be valid published bracket JSON.');
       }
 
       const invalid = games.find((game) => (
@@ -671,7 +690,7 @@ export default async ({ req, res, log, error }) => {
         databaseId,
         tableId: tableIds.tournaments,
         rowId: tournamentId,
-        data: { currentRound: 1 },
+        data: { currentRound: 1, bracketSnapshot },
       }).catch(() => undefined);
 
       await writeAudit(tablesDB, databaseId, {
@@ -679,7 +698,7 @@ export default async ({ req, res, log, error }) => {
         action: 'publishTournamentPairings',
         targetTable: tableIds.tournaments,
         targetRowId: tournamentId,
-        payload: { games: rows.length },
+        payload: { games: rows.length, bracketSnapshot: Boolean(bracketSnapshot) },
       });
 
       return res.json({ ok: true, action: 'publishTournamentPairings', rows });
@@ -713,7 +732,7 @@ export default async ({ req, res, log, error }) => {
         databaseId,
         tableId: tableIds.tournaments,
         rowId: tournamentId,
-        data: { currentRound: null },
+        data: { currentRound: null, bracketSnapshot: null },
       }).catch(() => undefined);
 
       await writeAudit(tablesDB, databaseId, {

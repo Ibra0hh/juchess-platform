@@ -481,6 +481,9 @@ class AppwriteService {
         cloudData.playersByTournament[row.$id] ?? const <PlayerSeed>[];
     final publishedRounds =
         cloudData.roundsByTournament[row.$id] ?? const <RoundSeed>[];
+    final bracketSnapshot = parsePublishedBracketSnapshot(
+      data['bracketSnapshot']?.toString(),
+    );
     final players = registeredPlayers.isNotEmpty
         ? registeredPlayers.length
         : cloudData.playerCountsByTournament[row.$id] ?? 0;
@@ -519,6 +522,7 @@ class AppwriteService {
       status: rawStatus,
       registeredPlayers: registeredPlayers,
       publishedRounds: publishedRounds,
+      bracketSnapshot: bracketSnapshot,
     );
   }
 }
@@ -658,6 +662,96 @@ Map<String, List<RoundSeed>> _groupPublishedRounds(
       }).toList(),
     );
   });
+}
+
+PublishedBracketSnapshot? parsePublishedBracketSnapshot(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+
+  try {
+    final parsed = jsonDecode(value);
+    if (parsed is! Map<String, dynamic>) return null;
+    final type = parsed['type']?.toString();
+    final title = parsed['title']?.toString() ?? 'Tournament bracket';
+
+    if (type == 'single') {
+      final rounds = _snapshotRounds(parsed['rounds']);
+      if (rounds.isEmpty) return null;
+      return PublishedBracketSnapshot(
+        type: 'single',
+        title: title,
+        rounds: rounds,
+      );
+    }
+
+    if (type == 'double') {
+      final brackets = parsed['brackets'];
+      if (brackets is! Map<String, dynamic>) return null;
+      final winners = _snapshotRounds(brackets['winners']);
+      final losers = _snapshotRounds(brackets['losers']);
+      final finalRounds = _snapshotRounds(brackets['final']);
+      if (winners.isEmpty && losers.isEmpty && finalRounds.isEmpty) {
+        return null;
+      }
+      return PublishedBracketSnapshot(
+        type: 'double',
+        title: title,
+        winners: winners,
+        losers: losers,
+        finalRounds: finalRounds,
+      );
+    }
+  } catch (_) {
+    return null;
+  }
+
+  return null;
+}
+
+List<RoundSeed> _snapshotRounds(dynamic value) {
+  if (value is! List) return const [];
+
+  return value
+      .whereType<Map>()
+      .map((round) {
+        final name = round['name']?.toString();
+        final matches = round['matches'];
+        if (name == null || matches is! List) return null;
+        final games = matches
+            .map(_snapshotMatch)
+            .whereType<MatchSeed>()
+            .toList(growable: false);
+        return RoundSeed(name, games);
+      })
+      .whereType<RoundSeed>()
+      .where((round) => round.games.isNotEmpty)
+      .toList(growable: false);
+}
+
+MatchSeed? _snapshotMatch(dynamic value) {
+  if (value is! Map) return null;
+  final white = value['white']?.toString();
+  final black = value['black']?.toString();
+  if (white == null || black == null) return null;
+
+  return MatchSeed(
+    white,
+    black,
+    _snapshotResult(value),
+    nextIndex: _asInt(value['next']),
+  );
+}
+
+String _snapshotResult(Map<dynamic, dynamic> value) {
+  if (value['live'] == true) return 'live';
+  if (value['winner'] == 'white') return '1-0';
+  if (value['winner'] == 'black') return '0-1';
+
+  final whiteScore = value['whiteScore']?.toString();
+  final blackScore = value['blackScore']?.toString();
+  if (whiteScore == '1' && blackScore == '0') return '1-0';
+  if (whiteScore == '0' && blackScore == '1') return '0-1';
+  if (whiteScore == '0.5' && blackScore == '0.5') return '1/2';
+  return '-';
 }
 
 class AppState extends ChangeNotifier {
@@ -2813,7 +2907,7 @@ class _TournamentMainTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (_mainTabLabel(event) == 'Bracket') {
-      if (event.publishedRounds.isEmpty) {
+      if (!_hasPublishedBracket(event)) {
         return const Padding(
           padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: TournamentEmptyPanel(
@@ -2822,6 +2916,10 @@ class _TournamentMainTab extends StatelessWidget {
                 'The bracket will appear after the organizer publishes it.',
           ),
         );
+      }
+      final snapshot = event.bracketSnapshot;
+      if (snapshot != null && !snapshot.isDouble && snapshot.rounds.isNotEmpty) {
+        return TournamentBracketView(rounds: snapshot.rounds);
       }
       if (_isDoubleElimination(event)) {
         return TournamentDoubleEliminationBracketView(event: event);
@@ -2879,6 +2977,15 @@ class _TournamentDoubleEliminationBracketViewState
   int _selectedView = 0;
 
   List<RoundSeed> get _rounds {
+    final snapshot = widget.event.bracketSnapshot;
+    if (snapshot != null && snapshot.isDouble) {
+      return switch (_selectedView) {
+        1 => snapshot.losers,
+        2 => snapshot.finalRounds,
+        _ => snapshot.winners,
+      };
+    }
+
     final brackets = buildDoubleEliminationRounds(widget.event);
     return switch (_selectedView) {
       1 => brackets.losers,
@@ -3890,6 +3997,19 @@ int _ratingForPlayerName(TournamentSeed event, String name) {
 bool _hasBracketTab(TournamentSeed event) {
   final lower = event.format.toLowerCase();
   return lower.contains('knockout') || lower.contains('elimination');
+}
+
+bool _hasPublishedBracket(TournamentSeed event) {
+  final snapshot = event.bracketSnapshot;
+  if (snapshot != null) {
+    if (snapshot.isDouble) {
+      return snapshot.winners.isNotEmpty ||
+          snapshot.losers.isNotEmpty ||
+          snapshot.finalRounds.isNotEmpty;
+    }
+    return snapshot.rounds.isNotEmpty;
+  }
+  return event.publishedRounds.isNotEmpty;
 }
 
 bool _isDoubleElimination(TournamentSeed event) {
@@ -7049,6 +7169,7 @@ class TournamentSeed {
     this.status = 'active',
     this.registeredPlayers = const [],
     this.publishedRounds = const [],
+    this.bracketSnapshot,
   });
 
   final String rowId;
@@ -7069,6 +7190,7 @@ class TournamentSeed {
   final String status;
   final List<PlayerSeed> registeredPlayers;
   final List<RoundSeed> publishedRounds;
+  final PublishedBracketSnapshot? bracketSnapshot;
 
   String get playerLabel {
     final cap = capacity;
@@ -7115,6 +7237,26 @@ class RoundSeed {
 
   final String label;
   final List<MatchSeed> games;
+}
+
+class PublishedBracketSnapshot {
+  const PublishedBracketSnapshot({
+    required this.type,
+    required this.title,
+    this.rounds = const [],
+    this.winners = const [],
+    this.losers = const [],
+    this.finalRounds = const [],
+  });
+
+  final String type;
+  final String title;
+  final List<RoundSeed> rounds;
+  final List<RoundSeed> winners;
+  final List<RoundSeed> losers;
+  final List<RoundSeed> finalRounds;
+
+  bool get isDouble => type == 'double';
 }
 
 class MatchSeed {

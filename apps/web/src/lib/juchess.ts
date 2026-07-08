@@ -18,6 +18,7 @@ export type Tournament = {
   desc: string
   registeredPlayers?: Member[]
   publishedGames?: TournamentGame[]
+  bracketSnapshot?: PublishedBracketSnapshot
 }
 
 type AppwriteTournamentRow = Models.Row & {
@@ -33,6 +34,7 @@ type AppwriteTournamentRow = Models.Row & {
   location?: string
   capacity?: number
   description?: string
+  bracketSnapshot?: string
 }
 
 type AppwriteRegistrationRow = Models.Row & {
@@ -84,6 +86,40 @@ export type TournamentGame = {
   status: 'scheduled' | 'live' | 'completed' | 'forfeit'
   result: '1-0' | '0-1' | '1/2-1/2' | '*'
 }
+
+export type PublishedBracketSide = 'white' | 'black'
+export type PublishedBracketView = 'winners' | 'losers' | 'final'
+
+export type PublishedBracketMatch = {
+  board?: number
+  white: string
+  black: string
+  whiteScore?: string
+  blackScore?: string
+  winner?: PublishedBracketSide
+  live?: boolean
+  pending?: boolean
+  next?: number
+}
+
+export type PublishedBracketRound = {
+  name: string
+  matches: PublishedBracketMatch[]
+}
+
+export type PublishedBracketSnapshot =
+  | {
+      version?: number
+      type: 'single'
+      title: string
+      rounds: PublishedBracketRound[]
+    }
+  | {
+      version?: number
+      type: 'double'
+      title: string
+      brackets: Record<PublishedBracketView, PublishedBracketRound[]>
+    }
 
 export type Announcement = {
   id: string
@@ -770,6 +806,80 @@ function mapAppwriteTournament(
     desc: row.description || 'Club tournament details will be published by the organizers.',
     registeredPlayers: playersByTournament.get(row.$id) ?? [],
     publishedGames: gamesByTournament.get(row.$id) ?? [],
+    bracketSnapshot: parsePublishedBracketSnapshot(row.bracketSnapshot),
+  }
+}
+
+function parsePublishedBracketSnapshot(value?: string): PublishedBracketSnapshot | undefined {
+  if (!value) return undefined
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>
+    if (parsed.type === 'single') {
+      return {
+        version: typeof parsed.version === 'number' ? parsed.version : undefined,
+        type: 'single',
+        title: typeof parsed.title === 'string' ? parsed.title : 'Single elimination bracket',
+        rounds: sanitizePublishedBracketRounds(parsed.rounds),
+      }
+    }
+
+    if (parsed.type === 'double') {
+      const brackets = parsed.brackets && typeof parsed.brackets === 'object'
+        ? parsed.brackets as Partial<Record<PublishedBracketView, unknown>>
+        : {}
+
+      return {
+        version: typeof parsed.version === 'number' ? parsed.version : undefined,
+        type: 'double',
+        title: typeof parsed.title === 'string' ? parsed.title : 'Double elimination bracket',
+        brackets: {
+          winners: sanitizePublishedBracketRounds(brackets.winners),
+          losers: sanitizePublishedBracketRounds(brackets.losers),
+          final: sanitizePublishedBracketRounds(brackets.final),
+        },
+      }
+    }
+  } catch {
+    return undefined
+  }
+
+  return undefined
+}
+
+function sanitizePublishedBracketRounds(value: unknown): PublishedBracketRound[] {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((round): PublishedBracketRound | null => {
+      if (!round || typeof round !== 'object') return null
+      const row = round as { name?: unknown; matches?: unknown }
+      if (typeof row.name !== 'string' || !Array.isArray(row.matches)) return null
+      return {
+        name: row.name,
+        matches: row.matches
+          .map((match) => sanitizePublishedBracketMatch(match))
+          .filter((match): match is PublishedBracketMatch => Boolean(match)),
+      }
+    })
+    .filter((round): round is PublishedBracketRound => Boolean(round))
+}
+
+function sanitizePublishedBracketMatch(value: unknown): PublishedBracketMatch | null {
+  if (!value || typeof value !== 'object') return null
+  const match = value as Record<string, unknown>
+  if (typeof match.white !== 'string' || typeof match.black !== 'string') return null
+
+  return {
+    black: match.black,
+    blackScore: typeof match.blackScore === 'string' ? match.blackScore : undefined,
+    board: typeof match.board === 'number' ? match.board : undefined,
+    live: Boolean(match.live),
+    next: typeof match.next === 'number' ? match.next : undefined,
+    pending: Boolean(match.pending),
+    white: match.white,
+    whiteScore: typeof match.whiteScore === 'string' ? match.whiteScore : undefined,
+    winner: match.winner === 'white' || match.winner === 'black' ? match.winner : undefined,
   }
 }
 

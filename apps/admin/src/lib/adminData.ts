@@ -38,6 +38,7 @@ type AppwriteTournamentRow = Models.Row & {
   location?: string
   capacity?: number
   description?: string
+  bracketSnapshot?: string
 }
 
 type AppwriteGameRow = Models.Row & {
@@ -95,6 +96,7 @@ export type AdminTournament = {
   location?: string
   description?: string
   publishedGames: number
+  bracketSnapshot?: string
 }
 
 export type AdminRegistrationStatus = 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
@@ -338,7 +340,7 @@ export async function deleteTournament(rowId: string) {
   return response.rowId
 }
 
-export async function publishTournamentPairings(rowId: string, games: PairingPublishInput[]) {
+export async function publishTournamentPairings(rowId: string, games: PairingPublishInput[], bracketSnapshot?: string) {
   const response = await runAdminAction<{ rows: AppwriteGameRow[] }>({
     method: ExecutionMethod.POST,
     path: `/tournaments/${rowId}/pairings/publish`,
@@ -351,6 +353,7 @@ export async function publishTournamentPairings(rowId: string, games: PairingPub
         status: game.status ?? 'scheduled',
         result: game.result ?? '*',
       })),
+      bracketSnapshot,
     },
   })
 
@@ -617,6 +620,7 @@ function mapTournament(
     location: row.location,
     description: row.description,
     publishedGames: gameCounts.get(row.$id) ?? 0,
+    bracketSnapshot: row.bracketSnapshot,
   }
 }
 

@@ -8,7 +8,15 @@ import {
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { loadTournaments, type Member, type Tournament, type TournamentGame } from '../lib/juchess'
+import {
+  loadTournaments,
+  type Member,
+  type PublishedBracketMatch,
+  type PublishedBracketRound,
+  type PublishedBracketSnapshot,
+  type Tournament,
+  type TournamentGame,
+} from '../lib/juchess'
 import './TournamentDetailPage.css'
 
 type DetailTab = 'registration' | 'players' | 'rounds' | 'games' | 'table'
@@ -568,13 +576,16 @@ function TableTab({
   tournament: Tournament
 }) {
   const publishedGames = tournament.publishedGames ?? []
-  const bracketConfig = publishedGames.length
+  const savedBracketConfig = tournament.bracketSnapshot
+    ? bracketConfigFromPublishedSnapshot(tournament.bracketSnapshot)
+    : null
+  const bracketConfig = savedBracketConfig ?? (publishedGames.length
     ? buildTournamentBracketConfig(
       tournament,
       standings.map((row) => row.member),
       publishedGames,
     )
-    : null
+    : null)
 
   if (isBracketTournament(tournament)) {
     if (bracketConfig) {
@@ -657,6 +668,62 @@ function buildTournamentBracketConfig(tournament: Tournament, players: Member[],
   }
 
   return null
+}
+
+function bracketConfigFromPublishedSnapshot(snapshot: PublishedBracketSnapshot): BracketConfig | null {
+  if (snapshot.type === 'single') {
+    const bracket = bracketDefinitionFromPublishedRounds(snapshot.rounds)
+    if (!bracket) return null
+    return {
+      type: 'single',
+      title: snapshot.title,
+      bracket,
+    }
+  }
+
+  const winners = bracketDefinitionFromPublishedRounds(snapshot.brackets.winners)
+  const losers = bracketDefinitionFromPublishedRounds(snapshot.brackets.losers)
+  const final = bracketDefinitionFromPublishedRounds(snapshot.brackets.final)
+  if (!winners && !losers && !final) return null
+
+  return {
+    type: 'double',
+    title: snapshot.title,
+    brackets: {
+      winners: winners ?? { rounds: [], matches: [] },
+      losers: losers ?? { rounds: [], matches: [] },
+      final: final ?? { rounds: [], matches: [] },
+    },
+  }
+}
+
+function bracketDefinitionFromPublishedRounds(rounds: PublishedBracketRound[]): BracketDefinition | null {
+  const visibleRounds = rounds.filter((round) => round.matches.length)
+  if (!visibleRounds.length) return null
+
+  return {
+    rounds: visibleRounds.map((round) => round.name),
+    matches: visibleRounds.map((round) => round.matches.map(publishedMatchToBracketMatch)),
+  }
+}
+
+function publishedMatchToBracketMatch(match: PublishedBracketMatch): BracketMatch {
+  const winner = match.winner === 'white' ? 'a' : match.winner === 'black' ? 'b' : undefined
+  return {
+    a: match.white,
+    b: match.black,
+    live: match.live,
+    next: match.next,
+    sa: bracketScoreValue(match.whiteScore),
+    sb: bracketScoreValue(match.blackScore),
+    w: winner,
+  }
+}
+
+function bracketScoreValue(value?: string) {
+  if (value === undefined || value === '') return undefined
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 function buildSingleEliminationBracket(

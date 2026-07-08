@@ -86,6 +86,7 @@ Fields:
 - `location` string, optional.
 - `capacity` integer, optional.
 - `description` string, optional.
+- `bracketSnapshot` longtext, optional. JSON snapshot of the published knockout bracket; web and mobile use this as the canonical bracket after publish.
 - `createdByProfileId` string, required.
 
 Permissions:

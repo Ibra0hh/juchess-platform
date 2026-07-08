@@ -1156,7 +1156,7 @@ function TournamentsScreen({
     setMessage(isKnockoutTournament(item) ? `${item.name} bracket shuffled.` : `${item.name} pairings shuffled.`)
   }
 
-  async function handlePublishPairings(item: AdminTournament, games: PairingPublishInput[]) {
+  async function handlePublishPairings(item: AdminTournament, games: PairingPublishInput[], bracketSnapshot?: string) {
     if (!item.rowId) {
       setMessage('Only cloud tournaments can publish pairings.')
       return
@@ -1175,7 +1175,7 @@ function TournamentsScreen({
     setSubmitting(true)
     setMessage(null)
     try {
-      await publishTournamentPairings(item.rowId, games)
+      await publishTournamentPairings(item.rowId, games, bracketSnapshot)
       setMessage(isKnockoutTournament(item) ? `${item.name} bracket published. Shuffle is locked.` : `${item.name} pairings published. Shuffle is locked.`)
       await onChanged()
     } catch (error) {
@@ -1578,7 +1578,7 @@ function TournamentManageView({
   onBack: () => void
   onComplete: (item: AdminTournament) => void
   onMessage: (message: string) => void
-  onPublish: (item: AdminTournament, games: PairingPublishInput[]) => void
+  onPublish: (item: AdminTournament, games: PairingPublishInput[], bracketSnapshot?: string) => void
   onShuffle: (item: AdminTournament) => void
   onUnpublish: (item: AdminTournament) => void
   participants: AdminRegistration[]
@@ -1597,9 +1597,13 @@ function TournamentManageView({
   const bracketPhase = getBracketPhase(tournament)
   const tournamentPlayers = useMemo(() => buildTournamentPlayers(tournament, shuffleSeed, participants), [participants, shuffleSeed, tournament])
   const pairings = useMemo(() => buildPairings(tournamentPlayers), [tournamentPlayers])
-  const bracketConfig = useMemo(() => (
+  const savedBracketConfig = useMemo(() => (
+    published ? parsePublishedAdminBracketSnapshot(tournament.bracketSnapshot) : null
+  ), [published, tournament.bracketSnapshot])
+  const generatedBracketConfig = useMemo(() => (
     knockout ? buildAdminBracketConfig(tournament, tournamentPlayers, bracketPhase) : null
   ), [bracketPhase, knockout, tournament, tournamentPlayers])
+  const bracketConfig = savedBracketConfig ?? generatedBracketConfig
   const activeBracketRounds = bracketConfig?.type === 'double'
     ? bracketConfig.brackets[bracketView]
     : bracketConfig?.rounds ?? []
@@ -1619,6 +1623,11 @@ function TournamentManageView({
     buildProcedurePlan(procedureMatches, physicalBoards)
   ), [physicalBoards, procedureMatches])
   const publishableGames = useMemo(() => buildPublishableGames(knockout ? firstBracketRoundPairings(allBracketRounds) : pairings), [allBracketRounds, knockout, pairings])
+  const publishableBracketSnapshot = useMemo(() => (
+    knockout && generatedBracketConfig
+      ? buildPublishedAdminBracketSnapshot(generatedBracketConfig, tournament, tournamentPlayers.length)
+      : undefined
+  ), [generatedBracketConfig, knockout, tournament, tournamentPlayers.length])
   const shuffleLocked = disabled || participantsLoading || published
   const publishLocked = disabled || participantsLoading || published || !publishableGames.length
 
@@ -1670,7 +1679,7 @@ function TournamentManageView({
               <button type="button" className="mini-button ghost" disabled={shuffleLocked} onClick={() => onShuffle(tournament)}>
                 Shuffle
               </button>
-              <button type="button" className="mini-button dark" disabled={publishLocked} onClick={() => onPublish(tournament, publishableGames)}>
+              <button type="button" className="mini-button dark" disabled={publishLocked} onClick={() => onPublish(tournament, publishableGames, publishableBracketSnapshot)}>
                 {published ? 'Published' : 'Publish'}
               </button>
               {published ? (
@@ -3147,6 +3156,95 @@ function getAllAdminBracketRounds(config: AdminBracketConfig) {
     ...config.brackets.losers,
     ...config.brackets.final,
   ]
+}
+
+function buildPublishedAdminBracketSnapshot(
+  config: AdminBracketConfig,
+  tournament: AdminTournament,
+  playerCount: number,
+) {
+  return JSON.stringify({
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    format: tournament.format,
+    playerCount,
+    ...config,
+  })
+}
+
+function parsePublishedAdminBracketSnapshot(value?: string): AdminBracketConfig | null {
+  if (!value) return null
+
+  try {
+    const parsed = JSON.parse(value) as Partial<AdminBracketConfig>
+    if (parsed.type === 'single' && Array.isArray(parsed.rounds)) {
+      return {
+        type: 'single',
+        title: typeof parsed.title === 'string' ? parsed.title : 'Single elimination bracket',
+        rounds: sanitizeAdminBracketRounds(parsed.rounds),
+      }
+    }
+
+    if (parsed.type === 'double' && parsed.brackets && typeof parsed.brackets === 'object') {
+      const brackets = parsed.brackets as Partial<Record<AdminBracketView, unknown>>
+      return {
+        type: 'double',
+        title: typeof parsed.title === 'string' ? parsed.title : 'Double elimination bracket',
+        brackets: {
+          winners: sanitizeAdminBracketRounds(brackets.winners),
+          losers: sanitizeAdminBracketRounds(brackets.losers),
+          final: sanitizeAdminBracketRounds(brackets.final),
+        },
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+function sanitizeAdminBracketRounds(value: unknown): AdminBracketRound[] {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((round): AdminBracketRound | null => {
+      if (!round || typeof round !== 'object') return null
+      const row = round as { name?: unknown; matches?: unknown }
+      if (typeof row.name !== 'string' || !Array.isArray(row.matches)) return null
+      return {
+        name: row.name,
+        matches: row.matches
+          .map((match) => sanitizeAdminBracketMatch(match))
+          .filter((match): match is AdminBracketMatch => Boolean(match)),
+      }
+    })
+    .filter((round): round is AdminBracketRound => Boolean(round))
+}
+
+function sanitizeAdminBracketMatch(value: unknown): AdminBracketMatch | null {
+  if (!value || typeof value !== 'object') return null
+  const match = value as Record<string, unknown>
+  if (typeof match.white !== 'string' || typeof match.black !== 'string') return null
+
+  const winner = match.winner === 'white' || match.winner === 'black' ? match.winner : undefined
+  const targetSlot = match.targetSlot === 'white' || match.targetSlot === 'black' ? match.targetSlot : undefined
+  return {
+    board: typeof match.board === 'number' ? match.board : Number(match.board) || 1,
+    white: match.white,
+    whiteProfileId: typeof match.whiteProfileId === 'string' ? match.whiteProfileId : undefined,
+    whiteRating: typeof match.whiteRating === 'number' || typeof match.whiteRating === 'string' ? match.whiteRating : '',
+    black: match.black,
+    blackProfileId: typeof match.blackProfileId === 'string' ? match.blackProfileId : undefined,
+    blackRating: typeof match.blackRating === 'number' || typeof match.blackRating === 'string' ? match.blackRating : '',
+    blackScore: typeof match.blackScore === 'string' ? match.blackScore : undefined,
+    live: Boolean(match.live),
+    next: typeof match.next === 'number' ? match.next : undefined,
+    pending: Boolean(match.pending),
+    targetSlot,
+    whiteScore: typeof match.whiteScore === 'string' ? match.whiteScore : undefined,
+    winner,
+  }
 }
 
 function buildAdminDoubleEliminationBrackets(
