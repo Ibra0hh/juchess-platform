@@ -4,6 +4,7 @@ import { appwriteConfig, appwriteReady, tablesDB } from './appwrite'
 export type TournamentStatus = 'Active' | 'Upcoming' | 'Completed'
 
 export type Tournament = {
+  rowId?: string
   id: string
   name: string
   status: TournamentStatus
@@ -15,6 +16,8 @@ export type Tournament = {
   capacity?: number
   round: string
   desc: string
+  registeredPlayers?: Member[]
+  publishedGames?: TournamentGame[]
 }
 
 type AppwriteTournamentRow = Models.Row & {
@@ -34,7 +37,26 @@ type AppwriteTournamentRow = Models.Row & {
 
 type AppwriteRegistrationRow = Models.Row & {
   tournamentId?: string
+  profileId?: string
   status?: 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
+  seed?: number
+}
+
+type AppwriteProfileRow = Models.Row & {
+  displayName?: string
+  universityId?: string
+  email?: string
+  rating?: number
+}
+
+type AppwriteGameRow = Models.Row & {
+  tournamentId?: string
+  round?: number
+  board?: number
+  whiteProfileId?: string
+  blackProfileId?: string
+  status?: 'scheduled' | 'live' | 'completed' | 'forfeit'
+  result?: '1-0' | '0-1' | '1/2-1/2' | '*'
 }
 
 export type Member = {
@@ -42,6 +64,17 @@ export type Member = {
   name: string
   rating: number
   universityId: string
+}
+
+export type TournamentGame = {
+  id: string
+  tournamentId: string
+  round: number
+  board: number
+  white: Member
+  black: Member
+  status: 'scheduled' | 'live' | 'completed' | 'forfeit'
+  result: '1-0' | '0-1' | '1/2-1/2' | '*'
 }
 
 export type BoardCell = {
@@ -509,7 +542,7 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
   }
 
   try {
-    const [response, participantCounts] = await Promise.all([
+    const [response, registrationResponse, profileResponse, gameResponse] = await Promise.all([
       tablesDB.listRows<AppwriteTournamentRow>({
         databaseId: appwriteConfig.databaseId,
         tableId: tableIds.tournaments,
@@ -517,11 +550,38 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
         total: false,
         ttl: 30,
       }),
-      loadRegistrationCounts(),
+      tablesDB.listRows<AppwriteRegistrationRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.registrations,
+        queries: [Query.limit(1000)],
+        total: false,
+        ttl: 30,
+      }),
+      tablesDB.listRows<AppwriteProfileRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.profiles,
+        queries: [Query.limit(1000)],
+        total: false,
+        ttl: 30,
+      }),
+      tablesDB.listRows<AppwriteGameRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.games,
+        queries: [Query.limit(1000)],
+        total: false,
+        ttl: 30,
+      }),
     ])
 
+    const profiles = mapProfiles(profileResponse.rows)
+    const playersByTournament = groupRegisteredPlayers(registrationResponse.rows, profiles)
+    const gamesByTournament = groupPublishedGames(gameResponse.rows, profiles)
+    const participantCounts = new Map(
+      Array.from(playersByTournament.entries()).map(([tournamentId, players]) => [tournamentId, players.length]),
+    )
+
     const rows = uniqueTournamentsByFormat(response.rows
-      .map((row) => mapAppwriteTournament(row, participantCounts))
+      .map((row) => mapAppwriteTournament(row, participantCounts, playersByTournament, gamesByTournament))
       .filter((tournament): tournament is Tournament => Boolean(tournament)))
       .sort(compareTournaments)
 
@@ -543,32 +603,72 @@ function uniqueTournamentsByFormat(tournaments: Tournament[]) {
   return Array.from(rows.values())
 }
 
-async function loadRegistrationCounts() {
-  const counts = new Map<string, number>()
-
-  try {
-    const response = await tablesDB.listRows<AppwriteRegistrationRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.registrations,
-      queries: [Query.limit(500)],
-      total: false,
-      ttl: 30,
+function mapProfiles(rows: AppwriteProfileRow[]) {
+  const profiles = new Map<string, Member>()
+  rows.forEach((row) => {
+    profiles.set(row.$id, {
+      id: row.$id,
+      name: row.displayName || row.email || row.$id,
+      rating: row.rating ?? 1200,
+      universityId: row.universityId || row.email || row.$id,
     })
+  })
+  return profiles
+}
 
-    response.rows.forEach((row) => {
-      if (!row.tournamentId || row.status === 'cancelled') return
-      counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
+function groupRegisteredPlayers(rows: AppwriteRegistrationRow[], profiles: Map<string, Member>) {
+  const groups = new Map<string, Array<Member & { seed?: number }>>()
+
+  rows.forEach((row) => {
+    if (!row.tournamentId || !row.profileId || row.status === 'cancelled') return
+    const profile = profiles.get(row.profileId)
+    if (!profile) return
+    const list = groups.get(row.tournamentId) ?? []
+    list.push({ ...profile, seed: row.seed })
+    groups.set(row.tournamentId, list)
+  })
+
+  return new Map(Array.from(groups.entries()).map(([tournamentId, players]) => [
+    tournamentId,
+    players
+      .sort((a, b) => (a.seed ?? 9999) - (b.seed ?? 9999) || a.name.localeCompare(b.name))
+      .map(({ seed: _seed, ...player }) => player),
+  ]))
+}
+
+function groupPublishedGames(rows: AppwriteGameRow[], profiles: Map<string, Member>) {
+  const groups = new Map<string, TournamentGame[]>()
+
+  rows.forEach((row) => {
+    if (!row.tournamentId || !row.whiteProfileId || !row.blackProfileId) return
+    const white = profiles.get(row.whiteProfileId)
+    const black = profiles.get(row.blackProfileId)
+    if (!white || !black) return
+    const list = groups.get(row.tournamentId) ?? []
+    list.push({
+      id: row.$id,
+      tournamentId: row.tournamentId,
+      round: row.round ?? 1,
+      board: row.board ?? list.length + 1,
+      white,
+      black,
+      status: row.status ?? 'scheduled',
+      result: row.result ?? '*',
     })
-  } catch (error) {
-    console.warn('JuChess registration count read failed.', error)
-  }
+    groups.set(row.tournamentId, list)
+  })
 
-  return counts
+  return new Map(Array.from(groups.entries()).map(([tournamentId, games]) => [
+    tournamentId,
+    games.sort((a, b) => a.round - b.round || a.board - b.board),
+  ]))
 }
 
 function mapAppwriteTournament(
   row: AppwriteTournamentRow,
   participantCounts: Map<string, number>,
+  playersByTournament: Map<string, Member[]>,
+  gamesByTournament: Map<string, TournamentGame[]>,
 ): Tournament | null {
   if (!row.format || !row.timeControl) return null
 
@@ -577,6 +677,7 @@ function mapAppwriteTournament(
   const format = normalizeTournamentFormat(row.format)
 
   return {
+    rowId: row.$id,
     id: formatRouteId(format),
     name: format,
     status,
@@ -588,6 +689,8 @@ function mapAppwriteTournament(
     capacity: row.capacity,
     round: formatRound(row),
     desc: row.description || 'Club tournament details will be published by the organizers.',
+    registeredPlayers: playersByTournament.get(row.$id) ?? [],
+    publishedGames: gamesByTournament.get(row.$id) ?? [],
   }
 }
 

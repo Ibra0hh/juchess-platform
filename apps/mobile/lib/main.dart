@@ -81,6 +81,10 @@ class AppConfig {
     'APPWRITE_REGISTRATIONS_TABLE_ID',
     defaultValue: 'registrations',
   );
+  static const gamesTableId = String.fromEnvironment(
+    'APPWRITE_GAMES_TABLE_ID',
+    defaultValue: 'games',
+  );
   static const accessGuardFunctionId = String.fromEnvironment(
     'APPWRITE_ACCESS_GUARD_FUNCTION_ID',
     defaultValue: 'access-guards',
@@ -365,7 +369,7 @@ class AppwriteService {
   }
 
   Future<List<TournamentSeed>> loadTournaments() async {
-    final counts = await _loadRegistrationCounts();
+    final cloudData = await _loadTournamentCloudData();
     final response = await tablesDB.listRows(
       databaseId: AppConfig.databaseId,
       tableId: AppConfig.tournamentsTableId,
@@ -377,7 +381,7 @@ class AppwriteService {
     final rows =
         uniqueTournamentsByFormat(
           response.rows
-              .map((row) => _mapTournament(row, counts))
+              .map((row) => _mapTournament(row, cloudData))
               .whereType<TournamentSeed>(),
         )..sort((a, b) {
           final status = _statusOrder(
@@ -391,6 +395,46 @@ class AppwriteService {
         });
 
     return rows;
+  }
+
+  Future<_TournamentCloudData> _loadTournamentCloudData() async {
+    try {
+      final registrationsFuture = tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.registrationsTableId,
+        queries: [Query.limit(1000)],
+        total: false,
+        ttl: 30,
+      );
+      final profilesFuture = tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.profilesTableId,
+        queries: [Query.limit(1000)],
+        total: false,
+        ttl: 30,
+      );
+      final gamesFuture = tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.gamesTableId,
+        queries: [Query.limit(1000)],
+        total: false,
+        ttl: 30,
+      );
+
+      final registrations = await registrationsFuture;
+      final profiles = _mapProfileRows((await profilesFuture).rows);
+      final games = await gamesFuture;
+
+      return _TournamentCloudData(
+        playersByTournament: _groupRegisteredPlayers(
+          registrations.rows,
+          profiles,
+        ),
+        roundsByTournament: _groupPublishedRounds(games.rows, profiles),
+      );
+    } catch (_) {
+      return const _TournamentCloudData();
+    }
   }
 
   Future<void> _createProfile(
@@ -425,32 +469,10 @@ class AppwriteService {
     }
   }
 
-  Future<Map<String, int>> _loadRegistrationCounts() async {
-    final counts = <String, int>{};
-
-    try {
-      final response = await tablesDB.listRows(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.registrationsTableId,
-        queries: [Query.limit(500)],
-        total: false,
-        ttl: 30,
-      );
-
-      for (final row in response.rows) {
-        final tournamentId = row.data['tournamentId']?.toString();
-        final status = row.data['status']?.toString();
-        if (tournamentId == null || status == 'cancelled') continue;
-        counts[tournamentId] = (counts[tournamentId] ?? 0) + 1;
-      }
-    } catch (_) {
-      return counts;
-    }
-
-    return counts;
-  }
-
-  TournamentSeed? _mapTournament(models.Row row, Map<String, int> counts) {
+  TournamentSeed? _mapTournament(
+    models.Row row,
+    _TournamentCloudData cloudData,
+  ) {
     final data = row.data;
     final format = data['format']?.toString();
     final timeControl = data['timeControl']?.toString();
@@ -463,7 +485,11 @@ class AppwriteService {
     final roundsTotal = _asInt(data['roundsTotal']);
     final currentRound = _asInt(data['currentRound']);
     final capacity = _asInt(data['capacity']);
-    final players = counts[row.$id] ?? 0;
+    final registeredPlayers =
+        cloudData.playersByTournament[row.$id] ?? const <PlayerSeed>[];
+    final publishedRounds =
+        cloudData.roundsByTournament[row.$id] ?? const <RoundSeed>[];
+    final players = registeredPlayers.length;
     final displayedPlayers = capacity == null
         ? players
         : players.clamp(0, capacity).toInt();
@@ -497,8 +523,133 @@ class AppwriteService {
           'Tournament details will be published by the club organizers.',
       startsAt: startsAt,
       status: rawStatus,
+      registeredPlayers: registeredPlayers,
+      publishedRounds: publishedRounds,
     );
   }
+}
+
+class _TournamentCloudData {
+  const _TournamentCloudData({
+    this.playersByTournament = const {},
+    this.roundsByTournament = const {},
+  });
+
+  final Map<String, List<PlayerSeed>> playersByTournament;
+  final Map<String, List<RoundSeed>> roundsByTournament;
+}
+
+Map<String, PlayerSeed> _mapProfileRows(List<models.Row> rows) {
+  final profiles = <String, PlayerSeed>{};
+  for (final row in rows) {
+    final data = row.data;
+    profiles[row.$id] = PlayerSeed(
+      9999,
+      data['displayName']?.toString() ?? data['email']?.toString() ?? row.$id,
+      _asInt(data['rating']) ?? 1200,
+      data['universityId']?.toString() ?? data['email']?.toString() ?? row.$id,
+    );
+  }
+  return profiles;
+}
+
+Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
+  List<models.Row> rows,
+  Map<String, PlayerSeed> profiles,
+) {
+  final groups = <String, List<PlayerSeed>>{};
+
+  for (final row in rows) {
+    final data = row.data;
+    final tournamentId = data['tournamentId']?.toString();
+    final profileId = data['profileId']?.toString();
+    final status = data['status']?.toString();
+    if (tournamentId == null ||
+        profileId == null ||
+        status == 'cancelled' ||
+        !profiles.containsKey(profileId)) {
+      continue;
+    }
+
+    final profile = profiles[profileId]!;
+    final seed = _asInt(data['seed']) ?? 9999;
+    groups
+        .putIfAbsent(tournamentId, () => [])
+        .add(PlayerSeed(seed, profile.name, profile.rating, profile.username));
+  }
+
+  return groups.map((tournamentId, players) {
+    players.sort(
+      (a, b) => a.rank == b.rank
+          ? a.name.compareTo(b.name)
+          : a.rank.compareTo(b.rank),
+    );
+    return MapEntry(tournamentId, [
+      for (var i = 0; i < players.length; i++)
+        PlayerSeed(
+          i + 1,
+          players[i].name,
+          players[i].rating,
+          players[i].username,
+        ),
+    ]);
+  });
+}
+
+Map<String, List<RoundSeed>> _groupPublishedRounds(
+  List<models.Row> rows,
+  Map<String, PlayerSeed> profiles,
+) {
+  final groups = <String, Map<int, List<({int board, MatchSeed match})>>>{};
+
+  for (final row in rows) {
+    final data = row.data;
+    final tournamentId = data['tournamentId']?.toString();
+    final whiteProfileId = data['whiteProfileId']?.toString();
+    final blackProfileId = data['blackProfileId']?.toString();
+    if (tournamentId == null ||
+        whiteProfileId == null ||
+        blackProfileId == null ||
+        !profiles.containsKey(whiteProfileId) ||
+        !profiles.containsKey(blackProfileId)) {
+      continue;
+    }
+
+    final round = _asInt(data['round']) ?? 1;
+    final board = _asInt(data['board']) ?? 1;
+    final status = data['status']?.toString();
+    final result = data['result']?.toString();
+    final match = MatchSeed(
+      profiles[whiteProfileId]!.name,
+      profiles[blackProfileId]!.name,
+      status == 'live'
+          ? 'live'
+          : result == '*' || result == null
+          ? '-'
+          : result,
+    );
+    groups.putIfAbsent(tournamentId, () => {});
+    groups[tournamentId]!.putIfAbsent(round, () => []).add((
+      board: board,
+      match: match,
+    ));
+  }
+
+  return groups.map((tournamentId, rounds) {
+    final sortedRounds = rounds.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return MapEntry(
+      tournamentId,
+      sortedRounds.map((entry) {
+        final matches = entry.value.toList()
+          ..sort((a, b) => a.board.compareTo(b.board));
+        return RoundSeed(
+          'Round ${entry.key}',
+          matches.map((item) => item.match).toList(),
+        );
+      }).toList(),
+    );
+  });
 }
 
 class AppState extends ChangeNotifier {
@@ -2432,10 +2583,25 @@ class _TournamentLiveTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final games = [
+      for (final round in event.publishedRounds)
+        for (var index = 0; index < round.games.length; index++)
+          (board: index + 1, round: round.label, match: round.games[index]),
+    ];
+    if (games.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+        child: TournamentEmptyPanel(
+          title: 'Games not published',
+          subtitle: 'Games will appear after the organizer publishes pairings.',
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: Column(
-        children: liveBoards
+        children: games
             .map(
               (game) => PrototypeCard(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -2454,14 +2620,15 @@ class _TournamentLiveTab extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          game.note,
+                          game.round,
                           style: const TextStyle(
                             color: Color(0x7321304e),
                             fontSize: 11,
                           ),
                         ),
                         const Spacer(),
-                        const LivePill(small: true),
+                        if (game.match.result == 'live')
+                          const LivePill(small: true),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -2473,13 +2640,13 @@ class _TournamentLiveTab extends StatelessWidget {
                             children: [
                               PlayerColorLine(
                                 color: PrototypeColors.surface,
-                                name: game.white,
+                                name: game.match.white,
                                 border: true,
                               ),
                               const SizedBox(height: 6),
                               PlayerColorLine(
                                 color: const Color(0xff232a36),
-                                name: game.black,
+                                name: game.match.black,
                               ),
                             ],
                           ),
@@ -2550,10 +2717,31 @@ class _TournamentMainTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (_mainTabLabel(event) == 'Bracket') {
+      if (event.publishedRounds.isEmpty) {
+        return const Padding(
+          padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+          child: TournamentEmptyPanel(
+            title: 'Bracket not published',
+            subtitle:
+                'The bracket will appear after the organizer publishes it.',
+          ),
+        );
+      }
       if (_isDoubleElimination(event)) {
         return TournamentDoubleEliminationBracketView(event: event);
       }
       return TournamentBracketView(rounds: buildSingleEliminationRounds(event));
+    }
+
+    final players = event.registeredPlayers;
+    if (players.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+        child: TournamentEmptyPanel(
+          title: 'No players yet',
+          subtitle: 'Registered players will appear here.',
+        ),
+      );
     }
 
     return Padding(
@@ -2562,16 +2750,13 @@ class _TournamentMainTab extends StatelessWidget {
         margin: EdgeInsets.zero,
         padding: EdgeInsets.zero,
         child: Column(
-          children: clubPlayers.take(event.players.clamp(4, 10).toInt()).map((
-            player,
-          ) {
-            final points = (10 - player.rank) / 2;
+          children: players.map((player) {
             return StandingRow(
               rank: player.rank,
               name: player.name,
               rating: player.rating,
-              points: points < 0 ? '0' : points.toStringAsFixed(1),
-              record: '${player.rank + 1}-${player.rank % 2}-${player.rank}',
+              points: '0',
+              record: '0-0-0',
             );
           }).toList(),
         ),
@@ -3267,6 +3452,7 @@ class TournamentRoundPanel extends StatelessWidget {
             TournamentPairingRow(
               board: index + 1,
               bottomBorder: index != round.games.length - 1,
+              event: event,
               match: round.games[index],
             ),
         ],
@@ -3279,12 +3465,14 @@ class TournamentPairingRow extends StatelessWidget {
   const TournamentPairingRow({
     required this.board,
     required this.bottomBorder,
+    required this.event,
     required this.match,
     super.key,
   });
 
   final int board;
   final bool bottomBorder;
+  final TournamentSeed event;
   final MatchSeed match;
 
   @override
@@ -3311,7 +3499,11 @@ class TournamentPairingRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: TournamentPairingPlayer(alignEnd: true, name: match.white),
+            child: TournamentPairingPlayer(
+              alignEnd: true,
+              event: event,
+              name: match.white,
+            ),
           ),
           const SizedBox(
             width: 44,
@@ -3325,7 +3517,9 @@ class TournamentPairingRow extends StatelessWidget {
               ),
             ),
           ),
-          Expanded(child: TournamentPairingPlayer(name: match.black)),
+          Expanded(
+            child: TournamentPairingPlayer(event: event, name: match.black),
+          ),
         ],
       ),
     );
@@ -3334,12 +3528,14 @@ class TournamentPairingRow extends StatelessWidget {
 
 class TournamentPairingPlayer extends StatelessWidget {
   const TournamentPairingPlayer({
+    required this.event,
     required this.name,
     this.alignEnd = false,
     super.key,
   });
 
   final bool alignEnd;
+  final TournamentSeed event;
   final String name;
 
   @override
@@ -3363,7 +3559,7 @@ class TournamentPairingPlayer extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          '${_ratingForPlayerName(name)}',
+          '${_ratingForPlayerName(event, name)}',
           style: const TextStyle(
             color: Color(0xff8b8577),
             fontFamily: 'monospace',
@@ -3422,15 +3618,24 @@ class _TournamentPlayersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shown = event.players == 0 ? 8 : event.players.clamp(4, 16).toInt();
+    final players = event.registeredPlayers;
+    if (players.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+        child: TournamentEmptyPanel(
+          title: 'No players yet',
+          subtitle: 'Registered players will appear here.',
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: PrototypeCard(
         margin: EdgeInsets.zero,
         padding: EdgeInsets.zero,
         child: Column(
-          children: clubPlayers
-              .take(shown)
+          children: players
               .map(
                 (player) => LeaderboardRow(
                   rank: player.rank,
@@ -3548,43 +3753,27 @@ bool _hasStageRounds(TournamentSeed event) {
 }
 
 List<RoundSeed> _roundsForStage(TournamentSeed event, String stageTab) {
-  if (event.status == 'upcoming') {
-    return [_upcomingRoundForEvent(event, stageTab)];
-  }
-  if (!_hasStageRounds(event)) return sampleRounds;
-  return stageTab == 'stage-two' ? stageTwoRounds : stageOneRounds;
-}
+  if (event.publishedRounds.isEmpty) return const [];
+  if (!_hasStageRounds(event)) return event.publishedRounds;
 
-RoundSeed _upcomingRoundForEvent(TournamentSeed event, String stageTab) {
-  final label = _hasStageRounds(event)
-      ? stageTab == 'stage-two'
-            ? 'Stage Two - Round 1'
-            : 'Stage One - Round 1'
-      : 'Round 1';
-  final rotation = stageTab == 'stage-two' ? 2 : 1;
-  return RoundSeed(label, _pairingsForEvent(event, rotation));
-}
-
-List<MatchSeed> _pairingsForEvent(TournamentSeed event, int rotation) {
-  final declared = event.players > 0
-      ? event.players
-      : event.capacity ?? clubPlayers.length;
-  final count = math.max(2, math.min(clubPlayers.length, declared));
-  final players = clubPlayers.take(count).toList();
-  final shift = players.isEmpty ? 0 : rotation % players.length;
-  final rotated = [...players.skip(shift), ...players.take(shift)];
-  final shown = rotated.take(math.min(8, rotated.length)).toList();
-  final matches = <MatchSeed>[];
-
-  for (var index = 0; index + 1 < shown.length; index += 2) {
-    matches.add(MatchSeed(shown[index].name, shown[index + 1].name, '-'));
-  }
-
-  return matches;
+  return event.publishedRounds
+      .asMap()
+      .entries
+      .map(
+        (entry) => RoundSeed(
+          stageTab == 'stage-two'
+              ? entry.key == 0
+                    ? 'Stage Two - Playoffs'
+                    : 'Stage Two - Round ${entry.key + 1}'
+              : 'Stage One - Round ${entry.key + 1}',
+          entry.value.games,
+        ),
+      )
+      .toList();
 }
 
 String _roundPanelStatus(TournamentSeed event, RoundSeed round) {
-  if (event.status == 'upcoming') return 'Draft pairings';
+  if (event.status == 'upcoming') return 'Published pairings';
   if (round.games.any((game) => game.result == 'live')) {
     return 'Live current round';
   }
@@ -3592,7 +3781,10 @@ String _roundPanelStatus(TournamentSeed event, RoundSeed round) {
   return 'Recorded round';
 }
 
-int _ratingForPlayerName(String name) {
+int _ratingForPlayerName(TournamentSeed event, String name) {
+  for (final player in event.registeredPlayers) {
+    if (player.name == name) return player.rating;
+  }
   for (final player in clubPlayers) {
     if (player.name == name) return player.rating;
   }
@@ -6759,6 +6951,8 @@ class TournamentSeed {
     this.currentRound,
     this.startsAt,
     this.status = 'active',
+    this.registeredPlayers = const [],
+    this.publishedRounds = const [],
   });
 
   final String rowId;
@@ -6777,6 +6971,8 @@ class TournamentSeed {
   final String description;
   final String? startsAt;
   final String status;
+  final List<PlayerSeed> registeredPlayers;
+  final List<RoundSeed> publishedRounds;
 
   String get playerLabel {
     final cap = capacity;
@@ -6989,6 +7185,19 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
 }
 
 List<String> _bracketPlayerNames(TournamentSeed event) {
+  if (event.publishedRounds.isNotEmpty) {
+    return [
+      for (final match in event.publishedRounds.first.games) ...[
+        match.white,
+        match.black,
+      ],
+    ];
+  }
+
+  if (event.registeredPlayers.isNotEmpty) {
+    return event.registeredPlayers.map((player) => player.name).toList();
+  }
+
   final declared = event.players > 0
       ? event.players
       : event.capacity ?? clubPlayers.length;

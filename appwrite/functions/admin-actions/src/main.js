@@ -242,6 +242,7 @@ export default async ({ req, res, log, error }) => {
         'POST /tournaments',
         'PATCH /tournaments/:id',
         'DELETE /tournaments/:id',
+        'POST /tournaments/:id/pairings/publish',
         'GET /admin/session',
         'GET /admin/admins',
         'POST /admin/admins',
@@ -581,6 +582,82 @@ export default async ({ req, res, log, error }) => {
       });
 
       return res.json({ ok: true, action: 'updateTournament', row });
+    }
+
+    if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'pairings' && segments[3] === 'publish') {
+      const tournamentId = segments[1];
+      const games = Array.isArray(body.games) ? body.games : [];
+      if (games.length === 0) {
+        return badRequest(res, 'No pairings were provided to publish.');
+      }
+
+      const invalid = games.find((game) => (
+        !Number.isInteger(Number(game.round)) ||
+        !Number.isInteger(Number(game.board)) ||
+        !game.whiteProfileId ||
+        !game.blackProfileId ||
+        game.whiteProfileId === game.blackProfileId
+      ));
+      if (invalid) {
+        return badRequest(res, 'Published pairings must include round, board, whiteProfileId and blackProfileId.');
+      }
+
+      await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: tournamentId,
+      });
+
+      const existing = await tablesDB.listRows({
+        databaseId,
+        tableId: tableIds.games,
+        queries: [Query.equal('tournamentId', tournamentId), Query.limit(500)],
+        total: false,
+      });
+
+      for (const row of existing.rows) {
+        await tablesDB.deleteRow({
+          databaseId,
+          tableId: tableIds.games,
+          rowId: row.$id,
+        });
+      }
+
+      const rows = [];
+      for (const game of games) {
+        const row = await tablesDB.createRow({
+          databaseId,
+          tableId: tableIds.games,
+          rowId: ID.unique(),
+          data: cleanObject({
+            tournamentId,
+            round: Number(game.round),
+            board: Number(game.board),
+            whiteProfileId: String(game.whiteProfileId),
+            blackProfileId: String(game.blackProfileId),
+            status: game.status && ['scheduled', 'live'].includes(game.status) ? game.status : 'scheduled',
+            result: '*',
+          }),
+        });
+        rows.push(row);
+      }
+
+      await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: tournamentId,
+        data: { currentRound: 1 },
+      }).catch(() => undefined);
+
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'publishTournamentPairings',
+        targetTable: tableIds.tournaments,
+        targetRowId: tournamentId,
+        payload: { games: rows.length },
+      });
+
+      return res.json({ ok: true, action: 'publishTournamentPairings', rows });
     }
 
     if (method === 'DELETE' && segments[0] === 'tournaments' && segments[1]) {

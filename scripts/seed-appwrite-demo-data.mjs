@@ -165,18 +165,7 @@ const registrations = [
   ...registrationsFor('arena', 'seed_tour_arena', players.slice(0, 10)),
 ]
 
-const games = [
-  game('seed_game_swiss_r1_01', 'seed_tour_swiss', 1, 1, 'seed_profile_01', 'seed_profile_02', 'scheduled', '*', ''),
-  game('seed_game_swiss_r1_02', 'seed_tour_swiss', 1, 2, 'seed_profile_03', 'seed_profile_04', 'scheduled', '*', ''),
-  game('seed_game_rr_01', 'seed_tour_completed', 1, 1, 'seed_profile_01', 'seed_profile_02', 'scheduled', '*', ''),
-  game('seed_game_drr_01', 'seed_tour_double_round_robin', 1, 1, 'seed_profile_01', 'seed_profile_06', 'scheduled', '*', ''),
-  game('seed_game_ko_r1_01', 'seed_tour_knockout', 1, 1, 'seed_profile_01', 'seed_profile_14', 'scheduled', '*', ''),
-  game('seed_game_ko_r1_02', 'seed_tour_knockout', 1, 2, 'seed_profile_02', 'seed_profile_13', 'scheduled', '*', ''),
-  game('seed_game_de_r1_01', 'seed_tour_double_elim', 1, 1, 'seed_profile_01', 'seed_profile_12', 'scheduled', '*', ''),
-  game('seed_game_multi_s1_01', 'seed_tour_multistage', 1, 1, 'seed_profile_01', 'seed_profile_07', 'scheduled', '*', ''),
-  game('seed_game_team_01', 'seed_tour_team', 1, 1, 'seed_profile_01', 'seed_profile_09', 'scheduled', '*', ''),
-  game('seed_game_arena_01', 'seed_tour_arena', 1, 1, 'seed_profile_08', 'seed_profile_09', 'scheduled', '*', ''),
-]
+const games = []
 
 const standings = [
   standing('seed_std_swiss_01', 'seed_tour_swiss', 'seed_profile_01', 1, 0, 0, 0, 0, 0, 0),
@@ -200,6 +189,16 @@ const deprecatedRows = [
   [tableIds.games, 'seed_game_swiss_r4_01'],
   [tableIds.games, 'seed_game_swiss_r4_02'],
   [tableIds.games, 'seed_game_multi_s2_01'],
+  [tableIds.games, 'seed_game_swiss_r1_01'],
+  [tableIds.games, 'seed_game_swiss_r1_02'],
+  [tableIds.games, 'seed_game_rr_01'],
+  [tableIds.games, 'seed_game_drr_01'],
+  [tableIds.games, 'seed_game_ko_r1_01'],
+  [tableIds.games, 'seed_game_ko_r1_02'],
+  [tableIds.games, 'seed_game_de_r1_01'],
+  [tableIds.games, 'seed_game_multi_s1_01'],
+  [tableIds.games, 'seed_game_team_01'],
+  [tableIds.games, 'seed_game_arena_01'],
   [tableIds.standings, 'seed_std_league_01'],
   ...Array.from({ length: 8 }, (_, index) => [
     tableIds.registrations,

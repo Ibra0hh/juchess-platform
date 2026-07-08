@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { loadTournaments, members, type Member, type Tournament } from '../lib/juchess'
+import { loadTournaments, type Member, type Tournament, type TournamentGame } from '../lib/juchess'
 import './TournamentDetailPage.css'
 
 type DetailTab = 'registration' | 'players' | 'rounds' | 'games' | 'table'
@@ -33,14 +33,14 @@ type GameCard = {
   round: string
   white: Member
   black: Member
-  result: 'LIVE' | '1-0' | '0-1' | '1/2-1/2'
+  result: 'LIVE' | '1-0' | '0-1' | '1/2-1/2' | '*'
 }
 
 type RoundPairing = {
   board: number
   white: Member
   black: Member
-  result: 'LIVE' | '1-0' | '0-1' | '1/2-1/2' | 'TBD'
+  result: 'LIVE' | '1-0' | '0-1' | '1/2-1/2' | '*'
 }
 
 type RoundGroup = {
@@ -348,7 +348,7 @@ function RegistrationTab({
         <OverviewItem label="Time control" value={tournament.timeControl} />
         <OverviewItem label="Stage" value={tournament.round} tone="accent" />
         <OverviewItem label="Venue" value={tournament.location} />
-        <OverviewItem label="Leading" value={`${leader.member.name} · ${leader.points} pts`} tone="gold" />
+        <OverviewItem label="Leading" value={leader ? `${leader.member.name} · ${leader.points} pts` : 'Not started'} tone="gold" />
       </div>
 
       <p className="detail-description">{tournament.desc}</p>
@@ -463,37 +463,41 @@ function RoundsTab({
             </button>
           </div>
         ) : null}
-        <div className="round-list">
-          {visibleRounds.map((round) => (
-            <article className={`round-admin-panel ${round.state}`} key={round.label}>
-              <div className="round-admin-head">
-                <strong>{round.label} pairings</strong>
-                <span>{roundAdminStatus(round, tournament)}</span>
-              </div>
-              {round.games.map((game) => (
-                <div className="round-admin-pairing" key={`${round.label}-${game.board}`}>
-                  <span>#{game.board}</span>
-                  <strong>
-                    {game.white.name}
-                    <small>{game.white.rating}</small>
-                  </strong>
-                  <em>vs</em>
-                  <strong>
-                    {game.black.name}
-                    <small>{game.black.rating}</small>
-                  </strong>
+        {visibleRounds.length ? (
+          <div className="round-list">
+            {visibleRounds.map((round) => (
+              <article className={`round-admin-panel ${round.state}`} key={round.label}>
+                <div className="round-admin-head">
+                  <strong>{round.label} pairings</strong>
+                  <span>{roundAdminStatus(round, tournament)}</span>
                 </div>
-              ))}
-            </article>
-          ))}
-        </div>
+                {round.games.map((game) => (
+                  <div className="round-admin-pairing" key={`${round.label}-${game.board}`}>
+                    <span>#{game.board}</span>
+                    <strong>
+                      {game.white.name}
+                      <small>{game.white.rating}</small>
+                    </strong>
+                    <em>vs</em>
+                    <strong>
+                      {game.black.name}
+                      <small>{game.black.rating}</small>
+                    </strong>
+                  </div>
+                ))}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <UnpublishedPanel title="Pairings not published" body="Rounds will appear here after the organizer publishes pairings in the admin panel." />
+        )}
       </div>
     </section>
   )
 }
 
 function roundAdminStatus(round: RoundGroup, tournament: Tournament) {
-  if (tournament.status === 'Upcoming') return 'Draft pairings'
+  if (tournament.status === 'Upcoming') return 'Published pairings'
   if (round.state === 'live') return 'Live current round'
   if (round.state === 'next') return 'Next round'
   return 'Recorded round'
@@ -527,23 +531,27 @@ function GamesTab({
         </div>
       </div>
 
-      <div className={`game-card-wrap ${view}`}>
-        {games.map((game) => (
-          <Link to={`/games?game=${game.id}`} className="game-card" key={game.id}>
-            <BoardPreview />
-            <div className="game-card-body">
-              <div>
-                <span>Board {game.board}</span>
-                <strong>{game.round}</strong>
+      {games.length ? (
+        <div className={`game-card-wrap ${view}`}>
+          {games.map((game) => (
+            <Link to={`/games?game=${game.id}`} className="game-card" key={game.id}>
+              <BoardPreview />
+              <div className="game-card-body">
+                <div>
+                  <span>Board {game.board}</span>
+                  <strong>{game.round}</strong>
+                </div>
+                <p>
+                  {game.white.name} vs {game.black.name}
+                </p>
+                <small>{game.result === 'LIVE' ? 'Watch the game ->' : game.result === '*' ? 'Scheduled' : `Result ${game.result}`}</small>
               </div>
-              <p>
-                {game.white.name} vs {game.black.name}
-              </p>
-              <small>{game.result === 'LIVE' ? 'Watch the game ->' : `Result ${game.result}`}</small>
-            </div>
-          </Link>
-        ))}
-      </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <UnpublishedPanel title="Games not published" body="Games will appear after the organizer publishes pairings." />
+      )}
     </section>
   )
 }
@@ -559,10 +567,14 @@ function TableTab({
   standings: StandingRow[]
   tournament: Tournament
 }) {
-  const bracketConfig = buildTournamentBracketConfig(
-    tournament,
-    standings.map((row) => row.member),
-  ) ?? bracketConfigs[tournament.id]
+  const publishedGames = tournament.publishedGames ?? []
+  const bracketConfig = publishedGames.length
+    ? buildTournamentBracketConfig(
+      tournament,
+      standings.map((row) => row.member),
+      publishedGames,
+    )
+    : null
 
   if (isBracketTournament(tournament)) {
     if (bracketConfig) {
@@ -579,22 +591,7 @@ function TableTab({
 
     return (
       <section className="detail-tab-panel">
-        <div className="bracket-panel">
-          <h2>{tournament.format} bracket</h2>
-          <div className="bracket-scroll">
-            {['Quarterfinal', 'Semifinal', 'Final'].map((round, roundIndex) => (
-              <div className="bracket-column" key={round}>
-                <h3>{round}</h3>
-                {standings.slice(roundIndex * 2, roundIndex * 2 + (roundIndex === 2 ? 1 : 2)).map((row) => (
-                  <div className="bracket-match" key={`${round}-${row.member.id}`}>
-                    <span>{row.member.name}</span>
-                    <strong>{roundIndex < 2 ? 'LIVE' : 'TBD'}</strong>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
+        <UnpublishedPanel title="Bracket not published" body="The bracket will appear after the organizer publishes it in the admin panel." />
       </section>
     )
   }
@@ -638,15 +635,16 @@ function TableTab({
   )
 }
 
-function buildTournamentBracketConfig(tournament: Tournament, players: Member[]): BracketConfig | null {
+function buildTournamentBracketConfig(tournament: Tournament, players: Member[], publishedGames: TournamentGame[]): BracketConfig | null {
   const bracketPlayers = players.slice(0, effectiveBracketPlayerCount(tournament, players.length))
-  if (bracketPlayers.length < 2) return null
+  const firstRoundGames = publishedGames.filter((game) => game.round === 1).sort((a, b) => a.board - b.board)
+  if (firstRoundGames.length < 1 || bracketPlayers.length < 2) return null
 
   if (/double elimination/i.test(tournament.format)) {
     return {
       type: 'double',
       title: 'Double elimination bracket',
-      brackets: buildDoubleEliminationBrackets(tournament, bracketPlayers),
+      brackets: buildDoubleEliminationBrackets(tournament, bracketPlayers, firstRoundGames),
     }
   }
 
@@ -654,7 +652,7 @@ function buildTournamentBracketConfig(tournament: Tournament, players: Member[])
     return {
       type: 'single',
       title: `${tournament.format} bracket`,
-      bracket: buildSingleEliminationBracket(tournament, bracketPlayers),
+      bracket: buildSingleEliminationBracket(tournament, bracketPlayers, firstRoundGames),
     }
   }
 
@@ -664,9 +662,11 @@ function buildTournamentBracketConfig(tournament: Tournament, players: Member[])
 function buildSingleEliminationBracket(
   tournament: Tournament,
   players: Member[],
+  publishedGames: TournamentGame[] = [],
   options: { forceActiveRound?: number; prefix?: string } = {},
 ): BracketDefinition {
-  const names = players.map((player) => player.name)
+  const publishedNames = publishedGames.flatMap((game) => [game.white.name, game.black.name])
+  const names = publishedNames.length ? publishedNames : players.map((player) => player.name)
   const counts = bracketRoundCounts(names.length)
   const labels = counts.map((count) => prefixedRoundName(count, options.prefix))
   const activeRound = options.forceActiveRound ?? activeBracketRoundIndex(labels, tournament)
@@ -680,16 +680,19 @@ function buildSingleEliminationBracket(
     const sourceCode = bracketRoundCode(label)
     const complete = tournament.status === 'Completed' || (tournament.status === 'Active' && roundIndex < activeRound)
     const live = tournament.status === 'Active' && roundIndex === activeRound
-    const roundMatches = pairNames(current).map(([a, b], matchIndex) => (
-      makeBracketMatch(a, b, {
+    const roundMatches = pairNames(current).map(([a, b], matchIndex) => {
+      const publishedGame = roundIndex === 0 ? publishedGames[matchIndex] : undefined
+      return makeBracketMatch(a, b, {
         complete,
         live,
         matchIndex,
+        result: publishedGame?.result,
+        status: publishedGame?.status,
         next: hasPlayIn && roundIndex === 0
           ? Math.floor((byeNames.length + matchIndex) / 2)
           : undefined,
       })
-    ))
+    })
     const winners = roundMatches.map((match, matchIndex) => (
       complete ? bracketWinner(match) : `Winner ${sourceCode}-${matchIndex + 1}`
     ))
@@ -707,12 +710,13 @@ function buildSingleEliminationBracket(
 function buildDoubleEliminationBrackets(
   tournament: Tournament,
   players: Member[],
+  publishedGames: TournamentGame[],
 ): Record<BracketView, BracketDefinition> {
   const winnersTournament = {
     ...tournament,
     round: /winner|w-/i.test(tournament.round) ? tournament.round : 'W-Final',
   }
-  const winners = buildSingleEliminationBracket(winnersTournament, players, {
+  const winners = buildSingleEliminationBracket(winnersTournament, players, publishedGames, {
     ...(/winner|w-/i.test(tournament.round) ? {} : { forceActiveRound: Number.POSITIVE_INFINITY }),
     prefix: 'W-',
   })
@@ -862,14 +866,30 @@ function makeBracketMatch(
     live,
     matchIndex,
     next,
+    result,
+    status,
   }: {
     complete: boolean
     live: boolean
     matchIndex: number
     next?: number
+    result?: TournamentGame['result']
+    status?: TournamentGame['status']
   },
 ): BracketMatch {
-  if (live) return { a, b, live: true, next }
+  if (status === 'live' || live) return { a, b, live: true, next }
+  if (result && result !== '*') {
+    if (result === '1/2-1/2') return { a, b, sa: 0.5, sb: 0.5, next }
+    const winner = result === '0-1' ? 'b' : 'a'
+    return {
+      a,
+      b,
+      next,
+      sa: winner === 'a' ? 1 : 0,
+      sb: winner === 'b' ? 1 : 0,
+      w: winner,
+    }
+  }
   if (!complete) return { a, b, next }
 
   const winner = matchIndex % 2 === 0 ? 'a' : 'b'
@@ -1230,6 +1250,16 @@ function isPendingMatch(match: BracketMatch) {
   )
 }
 
+function UnpublishedPanel({ body, title }: { body: string; title: string }) {
+  return (
+    <div className="unpublished-panel">
+      <Trophy size={24} aria-hidden="true" />
+      <strong>{title}</strong>
+      <span>{body}</span>
+    </div>
+  )
+}
+
 function OverviewItem({ label, value, tone }: { label: string; value: string; tone?: 'accent' | 'gold' }) {
   return (
     <div className="overview-item">
@@ -1265,10 +1295,8 @@ function StatusBadge({ status }: { status: Tournament['status'] }) {
 }
 
 function buildDetail(tournament: Tournament) {
-  const rotation = rotationFromId(tournament.id)
-  const orderedMembers = [...members.slice(rotation), ...members.slice(0, rotation)]
-  const count = Math.min(Math.max(tournament.participants, 4), orderedMembers.length)
-  const selectedMembers = orderedMembers.slice(0, count)
+  const selectedMembers = tournament.registeredPlayers ?? []
+  const publishedGames = tournament.publishedGames ?? []
 
   const standings = selectedMembers.map((member, index) => {
     const rank = index + 1
@@ -1289,76 +1317,53 @@ function buildDetail(tournament: Tournament) {
     } satisfies StandingRow
   })
 
-  const games = selectedMembers.slice(0, 8).reduce<GameCard[]>((acc, member, index, source) => {
-    if (index % 2 || !source[index + 1]) return acc
-    const board = acc.length + 1
-    const isLive = tournament.status === 'Active' && board <= 3
-    acc.push({
-      id: `${tournament.id}-${board}`,
-      board,
-      round: tournament.round,
-      white: member,
-      black: source[index + 1],
-      result: isLive ? 'LIVE' : board % 2 ? '1-0' : '1/2-1/2',
-    })
-    return acc
-  }, [])
+  const games = publishedGames.map(gameToCard)
 
   return {
     standings,
     games,
-    rounds: buildRoundGroups(tournament, selectedMembers),
+    rounds: buildRoundGroups(tournament, publishedGames),
   }
 }
 
-function rotationFromId(id: string) {
-  const seed = [...id].reduce((total, letter) => total + letter.charCodeAt(0), 0)
-  return seed % members.length
+function gameToCard(game: TournamentGame): GameCard {
+  return {
+    id: game.id,
+    board: game.board,
+    round: `Round ${game.round}`,
+    white: game.white,
+    black: game.black,
+    result: game.status === 'live' ? 'LIVE' : game.result,
+  }
 }
 
-function buildRoundGroups(tournament: Tournament, players: Member[]): RoundGroup[] {
-  const currentRound = extractRoundNumber(tournament.round)
-  const totalRounds = extractTotalRounds(tournament.round)
-  const completedRound = Math.max(1, currentRound - 1)
-  const showPrevious = tournament.status !== 'Upcoming' && currentRound > 1
-  const showCurrent = tournament.status !== 'Upcoming'
-  const showNext = tournament.status !== 'Completed' && (!totalRounds || currentRound < totalRounds)
-  const groups: RoundGroup[] = []
+function buildRoundGroups(_tournament: Tournament, games: TournamentGame[]): RoundGroup[] {
+  const groups = new Map<number, TournamentGame[]>()
+  games.forEach((game) => {
+    const list = groups.get(game.round) ?? []
+    list.push(game)
+    groups.set(game.round, list)
+  })
 
-  if (showPrevious) {
-    groups.push({
-      label: roundLabel(tournament, completedRound),
-      note: 'Completed pairings',
-      state: 'done',
-      games: pairRound(players, completedRound, 'done'),
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([round, roundGames]) => {
+      const hasLive = roundGames.some((game) => game.status === 'live')
+      const allDone = roundGames.every((game) => game.status === 'completed')
+      return {
+        label: `Round ${round}`,
+        note: hasLive ? 'Current round pairings' : allDone ? 'Recorded pairings' : 'Published pairings',
+        state: hasLive ? 'live' : allDone ? 'done' : 'next',
+        games: roundGames
+          .sort((a, b) => a.board - b.board)
+          .map((game) => ({
+            board: game.board,
+            white: game.white,
+            black: game.black,
+            result: game.status === 'live' ? 'LIVE' : game.result,
+          })),
+      } satisfies RoundGroup
     })
-  }
-
-  if (showCurrent) {
-    groups.push({
-      label: tournament.round,
-      note: tournament.status === 'Active' ? 'Current round pairings' : 'Final recorded round',
-      state: tournament.status === 'Active' ? 'live' : 'done',
-      games: pairRound(players, currentRound, tournament.status === 'Active' ? 'live' : 'done'),
-    })
-  }
-
-  if (showNext) {
-    const nextRound = tournament.status === 'Upcoming' ? 1 : currentRound + 1
-    groups.push({
-      label: roundLabel(tournament, nextRound),
-      note: tournament.status === 'Upcoming' ? 'First pairings pending' : 'Next pairings window',
-      state: 'next',
-      games: pairRound(players, nextRound, 'next'),
-    })
-  }
-
-  return groups.length ? groups : [{
-    label: tournament.round,
-    note: 'Round pairings',
-    state: 'done',
-    games: pairRound(players, 1, 'done'),
-  }]
 }
 
 function buildStageRoundGroups(rounds: RoundGroup[], stageTab: StageRoundTab): RoundGroup[] {
@@ -1377,40 +1382,6 @@ function buildStageRoundGroups(rounds: RoundGroup[], stageTab: StageRoundTab): R
     note: index === 0 ? 'Playoff qualification pairings' : 'Placement pairings',
     state: index === 0 ? 'live' : round.state,
   }))
-}
-
-function pairRound(players: Member[], roundNumber: number, state: 'done' | 'live' | 'next'): RoundPairing[] {
-  const rotated = [...players.slice(roundNumber % players.length), ...players.slice(0, roundNumber % players.length)]
-  return rotated.slice(0, 8).reduce<RoundPairing[]>((acc, member, index, source) => {
-    if (index % 2 || !source[index + 1]) return acc
-    const board = acc.length + 1
-    acc.push({
-      board,
-      white: member,
-      black: source[index + 1],
-      result: state === 'next' ? 'TBD' : state === 'live' ? 'LIVE' : board % 3 === 0 ? '1/2-1/2' : board % 2 ? '1-0' : '0-1',
-    })
-    return acc
-  }, [])
-}
-
-function roundLabel(tournament: Tournament, roundNumber: number) {
-  if (/week/i.test(tournament.round)) return `Week ${roundNumber}`
-  if (/cycle/i.test(tournament.round)) return `Cycle ${Math.max(1, Math.ceil(roundNumber / 3))} - Round ${roundNumber}`
-  if (/final/i.test(tournament.round) && roundNumber > 1) return `Round ${roundNumber}`
-  return `Round ${roundNumber}`
-}
-
-function extractRoundNumber(value: string) {
-  const round = /Round\s*(\d+)/i.exec(value)
-  const week = /Week\s*(\d+)/i.exec(value)
-  return Number(round?.[1] || week?.[1] || (/\bFinal\b/i.test(value) ? 5 : 1))
-}
-
-function extractTotalRounds(value: string) {
-  const total = /of\s*(\d+)/i.exec(value)
-  const finalRounds = /(\d+)\s*rounds/i.exec(value)
-  return total?.[1] ? Number(total[1]) : finalRounds?.[1] ? Number(finalRounds[1]) : null
 }
 
 function initialStageTab(round: string): StageRoundTab {

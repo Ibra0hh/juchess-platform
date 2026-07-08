@@ -546,6 +546,36 @@
   padding: 16px;
 }
 
+.unpublished-panel {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: 16px;
+  border: 1px dashed rgba(30, 43, 69, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 252, 244, 0.72);
+  color: rgba(30, 43, 69, 0.68);
+  padding: 28px 18px;
+  text-align: center;
+}
+
+.unpublished-panel svg {
+  color: #a98a3f;
+}
+
+.unpublished-panel strong {
+  color: #14213d;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.unpublished-panel span {
+  max-width: 440px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .round-admin-panel {
   overflow: hidden;
   border: 1px solid #e6dfd3;

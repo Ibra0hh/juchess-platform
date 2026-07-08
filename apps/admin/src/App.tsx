@@ -14,6 +14,7 @@ import {
   loadTournamentRegistrations,
   loadBlockLists,
   loadAdminTournaments,
+  publishTournamentPairings,
   signInAdmin,
   signOutAdmin,
   unblockIdentity,
@@ -33,6 +34,7 @@ import {
   type IdentityBlock,
   type IdentityBlockType,
   type IpBlock,
+  type PairingPublishInput,
   type TournamentInput,
 } from './lib/adminData'
 import { adminQueues, type TournamentStatus } from './lib/juchess'
@@ -45,6 +47,7 @@ type DeviceKey = 'ios' | 'android' | 'tablet' | 'web'
 
 type Player = {
   id: string
+  profileId?: string
   name: string
   initials: string
   universityId: string
@@ -60,8 +63,10 @@ type Player = {
 type Pairing = {
   board: number
   white: string
+  whiteProfileId?: string
   whiteRating: number | string
   black: string
+  blackProfileId?: string
   blackRating: number | string
   next?: number
 }
@@ -124,6 +129,7 @@ type ProcedureSlot = {
 
 type BracketEntrant = {
   name: string
+  profileId?: string
   rating: number | string
 }
 
@@ -883,7 +889,8 @@ function TournamentsScreen({
   const [registrations, setRegistrations] = useState<AdminRegistration[]>([])
   const [registrationsLoading, setRegistrationsLoading] = useState(false)
   const [registrationActionId, setRegistrationActionId] = useState<string | null>(null)
-  const [publishedPairings, setPublishedPairings] = useState<Record<string, boolean>>({})
+  const [managedRegistrations, setManagedRegistrations] = useState<AdminRegistration[]>([])
+  const [managedRegistrationsLoading, setManagedRegistrationsLoading] = useState(false)
   const [shuffleSeeds, setShuffleSeeds] = useState<Record<string, number>>({})
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -952,6 +959,31 @@ function TournamentsScreen({
       alive = false
     }
   }, [selectedTournamentRowId])
+
+  useEffect(() => {
+    let alive = true
+
+    async function loadManagedRegistrations() {
+      if (!managedTournament?.rowId) {
+        setManagedRegistrations([])
+        setManagedRegistrationsLoading(false)
+        return
+      }
+
+      setManagedRegistrationsLoading(true)
+      const result = await loadTournamentRegistrations(managedTournament.rowId)
+      if (!alive) return
+      setManagedRegistrations(result.registrations.filter((item) => item.status !== 'cancelled'))
+      if (result.error) setMessage('Tournament participants are unavailable right now.')
+      setManagedRegistrationsLoading(false)
+    }
+
+    void loadManagedRegistrations()
+
+    return () => {
+      alive = false
+    }
+  }, [managedTournament?.rowId])
 
   function update<K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) {
     setForm((current) => {
@@ -1111,7 +1143,7 @@ function TournamentsScreen({
 
   function handleShufflePairings(item: AdminTournament) {
     const key = tournamentKey(item)
-    if (publishedPairings[key]) {
+    if (item.publishedGames > 0) {
       setMessage(`${item.name} is published. Shuffle is locked.`)
       return
     }
@@ -1120,10 +1152,33 @@ function TournamentsScreen({
     setMessage(isKnockoutTournament(item) ? `${item.name} bracket shuffled.` : `${item.name} pairings shuffled.`)
   }
 
-  function handlePublishPairings(item: AdminTournament) {
-    const key = tournamentKey(item)
-    setPublishedPairings((current) => ({ ...current, [key]: true }))
-    setMessage(isKnockoutTournament(item) ? `${item.name} bracket published. Shuffle is locked.` : `${item.name} pairings published. Shuffle is locked.`)
+  async function handlePublishPairings(item: AdminTournament, games: PairingPublishInput[]) {
+    if (!item.rowId) {
+      setMessage('Only cloud tournaments can publish pairings.')
+      return
+    }
+
+    if (item.publishedGames > 0) {
+      setMessage(`${item.name} is published. Shuffle is locked.`)
+      return
+    }
+
+    if (!games.length) {
+      setMessage('Add at least two registered players before publishing pairings.')
+      return
+    }
+
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      await publishTournamentPairings(item.rowId, games)
+      setMessage(isKnockoutTournament(item) ? `${item.name} bracket published. Shuffle is locked.` : `${item.name} pairings published. Shuffle is locked.`)
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   function openManagePanel(item: AdminTournament) {
@@ -1175,7 +1230,9 @@ function TournamentsScreen({
           onMessage={setMessage}
           onPublish={handlePublishPairings}
           onShuffle={handleShufflePairings}
-          published={Boolean(publishedPairings[tournamentKey(managedTournament)])}
+          participants={managedRegistrations}
+          participantsLoading={managedRegistrationsLoading}
+          published={managedTournament.publishedGames > 0}
           shuffleSeed={shuffleSeeds[tournamentKey(managedTournament)] ?? 0}
           tournament={managedTournament}
         />
@@ -1481,6 +1538,8 @@ function TournamentManageView({
   onMessage,
   onPublish,
   onShuffle,
+  participants,
+  participantsLoading,
   published,
   shuffleSeed,
   tournament,
@@ -1489,8 +1548,10 @@ function TournamentManageView({
   onBack: () => void
   onComplete: (item: AdminTournament) => void
   onMessage: (message: string) => void
-  onPublish: (item: AdminTournament) => void
+  onPublish: (item: AdminTournament, games: PairingPublishInput[]) => void
   onShuffle: (item: AdminTournament) => void
+  participants: AdminRegistration[]
+  participantsLoading: boolean
   published: boolean
   shuffleSeed: number
   tournament: AdminTournament
@@ -1503,7 +1564,7 @@ function TournamentManageView({
   const [physicalBoards, setPhysicalBoards] = useState(3)
   const liveBoardRef = useRef<HTMLElement | null>(null)
   const bracketPhase = getBracketPhase(tournament)
-  const tournamentPlayers = useMemo(() => buildTournamentPlayers(tournament, shuffleSeed), [shuffleSeed, tournament])
+  const tournamentPlayers = useMemo(() => buildTournamentPlayers(tournament, shuffleSeed, participants), [participants, shuffleSeed, tournament])
   const pairings = useMemo(() => buildPairings(tournamentPlayers), [tournamentPlayers])
   const bracketConfig = useMemo(() => (
     knockout ? buildAdminBracketConfig(tournament, tournamentPlayers, bracketPhase) : null
@@ -1526,8 +1587,9 @@ function TournamentManageView({
   const procedurePlan = useMemo(() => (
     buildProcedurePlan(procedureMatches, physicalBoards)
   ), [physicalBoards, procedureMatches])
-  const shuffleLocked = disabled || published
-  const publishLocked = disabled || published
+  const publishableGames = useMemo(() => buildPublishableGames(knockout ? firstBracketRoundPairings(allBracketRounds) : pairings), [allBracketRounds, knockout, pairings])
+  const shuffleLocked = disabled || participantsLoading || published
+  const publishLocked = disabled || participantsLoading || published || !publishableGames.length
 
   useEffect(() => {
     setStage(playStage)
@@ -1577,7 +1639,7 @@ function TournamentManageView({
               <button type="button" className="mini-button ghost" disabled={shuffleLocked} onClick={() => onShuffle(tournament)}>
                 Shuffle
               </button>
-              <button type="button" className="mini-button dark" disabled={publishLocked} onClick={() => onPublish(tournament)}>
+              <button type="button" className="mini-button dark" disabled={publishLocked} onClick={() => onPublish(tournament, publishableGames)}>
                 {published ? 'Published' : 'Publish'}
               </button>
             </>
@@ -1602,12 +1664,16 @@ function TournamentManageView({
         {stage === 'participants' ? (
           <>
             <div className="manage-panel-head">Participants</div>
-            {tournamentPlayers.map((player, index) => (
+            {participantsLoading ? (
+              <div className="empty-row">Loading participants...</div>
+            ) : tournamentPlayers.length ? tournamentPlayers.map((player, index) => (
               <div key={player.id} className="manage-row">
                 <strong>{index + 1}. {player.name}</strong>
                 <span>{player.rating}</span>
               </div>
-            ))}
+            )) : (
+              <EmptyState title="No registered players" body="Players must register before pairings can be published." />
+            )}
           </>
         ) : null}
         {stage === 'rounds' ? (
@@ -1616,14 +1682,18 @@ function TournamentManageView({
               <strong>{tournament.status === 'upcoming' ? 'Round 1 pairings' : 'Live — current round'}</strong>
               <span>{publishState}</span>
             </div>
-            {pairings.map((pairing) => (
+            {participantsLoading ? (
+              <div className="empty-row">Loading pairings...</div>
+            ) : pairings.length ? pairings.map((pairing) => (
               <div key={pairing.board} className="pairing-row">
                 <span>#{pairing.board}</span>
                 <strong>{pairing.white}<small>{pairing.whiteRating}</small></strong>
                 <em>vs</em>
                 <strong>{pairing.black}<small>{pairing.blackRating}</small></strong>
               </div>
-            ))}
+            )) : (
+              <EmptyState title="No pairings yet" body="Add at least two registered players before publishing pairings." />
+            )}
           </>
         ) : null}
         {stage === 'bracket' ? (
@@ -2797,6 +2867,16 @@ function adminRoleLabel(role: AdminRole) {
   return 'Admin'
 }
 
+function initialsForName(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'P'
+}
+
 function tournamentKey(item: AdminTournament) {
   return item.rowId ?? item.id
 }
@@ -2809,21 +2889,36 @@ function isDoubleEliminationTournament(item: AdminTournament) {
   return /double elimination/i.test(item.format)
 }
 
-function buildTournamentPlayers(tournament: AdminTournament, seed: number) {
-  const count = effectiveAdminPlayerCount(tournament)
-  const players = demoPlayers.slice(0, count)
+function buildTournamentPlayers(tournament: AdminTournament, seed: number, registrations: AdminRegistration[]) {
+  const count = effectiveAdminPlayerCount(tournament, registrations.length)
+  const players = registrations
+    .slice(0, count)
+    .map((registration, index) => ({
+      id: registration.profileId,
+      profileId: registration.profileId,
+      name: registration.playerName,
+      initials: initialsForName(registration.playerName),
+      universityId: registration.universityId || registration.profileId,
+      email: registration.email || '',
+      phone: '',
+      rating: registration.rating ?? 1200,
+      record: '0-0-0',
+      avatarColor: demoPlayers[index % demoPlayers.length]?.avatarColor ?? '#21304e',
+      tournaments: 1,
+    }))
   if (!seed) return players
   return seededShuffle(players, seed)
 }
 
-function effectiveAdminPlayerCount(tournament: AdminTournament) {
+function effectiveAdminPlayerCount(tournament: AdminTournament, availablePlayers: number) {
   const declared = tournament.players > 0
     ? tournament.players
     : tournament.capacity && tournament.capacity > 0
       ? tournament.capacity
-      : demoPlayers.length
+      : availablePlayers
 
-  return Math.max(2, Math.min(demoPlayers.length, declared))
+  if (availablePlayers <= 0) return 0
+  return Math.max(0, Math.min(availablePlayers, declared))
 }
 
 function seededShuffle<T>(items: T[], seed: number) {
@@ -2848,11 +2943,33 @@ function buildPairings(players: Player[]): Pairing[] {
     return {
       board: index + 1,
       white: player.name,
+      whiteProfileId: player.profileId ?? player.id,
       whiteRating: player.rating,
       black: opponent?.name ?? 'TBD',
+      blackProfileId: opponent?.profileId ?? opponent?.id,
       blackRating: opponent?.rating ?? '-',
     }
   })
+}
+
+function firstBracketRoundPairings(rounds: AdminBracketRound[]): Pairing[] {
+  return (rounds[0]?.matches ?? []).map((match, index) => ({
+    ...match,
+    board: index + 1,
+  }))
+}
+
+function buildPublishableGames(pairings: Pairing[]): PairingPublishInput[] {
+  return pairings
+    .filter((pairing) => pairing.whiteProfileId && pairing.blackProfileId && pairing.whiteProfileId !== pairing.blackProfileId)
+    .map((pairing) => ({
+      round: 1,
+      board: pairing.board,
+      whiteProfileId: pairing.whiteProfileId as string,
+      blackProfileId: pairing.blackProfileId as string,
+      status: 'scheduled',
+      result: '*',
+    }))
 }
 
 function buildPlayableBoardsFromPairings(pairings: Pairing[]): PlayableBoard[] {
@@ -3026,7 +3143,7 @@ function buildAdminSingleEliminationRounds(
   phase: AdminBracketPhase,
   options: { forceActiveRound?: number; prefix?: string } = {},
 ): AdminBracketRound[] {
-  const entrants: BracketEntrant[] = players.map((player) => ({ name: player.name, rating: player.rating }))
+  const entrants: BracketEntrant[] = players.map((player) => ({ name: player.name, profileId: player.profileId ?? player.id, rating: player.rating }))
   const counts = bracketRoundCounts(entrants.length)
   const labels = counts.map((count) => `${options.prefix ?? ''}${bracketRoundName(count)}`)
   const activeRound = options.forceActiveRound ?? activeAdminBracketRoundIndex(labels, tournament, phase)
@@ -3044,7 +3161,7 @@ function buildAdminSingleEliminationRounds(
         ? Math.floor((byeCount + matchIndex) / 2)
         : undefined
       return buildBracketMatchForPhase(
-        makeBracketPairing(white.name, black.name, matchIndex + 1, next, white.rating, black.rating),
+        makeBracketPairing(white.name, black.name, matchIndex + 1, next, white.rating, black.rating, white.profileId, black.profileId),
         complete ? 'completed' : live ? 'active' : 'setup',
         matchIndex % 2 === 0 ? 'white' : 'black',
         live,
@@ -3200,12 +3317,16 @@ function makeBracketPairing(
   next?: number,
   whiteRating: number | string = '',
   blackRating: number | string = '',
+  whiteProfileId?: string,
+  blackProfileId?: string,
 ): Pairing {
   const pairing: Pairing = {
     black,
+    blackProfileId,
     blackRating,
     board,
     white,
+    whiteProfileId,
     whiteRating,
   }
   if (next !== undefined) pairing.next = next

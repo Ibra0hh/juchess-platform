@@ -40,6 +40,19 @@ type AppwriteTournamentRow = Models.Row & {
   description?: string
 }
 
+type AppwriteGameRow = Models.Row & {
+  tournamentId?: string
+  round?: number
+  board?: number
+  whiteProfileId?: string
+  blackProfileId?: string
+  status?: 'scheduled' | 'live' | 'completed' | 'forfeit'
+  result?: '1-0' | '0-1' | '1/2-1/2' | '*'
+  pgn?: string
+  startedAt?: string
+  finishedAt?: string
+}
+
 type AppwriteRegistrationRow = Models.Row & {
   tournamentId?: string
   profileId?: string
@@ -81,6 +94,7 @@ export type AdminTournament = {
   startsAt?: string
   location?: string
   description?: string
+  publishedGames: number
 }
 
 export type AdminRegistrationStatus = 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
@@ -118,6 +132,15 @@ export type TournamentInput = {
   capacity?: number
   description?: string
   createdByProfileId?: string
+}
+
+export type PairingPublishInput = {
+  round: number
+  board: number
+  whiteProfileId: string
+  blackProfileId: string
+  status?: 'scheduled' | 'live'
+  result?: '*'
 }
 
 export type AdminTournamentLoadResult = {
@@ -252,7 +275,7 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
   }
 
   try {
-    const [rows, participantCounts] = await Promise.all([
+    const [rows, participantCounts, gameCounts] = await Promise.all([
       tablesDB.listRows<AppwriteTournamentRow>({
         databaseId: appwriteConfig.databaseId,
         tableId: tableIds.tournaments,
@@ -261,10 +284,11 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
         ttl: 15,
       }),
       loadRegistrationCounts(),
+      loadPublishedGameCounts(),
     ])
 
     const tournaments = uniqueTournamentsByFormat(rows.rows
-      .map((row) => mapTournament(row, participantCounts))
+      .map((row) => mapTournament(row, participantCounts, gameCounts))
       .filter((tournament): tournament is AdminTournament => Boolean(tournament)))
       .sort(compareTournaments)
 
@@ -313,6 +337,25 @@ export async function deleteTournament(rowId: string) {
   })
 
   return response.rowId
+}
+
+export async function publishTournamentPairings(rowId: string, games: PairingPublishInput[]) {
+  const response = await runAdminAction<{ rows: AppwriteGameRow[] }>({
+    method: ExecutionMethod.POST,
+    path: `/tournaments/${rowId}/pairings/publish`,
+    body: {
+      games: games.map((game) => ({
+        round: game.round,
+        board: game.board,
+        whiteProfileId: game.whiteProfileId,
+        blackProfileId: game.blackProfileId,
+        status: game.status ?? 'scheduled',
+        result: game.result ?? '*',
+      })),
+    },
+  })
+
+  return response.rows
 }
 
 export async function loadTournamentRegistrations(tournamentRowId: string): Promise<RegistrationLoadResult> {
@@ -483,6 +526,29 @@ async function loadRegistrationCounts() {
   return counts
 }
 
+async function loadPublishedGameCounts() {
+  const counts = new Map<string, number>()
+
+  try {
+    const response = await tablesDB.listRows<AppwriteGameRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.games,
+      queries: [Query.limit(1000)],
+      total: false,
+      ttl: 15,
+    })
+
+    response.rows.forEach((row) => {
+      if (!row.tournamentId) return
+      counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
+    })
+  } catch (error) {
+    console.warn('Admin game count read failed.', error)
+  }
+
+  return counts
+}
+
 async function loadProfilesById(profileIds: string[]) {
   const uniqueIds = Array.from(new Set(profileIds.filter(Boolean)))
   const profiles = new Map<string, AppwriteProfileRow>()
@@ -510,6 +576,7 @@ async function loadProfilesById(profileIds: string[]) {
 function mapTournament(
   row: AppwriteTournamentRow,
   participantCounts: Map<string, number>,
+  gameCounts: Map<string, number>,
 ): AdminTournament | null {
   if (!row.format || !row.timeControl) return null
   const status = row.status === 'cancelled' ? 'archived' : row.status
@@ -531,6 +598,7 @@ function mapTournament(
     startsAt: row.startsAt,
     location: row.location,
     description: row.description,
+    publishedGames: gameCounts.get(row.$id) ?? 0,
   }
 }
 
