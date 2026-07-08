@@ -243,6 +243,7 @@ export default async ({ req, res, log, error }) => {
         'PATCH /tournaments/:id',
         'DELETE /tournaments/:id',
         'POST /tournaments/:id/pairings/publish',
+        'POST /profiles/lookup',
         'GET /admin/session',
         'GET /admin/admins',
         'POST /admin/admins',
@@ -267,6 +268,28 @@ export default async ({ req, res, log, error }) => {
 
     if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'session') {
       return res.json({ ok: true, allowed: true, profile: actor });
+    }
+
+    if (method === 'POST' && segments[0] === 'profiles' && segments[1] === 'lookup') {
+      const ids = Array.isArray(body.ids)
+        ? Array.from(new Set(body.ids.map((id) => String(id)).filter(Boolean)))
+        : [];
+
+      if (!ids.length) {
+        return res.json({ ok: true, rows: [] });
+      }
+
+      const response = await tablesDB.listRows({
+        databaseId,
+        tableId: tableIds.profiles,
+        queries: [Query.limit(500)],
+        total: false,
+      });
+
+      return res.json({
+        ok: true,
+        rows: response.rows.filter((row) => ids.includes(row.$id)),
+      });
     }
 
     if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'admins' && segments.length === 2) {

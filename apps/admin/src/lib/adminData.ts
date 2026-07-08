@@ -555,6 +555,19 @@ async function loadProfilesById(profileIds: string[]) {
   if (!uniqueIds.length) return profiles
 
   try {
+    const response = await runAdminAction<{ rows: AppwriteProfileRow[] }>({
+      method: ExecutionMethod.POST,
+      path: '/profiles/lookup',
+      body: { ids: uniqueIds },
+    })
+
+    response.rows.forEach((row) => profiles.set(row.$id, row))
+    if (profiles.size === uniqueIds.length) return profiles
+  } catch (error) {
+    console.warn('Admin server profile lookup failed.', error)
+  }
+
+  try {
     const response = await tablesDB.listRows<AppwriteProfileRow>({
       databaseId: appwriteConfig.databaseId,
       tableId: tableIds.profiles,

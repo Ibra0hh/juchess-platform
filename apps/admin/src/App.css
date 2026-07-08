@@ -1469,7 +1469,7 @@ button {
 }
 
 .tournament-manage-view {
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
   animation: cj-fade 0.3s ease;
 }
@@ -1835,29 +1835,33 @@ button {
 }
 
 .website-bracket-host {
-  max-width: 1100px;
+  width: min(100%, 1380px);
+  max-width: none;
   overflow: visible;
   border: 0;
   background: transparent;
 }
 
 .website-bracket-host .bracket-panel {
-  background: #fffcf4;
-  border: 1px solid rgba(30, 43, 69, 0.16);
-  border-radius: 10px;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(169, 138, 63, 0.16), transparent 34%),
+    linear-gradient(135deg, #181b25 0%, #232530 48%, #1b1d27 100%);
+  box-shadow: 0 24px 52px rgba(20, 33, 61, 0.22);
 }
 
 .bracket-panel {
-  padding: 18px;
+  padding: 24px;
 }
 
 .bracket-panel h2 {
   margin: 0;
-  color: #1e2b45;
+  color: #fffaf0;
   font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 23px;
-  font-weight: 700;
+  font-size: 28px;
+  font-weight: 800;
 }
 
 .bracket-heading {
@@ -1877,10 +1881,10 @@ button {
 .bracket-switch button {
   height: 38px;
   padding: 0 20px;
-  color: #1e2b45;
-  background: transparent;
-  border: 1px solid rgba(30, 43, 69, 0.28);
-  border-radius: 8px;
+  color: rgba(255, 250, 240, 0.82);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
   cursor: pointer;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-size: 13px;
@@ -1888,20 +1892,49 @@ button {
 }
 
 .bracket-switch button:hover {
-  border-color: #7a2431;
+  border-color: rgba(169, 138, 63, 0.6);
 }
 
 .bracket-switch button.active {
-  color: #f5efe3;
-  background: #1e2b45;
-  border-color: #1e2b45;
+  color: #1b1d27;
+  background: #fffaf0;
+  border-color: #fffaf0;
+}
+
+.bracket-navigation {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.bracket-nav-arrow {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fffaf0;
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.bracket-nav-arrow:disabled {
+  cursor: default;
+  opacity: 0.34;
+}
+
+.bracket-nav-arrow:not(:disabled):hover {
+  border-color: rgba(169, 138, 63, 0.72);
+  background: rgba(169, 138, 63, 0.18);
 }
 
 .bracket-round-nav {
   display: flex;
-  gap: 8px;
-  margin-top: 14px;
-  padding: 2px 0 0;
+  gap: 10px;
+  padding: 2px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -1912,12 +1945,12 @@ button {
 
 .bracket-round-nav button {
   flex: none;
-  height: 34px;
-  padding: 0 14px;
-  color: rgba(30, 43, 69, 0.72);
-  background: rgba(255, 252, 244, 0.68);
-  border: 1px solid rgba(30, 43, 69, 0.18);
-  border-radius: 8px;
+  height: 38px;
+  padding: 0 18px;
+  color: rgba(255, 250, 240, 0.78);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
   cursor: pointer;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-size: 12px;
@@ -1927,25 +1960,25 @@ button {
 }
 
 .bracket-round-nav button:hover {
-  color: #7a2431;
-  border-color: rgba(122, 36, 49, 0.4);
+  color: #fffaf0;
+  border-color: rgba(169, 138, 63, 0.56);
 }
 
 .bracket-round-nav button.active {
-  color: #f5efe3;
-  background: #1e2b45;
-  border-color: #1e2b45;
-  box-shadow: 0 1px 4px rgba(30, 43, 69, 0.14);
+  color: #1b1d27;
+  background: #fffaf0;
+  border-color: #fffaf0;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
 }
 
 .bracket-scroll {
-  margin-top: 20px;
-  max-height: min(760px, 76vh);
+  margin-top: 26px;
+  max-height: min(880px, 82vh);
   overflow: auto;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
   cursor: grab;
   scrollbar-width: thin;
-  scrollbar-color: rgba(30, 43, 69, 0.3) transparent;
+  scrollbar-color: rgba(255, 250, 240, 0.36) transparent;
 }
 
 .bracket-scroll::-webkit-scrollbar {
@@ -1954,7 +1987,7 @@ button {
 }
 
 .bracket-scroll::-webkit-scrollbar-thumb {
-  background: rgba(30, 43, 69, 0.25);
+  background: rgba(255, 250, 240, 0.28);
   border-radius: 4px;
 }
 
@@ -1962,7 +1995,8 @@ button {
   min-width: max-content;
   display: flex;
   align-items: stretch;
-  gap: 34px;
+  gap: 72px;
+  padding: 0 36px 42px;
   position: relative;
 }
 
@@ -1977,20 +2011,23 @@ button {
 }
 
 .bracket-column {
-  width: 220px;
+  width: 260px;
   display: flex;
   flex: none;
   flex-direction: column;
 }
 
 .bracket-column h3 {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   margin: 0;
-  padding: 0 4px 10px;
-  color: rgba(30, 43, 69, 0.58);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-align: center;
+  padding: 0 4px 18px;
+  color: rgba(255, 250, 240, 0.8);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: left;
   text-transform: uppercase;
 }
 
@@ -1999,26 +2036,27 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  gap: 12px;
+  gap: 22px;
+  min-height: 680px;
 }
 
 .bracket-match.rich {
   width: 100%;
   position: relative;
   z-index: 1;
-  min-height: 76px;
+  min-height: 88px;
   margin: 0;
   display: block;
   appearance: none;
-  padding: 10px 12px;
-  border: 1px solid rgba(30, 43, 69, 0.14);
-  border-left: 3px solid rgba(30, 43, 69, 0.2);
-  border-radius: 8px;
-  background: #fffcf4;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 4px solid rgba(255, 250, 240, 0.22);
+  border-radius: 14px;
+  background: rgba(43, 44, 55, 0.96);
   color: inherit;
   cursor: default;
   font: inherit;
-  box-shadow: 0 1px 3px rgba(30, 43, 69, 0.06);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   text-align: left;
 }
 
@@ -2027,20 +2065,20 @@ button {
 }
 
 .bracket-match.rich.selectable:hover {
-  border-color: rgba(122, 36, 49, 0.45);
-  box-shadow: 0 6px 18px rgba(30, 43, 69, 0.12);
+  border-color: rgba(169, 138, 63, 0.72);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26);
   transform: translateY(-1px);
 }
 
 .bracket-match.rich.selectable:focus-visible {
-  outline: 3px solid rgba(122, 36, 49, 0.22);
+  outline: 3px solid rgba(169, 138, 63, 0.34);
   outline-offset: 3px;
 }
 
 .bracket-match.rich.selected-board {
-  border-color: rgba(122, 36, 49, 0.72);
-  border-left-color: #7a2431;
-  box-shadow: 0 0 0 3px rgba(122, 36, 49, 0.12), 0 8px 20px rgba(30, 43, 69, 0.14);
+  border-color: rgba(169, 138, 63, 0.9);
+  border-left-color: #a98a3f;
+  box-shadow: 0 0 0 3px rgba(169, 138, 63, 0.18), 0 16px 32px rgba(0, 0, 0, 0.28);
 }
 
 .bracket-match.rich.complete {
@@ -2048,13 +2086,13 @@ button {
 }
 
 .bracket-match.rich.live {
-  background: #fff7ee;
-  border-color: rgba(122, 36, 49, 0.4);
+  background: rgba(54, 39, 43, 0.98);
+  border-color: rgba(122, 36, 49, 0.62);
   border-left-color: #7a2431;
 }
 
 .bracket-match.rich.pending {
-  background: rgba(255, 252, 244, 0.55);
+  background: rgba(43, 44, 55, 0.66);
 }
 
 .bracket-live-tag {
@@ -2062,7 +2100,7 @@ button {
   align-items: center;
   gap: 5px;
   margin-bottom: 6px;
-  color: #7a2431;
+  color: #f0c36f;
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -2073,8 +2111,7 @@ button {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #7a2431;
-  animation: ju-pulse 1.6s ease-in-out infinite;
+  background: #f0c36f;
 }
 
 .bracket-player {
@@ -2085,36 +2122,37 @@ button {
 }
 
 .bracket-player + .bracket-player {
-  margin-top: 5px;
-  padding-top: 5px;
-  border-top: 1px solid rgba(30, 43, 69, 0.08);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 250, 240, 0.1);
 }
 
 .bracket-player span {
   min-width: 0;
   overflow: hidden;
-  color: #1e2b45;
-  font-size: 13px;
-  font-weight: 400;
+  color: rgba(255, 250, 240, 0.94);
+  font-size: 14px;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bracket-player.winner span {
-  font-weight: 600;
+  color: #fff;
+  font-weight: 900;
 }
 
 .bracket-player.muted span,
 .bracket-player.muted strong {
-  color: rgba(30, 43, 69, 0.45);
+  color: rgba(255, 250, 240, 0.42);
 }
 
 .bracket-player strong {
   flex: none;
-  color: #1e2b45;
+  color: #fffaf0;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .admin-bracket-scroll {

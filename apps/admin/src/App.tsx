@@ -60,6 +60,8 @@ type Player = {
   blocked?: boolean
 }
 
+type AdminBracketSide = 'white' | 'black'
+
 type Pairing = {
   board: number
   white: string
@@ -69,14 +71,13 @@ type Pairing = {
   blackProfileId?: string
   blackRating: number | string
   next?: number
+  targetSlot?: AdminBracketSide
 }
 
 type PlayableBoard = Pairing & {
   boardKey: string
   boardLabel: string
 }
-
-type AdminBracketSide = 'white' | 'black'
 
 type AdminBracketMatch = Pairing & {
   whiteScore?: string
@@ -1840,12 +1841,13 @@ function AdminBracketPreview({
 
     const updateActiveRound = () => {
       const columns = Array.from(track.querySelectorAll<HTMLElement>('[data-round-index]'))
-      const targetLeft = scroll.scrollLeft + 12
+      const viewportCenter = scroll.scrollLeft + scroll.clientWidth / 2
       let nearest = 0
       let nearestDistance = Number.POSITIVE_INFINITY
 
       columns.forEach((column, index) => {
-        const distance = Math.abs(column.offsetLeft - targetLeft)
+        const columnCenter = column.offsetLeft + column.offsetWidth / 2
+        const distance = Math.abs(columnCenter - viewportCenter)
         if (distance < nearestDistance) {
           nearest = index
           nearestDistance = distance
@@ -1891,9 +1893,14 @@ function AdminBracketPreview({
 
     setActiveRound(roundIndex)
     scroll.scrollTo({
-      left: Math.max(0, target.offsetLeft - 18),
+      left: Math.max(0, target.offsetLeft - (scroll.clientWidth - target.offsetWidth) / 2),
       behavior: 'smooth',
     })
+  }
+
+  const jumpBy = (direction: -1 | 1) => {
+    const nextRound = Math.max(0, Math.min(rounds.length - 1, activeRound + direction))
+    jumpToRound(nextRound)
   }
 
   return (
@@ -1916,19 +1923,39 @@ function AdminBracketPreview({
         ) : null}
       </div>
 
-      <nav className="bracket-round-nav" aria-label="Bracket rounds">
-        {rounds.map((round, roundIndex) => (
-          <button
-            type="button"
-            className={activeRound === roundIndex ? 'active' : undefined}
-            aria-current={activeRound === roundIndex ? 'true' : undefined}
-            onClick={() => jumpToRound(roundIndex)}
-            key={round.name}
-          >
-            {round.name}
-          </button>
-        ))}
-      </nav>
+      <div className="bracket-navigation">
+        <button
+          type="button"
+          className="bracket-nav-arrow"
+          aria-label="Previous bracket round"
+          disabled={activeRound === 0}
+          onClick={() => jumpBy(-1)}
+        >
+          ‹
+        </button>
+        <nav className="bracket-round-nav" aria-label="Bracket rounds">
+          {rounds.map((round, roundIndex) => (
+            <button
+              type="button"
+              className={activeRound === roundIndex ? 'active' : undefined}
+              aria-current={activeRound === roundIndex ? 'true' : undefined}
+              onClick={() => jumpToRound(roundIndex)}
+              key={round.name}
+            >
+              {round.name}
+            </button>
+          ))}
+        </nav>
+        <button
+          type="button"
+          className="bracket-nav-arrow"
+          aria-label="Next bracket round"
+          disabled={activeRound >= rounds.length - 1}
+          onClick={() => jumpBy(1)}
+        >
+          ›
+        </button>
+      </div>
 
       <div className="bracket-scroll" aria-label={title} ref={scrollRef}>
         <div className="bracket-track" ref={trackRef}>
@@ -1997,11 +2024,13 @@ function AdminBracketMatchCard({
       <BracketPlayerRow
         name={match.white}
         score={match.live ? '•' : match.whiteScore ?? ''}
+        side="white"
         state={bracketPlayerState(match, 'white')}
       />
       <BracketPlayerRow
         name={match.black}
         score={match.live ? '•' : match.blackScore ?? ''}
+        side="black"
         state={bracketPlayerState(match, 'black')}
       />
     </>
@@ -2014,6 +2043,7 @@ function AdminBracketMatchCard({
         className={className}
         data-brk-card={`${roundIndex}-${matchIndex}`}
         data-target={match.next ?? ''}
+        data-target-slot={match.targetSlot ?? ''}
         data-win={lineState}
         onClick={() => onSelect?.(boardKey)}
       >
@@ -2027,6 +2057,7 @@ function AdminBracketMatchCard({
       className={className}
       data-brk-card={`${roundIndex}-${matchIndex}`}
       data-target={match.next ?? ''}
+      data-target-slot={match.targetSlot ?? ''}
       data-win={lineState}
     >
       {content}
@@ -2039,13 +2070,18 @@ function drawBracketLines(track: HTMLDivElement) {
   if (!svg) return
 
   const cards = Array.from(track.querySelectorAll<HTMLElement>('[data-brk-card]'))
-  const cardsByRound = new Map<number, Array<{ element: HTMLElement; index: number; win: string | null }>>()
+  const cardsByRound = new Map<number, Array<{ element: HTMLElement; index: number; targetSlot: string | null; win: string | null }>>()
 
   cards.forEach((element) => {
     const [round, index] = (element.dataset.brkCard || '').split('-').map(Number)
     if (!Number.isFinite(round) || !Number.isFinite(index)) return
     const entries = cardsByRound.get(round) || []
-    entries.push({ element, index, win: element.dataset.win || null })
+    entries.push({
+      element,
+      index,
+      targetSlot: element.dataset.targetSlot || null,
+      win: element.dataset.win || null,
+    })
     cardsByRound.set(round, entries)
   })
 
@@ -2069,11 +2105,16 @@ function drawBracketLines(track: HTMLDivElement) {
       const target = nextRound.find((candidate) => candidate.index === targetIndex)
       if (!target) return
 
-      const from = match.element.getBoundingClientRect()
-      const to = target.element.getBoundingClientRect()
-      const x1 = from.right - base.left
+      const fromAnchor = bracketSourceAnchor(match.element, match.win)
+      const targetSlot = match.targetSlot || (match.index % 2 === 0 ? 'white' : 'black')
+      const toAnchor = bracketTargetAnchor(target.element, targetSlot)
+      const from = fromAnchor.getBoundingClientRect()
+      const to = toAnchor.getBoundingClientRect()
+      const fromCard = match.element.getBoundingClientRect()
+      const toCard = target.element.getBoundingClientRect()
+      const x1 = fromCard.right - base.left
       const y1 = from.top - base.top + from.height / 2
-      const x2 = to.left - base.left
+      const x2 = toCard.left - base.left
       const y2 = to.top - base.top + to.height / 2
       const midX = (x1 + x2) / 2
       const decided = match.win === 'a' || match.win === 'b'
@@ -2082,8 +2123,8 @@ function drawBracketLines(track: HTMLDivElement) {
 
       path.setAttribute('d', `M${x1} ${y1} H${midX} V${y2} H${x2}`)
       path.setAttribute('fill', 'none')
-      path.setAttribute('stroke', decided ? '#7A2431' : live ? '#A98A3F' : 'rgba(30,43,69,.22)')
-      path.setAttribute('stroke-width', decided ? '2.25' : '1.5')
+      path.setAttribute('stroke', decided ? '#F0C36F' : live ? '#C78B95' : 'rgba(255,250,240,.24)')
+      path.setAttribute('stroke-width', decided ? '2.4' : '1.8')
       path.setAttribute('stroke-linejoin', 'round')
       path.setAttribute('stroke-linecap', 'round')
       if (live) path.setAttribute('stroke-dasharray', '5 3')
@@ -2092,17 +2133,39 @@ function drawBracketLines(track: HTMLDivElement) {
   })
 }
 
+function bracketSourceAnchor(element: HTMLElement, win: string | null) {
+  if (win === 'a') {
+    return element.querySelector<HTMLElement>('[data-brk-player="white"]') ?? element
+  }
+  if (win === 'b') {
+    return element.querySelector<HTMLElement>('[data-brk-player="black"]') ?? element
+  }
+  return element
+}
+
+function bracketTargetAnchor(element: HTMLElement, slot: string | null) {
+  if (slot === 'white') {
+    return element.querySelector<HTMLElement>('[data-brk-player="white"]') ?? element
+  }
+  if (slot === 'black') {
+    return element.querySelector<HTMLElement>('[data-brk-player="black"]') ?? element
+  }
+  return element
+}
+
 function BracketPlayerRow({
   name,
   score,
+  side,
   state,
 }: {
   name: string
   score: string
+  side: AdminBracketSide
   state: 'neutral' | 'winner' | 'muted'
 }) {
   return (
-    <div className={`bracket-player ${state}`}>
+    <div className={`bracket-player ${state}`} data-brk-player={side}>
       <span>{name}</span>
       <strong>{score}</strong>
     </div>
@@ -3145,10 +3208,10 @@ function buildAdminSingleEliminationRounds(
 ): AdminBracketRound[] {
   const entrants: BracketEntrant[] = players.map((player) => ({ name: player.name, profileId: player.profileId ?? player.id, rating: player.rating }))
   const counts = bracketRoundCounts(entrants.length)
-  const labels = counts.map((count) => `${options.prefix ?? ''}${bracketRoundName(count)}`)
-  const activeRound = options.forceActiveRound ?? activeAdminBracketRoundIndex(labels, tournament, phase)
   const baseSize = previousPowerOfTwo(entrants.length)
   const hasPlayIn = entrants.length !== baseSize
+  const labels = counts.map((count, index) => `${options.prefix ?? ''}${bracketRoundName(count, hasPlayIn && index === 0)}`)
+  const activeRound = options.forceActiveRound ?? activeAdminBracketRoundIndex(labels, tournament, phase)
   const byeCount = hasPlayIn ? Math.max(0, baseSize * 2 - entrants.length) : 0
   const byes = entrants.slice(0, byeCount)
   let current = hasPlayIn ? entrants.slice(byeCount) : entrants
@@ -3157,11 +3220,21 @@ function buildAdminSingleEliminationRounds(
     const complete = phase === 'completed' || (phase === 'active' && roundIndex < activeRound)
     const live = phase === 'active' && roundIndex === activeRound
     const matches = pairEntrants(current).map(([white, black], matchIndex) => {
-      const next = hasPlayIn && roundIndex === 0
-        ? Math.floor((byeCount + matchIndex) / 2)
+      const target = hasPlayIn && roundIndex === 0
+        ? playInTarget(matchIndex, byeCount)
         : undefined
       return buildBracketMatchForPhase(
-        makeBracketPairing(white.name, black.name, matchIndex + 1, next, white.rating, black.rating, white.profileId, black.profileId),
+        makeBracketPairing(
+          white.name,
+          black.name,
+          matchIndex + 1,
+          target?.next,
+          white.rating,
+          black.rating,
+          white.profileId,
+          black.profileId,
+          target?.slot,
+        ),
         complete ? 'completed' : live ? 'active' : 'setup',
         matchIndex % 2 === 0 ? 'white' : 'black',
         live,
@@ -3177,6 +3250,16 @@ function buildAdminSingleEliminationRounds(
 
     return { name, matches }
   })
+}
+
+function playInTarget(matchIndex: number, byeCount: number) {
+  const entryIndex = matchIndex < byeCount
+    ? matchIndex * 2 + 1
+    : byeCount + matchIndex
+  return {
+    next: Math.floor(entryIndex / 2),
+    slot: (entryIndex % 2 === 0 ? 'white' : 'black') as AdminBracketSide,
+  }
 }
 
 function bracketRoundCounts(playerCount: number) {
@@ -3319,6 +3402,7 @@ function makeBracketPairing(
   blackRating: number | string = '',
   whiteProfileId?: string,
   blackProfileId?: string,
+  targetSlot?: AdminBracketSide,
 ): Pairing {
   const pairing: Pairing = {
     black,
@@ -3330,6 +3414,7 @@ function makeBracketPairing(
     whiteRating,
   }
   if (next !== undefined) pairing.next = next
+  if (targetSlot) pairing.targetSlot = targetSlot
   return pairing
 }
 
@@ -3383,7 +3468,8 @@ function bracketBoardKey(roundName: string, matchIndex: number) {
   return `bracket:${roundName}:${matchIndex}`
 }
 
-function bracketRoundName(playersInRound: number) {
+function bracketRoundName(playersInRound: number, playIn = false) {
+  if (playIn) return 'Play-in'
   if (playersInRound === 2) return 'Final'
   if (playersInRound === 4) return 'Semifinal'
   if (playersInRound === 8) return 'Quarterfinal'
@@ -3391,9 +3477,10 @@ function bracketRoundName(playersInRound: number) {
 }
 
 function bracketRoundCodeFromName(label: string) {
-  if (/final/i.test(label) && !/semi/i.test(label)) return 'F'
-  if (/semifinal/i.test(label)) return 'SF'
+  if (/play[-\s]?in/i.test(label)) return 'PI'
   if (/quarterfinal/i.test(label)) return 'QF'
+  if (/semifinal/i.test(label)) return 'SF'
+  if (/final/i.test(label)) return 'F'
   const count = /round of\s*(\d+)/i.exec(label)?.[1]
   if (count) return `R${count}`
   const loserRound = /l-round\s*(\d+)/i.exec(label)?.[1]
