@@ -40,7 +40,7 @@ import {
 } from './lib/adminData'
 import { adminQueues, type TournamentStatus } from './lib/juchess'
 
-type Screen = 'dashboard' | 'windows' | 'tournaments' | 'players' | 'news' | 'announcements'
+type Screen = 'dashboard' | 'windows' | 'tournaments' | 'players' | 'news' | 'announcements' | 'adminAccess'
 type TournamentTab = TournamentStatus
 type TournamentDataSource = 'cloud' | 'unavailable'
 type WindowKey = 'home' | 'tournaments' | 'games' | 'tools' | 'profile' | 'auth'
@@ -163,6 +163,7 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
   { key: 'players', label: 'Players', icon: '◍' },
   { key: 'news', label: 'News', icon: '◫' },
   { key: 'announcements', label: 'Announcements', icon: '◈' },
+  { key: 'adminAccess', label: 'Admin access', icon: '▣' },
 ]
 
 const tournamentTabs: TournamentTab[] = ['draft', 'upcoming', 'active', 'completed', 'archived']
@@ -204,6 +205,7 @@ const pageText: Record<Screen, { title: string; sub: string }> = {
   players: { title: 'Player Management', sub: 'Roster, ratings and player records' },
   news: { title: 'News', sub: 'Public posts shown on the app & website' },
   announcements: { title: 'Announcements', sub: 'Broadcast to players and members' },
+  adminAccess: { title: 'Admin access', sub: 'Manage admin-only accounts and permissions' },
 }
 
 const demoPlayers: Player[] = [
@@ -477,8 +479,9 @@ function App() {
         <PlayersScreen blocks={blocks} session={session} onBlocksChanged={refreshBlocks} />
       ) : null}
       {screen === 'news' ? <NewsScreen /> : null}
-      {screen === 'announcements' ? (
-        <AnnouncementsScreen
+      {screen === 'announcements' ? <AnnouncementsScreen /> : null}
+      {screen === 'adminAccess' ? (
+        <AdminAccessScreen
           adminProfiles={adminProfiles}
           session={session}
           onAdminsChanged={refreshAdminProfiles}
@@ -2959,7 +2962,89 @@ function NewsScreen() {
   )
 }
 
-function AnnouncementsScreen({
+const broadcastChannels = [
+  { key: 'app', label: 'App', detail: 'In-app notification feed' },
+  { key: 'email', label: 'Email', detail: 'Send to registered email addresses' },
+  { key: 'sms', label: 'SMS', detail: 'Send to verified phone numbers' },
+] as const
+
+type BroadcastChannel = typeof broadcastChannels[number]['key']
+
+function AnnouncementsScreen() {
+  const [audience, setAudience] = useState('All users')
+  const [channels, setChannels] = useState<Record<BroadcastChannel, boolean>>({
+    app: true,
+    email: true,
+    sms: false,
+  })
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const selectedChannels = broadcastChannels.filter((item) => channels[item.key])
+  const channelLabel = selectedChannels.length
+    ? selectedChannels.map((item) => item.label).join(' + ')
+    : 'No channel selected'
+
+  function toggleChannel(channel: BroadcastChannel) {
+    setChannels((current) => ({
+      ...current,
+      [channel]: !current[channel],
+    }))
+  }
+
+  return (
+    <div className="announcements-screen">
+      <section className="panel-card announcement-card">
+        <div className="panel-head">
+          <strong>Broadcast composer</strong>
+          <span>{channelLabel}</span>
+        </div>
+        <div className="audience-tabs">
+          {['All users', 'Tournament participants', 'Club members', 'Specific players'].map((item) => (
+            <button key={item} type="button" className={audience === item ? 'active' : undefined} onClick={() => setAudience(item)}>{item}</button>
+          ))}
+        </div>
+        <div className="channel-picker" aria-label="Broadcast delivery channels">
+          {broadcastChannels.map((item) => (
+            <label className={channels[item.key] ? 'active' : undefined} key={item.key}>
+              <input
+                type="checkbox"
+                checked={channels[item.key]}
+                onChange={() => toggleChannel(item.key)}
+              />
+              <span>
+                <strong>{item.label}</strong>
+                <small>{item.detail}</small>
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="post-form">
+          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Announcement title" />
+          <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write the message..." />
+          <button type="button" className="primary-button" disabled={!selectedChannels.length}>Send announcement</button>
+        </div>
+      </section>
+      <section className="panel-card">
+        <div className="panel-title">Delivery status</div>
+        <QueueRow icon="◈" tint="#EAF0FA" label="Audience" count={audience === 'All users' ? 248 : 32} action="Ready" onClick={() => undefined} />
+        <QueueRow icon="▣" tint="#FBF1E2" label="Selected channels" count={selectedChannels.length} action={selectedChannels.length ? channelLabel : 'Choose'} onClick={() => undefined} />
+        {broadcastChannels.map((item) => (
+          <QueueRow
+            icon={item.key === 'email' ? '✉' : item.key === 'sms' ? '▣' : '◈'}
+            tint={item.key === 'email' ? '#EAF6F0' : item.key === 'sms' ? '#FBF1E2' : '#EAF0FA'}
+            label={`${item.label} channel`}
+            count={channels[item.key] ? 1 : 0}
+            action={channels[item.key] ? 'On' : 'Off'}
+            onClick={() => toggleChannel(item.key)}
+            key={item.key}
+          />
+        ))}
+      </section>
+    </div>
+  )
+}
+
+function AdminAccessScreen({
   adminProfiles,
   onAdminsChanged,
   session,
@@ -2968,38 +3053,23 @@ function AnnouncementsScreen({
   onAdminsChanged: () => Promise<void>
   session: AdminSession
 }) {
-  const [audience, setAudience] = useState('All users')
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
+  if (session.profile?.role !== 'superAdmin') {
+    return (
+      <div className="admin-access-screen">
+        <section className="panel-card">
+          <div className="panel-head">
+            <strong>Admin access</strong>
+            <span>Super admin only</span>
+          </div>
+          <EmptyState title="Restricted area" body="Only a super admin can create, activate, or suspend admin access." />
+        </section>
+      </div>
+    )
+  }
 
   return (
-    <div className="announcements-screen">
-      <section className="panel-card announcement-card">
-        <div className="panel-head">
-          <strong>Broadcast composer</strong>
-          <span>App · Email · SMS</span>
-        </div>
-        <div className="audience-tabs">
-          {['All users', 'Tournament participants', 'Club members', 'Specific players'].map((item) => (
-            <button key={item} type="button" className={audience === item ? 'active' : undefined} onClick={() => setAudience(item)}>{item}</button>
-          ))}
-        </div>
-        <div className="post-form">
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Announcement title" />
-          <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write the message..." />
-          <button type="button" className="primary-button">Send announcement</button>
-        </div>
-      </section>
-      {session.profile?.role === 'superAdmin' ? (
-        <AdminAccessManagement admins={adminProfiles} session={session} onChanged={onAdminsChanged} />
-      ) : (
-        <section className="panel-card">
-          <div className="panel-title">Delivery status</div>
-          <QueueRow icon="◈" tint="#EAF0FA" label="Audience" count={audience === 'All users' ? 248 : 32} action="Ready" onClick={() => undefined} />
-          <QueueRow icon="✉" tint="#EAF6F0" label="Email channel" count={1} action="On" onClick={() => undefined} />
-          <QueueRow icon="▣" tint="#FBF1E2" label="SMS channel" count={1} action="On" onClick={() => undefined} />
-        </section>
-      )}
+    <div className="admin-access-screen">
+      <AdminAccessManagement admins={adminProfiles} session={session} onChanged={onAdminsChanged} />
     </div>
   )
 }
