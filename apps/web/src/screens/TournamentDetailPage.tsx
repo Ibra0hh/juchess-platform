@@ -78,6 +78,7 @@ type BracketConfig =
     }
 
 const boardPieces = ['♜', '♞', '', '♛', '', '♜', '♚', '', '♟', '♟', '', '', '♟', '♟', '♟', '', '', '', '♝', '', '', '♞', '', '', '', '', '', '♙', '♗', '', '', '', '', '', '♘', '', '♙', '', '', '', '', '', '', '', '', '♘', '♙', '', '♙', '♙', '♙', '', '', '♙', '♙', '♙', '♖', '', '♗', '♕', '', '♖', '♔', '']
+const bracketByeName = 'Bye'
 
 const bracketConfigs: Record<string, BracketConfig> = {
   'single-elimination': {
@@ -665,40 +666,36 @@ function buildSingleEliminationBracket(
   options: { forceActiveRound?: number; prefix?: string } = {},
 ): BracketDefinition {
   const publishedNames = publishedGames.flatMap((game) => [game.white.name, game.black.name])
-  const names = publishedNames.length ? publishedNames : players.map((player) => player.name)
+  const names = players.length ? players.map((player) => player.name) : publishedNames
   const counts = bracketRoundCounts(names.length)
   const labels = counts.map((count) => prefixedRoundName(count, options.prefix))
   const activeRound = options.forceActiveRound ?? activeBracketRoundIndex(labels, tournament)
-  const baseSize = previousPowerOfTwo(names.length)
-  const hasPlayIn = names.length !== baseSize
-  const byeCount = hasPlayIn ? Math.max(0, baseSize * 2 - names.length) : 0
-  const byeNames = names.slice(0, byeCount)
-  let current = hasPlayIn ? names.slice(byeCount) : names
+  const bracketSize = nextPowerOfTwo(names.length)
+  let current = openingBracketNames(names, bracketSize)
+  let publishedGameIndex = 0
 
   const matches = labels.map((label, roundIndex) => {
     const sourceCode = bracketRoundCode(label)
     const complete = tournament.status === 'Completed' || (tournament.status === 'Active' && roundIndex < activeRound)
     const live = tournament.status === 'Active' && roundIndex === activeRound
     const roundMatches = pairNames(current).map(([a, b], matchIndex) => {
-      const publishedGame = roundIndex === 0 ? publishedGames[matchIndex] : undefined
+      const publishedGame = roundIndex === 0 && !isByeName(a) && !isByeName(b)
+        ? publishedGames[publishedGameIndex++]
+        : undefined
       return makeBracketMatch(a, b, {
         complete,
         live,
         matchIndex,
         result: publishedGame?.result,
         status: publishedGame?.status,
-        next: hasPlayIn && roundIndex === 0
-          ? Math.floor((byeNames.length + matchIndex) / 2)
-          : undefined,
+        next: roundIndex < labels.length - 1 ? Math.floor(matchIndex / 2) : undefined,
       })
     })
     const winners = roundMatches.map((match, matchIndex) => (
-      complete ? bracketWinner(match) : `Winner ${sourceCode}-${matchIndex + 1}`
+      match.w || complete ? bracketWinner(match) : `Winner ${sourceCode}-${matchIndex + 1}`
     ))
 
-    current = hasPlayIn && roundIndex === 0
-      ? interleaveByesAndWinners(byeNames, winners)
-      : winners
+    current = winners
 
     return roundMatches
   })
@@ -813,8 +810,7 @@ function buildLoserBracketRounds(
 }
 
 function bracketRoundCounts(playerCount: number) {
-  const baseSize = previousPowerOfTwo(playerCount)
-  const counts: number[] = playerCount === baseSize ? [playerCount] : [playerCount, baseSize]
+  const counts: number[] = [nextPowerOfTwo(playerCount)]
   let next = counts[counts.length - 1] / 2
   while (next >= 2) {
     counts.push(next)
@@ -833,9 +829,9 @@ function effectiveBracketPlayerCount(tournament: Tournament, availablePlayers: n
   return Math.max(2, Math.min(availablePlayers, declared))
 }
 
-function previousPowerOfTwo(value: number) {
+function nextPowerOfTwo(value: number) {
   let result = 1
-  while (result * 2 <= value) result *= 2
+  while (result < value) result *= 2
   return Math.max(2, result)
 }
 
@@ -847,14 +843,21 @@ function pairNames(names: string[]) {
   return pairs
 }
 
-function interleaveByesAndWinners(byes: string[], winners: string[]) {
-  const rows: string[] = []
-  const max = Math.max(byes.length, winners.length)
-  for (let index = 0; index < max; index += 1) {
-    if (byes[index]) rows.push(byes[index])
-    if (winners[index]) rows.push(winners[index])
+function openingBracketNames(names: string[], bracketSize: number) {
+  const slots: string[] = []
+  const firstRoundMatches = Math.max(1, bracketSize / 2)
+  const byeCount = Math.max(0, bracketSize - names.length)
+  let playerIndex = 0
+
+  for (let matchIndex = 0; matchIndex < firstRoundMatches; matchIndex += 1) {
+    const a = names[playerIndex++] ?? bracketByeName
+    const b = matchIndex >= firstRoundMatches - byeCount
+      ? bracketByeName
+      : names[playerIndex++] ?? bracketByeName
+    slots.push(a, b)
   }
-  return rows
+
+  return slots
 }
 
 function makeBracketMatch(
@@ -876,6 +879,8 @@ function makeBracketMatch(
     status?: TournamentGame['status']
   },
 ): BracketMatch {
+  const byeWinner = bracketByeWinner(a, b)
+  if (byeWinner) return { a, b, next, w: byeWinner }
   if (status === 'live' || live) return { a, b, live: true, next }
   if (result && result !== '*') {
     if (result === '1/2-1/2') return { a, b, sa: 0.5, sb: 0.5, next }
@@ -902,6 +907,14 @@ function makeBracketMatch(
   }
 }
 
+function bracketByeWinner(a: string, b: string): 'a' | 'b' | null {
+  const aBye = isByeName(a)
+  const bBye = isByeName(b)
+  if (aBye && !bBye) return 'b'
+  if (bBye && !aBye) return 'a'
+  return null
+}
+
 function bracketWinner(match: BracketMatch) {
   if (match.w === 'b') return match.b
   return match.a
@@ -925,7 +938,9 @@ function loserName(match: BracketMatch | undefined, roundLabel: string, matchNum
 }
 
 function losersFromBracketRound(matches: BracketMatch[], roundLabel: string) {
-  return matches.map((match, index) => loserName(match, roundLabel, index + 1))
+  return matches
+    .map((match, index) => loserName(match, roundLabel, index + 1))
+    .filter((name) => !isByeName(name))
 }
 
 function prefixedRoundName(playersInRound: number, prefix = '') {
@@ -1247,6 +1262,10 @@ function isPendingMatch(match: BracketMatch) {
     || match.a.startsWith('Reset ')
     || match.b.startsWith('Reset ')
   )
+}
+
+function isByeName(name: string) {
+  return name === bracketByeName
 }
 
 function UnpublishedPanel({ body, title }: { body: string; title: string }) {

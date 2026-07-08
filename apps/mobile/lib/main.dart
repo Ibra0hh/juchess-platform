@@ -7163,6 +7163,8 @@ class DoubleEliminationRoundSets {
   final List<RoundSeed> finalRounds;
 }
 
+const bracketByeName = 'Bye';
+
 List<RoundSeed> buildSingleEliminationRounds(
   TournamentSeed event, {
   String prefix = '',
@@ -7175,11 +7177,8 @@ List<RoundSeed> buildSingleEliminationRounds(
       .toList();
   final activeRound =
       forceActiveRound ?? _activeBracketRoundIndex(labels, event);
-  final baseSize = _previousPowerOfTwo(players.length);
-  final hasPlayIn = players.length != baseSize;
-  final byeCount = hasPlayIn ? math.max(0, baseSize * 2 - players.length) : 0;
-  final byes = players.take(byeCount).toList();
-  var current = hasPlayIn ? players.skip(byeCount).toList() : players;
+  final bracketSize = _nextPowerOfTwo(players.length);
+  var current = _openingBracketNames(players, bracketSize);
   final rounds = <RoundSeed>[];
 
   for (var roundIndex = 0; roundIndex < labels.length; roundIndex++) {
@@ -7193,14 +7192,15 @@ List<RoundSeed> buildSingleEliminationRounds(
 
     for (var index = 0; index + 1 < current.length; index += 2) {
       final matchIndex = games.length;
-      final result = live
-          ? 'live'
-          : complete
-          ? (matchIndex.isEven ? '1-0' : '0-1')
-          : '-';
-      final nextIndex = hasPlayIn && roundIndex == 0
-          ? ((byeCount + matchIndex) / 2).floor()
-          : null;
+      final byeResult = _byeResult(current[index], current[index + 1]);
+      final result =
+          byeResult ??
+          (live
+              ? 'live'
+              : complete
+              ? (matchIndex.isEven ? '1-0' : '0-1')
+              : '-');
+      final nextIndex = roundIndex < labels.length - 1 ? matchIndex ~/ 2 : null;
       final match = MatchSeed(
         current[index],
         current[index + 1],
@@ -7209,14 +7209,14 @@ List<RoundSeed> buildSingleEliminationRounds(
       );
       games.add(match);
       winners.add(
-        complete ? _matchWinner(match) : 'Winner $sourceCode-${matchIndex + 1}',
+        byeResult != null || complete
+            ? _matchWinner(match)
+            : 'Winner $sourceCode-${matchIndex + 1}',
       );
     }
 
     rounds.add(RoundSeed(labels[roundIndex], games));
-    current = hasPlayIn && roundIndex == 0
-        ? _interleaveNames(byes, winners)
-        : winners;
+    current = winners;
   }
 
   return rounds;
@@ -7280,6 +7280,10 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
 }
 
 List<String> _bracketPlayerNames(TournamentSeed event) {
+  if (event.registeredPlayers.isNotEmpty) {
+    return event.registeredPlayers.map((player) => player.name).toList();
+  }
+
   if (event.publishedRounds.isNotEmpty) {
     return [
       for (final match in event.publishedRounds.first.games) ...[
@@ -7287,10 +7291,6 @@ List<String> _bracketPlayerNames(TournamentSeed event) {
         match.black,
       ],
     ];
-  }
-
-  if (event.registeredPlayers.isNotEmpty) {
-    return event.registeredPlayers.map((player) => player.name).toList();
   }
 
   final declared = event.players > 0
@@ -7301,10 +7301,7 @@ List<String> _bracketPlayerNames(TournamentSeed event) {
 }
 
 List<int> _bracketRoundCounts(int playerCount) {
-  final baseSize = _previousPowerOfTwo(playerCount);
-  final counts = playerCount == baseSize
-      ? <int>[playerCount]
-      : <int>[playerCount, baseSize];
+  final counts = <int>[_nextPowerOfTwo(playerCount)];
   var next = (counts.last / 2).floor();
   while (next >= 2) {
     counts.add(next);
@@ -7313,12 +7310,33 @@ List<int> _bracketRoundCounts(int playerCount) {
   return counts;
 }
 
-int _previousPowerOfTwo(int value) {
+int _nextPowerOfTwo(int value) {
   var result = 1;
-  while (result * 2 <= value) {
+  while (result < value) {
     result *= 2;
   }
   return math.max(2, result);
+}
+
+List<String> _openingBracketNames(List<String> names, int bracketSize) {
+  final slots = <String>[];
+  final firstRoundMatches = math.max(1, bracketSize ~/ 2);
+  final byeCount = math.max(0, bracketSize - names.length);
+  var playerIndex = 0;
+
+  for (var matchIndex = 0; matchIndex < firstRoundMatches; matchIndex++) {
+    final white = playerIndex < names.length
+        ? names[playerIndex++]
+        : bracketByeName;
+    final black = matchIndex >= firstRoundMatches - byeCount
+        ? bracketByeName
+        : playerIndex < names.length
+        ? names[playerIndex++]
+        : bracketByeName;
+    slots.addAll([white, black]);
+  }
+
+  return slots;
 }
 
 String _bracketRoundName(int playersInRound) {
@@ -7346,6 +7364,16 @@ String _bracketRoundCode(String label) {
   return label.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '');
 }
 
+String? _byeResult(String white, String black) {
+  final whiteBye = _isByeName(white);
+  final blackBye = _isByeName(black);
+  if (whiteBye && !blackBye) return '0-1';
+  if (blackBye && !whiteBye) return '1-0';
+  return null;
+}
+
+bool _isByeName(String name) => name == bracketByeName;
+
 int _activeBracketRoundIndex(List<String> labels, TournamentSeed event) {
   if (event.status == 'completed') return labels.length;
   if (event.status != 'active') return 0;
@@ -7369,21 +7397,12 @@ int _activeBracketRoundIndex(List<String> labels, TournamentSeed event) {
   return math.max(0, math.min(labels.length - 1, labels.length - 2));
 }
 
-List<String> _interleaveNames(List<String> byes, List<String> winners) {
-  final rows = <String>[];
-  final maxLength = math.max(byes.length, winners.length);
-  for (var index = 0; index < maxLength; index++) {
-    if (index < byes.length) rows.add(byes[index]);
-    if (index < winners.length) rows.add(winners[index]);
-  }
-  return rows;
-}
-
 List<String> _losersFromRound(RoundSeed? round, String sourceLabel) {
   if (round == null) return const [];
   return [
     for (var i = 0; i < round.games.length; i++)
-      _matchLoser(round.games[i], sourceLabel, i + 1),
+      if (!_isByeName(_matchLoser(round.games[i], sourceLabel, i + 1)))
+        _matchLoser(round.games[i], sourceLabel, i + 1),
   ];
 }
 
