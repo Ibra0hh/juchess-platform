@@ -462,9 +462,14 @@
                 <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 12px;">
                   <sc-for list="{{ col.matches }}" as="m" hint-placeholder-count="2">
                     <div data-brk-card="{{ m.cid }}" data-target="{{ m.next }}" data-win="{{ m.win }}" style="position: relative; z-index: 1; background: {{ m.bg }}; border: 1px solid {{ m.bd }}; border-left: 3px solid {{ m.accent }}; border-radius: 8px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(30,43,69,.06);">
-                      <sc-if value="{{ m.tag }}" hint-placeholder-val="{{ false }}">
-                        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 6px;"><span class="ju-pulse" style="width: 5px; height: 5px; border-radius: 50%; background: #7A2431;"></span><span style="font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #7A2431;">{{ m.tag }}</span></div>
-                      </sc-if>
+                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 13px; margin-bottom: 6px;">
+                        <sc-if value="{{ m.matchTag }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 800; color: rgba(30,43,69,.52);">{{ m.matchTag }}</span>
+                        </sc-if>
+                        <sc-if value="{{ m.tag }}" hint-placeholder-val="{{ false }}">
+                          <span style="display: inline-flex; align-items: center; gap: 5px; margin-left: auto;"><span class="ju-pulse" style="width: 5px; height: 5px; border-radius: 50%; background: #7A2431;"></span><span style="font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #7A2431;">{{ m.tag }}</span></span>
+                        </sc-if>
+                      </div>
                       <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
                         <span style="font-size: 13px; font-weight: {{ m.aw }}; color: {{ m.ac }};">{{ m.a }}</span>
                         <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; color: {{ m.ac }};">{{ m.sa }}</span>
@@ -519,6 +524,7 @@ class Component extends DCLogic {
             aw: aWin ? 600 : 400, bw: bWin ? 600 : 400,
             ac: aWin ? '#1E2B45' : (bWin ? 'rgba(30,43,69,.45)' : '#1E2B45'),
             bc: bWin ? '#1E2B45' : (aWin ? 'rgba(30,43,69,.45)' : '#1E2B45'),
+            matchTag: m.matchNumber ? 'Match ' + m.matchNumber : false,
             tag: m.live ? 'Live' : false,
             bg: m.live ? '#FFF7EE' : (tbd ? 'rgba(255,252,244,.55)' : '#FFFCF4'),
             bd: m.live ? 'rgba(122,36,49,.4)' : 'rgba(30,43,69,.15)',

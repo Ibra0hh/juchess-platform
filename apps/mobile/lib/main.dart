@@ -760,6 +760,7 @@ MatchSeed? _snapshotMatch(dynamic value) {
     white,
     black,
     _snapshotResult(value),
+    matchNumber: _asInt(value['matchNumber']),
     nextIndex: _asInt(value['next']),
   );
 }
@@ -3393,6 +3394,23 @@ class BracketMatchCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
+          if (match.matchNumber != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(11, 6, 11, 0),
+              child: Row(
+                children: [
+                  Text(
+                    'MATCH ${match.matchNumber}',
+                    style: const TextStyle(
+                      color: Color(0x8a21304e),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           BracketPlayerRow(
             name: match.white,
             winner: _whiteWon,
@@ -3455,15 +3473,16 @@ class BracketPlayerRow extends StatelessWidget {
   final bool faded;
   final bool bottomBorder;
 
-  bool get _pending =>
-      name == 'TBD' ||
-      name.startsWith('Winner ') ||
-      name.startsWith('Loser ') ||
-      name.startsWith('Reset ');
+  bool get _pending => name == 'TBD' || name.startsWith('Reset ');
+
+  bool get _placeholder =>
+      name.startsWith('Winner ') || name.startsWith('Loser ');
 
   @override
   Widget build(BuildContext context) {
-    final opacity = _pending ? 0.45 : (faded ? 0.42 : 1.0);
+    final opacity = _pending
+        ? 0.45
+        : (_placeholder ? 0.68 : (faded ? 0.42 : 1.0));
     return Expanded(
       child: Opacity(
         opacity: opacity,
@@ -3496,7 +3515,9 @@ class BracketPlayerRow extends StatelessWidget {
                     color: PrototypeColors.navy,
                     fontSize: 12.5,
                     fontWeight: winner ? FontWeight.w800 : FontWeight.w500,
-                    fontStyle: _pending ? FontStyle.italic : FontStyle.normal,
+                    fontStyle: _pending || _placeholder
+                        ? FontStyle.italic
+                        : FontStyle.normal,
                   ),
                 ),
               ),
@@ -7291,11 +7312,18 @@ class PublishedBracketSnapshot {
 }
 
 class MatchSeed {
-  const MatchSeed(this.white, this.black, this.result, {this.nextIndex});
+  const MatchSeed(
+    this.white,
+    this.black,
+    this.result, {
+    this.matchNumber,
+    this.nextIndex,
+  });
 
   final String white;
   final String black;
   final String result;
+  final int? matchNumber;
   final int? nextIndex;
 }
 
@@ -7347,6 +7375,7 @@ List<RoundSeed> buildSingleEliminationRounds(
   TournamentSeed event, {
   String prefix = '',
   int? forceActiveRound,
+  List<List<int>> matchNumbers = const [],
 }) {
   final players = _bracketPlayerNames(event);
   final counts = _bracketRoundCounts(players.length);
@@ -7383,13 +7412,18 @@ List<RoundSeed> buildSingleEliminationRounds(
         current[index],
         current[index + 1],
         result,
+        matchNumber:
+            roundIndex < matchNumbers.length &&
+                matchIndex < matchNumbers[roundIndex].length
+            ? matchNumbers[roundIndex][matchIndex]
+            : null,
         nextIndex: nextIndex,
       );
       games.add(match);
       winners.add(
         byeResult != null || complete
             ? _matchWinner(match)
-            : 'Winner $sourceCode-${matchIndex + 1}',
+            : _matchWinner(match, sourceCode, matchIndex + 1),
       );
     }
 
@@ -7405,20 +7439,26 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
     r'winner|w-',
     caseSensitive: false,
   ).hasMatch(event.current);
+  final numbering = _buildDoubleEliminationMatchNumbering(
+    _bracketRoundCounts(
+      _bracketPlayerNames(event).length,
+    ).map((count) => math.max(1, count ~/ 2)).toList(),
+  );
   final winners = buildSingleEliminationRounds(
     event,
     prefix: 'W-',
     forceActiveRound: winnerRoundActive ? null : 999,
+    matchNumbers: numbering.winners,
   );
   final firstLoserPool = _losersFromRound(
     winners.isNotEmpty ? winners.first : null,
     winners.isNotEmpty ? winners.first.label : 'W-Round',
   );
   final incomingLosers = winners.length > 2
-      ? winners
-            .sublist(1, winners.length - 1)
-            .map((round) => _losersFromRound(round, round.label))
-            .toList()
+      ? winners.sublist(1, winners.length - 1).map((round) {
+          final losers = _losersFromRound(round, round.label);
+          return losers.length > 2 ? losers.reversed.toList() : losers;
+        }).toList()
       : <List<String>>[];
   final loserRounds = _buildLoserRounds(
     firstLoserPool,
@@ -7427,6 +7467,7 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
     _lowerBracketRoundLabelsFromWinnerRounds([
       for (final round in winners) round.label,
     ]),
+    numbering.losers,
   );
   final winnersFinal = winners.isNotEmpty ? winners.last : null;
   final winnersFinalMatch = winnersFinal?.games.isNotEmpty == true
@@ -7442,13 +7483,13 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
     _matchLoser(winnersFinalMatch, winnersFinal?.label ?? 'W-Final', 1),
     loserFinalOpponent,
     event.status == 'active' ? 'live' : '-',
+    matchNumber: numbering.lowerFinal,
   );
   final grandFinal = MatchSeed(
     _matchWinner(winnersFinalMatch, winnersFinal?.label ?? 'W-Final', 1),
-    loserFinal.result == 'live'
-        ? 'Winner Losers Final'
-        : _matchWinner(loserFinal, 'Final', 1),
+    _matchWinner(loserFinal, 'Lower Final', 1),
     event.status == 'completed' ? '1-0' : '-',
+    matchNumber: numbering.grandFinal,
   );
 
   return DoubleEliminationRoundSets(
@@ -7459,10 +7500,97 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
     ],
     finalRounds: [
       RoundSeed('Grand Final', [grandFinal]),
-      const RoundSeed('Reset if needed', [
-        MatchSeed('Winner Grand Final', 'Reset only if needed', '-'),
+      RoundSeed('Reset if needed', [
+        MatchSeed(
+          'Winner of ${numbering.grandFinal}',
+          'Reset only if needed',
+          '-',
+          matchNumber: numbering.resetFinal,
+        ),
       ]),
     ],
+  );
+}
+
+class DoubleEliminationMatchNumbering {
+  const DoubleEliminationMatchNumbering({
+    required this.winners,
+    required this.losers,
+    required this.lowerFinal,
+    required this.grandFinal,
+    required this.resetFinal,
+  });
+
+  final List<List<int>> winners;
+  final List<List<int>> losers;
+  final int lowerFinal;
+  final int grandFinal;
+  final int resetFinal;
+}
+
+DoubleEliminationMatchNumbering _buildDoubleEliminationMatchNumbering(
+  List<int> winnerMatchCounts,
+) {
+  final winners = [for (final _ in winnerMatchCounts) <int>[]];
+  final losers = <List<int>>[];
+  var next = 1;
+
+  List<int> allocate(int count, {bool descending = false}) {
+    final numbers = [for (var index = 0; index < count; index++) next + index];
+    next += count;
+    return descending ? numbers.reversed.toList() : numbers;
+  }
+
+  if (winnerMatchCounts.isNotEmpty) {
+    winners[0] = allocate(winnerMatchCounts[0]);
+  }
+
+  var poolCount = winnerMatchCounts.isNotEmpty ? winnerMatchCounts[0] : 0;
+  var poolDescending = false;
+
+  for (
+    var winnerRoundIndex = 1;
+    winnerRoundIndex < winnerMatchCounts.length - 1;
+    winnerRoundIndex++
+  ) {
+    if (poolCount >= 2) {
+      final matchCount = poolCount ~/ 2;
+      losers.add(allocate(matchCount, descending: poolDescending));
+      poolCount = matchCount + (poolCount % 2);
+    }
+
+    winners[winnerRoundIndex] = allocate(winnerMatchCounts[winnerRoundIndex]);
+
+    final incomingCount = winnerMatchCounts[winnerRoundIndex];
+    if (incomingCount > 0) {
+      final pairCount = math.min(poolCount, incomingCount);
+      if (pairCount > 0) {
+        poolDescending = incomingCount > 2;
+        losers.add(allocate(pairCount, descending: poolDescending));
+      }
+      poolCount = poolCount + incomingCount - pairCount;
+    }
+  }
+
+  while (poolCount > 1) {
+    final matchCount = poolCount ~/ 2;
+    losers.add(allocate(matchCount, descending: poolDescending));
+    poolCount = matchCount + (poolCount % 2);
+  }
+
+  final finalWinnerRoundIndex = winnerMatchCounts.length - 1;
+  if (finalWinnerRoundIndex > 0) {
+    winners[finalWinnerRoundIndex] = allocate(
+      winnerMatchCounts[finalWinnerRoundIndex],
+    );
+  }
+
+  return DoubleEliminationMatchNumbering(
+    winners: winners,
+    losers: losers,
+    lowerFinal: next,
+    grandFinal: next + 1,
+    resetFinal: next + 2,
   );
 }
 
@@ -7540,13 +7668,13 @@ String _bracketRoundCode(String label) {
   final suffix = survivor
       ? 'S'
       : qualifier
-          ? 'Q'
-          : '';
+      ? 'Q'
+      : '';
   final prefix = lower.contains('minor')
       ? 'MN'
       : lower.contains('major')
-          ? 'MJ'
-          : '';
+      ? 'MJ'
+      : '';
   if (lower.contains('quarterfinal')) return '${prefix}QF$suffix';
   if (lower.contains('semifinal')) return '${prefix}SF$suffix';
   if (lower.contains('final')) {
@@ -7619,6 +7747,7 @@ List<RoundSeed> _buildLoserRounds(
   List<List<String>> incomingPools,
   TournamentSeed event,
   List<String> lowerRoundLabels,
+  List<List<int>> matchNumbers,
 ) {
   final rounds = <RoundSeed>[];
   var pool = [...firstPool];
@@ -7631,6 +7760,9 @@ List<RoundSeed> _buildLoserRounds(
         : pool.sublist(0, pool.length - 1);
     final carry = pool.length.isEven ? <String>[] : <String>[pool.last];
     final roundNumber = rounds.length + 1;
+    final roundMatchNumbers = rounds.length < matchNumbers.length
+        ? matchNumbers[rounds.length]
+        : const <int>[];
     final games = <MatchSeed>[];
     final winners = <String>[];
 
@@ -7640,13 +7772,16 @@ List<RoundSeed> _buildLoserRounds(
         pairable[index],
         pairable[index + 1],
         complete ? (matchIndex.isEven ? '1-0' : '0-1') : '-',
+        matchNumber: matchIndex < roundMatchNumbers.length
+            ? roundMatchNumbers[matchIndex]
+            : null,
         nextIndex: feedsDropIn ? matchIndex : matchIndex ~/ 2,
       );
       games.add(match);
       winners.add(
         complete
             ? _matchWinner(match)
-            : 'Winner L$roundNumber-${matchIndex + 1}',
+            : _matchWinner(match, 'L$roundNumber', matchIndex + 1),
       );
     }
 
@@ -7663,6 +7798,9 @@ List<RoundSeed> _buildLoserRounds(
 
     final pairCount = math.min(pool.length, incoming.length);
     final roundNumber = rounds.length + 1;
+    final roundMatchNumbers = rounds.length < matchNumbers.length
+        ? matchNumbers[rounds.length]
+        : const <int>[];
     final games = <MatchSeed>[];
     final winners = <String>[];
 
@@ -7671,11 +7809,16 @@ List<RoundSeed> _buildLoserRounds(
         pool[index],
         incoming[index],
         complete ? (index.isEven ? '1-0' : '0-1') : '-',
+        matchNumber: index < roundMatchNumbers.length
+            ? roundMatchNumbers[index]
+            : null,
         nextIndex: index ~/ 2,
       );
       games.add(match);
       winners.add(
-        complete ? _matchWinner(match) : 'Winner L$roundNumber-${index + 1}',
+        complete
+            ? _matchWinner(match)
+            : _matchWinner(match, 'L$roundNumber', index + 1),
       );
     }
 
@@ -7759,7 +7902,8 @@ Map<String, int> _lowerBracketCodeIndex(List<String> labels) {
     if (RegExp(r'\bminor\b', caseSensitive: false).hasMatch(labels[i])) {
       codes[_bracketRoundCode('$unprefixed survivor').toUpperCase()] = i;
       codes[_bracketRoundCode('$unprefixed Qualifier').toUpperCase()] = i;
-      if (i == 0 && RegExp(r'quarterfinal', caseSensitive: false).hasMatch(labels[i])) {
+      if (i == 0 &&
+          RegExp(r'quarterfinal', caseSensitive: false).hasMatch(labels[i])) {
         codes[_bracketRoundCode('Round of 16 survivor').toUpperCase()] = i;
         codes[_bracketRoundCode('Round of 16 Qualifier').toUpperCase()] = i;
       }
@@ -7810,6 +7954,7 @@ MatchSeed _rewriteLowerBracketMatch(
       codeToIndex: codeToIndex,
     ),
     match.result,
+    matchNumber: match.matchNumber,
     nextIndex: finalFeed ? 0 : match.nextIndex,
   );
 }
@@ -7911,6 +8056,7 @@ String _matchWinner(
   }
   if (match.result == '0-1') return match.black;
   if (match.result == '1-0') return match.white;
+  if (match.matchNumber != null) return 'Winner of ${match.matchNumber}';
   return 'Winner ${_bracketRoundCode(sourceLabel)}-$matchNumber';
 }
 
@@ -7920,6 +8066,7 @@ String _matchLoser(MatchSeed? match, String sourceLabel, int matchNumber) {
   }
   if (match.result == '0-1') return match.white;
   if (match.result == '1-0') return match.black;
+  if (match.matchNumber != null) return 'Loser of ${match.matchNumber}';
   return 'Loser ${_bracketRoundCode(sourceLabel)}-$matchNumber';
 }
 
@@ -8000,61 +8147,101 @@ const bracketRounds = [
 
 const doubleEliminationWinnersRounds = [
   RoundSeed('W-Round of 16', [
-    MatchSeed('Ibrahim Ahmad', 'Zaid Hamdan', '1-0'),
-    MatchSeed('Sara Nasser', 'Hasan Qasem', '1-0'),
-    MatchSeed('Leen Haddad', 'Noor Barakat', '1-0'),
-    MatchSeed('Yazan Khaled', 'Khaled Mansour', '1-0'),
-    MatchSeed('Omar Saleh', 'Tala Suleiman', '1-0'),
-    MatchSeed('Mohammad Al-Khatib', 'Rania Odeh', '1-0'),
-    MatchSeed('Amr Zaidan', 'Lina Shami', '1-0'),
-    MatchSeed('Dana Aqel', 'Fadi Rimawi', '1-0'),
+    MatchSeed('Ibrahim Ahmad', 'Zaid Hamdan', '1-0', matchNumber: 1),
+    MatchSeed('Sara Nasser', 'Hasan Qasem', '1-0', matchNumber: 2),
+    MatchSeed('Leen Haddad', 'Noor Barakat', '1-0', matchNumber: 3),
+    MatchSeed('Yazan Khaled', 'Khaled Mansour', '1-0', matchNumber: 4),
+    MatchSeed('Omar Saleh', 'Tala Suleiman', '1-0', matchNumber: 5),
+    MatchSeed('Mohammad Al-Khatib', 'Rania Odeh', '1-0', matchNumber: 6),
+    MatchSeed('Amr Zaidan', 'Lina Shami', '1-0', matchNumber: 7),
+    MatchSeed('Dana Aqel', 'Fadi Rimawi', '1-0', matchNumber: 8),
   ]),
   RoundSeed('W-Quarterfinal', [
-    MatchSeed('Ibrahim Ahmad', 'Sara Nasser', '1-0'),
-    MatchSeed('Leen Haddad', 'Yazan Khaled', '1-0'),
-    MatchSeed('Omar Saleh', 'Mohammad Al-Khatib', '1-0'),
-    MatchSeed('Dana Aqel', 'Amr Zaidan', '1-0'),
+    MatchSeed('Ibrahim Ahmad', 'Sara Nasser', '1-0', matchNumber: 13),
+    MatchSeed('Leen Haddad', 'Yazan Khaled', '1-0', matchNumber: 14),
+    MatchSeed('Omar Saleh', 'Mohammad Al-Khatib', '1-0', matchNumber: 15),
+    MatchSeed('Dana Aqel', 'Amr Zaidan', '1-0', matchNumber: 16),
   ]),
   RoundSeed('W-Semifinal', [
-    MatchSeed('Ibrahim Ahmad', 'Leen Haddad', '1-0'),
-    MatchSeed('Omar Saleh', 'Dana Aqel', '1-0'),
+    MatchSeed('Ibrahim Ahmad', 'Leen Haddad', '1-0', matchNumber: 23),
+    MatchSeed('Omar Saleh', 'Dana Aqel', '1-0', matchNumber: 24),
   ]),
-  RoundSeed('W-Final', [MatchSeed('Ibrahim Ahmad', 'Omar Saleh', '1-0')]),
+  RoundSeed('W-Final', [
+    MatchSeed('Ibrahim Ahmad', 'Omar Saleh', '1-0', matchNumber: 28),
+  ]),
 ];
 
 const doubleEliminationLosersRounds = [
   RoundSeed('Lower Round 1', [
-    MatchSeed('Zaid Hamdan', 'Hasan Qasem', '1-0', nextIndex: 0),
-    MatchSeed('Noor Barakat', 'Khaled Mansour', '1-0', nextIndex: 1),
-    MatchSeed('Tala Suleiman', 'Rania Odeh', '1-0', nextIndex: 2),
-    MatchSeed('Lina Shami', 'Fadi Rimawi', '1-0', nextIndex: 3),
+    MatchSeed(
+      'Zaid Hamdan',
+      'Hasan Qasem',
+      '1-0',
+      matchNumber: 9,
+      nextIndex: 0,
+    ),
+    MatchSeed(
+      'Noor Barakat',
+      'Khaled Mansour',
+      '1-0',
+      matchNumber: 10,
+      nextIndex: 1,
+    ),
+    MatchSeed(
+      'Tala Suleiman',
+      'Rania Odeh',
+      '1-0',
+      matchNumber: 11,
+      nextIndex: 2,
+    ),
+    MatchSeed(
+      'Lina Shami',
+      'Fadi Rimawi',
+      '1-0',
+      matchNumber: 12,
+      nextIndex: 3,
+    ),
   ]),
   RoundSeed('Lower Round 2', [
-    MatchSeed('Sara Nasser', 'Zaid Hamdan', '1-0'),
-    MatchSeed('Yazan Khaled', 'Noor Barakat', '1-0'),
-    MatchSeed('Mohammad Al-Khatib', 'Tala Suleiman', '1-0'),
-    MatchSeed('Amr Zaidan', 'Lina Shami', '1-0'),
+    MatchSeed('Sara Nasser', 'Zaid Hamdan', '1-0', matchNumber: 20),
+    MatchSeed('Yazan Khaled', 'Noor Barakat', '1-0', matchNumber: 19),
+    MatchSeed('Mohammad Al-Khatib', 'Tala Suleiman', '1-0', matchNumber: 18),
+    MatchSeed('Amr Zaidan', 'Lina Shami', '1-0', matchNumber: 17),
   ]),
   RoundSeed('Lower Round 3', [
-    MatchSeed('Sara Nasser', 'Yazan Khaled', '1-0', nextIndex: 0),
-    MatchSeed('Mohammad Al-Khatib', 'Amr Zaidan', '1-0', nextIndex: 1),
+    MatchSeed(
+      'Sara Nasser',
+      'Yazan Khaled',
+      '1-0',
+      matchNumber: 22,
+      nextIndex: 0,
+    ),
+    MatchSeed(
+      'Mohammad Al-Khatib',
+      'Amr Zaidan',
+      '1-0',
+      matchNumber: 21,
+      nextIndex: 1,
+    ),
   ]),
   RoundSeed('Lower Round 4', [
-    MatchSeed('Leen Haddad', 'Sara Nasser', '0-1'),
-    MatchSeed('Dana Aqel', 'Mohammad Al-Khatib', '0-1'),
+    MatchSeed('Leen Haddad', 'Sara Nasser', '0-1', matchNumber: 25),
+    MatchSeed('Dana Aqel', 'Mohammad Al-Khatib', '0-1', matchNumber: 26),
   ]),
   RoundSeed('Lower Round 5', [
-    MatchSeed('Sara Nasser', 'Mohammad Al-Khatib', '1-0'),
+    MatchSeed('Sara Nasser', 'Mohammad Al-Khatib', '1-0', matchNumber: 27),
   ]),
-  RoundSeed('Lower Final', [MatchSeed('Omar Saleh', 'Sara Nasser', 'live')]),
+  RoundSeed('Lower Final', [
+    MatchSeed('Omar Saleh', 'Sara Nasser', 'live', matchNumber: 29),
+  ]),
 ];
 
 const doubleEliminationFinalRounds = [
   RoundSeed('Grand Final', [
-    MatchSeed('Ibrahim Ahmad', 'Winner Losers Final', '-'),
+    MatchSeed('Ibrahim Ahmad', 'Winner of 29', '-', matchNumber: 30),
   ]),
   RoundSeed('Reset if needed', [
-    MatchSeed('Winner Grand Final', 'Reset only if needed', '-'),
+    MatchSeed('Winner of 30', 'Reset only if needed', '-', matchNumber: 31),
   ]),
 ];
 

@@ -66,6 +66,7 @@ type AdminBracketSide = 'white' | 'black'
 type Pairing = {
   round?: number
   board: number
+  matchNumber?: number
   white: string
   whiteProfileId?: string
   whiteRating: number | string
@@ -2203,10 +2204,15 @@ const AdminBracketMatchCard = memo(function AdminBracketMatchCard({
   ].filter(Boolean).join(' ')
   const content = (
     <>
-      {match.live ? (
-        <div className="bracket-live-tag">
-          <span aria-hidden="true" />
-          Live
+      {match.matchNumber || match.live ? (
+        <div className="bracket-match-head">
+          {match.matchNumber ? <span className="bracket-match-number">Match {match.matchNumber}</span> : <span />}
+          {match.live ? (
+            <span className="bracket-live-tag">
+              <span aria-hidden="true" />
+              Live
+            </span>
+          ) : null}
         </div>
       ) : null}
       <BracketPlayerRow
@@ -3585,11 +3591,12 @@ function buildProcedureMatchesFromBracket(rounds: AdminBracketRound[]): Procedur
 
   return targetRound.matches.map((match, index) => {
     const playable = isPlayableMatch(match)
+    const matchNumber = match.matchNumber ?? index + 1
     return {
       black: match.black,
-      boardLabel: `${targetRound.name} Board ${index + 1}`,
+      boardLabel: `${targetRound.name} Match ${matchNumber}`,
       boardKey: bracketBoardKey(targetRound.name, index),
-      matchNumber: index + 1,
+      matchNumber,
       playable,
       roundLabel: targetRound.name,
       status: match.live ? 'Live now' : match.winner ? 'Complete' : playable ? 'Ready' : 'Waiting for player',
@@ -3742,6 +3749,7 @@ function sanitizeAdminBracketMatch(value: unknown): AdminBracketMatch | null {
   const targetSlot = match.targetSlot === 'white' || match.targetSlot === 'black' ? match.targetSlot : undefined
   return {
     board: typeof match.board === 'number' ? match.board : Number(match.board) || 1,
+    matchNumber: typeof match.matchNumber === 'number' ? match.matchNumber : undefined,
     white: match.white,
     whiteProfileId: typeof match.whiteProfileId === 'string' ? match.whiteProfileId : undefined,
     whiteRating: typeof match.whiteRating === 'number' || typeof match.whiteRating === 'string' ? match.whiteRating : '',
@@ -3763,6 +3771,8 @@ function buildAdminDoubleEliminationBrackets(
   players: Player[],
   phase: AdminBracketPhase,
 ): Record<AdminBracketView, AdminBracketRound[]> {
+  const winnerMatchCounts = bracketRoundCounts(players.length).map((count) => Math.max(1, count / 2))
+  const matchNumbers = buildDoubleEliminationMatchNumbering(winnerMatchCounts)
   const winnersPhase = phase === 'active' && !/winner|w-/i.test(tournament.round)
     ? 'completed'
     : phase
@@ -3771,16 +3781,21 @@ function buildAdminDoubleEliminationBrackets(
     : undefined
   const winners = buildAdminSingleEliminationRounds(tournament, players, winnersPhase, {
     forceActiveRound: winnersForceRound,
+    matchNumbers: matchNumbers.winners,
     prefix: 'W-',
   })
   const firstLoserPool = adminLosersFromRound(winners[0], winners[0]?.name ?? 'W-Round')
   const incomingLosers = winners
     .slice(1, -1)
-    .map((round) => adminLosersFromRound(round, round.name))
+    .map((round) => {
+      const losers = adminLosersFromRound(round, round.name)
+      return losers.length > 2 ? [...losers].reverse() : losers
+    })
   const loserRounds = buildAdminLoserRounds(
     firstLoserPool,
     incomingLosers,
     phase,
+    matchNumbers.losers,
   )
   const winnersFinal = winners[winners.length - 1]
   const winnersFinalMatch = winnersFinal?.matches[0]
@@ -3791,6 +3806,13 @@ function buildAdminDoubleEliminationBrackets(
     adminLoserName(winnersFinalMatch, winnersFinal?.name ?? 'W-Final', 1),
     loserFinalOpponent,
     1,
+    undefined,
+    '',
+    '',
+    undefined,
+    undefined,
+    undefined,
+    matchNumbers.lowerFinal,
   )
   const loserFinal = buildBracketMatchForPhase(
     loserFinalPairing,
@@ -3801,8 +3823,15 @@ function buildAdminDoubleEliminationBrackets(
   const grandFinal = buildBracketMatchForPhase(
     makeBracketPairing(
       adminWinnerName(winnersFinalMatch, winnersFinal?.name ?? 'W-Final', 1),
-      loserFinal.winner ? adminWinnerName(loserFinal, 'Final', 1) : 'Winner Losers Final',
+      adminWinnerName(loserFinal, 'Lower Final', 1),
       1,
+      undefined,
+      '',
+      '',
+      undefined,
+      undefined,
+      undefined,
+      matchNumbers.grandFinal,
     ),
     phase === 'completed' || (phase === 'active' && /grand/i.test(tournament.round)) ? phase : 'setup',
     'white',
@@ -3821,8 +3850,71 @@ function buildAdminDoubleEliminationBrackets(
     ],
     final: [
       { name: 'Grand Final', role: 'final', matches: [grandFinal] },
-      { name: 'Reset if needed', role: 'final', matches: [buildOpenMatch(makeBracketPairing('Winner Grand Final', 'Reset only if needed', 1))] },
+      { name: 'Reset if needed', role: 'final', matches: [buildOpenMatch(makeBracketPairing(`Winner of ${matchNumbers.grandFinal}`, 'Reset only if needed', 1, undefined, '', '', undefined, undefined, undefined, matchNumbers.resetFinal))] },
     ],
+  }
+}
+
+function buildDoubleEliminationMatchNumbering(winnerMatchCounts: number[]) {
+  const winners: number[][] = winnerMatchCounts.map(() => [])
+  const losers: number[][] = []
+  let next = 1
+
+  const allocate = (count: number, direction: 'asc' | 'desc' = 'asc') => {
+    const numbers = Array.from({ length: count }, (_value, index) => next + index)
+    next += count
+    return direction === 'desc' ? numbers.reverse() : numbers
+  }
+
+  if (winnerMatchCounts.length) {
+    winners[0] = allocate(winnerMatchCounts[0])
+  }
+
+  let poolCount = winnerMatchCounts[0] ?? 0
+  let poolDirection: 'asc' | 'desc' = 'asc'
+
+  for (let winnerRoundIndex = 1; winnerRoundIndex < winnerMatchCounts.length - 1; winnerRoundIndex += 1) {
+    if (poolCount >= 2) {
+      const matchCount = Math.floor(poolCount / 2)
+      const direction: 'asc' | 'desc' = poolDirection === 'desc' ? 'desc' : 'asc'
+      losers.push(allocate(matchCount, direction))
+      poolCount = matchCount + (poolCount % 2)
+      poolDirection = direction
+    }
+
+    winners[winnerRoundIndex] = allocate(winnerMatchCounts[winnerRoundIndex])
+
+    const incomingCount = winnerMatchCounts[winnerRoundIndex]
+    if (incomingCount > 0) {
+      const pairCount = Math.min(poolCount, incomingCount)
+      if (pairCount > 0) {
+        const direction = incomingCount > 2 ? 'desc' : 'asc'
+        losers.push(allocate(pairCount, direction))
+        poolDirection = direction
+      }
+      poolCount = poolCount + incomingCount - pairCount
+    }
+  }
+
+  while (poolCount > 1) {
+    const matchCount = Math.floor(poolCount / 2)
+    const direction: 'asc' | 'desc' = poolDirection === 'desc' ? 'desc' : 'asc'
+    losers.push(allocate(matchCount, direction))
+    poolCount = matchCount + (poolCount % 2)
+    poolDirection = direction
+  }
+
+  const finalWinnerRoundIndex = winnerMatchCounts.length - 1
+  if (finalWinnerRoundIndex > 0) {
+    winners[finalWinnerRoundIndex] = allocate(winnerMatchCounts[finalWinnerRoundIndex])
+  }
+
+  return {
+    grandFinal: next + 1,
+    losers,
+    lowerFinal: next,
+    resetFinal: next + 2,
+    winners,
   }
 }
 
@@ -3830,7 +3922,7 @@ function buildAdminSingleEliminationRounds(
   tournament: AdminTournament,
   players: Player[],
   phase: AdminBracketPhase,
-  options: { forceActiveRound?: number; prefix?: string } = {},
+  options: { forceActiveRound?: number; matchNumbers?: number[][]; prefix?: string } = {},
 ): AdminBracketRound[] {
   const entrants: BracketEntrant[] = players.map((player) => ({ name: player.name, profileId: player.profileId ?? player.id, rating: player.rating }))
   const counts = bracketRoundCounts(entrants.length)
@@ -3844,6 +3936,7 @@ function buildAdminSingleEliminationRounds(
     const live = phase === 'active' && roundIndex === activeRound
     const matches = pairEntrants(current).map(([white, black], matchIndex) => {
       const hasTarget = roundIndex < labels.length - 1
+      const matchNumber = options.matchNumbers?.[roundIndex]?.[matchIndex]
       return buildBracketMatchForPhase(
         makeBracketPairing(
           white.name,
@@ -3855,6 +3948,7 @@ function buildAdminSingleEliminationRounds(
           white.profileId,
           black.profileId,
           hasTarget ? (matchIndex % 2 === 0 ? 'white' : 'black') : undefined,
+          matchNumber,
         ),
         complete ? 'completed' : live ? 'active' : 'setup',
         matchIndex % 2 === 0 ? 'white' : 'black',
@@ -3862,7 +3956,7 @@ function buildAdminSingleEliminationRounds(
       )
     })
     const winners: BracketEntrant[] = matches.map((match, index) => ({
-      name: match.winner ? adminWinnerName(match, name, index + 1) : `Winner ${bracketRoundCodeFromName(name)}-${index + 1}`,
+      name: adminWinnerName(match, name, index + 1),
       rating: '',
     }))
     current = winners
@@ -3945,6 +4039,7 @@ function buildAdminLoserRounds(
   firstPool: string[],
   incomingPools: string[][],
   phase: AdminBracketPhase,
+  matchNumbers: number[][],
 ): AdminBracketRound[] {
   const rounds: AdminBracketRound[] = []
   let pool = [...firstPool]
@@ -3956,8 +4051,9 @@ function buildAdminLoserRounds(
     index: number,
     next: number,
     targetSlot: AdminBracketSide,
+    matchNumber?: number,
   ) => buildBracketMatchForPhase(
-    makeBracketPairing(white, black, index + 1, next, '', '', undefined, undefined, targetSlot),
+    makeBracketPairing(white, black, index + 1, next, '', '', undefined, undefined, targetSlot, matchNumber),
     complete ? 'completed' : 'setup',
     index % 2 === 0 ? 'white' : 'black',
   )
@@ -3978,15 +4074,17 @@ function buildAdminLoserRounds(
     const pairable = pool.length % 2 === 0 ? pool : pool.slice(0, -1)
     const carry = pool.length % 2 === 0 ? [] : [pool[pool.length - 1]]
     const roundNumber = rounds.length + 1
+    const roundMatchNumbers = matchNumbers[rounds.length] ?? []
     const matches = pairEntrants(pairable).map(([white, black], index) => buildLoserMatch(
       white,
       black,
       index,
       feedsDropIn ? index : Math.floor(index / 2),
       feedsDropIn ? 'white' : index % 2 === 0 ? 'white' : 'black',
+      roundMatchNumbers[index],
     ))
     const winners = matches.map((match, index) => (
-      match.winner ? adminWinnerName(match, `L${roundNumber}`, index + 1) : `Winner L${roundNumber}-${index + 1}`
+      adminWinnerName(match, `L${roundNumber}`, index + 1)
     ))
     pushRound('minor', matches)
     pool = [...winners, ...carry]
@@ -4001,15 +4099,17 @@ function buildAdminLoserRounds(
 
     const pairCount = Math.min(pool.length, incoming.length)
     const roundNumber = rounds.length + 1
+    const roundMatchNumbers = matchNumbers[rounds.length] ?? []
     const matches = Array.from({ length: pairCount }, (_, index) => buildLoserMatch(
       pool[index],
       incoming[index],
       index,
       Math.floor(index / 2),
       index % 2 === 0 ? 'white' : 'black',
+      roundMatchNumbers[index],
     ))
     const winners = matches.map((match, index) => (
-      match.winner ? adminWinnerName(match, `L${roundNumber}`, index + 1) : `Winner L${roundNumber}-${index + 1}`
+      adminWinnerName(match, `L${roundNumber}`, index + 1)
     ))
     pushRound('major', matches)
     pool = [
@@ -4167,6 +4267,7 @@ function adminWinnerName(match: AdminBracketMatch | undefined, sourceLabel: stri
   if (!match) return `Winner ${bracketRoundCodeFromName(sourceLabel)}-${matchNumber}`
   if (match.winner === 'white') return match.white
   if (match.winner === 'black') return match.black
+  if (match.matchNumber) return `Winner of ${match.matchNumber}`
   return `Winner ${bracketRoundCodeFromName(sourceLabel)}-${matchNumber}`
 }
 
@@ -4174,6 +4275,7 @@ function adminLoserName(match: AdminBracketMatch | undefined, sourceLabel: strin
   if (!match) return `Loser ${bracketRoundCodeFromName(sourceLabel)}-${matchNumber}`
   if (match.winner === 'white') return match.black
   if (match.winner === 'black') return match.white
+  if (match.matchNumber) return `Loser of ${match.matchNumber}`
   return `Loser ${bracketRoundCodeFromName(sourceLabel)}-${matchNumber}`
 }
 
@@ -4200,6 +4302,7 @@ function makeBracketPairing(
   whiteProfileId?: string,
   blackProfileId?: string,
   targetSlot?: AdminBracketSide,
+  matchNumber?: number,
 ): Pairing {
   const pairing: Pairing = {
     black,
@@ -4210,6 +4313,7 @@ function makeBracketPairing(
     whiteProfileId,
     whiteRating,
   }
+  if (matchNumber) pairing.matchNumber = matchNumber
   if (next !== undefined) pairing.next = next
   if (targetSlot) pairing.targetSlot = targetSlot
   return pairing

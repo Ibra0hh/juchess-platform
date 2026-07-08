@@ -61,6 +61,7 @@ type RoundGroup = {
 type BracketMatch = {
   a: string
   b: string
+  matchNumber?: number
   sa?: number
   sb?: number
   w?: 'a' | 'b'
@@ -717,6 +718,7 @@ function publishedMatchToBracketMatch(match: PublishedBracketMatch): BracketMatc
     a: match.white,
     b: match.black,
     live: match.live,
+    matchNumber: match.matchNumber,
     next: match.next,
     sa: bracketScoreValue(match.whiteScore),
     sb: bracketScoreValue(match.blackScore),
@@ -734,7 +736,7 @@ function buildSingleEliminationBracket(
   tournament: Tournament,
   players: Member[],
   publishedGames: TournamentGame[] = [],
-  options: { forceActiveRound?: number; prefix?: string } = {},
+  options: { forceActiveRound?: number; matchNumbers?: number[][]; prefix?: string } = {},
 ): BracketDefinition {
   const publishedNames = publishedGames.flatMap((game) => [game.white.name, game.black.name])
   const names = players.length ? players.map((player) => player.name) : publishedNames
@@ -756,6 +758,7 @@ function buildSingleEliminationBracket(
       return makeBracketMatch(a, b, {
         complete,
         live,
+        matchNumber: options.matchNumbers?.[roundIndex]?.[matchIndex],
         matchIndex,
         result: publishedGame?.result,
         status: publishedGame?.status,
@@ -763,7 +766,7 @@ function buildSingleEliminationBracket(
       })
     })
     const winners = roundMatches.map((match, matchIndex) => (
-      match.w || complete ? bracketWinner(match) : `Winner ${sourceCode}-${matchIndex + 1}`
+      match.w || complete ? bracketWinner(match) : winnerNameFromMatch(match, sourceCode, matchIndex + 1)
     ))
 
     current = winners
@@ -779,12 +782,18 @@ function buildDoubleEliminationBrackets(
   players: Member[],
   publishedGames: TournamentGame[],
 ): Record<BracketView, BracketDefinition> {
+  const publishedNames = publishedGames.flatMap((game) => [game.white.name, game.black.name])
+  const playerCount = Math.max(2, players.length || publishedNames.length)
+  const matchNumbers = buildDoubleEliminationMatchNumbering(
+    bracketRoundCounts(playerCount).map((count) => Math.max(1, count / 2)),
+  )
   const winnersTournament = {
     ...tournament,
     round: /winner|w-/i.test(tournament.round) ? tournament.round : 'W-Final',
   }
   const winners = buildSingleEliminationBracket(winnersTournament, players, publishedGames, {
     ...(/winner|w-/i.test(tournament.round) ? {} : { forceActiveRound: Number.POSITIVE_INFINITY }),
+    matchNumbers: matchNumbers.winners,
     prefix: 'W-',
   })
   const winnerMatches = winners.matches
@@ -792,7 +801,10 @@ function buildDoubleEliminationBrackets(
   const firstLoserPool = losersFromBracketRound(winnerMatches[0] || [], winnerLabels[0] || 'W-Round')
   const incomingLosers = winnerMatches
     .slice(1, -1)
-    .map((round, index) => losersFromBracketRound(round, winnerLabels[index + 1] || `W-Round ${index + 2}`))
+    .map((round, index) => {
+      const losers = losersFromBracketRound(round, winnerLabels[index + 1] || `W-Round ${index + 2}`)
+      return losers.length > 2 ? [...losers].reverse() : losers
+    })
   const winnersFinalLoser = loserName(
     winnerMatches[winnerMatches.length - 1]?.[0],
     winnerLabels[winnerLabels.length - 1] || 'W-Final',
@@ -803,6 +815,7 @@ function buildDoubleEliminationBrackets(
     incomingLosers,
     tournament,
     buildLowerBracketRoundLabelsFromWinnerRounds(winnerLabels),
+    matchNumbers.losers,
   )
   const loserChampion = loserRounds.length
     ? winnerNameFromMatch(
@@ -815,14 +828,16 @@ function buildDoubleEliminationBrackets(
   const losersFinal = makeBracketMatch(winnersFinalLoser, loserChampion, {
     complete: tournament.status === 'Completed',
     live: losersFinalLive,
+    matchNumber: matchNumbers.lowerFinal,
     matchIndex: 0,
   })
   const grandFinal = makeBracketMatch(
     winnerNameFromMatch(winnerMatches[winnerMatches.length - 1]?.[0], 'W-Final', 1),
-    losersFinal.live || !losersFinal.w ? 'Winner Losers Final' : bracketWinner(losersFinal),
+    winnerNameFromMatch(losersFinal, 'Lower Final', 1),
     {
       complete: tournament.status === 'Completed',
       live: tournament.status === 'Active' && /grand/i.test(tournament.round),
+      matchNumber: matchNumbers.grandFinal,
       matchIndex: 0,
     },
   )
@@ -837,9 +852,72 @@ function buildDoubleEliminationBrackets(
       rounds: ['Grand Final', 'Reset if needed'],
       matches: [
         [grandFinal],
-        [{ a: 'Winner Grand Final', b: 'Reset only if needed' }],
+        [{ a: `Winner of ${matchNumbers.grandFinal}`, b: 'Reset only if needed', matchNumber: matchNumbers.resetFinal }],
       ],
     },
+  }
+}
+
+function buildDoubleEliminationMatchNumbering(winnerMatchCounts: number[]) {
+  const winners: number[][] = winnerMatchCounts.map(() => [])
+  const losers: number[][] = []
+  let next = 1
+
+  const allocate = (count: number, direction: 'asc' | 'desc' = 'asc') => {
+    const numbers = Array.from({ length: count }, (_value, index) => next + index)
+    next += count
+    return direction === 'desc' ? numbers.reverse() : numbers
+  }
+
+  if (winnerMatchCounts.length) {
+    winners[0] = allocate(winnerMatchCounts[0])
+  }
+
+  let poolCount = winnerMatchCounts[0] ?? 0
+  let poolDirection: 'asc' | 'desc' = 'asc'
+
+  for (let winnerRoundIndex = 1; winnerRoundIndex < winnerMatchCounts.length - 1; winnerRoundIndex += 1) {
+    if (poolCount >= 2) {
+      const matchCount = Math.floor(poolCount / 2)
+      const direction: 'asc' | 'desc' = poolDirection === 'desc' ? 'desc' : 'asc'
+      losers.push(allocate(matchCount, direction))
+      poolCount = matchCount + (poolCount % 2)
+      poolDirection = direction
+    }
+
+    winners[winnerRoundIndex] = allocate(winnerMatchCounts[winnerRoundIndex])
+
+    const incomingCount = winnerMatchCounts[winnerRoundIndex]
+    if (incomingCount > 0) {
+      const pairCount = Math.min(poolCount, incomingCount)
+      if (pairCount > 0) {
+        const direction = incomingCount > 2 ? 'desc' : 'asc'
+        losers.push(allocate(pairCount, direction))
+        poolDirection = direction
+      }
+      poolCount = poolCount + incomingCount - pairCount
+    }
+  }
+
+  while (poolCount > 1) {
+    const matchCount = Math.floor(poolCount / 2)
+    const direction: 'asc' | 'desc' = poolDirection === 'desc' ? 'desc' : 'asc'
+    losers.push(allocate(matchCount, direction))
+    poolCount = matchCount + (poolCount % 2)
+    poolDirection = direction
+  }
+
+  const finalWinnerRoundIndex = winnerMatchCounts.length - 1
+  if (finalWinnerRoundIndex > 0) {
+    winners[finalWinnerRoundIndex] = allocate(winnerMatchCounts[finalWinnerRoundIndex])
+  }
+
+  return {
+    grandFinal: next + 1,
+    losers,
+    lowerFinal: next,
+    resetFinal: next + 2,
+    winners,
   }
 }
 
@@ -848,15 +926,17 @@ function buildLoserBracketRounds(
   incomingPools: string[][],
   tournament: Tournament,
   lowerRoundLabels: string[],
+  matchNumbers: number[][],
 ) {
   const rawRounds: Array<{ round: string; matches: BracketMatch[] }> = []
   let pool = firstPool
   const complete = tournament.status === 'Completed' || tournament.status === 'Active'
 
-  const buildLoserMatch = (a: string, b: string, matchIndex: number, next: number) => (
+  const buildLoserMatch = (a: string, b: string, matchIndex: number, next: number, matchNumber?: number) => (
     makeBracketMatch(a, b, {
       complete,
       live: false,
+      matchNumber,
       matchIndex,
       next,
     })
@@ -867,11 +947,12 @@ function buildLoserBracketRounds(
     const pairable = pool.length % 2 === 0 ? pool : pool.slice(0, -1)
     const carry = pool.length % 2 === 0 ? [] : [pool[pool.length - 1]]
     const roundNumber = rawRounds.length + 1
+    const roundMatchNumbers = matchNumbers[rawRounds.length] ?? []
     const matches = pairNames(pairable).map(([a, b], matchIndex) => (
-      buildLoserMatch(a, b, matchIndex, feedsDropIn ? matchIndex : Math.floor(matchIndex / 2))
+      buildLoserMatch(a, b, matchIndex, feedsDropIn ? matchIndex : Math.floor(matchIndex / 2), roundMatchNumbers[matchIndex])
     ))
     const winners = matches.map((match, index) => (
-      complete ? bracketWinner(match) : `Winner L${roundNumber}-${index + 1}`
+      complete ? bracketWinner(match) : winnerNameFromMatch(match, `L${roundNumber}`, index + 1)
     ))
     rawRounds.push({ round: `L-Round ${roundNumber}`, matches })
     pool = [...winners, ...carry]
@@ -886,11 +967,12 @@ function buildLoserBracketRounds(
 
     const pairCount = Math.min(pool.length, incoming.length)
     const roundNumber = rawRounds.length + 1
+    const roundMatchNumbers = matchNumbers[rawRounds.length] ?? []
     const matches = Array.from({ length: pairCount }, (_, index) => (
-      buildLoserMatch(pool[index], incoming[index], index, Math.floor(index / 2))
+      buildLoserMatch(pool[index], incoming[index], index, Math.floor(index / 2), roundMatchNumbers[index])
     ))
     const winners = matches.map((match, index) => (
-      complete ? bracketWinner(match) : `Winner L${roundNumber}-${index + 1}`
+      complete ? bracketWinner(match) : winnerNameFromMatch(match, `L${roundNumber}`, index + 1)
     ))
     rawRounds.push({ round: `L-Round ${roundNumber}`, matches })
     pool = [
@@ -1150,6 +1232,7 @@ function makeBracketMatch(
   {
     complete,
     live,
+    matchNumber,
     matchIndex,
     next,
     result,
@@ -1157,34 +1240,32 @@ function makeBracketMatch(
   }: {
     complete: boolean
     live: boolean
+    matchNumber?: number
     matchIndex: number
     next?: number
     result?: TournamentGame['result']
     status?: TournamentGame['status']
   },
 ): BracketMatch {
+  const base = { a, b, matchNumber, next }
   const byeWinner = bracketByeWinner(a, b)
-  if (byeWinner) return { a, b, next, w: byeWinner }
-  if (status === 'live' || live) return { a, b, live: true, next }
+  if (byeWinner) return { ...base, w: byeWinner }
+  if (status === 'live' || live) return { ...base, live: true }
   if (result && result !== '*') {
-    if (result === '1/2-1/2') return { a, b, sa: 0.5, sb: 0.5, next }
+    if (result === '1/2-1/2') return { ...base, sa: 0.5, sb: 0.5 }
     const winner = result === '0-1' ? 'b' : 'a'
     return {
-      a,
-      b,
-      next,
+      ...base,
       sa: winner === 'a' ? 1 : 0,
       sb: winner === 'b' ? 1 : 0,
       w: winner,
     }
   }
-  if (!complete) return { a, b, next }
+  if (!complete) return base
 
   const winner = matchIndex % 2 === 0 ? 'a' : 'b'
   return {
-    a,
-    b,
-    next,
+    ...base,
     sa: winner === 'a' ? 1 : 0,
     sb: winner === 'b' ? 1 : 0,
     w: winner,
@@ -1212,12 +1293,14 @@ function bracketLoser(match: BracketMatch) {
 function winnerNameFromMatch(match: BracketMatch | undefined, roundLabel: string, matchNumber: number) {
   if (!match) return `Winner ${bracketRoundCode(roundLabel)}-${matchNumber}`
   if (match.w) return bracketWinner(match)
+  if (match.matchNumber) return `Winner of ${match.matchNumber}`
   return `Winner ${bracketRoundCode(roundLabel)}-${matchNumber}`
 }
 
 function loserName(match: BracketMatch | undefined, roundLabel: string, matchNumber: number) {
   if (!match) return `Loser ${bracketRoundCode(roundLabel)}-${matchNumber}`
   if (match.w) return bracketLoser(match)
+  if (match.matchNumber) return `Loser of ${match.matchNumber}`
   return `Loser ${bracketRoundCode(roundLabel)}-${matchNumber}`
 }
 
@@ -1444,10 +1527,15 @@ function BracketMatchCard({
       data-target={match.next ?? ''}
       data-win={lineState}
     >
-      {match.live ? (
-        <div className="bracket-live-tag">
-          <span aria-hidden="true" />
-          Live
+      {match.matchNumber || match.live ? (
+        <div className="bracket-match-head">
+          {match.matchNumber ? <span className="bracket-match-number">Match {match.matchNumber}</span> : <span />}
+          {match.live ? (
+            <span className="bracket-live-tag">
+              <span aria-hidden="true" />
+              Live
+            </span>
+          ) : null}
         </div>
       ) : null}
       <BracketPlayerRow

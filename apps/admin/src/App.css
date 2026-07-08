@@ -2064,6 +2064,24 @@ button {
   background: rgba(255, 252, 244, 0.72);
 }
 
+.bracket-match-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 13px;
+  margin-bottom: 6px;
+}
+
+.bracket-match-number {
+  color: rgba(30, 43, 69, 0.52);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .rich-bracket-panel.bracket-view-losers .bracket-column h3 {
   color: rgba(122, 36, 49, 0.72);
   letter-spacing: 0.09em;
@@ -2118,6 +2136,10 @@ button {
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.bracket-match-head .bracket-live-tag {
+  margin-bottom: 0;
 }
 
 .bracket-live-tag span {

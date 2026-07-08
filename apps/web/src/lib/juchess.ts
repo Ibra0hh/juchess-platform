@@ -92,6 +92,7 @@ export type PublishedBracketView = 'winners' | 'losers' | 'final'
 
 export type PublishedBracketMatch = {
   board?: number
+  matchNumber?: number
   white: string
   black: string
   whiteScore?: string
@@ -875,6 +876,7 @@ function sanitizePublishedBracketMatch(value: unknown): PublishedBracketMatch | 
     blackScore: typeof match.blackScore === 'string' ? match.blackScore : undefined,
     board: typeof match.board === 'number' ? match.board : undefined,
     live: Boolean(match.live),
+    matchNumber: typeof match.matchNumber === 'number' ? match.matchNumber : undefined,
     next: typeof match.next === 'number' ? match.next : undefined,
     pending: Boolean(match.pending),
     white: match.white,
