@@ -150,7 +150,7 @@ const bracketConfigs: Record<string, BracketConfig> = {
         ],
       },
       losers: {
-        rounds: ['Quarterfinal survival', 'Quarterfinal', 'Semifinal survival', 'Semifinal', 'Final survival', 'Final'],
+        rounds: ['Round of 16 survivor', 'Quarterfinal', 'Semifinal survivor', 'Semifinal', 'Final survivor', 'Final'],
         matches: [
           [
             { a: 'Zaid Hamdan', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a', next: 0 },
@@ -1024,8 +1024,8 @@ function buildLowerBracketCodeIndex(labels: string[]) {
   const entries: Array<[string, number]> = []
   labels.forEach((label, index) => {
     entries.push([bracketRoundCode(label).toUpperCase(), index])
-    if (/survival/i.test(label)) {
-      entries.push([bracketRoundCode(label.replace(/survival/ig, 'Qualifier')).toUpperCase(), index])
+    if (/surviv(?:or|al)/i.test(label)) {
+      entries.push([bracketRoundCode(label.replace(/surviv(?:or|al)/ig, 'Qualifier')).toUpperCase(), index])
     }
   })
   return new Map(entries)
@@ -1059,23 +1059,29 @@ function buildLowerBracketRoundLabels(matchCounts: number[], includesFinalRound 
     const nextSame = matchCounts[index + 1] === matchCount
     const previousSame = matchCounts[index - 1] === matchCount
     if (includesFinalRound && index === matchCounts.length - 1) return 'Final'
-    if (index === matchCounts.length - 1) return 'Final survival'
-    if (nextSame && !previousSame) return `${stage} survival`
+    if (index === matchCounts.length - 1) return 'Final survivor'
+    if (nextSame && !previousSame) {
+      const survivorStage = bracketRoundName(Math.max(2, matchCount * (index === 0 ? 4 : 2)))
+      return `${survivorStage} survivor`
+    }
     return stage
   })
 }
 
 function buildLowerBracketRoundLabelsFromWinnerRounds(winnerRoundLabels: string[]) {
   const stages = winnerRoundLabels
-    .slice(1, -1)
     .map((label) => stripWinnerBracketPrefix(label))
     .filter(Boolean)
 
   if (!stages.length) return []
 
+  const middleStages = stages.slice(1, -1)
   return [
-    ...stages.flatMap((stage) => [`${stage} survival`, stage]),
-    'Final survival',
+    `${stages[0]} survivor`,
+    ...middleStages.flatMap((stage, index) => (
+      index === 0 ? [stage] : [`${stage} survivor`, stage]
+    )),
+    'Final survivor',
   ]
 }
 
@@ -1233,9 +1239,9 @@ function bracketRoundName(playersInRound: number) {
 }
 
 function bracketRoundCode(label: string) {
-  const survival = /survival/i.test(label)
+  const survivor = /surviv(?:or|al)/i.test(label)
   const qualifier = /qualifier/i.test(label)
-  const suffix = survival ? 'S' : qualifier ? 'Q' : ''
+  const suffix = survivor ? 'S' : qualifier ? 'Q' : ''
   if (/quarterfinal/i.test(label)) return `QF${suffix}`
   if (/semifinal/i.test(label)) return `SF${suffix}`
   if (/final/i.test(label)) return `F${suffix}`

@@ -7535,9 +7535,9 @@ String _bracketRoundName(int playersInRound) {
 
 String _bracketRoundCode(String label) {
   final lower = label.toLowerCase();
-  final survival = lower.contains('survival');
+  final survivor = RegExp(r'surviv(?:or|al)').hasMatch(lower);
   final qualifier = lower.contains('qualifier');
-  final suffix = survival
+  final suffix = survivor
       ? 'S'
       : qualifier
           ? 'Q'
@@ -7739,9 +7739,9 @@ Map<String, int> _lowerBracketCodeIndex(List<String> labels) {
   final codes = <String, int>{};
   for (var i = 0; i < labels.length; i++) {
     codes[_bracketRoundCode(labels[i]).toUpperCase()] = i;
-    if (labels[i].toLowerCase().contains('survival')) {
+    if (RegExp(r'surviv(?:or|al)', caseSensitive: false).hasMatch(labels[i])) {
       codes[_bracketRoundCode(labels[i].replaceAll(
-        RegExp('survival', caseSensitive: false),
+        RegExp(r'surviv(?:or|al)', caseSensitive: false),
         'Qualifier',
       )).toUpperCase()] = i;
     }
@@ -7841,21 +7841,20 @@ List<String> _lowerBracketRoundLabels(
 List<String> _lowerBracketRoundLabelsFromWinnerRounds(
   List<String> winnerRoundLabels,
 ) {
-  if (winnerRoundLabels.length < 3) return const [];
-
   final stages = [
-    for (final label in winnerRoundLabels.sublist(
-      1,
-      winnerRoundLabels.length - 1,
-    ))
-      _stripWinnerBracketPrefix(label),
+    for (final label in winnerRoundLabels) _stripWinnerBracketPrefix(label),
   ].where((label) => label.isNotEmpty).toList();
 
   if (stages.isEmpty) return const [];
 
+  final middleStages = stages.sublist(1, math.max(1, stages.length - 1));
   return [
-    for (final stage in stages) ...['$stage survival', stage],
-    'Final survival',
+    '${stages.first} survivor',
+    for (var index = 0; index < middleStages.length; index++)
+      ...index == 0
+          ? [middleStages[index]]
+          : ['${middleStages[index]} survivor', middleStages[index]],
+    'Final survivor',
   ];
 }
 
@@ -7876,8 +7875,13 @@ String _lowerBracketRoundLabel(
       index + 1 < matchCounts.length && matchCounts[index + 1] == matchCount;
   final previousSame = index > 0 && matchCounts[index - 1] == matchCount;
   if (includesFinalRound && index == matchCounts.length - 1) return 'Final';
-  if (index == matchCounts.length - 1) return 'Final survival';
-  if (nextSame && !previousSame) return '$stage survival';
+  if (index == matchCounts.length - 1) return 'Final survivor';
+  if (nextSame && !previousSame) {
+    final survivorStage = _bracketRoundName(
+      math.max(2, matchCount * (index == 0 ? 4 : 2)),
+    );
+    return '$survivorStage survivor';
+  }
   return stage;
 }
 
@@ -8008,7 +8012,7 @@ const doubleEliminationWinnersRounds = [
 ];
 
 const doubleEliminationLosersRounds = [
-  RoundSeed('Quarterfinal survival', [
+  RoundSeed('Round of 16 survivor', [
     MatchSeed('Zaid Hamdan', 'Hasan Qasem', '1-0', nextIndex: 0),
     MatchSeed('Noor Barakat', 'Khaled Mansour', '1-0', nextIndex: 1),
     MatchSeed('Tala Suleiman', 'Rania Odeh', '1-0', nextIndex: 2),
@@ -8020,7 +8024,7 @@ const doubleEliminationLosersRounds = [
     MatchSeed('Mohammad Al-Khatib', 'Tala Suleiman', '1-0'),
     MatchSeed('Amr Zaidan', 'Lina Shami', '1-0'),
   ]),
-  RoundSeed('Semifinal survival', [
+  RoundSeed('Semifinal survivor', [
     MatchSeed('Sara Nasser', 'Yazan Khaled', '1-0', nextIndex: 0),
     MatchSeed('Mohammad Al-Khatib', 'Amr Zaidan', '1-0', nextIndex: 1),
   ]),
@@ -8028,7 +8032,7 @@ const doubleEliminationLosersRounds = [
     MatchSeed('Leen Haddad', 'Sara Nasser', '0-1'),
     MatchSeed('Dana Aqel', 'Mohammad Al-Khatib', '0-1'),
   ]),
-  RoundSeed('Final survival', [
+  RoundSeed('Final survivor', [
     MatchSeed('Sara Nasser', 'Mohammad Al-Khatib', '1-0'),
   ]),
   RoundSeed('Final', [MatchSeed('Omar Saleh', 'Sara Nasser', 'live')]),
