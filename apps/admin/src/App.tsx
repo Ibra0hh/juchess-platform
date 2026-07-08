@@ -3781,7 +3781,6 @@ function buildAdminDoubleEliminationBrackets(
     firstLoserPool,
     incomingLosers,
     phase,
-    winners.map((round) => round.name),
   )
   const winnersFinal = winners[winners.length - 1]
   const winnersFinalMatch = winnersFinal?.matches[0]
@@ -3815,8 +3814,7 @@ function buildAdminDoubleEliminationBrackets(
     losers: [
       ...loserRounds,
       {
-        name: 'Major Final',
-        note: `Loser from ${stripWinnerBracketPrefix(winnersFinal?.name ?? 'W-Final')} enters`,
+        name: 'Lower Final',
         role: 'major',
         matches: [loserFinal],
       },
@@ -3947,13 +3945,10 @@ function buildAdminLoserRounds(
   firstPool: string[],
   incomingPools: string[][],
   phase: AdminBracketPhase,
-  winnerRoundLabels: string[],
 ): AdminBracketRound[] {
   const rounds: AdminBracketRound[] = []
   let pool = [...firstPool]
   const complete = phase === 'active' || phase === 'completed'
-  const winnerSources = winnerRoundLabels.map((label) => stripWinnerBracketPrefix(label)).filter(Boolean)
-  const incomingSources = winnerSources.slice(1, -1)
 
   const buildLoserMatch = (
     white: string,
@@ -3970,17 +3965,15 @@ function buildAdminLoserRounds(
   const pushRound = (
     role: AdminBracketRoundRole,
     matches: AdminBracketMatch[],
-    note: string,
   ) => {
     rounds.push({
-      name: `${lowerBracketRoundPrefix(role)} ${lowerBracketRoundStage(matches.length)}`,
-      note,
+      name: `Lower Round ${rounds.length + 1}`,
       role,
       matches,
     })
   }
 
-  const reducePool = (feedsDropIn = false, note = 'Lower bracket survivors only') => {
+  const reducePool = (feedsDropIn = false) => {
     if (pool.length < 2) return
     const pairable = pool.length % 2 === 0 ? pool : pool.slice(0, -1)
     const carry = pool.length % 2 === 0 ? [] : [pool[pool.length - 1]]
@@ -3995,11 +3988,11 @@ function buildAdminLoserRounds(
     const winners = matches.map((match, index) => (
       match.winner ? adminWinnerName(match, `L${roundNumber}`, index + 1) : `Winner L${roundNumber}-${index + 1}`
     ))
-    pushRound('minor', matches, note)
+    pushRound('minor', matches)
     pool = [...winners, ...carry]
   }
 
-  const pairDropIns = (incoming: string[], sourceLabel: string) => {
+  const pairDropIns = (incoming: string[]) => {
     if (!incoming.length) return
     if (!pool.length) {
       pool = [...incoming]
@@ -4018,7 +4011,7 @@ function buildAdminLoserRounds(
     const winners = matches.map((match, index) => (
       match.winner ? adminWinnerName(match, `L${roundNumber}`, index + 1) : `Winner L${roundNumber}-${index + 1}`
     ))
-    pushRound('major', matches, `Losers from ${sourceLabel} enter`)
+    pushRound('major', matches)
     pool = [
       ...winners,
       ...pool.slice(pairCount),
@@ -4026,28 +4019,16 @@ function buildAdminLoserRounds(
     ]
   }
 
-  incomingPools.forEach((incoming, index) => {
-    reducePool(incoming.length > 0, index === 0
-      ? `Losers from ${winnerSources[0] ?? 'opening round'} fight to stay alive`
-      : 'Lower bracket survivors fight to stay alive')
-    pairDropIns(incoming, incomingSources[index] ?? 'winners bracket')
+  incomingPools.forEach((incoming) => {
+    reducePool(incoming.length > 0)
+    pairDropIns(incoming)
   })
 
   while (pool.length > 1) {
-    reducePool(false, 'Lower bracket survivors fight to reach the lower final')
+    reducePool()
   }
 
   return normalizeAdminLowerBracketRounds(rounds, rounds.map((round) => round.name))
-}
-
-function lowerBracketRoundPrefix(role: AdminBracketRoundRole) {
-  if (role === 'major') return 'Major'
-  if (role === 'final') return 'Grand'
-  return 'Minor'
-}
-
-function lowerBracketRoundStage(matchCount: number) {
-  return bracketRoundName(Math.max(2, matchCount * 2))
 }
 
 function normalizeAdminLowerBracketRounds(
@@ -4061,7 +4042,7 @@ function normalizeAdminLowerBracketRounds(
   )
   const includesFinalRound = isLowerBracketFinalRound(rounds[rounds.length - 1]?.name)
   const labels = rounds.map((round, index) => {
-    if (includesFinalRound && index === rounds.length - 1) return 'Final'
+    if (includesFinalRound && index === rounds.length - 1) return 'Lower Final'
     return preferredLabels[index] ?? fallbackLabels[index] ?? round.name
   })
   const rawToLabel = new Map(labels.map((label, index) => [`L${index + 1}`, label]))
@@ -4085,6 +4066,7 @@ function buildLowerBracketCodeIndex(labels: string[]) {
   const entries: Array<[string, number]> = []
   labels.forEach((label, index) => {
     entries.push([bracketRoundCodeFromName(label).toUpperCase(), index])
+    lowerBracketLegacyCodes(index).forEach((code) => entries.push([code, index]))
     const unprefixed = label.replace(/\b(?:minor|major)\s+/i, '')
     if (/minor/i.test(label)) {
       entries.push([bracketRoundCodeFromName(`${unprefixed} survivor`).toUpperCase(), index])
@@ -4099,6 +4081,18 @@ function buildLowerBracketCodeIndex(labels: string[]) {
     }
   })
   return new Map(entries)
+}
+
+function lowerBracketLegacyCodes(index: number) {
+  const aliases = [
+    ['MNQF', 'QFQ', 'QFS', 'R16S', 'R16Q'],
+    ['MJQF', 'QF'],
+    ['MNSF', 'SFQ', 'SFS'],
+    ['MJSF', 'SF'],
+    ['MNF', 'FQ', 'FS'],
+    ['MJF', 'F'],
+  ]
+  return aliases[index] ?? []
 }
 
 function rewriteAdminLowerBracketPlaceholders(
@@ -4152,39 +4146,21 @@ function rewriteLowerBracketPlaceholder(
 }
 
 function buildLowerBracketRoundLabels(matchCounts: number[], includesFinalRound = false) {
-  return matchCounts.map((matchCount, index) => {
-    const stage = bracketRoundName(Math.max(2, matchCount * 2))
-    const nextSame = matchCounts[index + 1] === matchCount
-    const previousSame = matchCounts[index - 1] === matchCount
-    if (includesFinalRound && index === matchCounts.length - 1) return 'Final'
-    if (index === matchCounts.length - 1) return `Minor ${stage}`
-    if (nextSame && !previousSame) return `Minor ${stage}`
-    if (previousSame && !nextSame) return `Major ${stage}`
-    return `Minor ${stage}`
+  return matchCounts.map((_matchCount, index) => {
+    if (includesFinalRound && index === matchCounts.length - 1) return 'Lower Final'
+    return `Lower Round ${index + 1}`
   })
 }
 
 function buildLowerBracketRoundLabelsFromWinnerRounds(winnerRoundLabels: string[]) {
-  const stages = winnerRoundLabels
-    .slice(1)
-    .map((label) => stripWinnerBracketPrefix(label))
-    .filter(Boolean)
-
-  if (!stages.length) return []
-
-  return stages.flatMap((stage, index) => (
-    index === stages.length - 1
-      ? [`Minor ${stage}`]
-      : [`Minor ${stage}`, `Major ${stage}`]
+  const count = Math.max(0, (winnerRoundLabels.length - 1) * 2)
+  return Array.from({ length: count }, (_value, index) => (
+    index === count - 1 ? 'Lower Final' : `Lower Round ${index + 1}`
   ))
 }
 
-function stripWinnerBracketPrefix(label: string) {
-  return label.replace(/^W[-\s]*/i, '').trim()
-}
-
 function isLowerBracketFinalRound(name?: string) {
-  return Boolean(name && /^(?:l-)?final$/i.test(name.trim()))
+  return Boolean(name && /^(?:(?:l|lower)[-\s]*)?final$/i.test(name.trim()))
 }
 
 function adminWinnerName(match: AdminBracketMatch | undefined, sourceLabel: string, matchNumber: number) {
@@ -4330,6 +4306,8 @@ function bracketRoundCodeFromName(label: string) {
   if (/final/i.test(label)) return `${prefix}F${suffix}`
   const count = /round of\s*(\d+)/i.exec(label)?.[1]
   if (count) return `${prefix}R${count}${suffix}`
+  const lowerRound = /lower round\s*(\d+)/i.exec(label)?.[1]
+  if (lowerRound) return `LR${lowerRound}`
   const loserRound = /l-round\s*(\d+)/i.exec(label)?.[1]
   if (loserRound) return `L${loserRound}`
   return label.replace(/[^A-Za-z0-9]+/g, '').slice(0, 6) || 'R'

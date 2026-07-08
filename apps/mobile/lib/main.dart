@@ -7455,7 +7455,7 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
     winners: winners,
     losers: [
       ...loserRounds,
-      RoundSeed('Major Final', [loserFinal]),
+      RoundSeed('Lower Final', [loserFinal]),
     ],
     finalRounds: [
       RoundSeed('Grand Final', [grandFinal]),
@@ -7559,6 +7559,11 @@ String _bracketRoundCode(String label) {
   if (roundMatch != null) {
     return '${prefix}R${roundMatch.group(1)}$suffix';
   }
+  final lowerRoundMatch = RegExp(
+    r'lower round\s*(\d+)',
+    caseSensitive: false,
+  ).firstMatch(label);
+  if (lowerRoundMatch != null) return 'LR${lowerRoundMatch.group(1)}';
   final loserMatch = RegExp(
     r'l-round\s*(\d+)',
     caseSensitive: false,
@@ -7744,6 +7749,9 @@ Map<String, int> _lowerBracketCodeIndex(List<String> labels) {
   final codes = <String, int>{};
   for (var i = 0; i < labels.length; i++) {
     codes[_bracketRoundCode(labels[i]).toUpperCase()] = i;
+    for (final code in _lowerBracketLegacyCodes(i)) {
+      codes[code] = i;
+    }
     final unprefixed = labels[i].replaceFirst(
       RegExp(r'\b(?:minor|major)\s+', caseSensitive: false),
       '',
@@ -7761,6 +7769,18 @@ Map<String, int> _lowerBracketCodeIndex(List<String> labels) {
     }
   }
   return codes;
+}
+
+List<String> _lowerBracketLegacyCodes(int index) {
+  const aliases = [
+    ['MNQF', 'QFQ', 'QFS', 'R16S', 'R16Q'],
+    ['MJQF', 'QF'],
+    ['MNSF', 'SFQ', 'SFS'],
+    ['MJSF', 'SF'],
+    ['MNF', 'FQ', 'FS'],
+    ['MJF', 'F'],
+  ];
+  return index < aliases.length ? aliases[index] : const [];
 }
 
 MatchSeed _rewriteLowerBracketMatch(
@@ -7855,25 +7875,11 @@ List<String> _lowerBracketRoundLabels(
 List<String> _lowerBracketRoundLabelsFromWinnerRounds(
   List<String> winnerRoundLabels,
 ) {
-  final stages = [
-    for (final label in winnerRoundLabels.skip(1))
-      _stripWinnerBracketPrefix(label),
-  ].where((label) => label.isNotEmpty).toList();
-
-  if (stages.isEmpty) return const [];
-
+  final count = math.max(0, (winnerRoundLabels.length - 1) * 2);
   return [
-    for (var index = 0; index < stages.length; index++)
-      ...index == stages.length - 1
-          ? ['Minor ${stages[index]}']
-          : ['Minor ${stages[index]}', 'Major ${stages[index]}'],
+    for (var index = 0; index < count; index++)
+      index == count - 1 ? 'Lower Final' : 'Lower Round ${index + 1}',
   ];
-}
-
-String _stripWinnerBracketPrefix(String label) {
-  return label
-      .replaceFirst(RegExp(r'^W[-\s]*', caseSensitive: false), '')
-      .trim();
 }
 
 String _lowerBracketRoundLabel(
@@ -7881,21 +7887,18 @@ String _lowerBracketRoundLabel(
   int index, {
   required bool includesFinalRound,
 }) {
-  final matchCount = matchCounts[index];
-  final stage = _bracketRoundName(math.max(2, matchCount * 2));
-  final nextSame =
-      index + 1 < matchCounts.length && matchCounts[index + 1] == matchCount;
-  final previousSame = index > 0 && matchCounts[index - 1] == matchCount;
-  if (includesFinalRound && index == matchCounts.length - 1) return 'Final';
-  if (index == matchCounts.length - 1) return 'Minor $stage';
-  if (nextSame && !previousSame) return 'Minor $stage';
-  if (previousSame && !nextSame) return 'Major $stage';
-  return 'Minor $stage';
+  if (includesFinalRound && index == matchCounts.length - 1) {
+    return 'Lower Final';
+  }
+  return 'Lower Round ${index + 1}';
 }
 
 bool _isLowerBracketFinalRound(String? label) {
   if (label == null) return false;
-  return RegExp(r'^(?:l-)?final$', caseSensitive: false).hasMatch(label.trim());
+  return RegExp(
+    r'^(?:(?:l|lower)[-\s]*)?final$',
+    caseSensitive: false,
+  ).hasMatch(label.trim());
 }
 
 String _matchWinner(
@@ -8020,30 +8023,30 @@ const doubleEliminationWinnersRounds = [
 ];
 
 const doubleEliminationLosersRounds = [
-  RoundSeed('Minor Quarterfinal', [
+  RoundSeed('Lower Round 1', [
     MatchSeed('Zaid Hamdan', 'Hasan Qasem', '1-0', nextIndex: 0),
     MatchSeed('Noor Barakat', 'Khaled Mansour', '1-0', nextIndex: 1),
     MatchSeed('Tala Suleiman', 'Rania Odeh', '1-0', nextIndex: 2),
     MatchSeed('Lina Shami', 'Fadi Rimawi', '1-0', nextIndex: 3),
   ]),
-  RoundSeed('Major Quarterfinal', [
+  RoundSeed('Lower Round 2', [
     MatchSeed('Sara Nasser', 'Zaid Hamdan', '1-0'),
     MatchSeed('Yazan Khaled', 'Noor Barakat', '1-0'),
     MatchSeed('Mohammad Al-Khatib', 'Tala Suleiman', '1-0'),
     MatchSeed('Amr Zaidan', 'Lina Shami', '1-0'),
   ]),
-  RoundSeed('Minor Semifinal', [
+  RoundSeed('Lower Round 3', [
     MatchSeed('Sara Nasser', 'Yazan Khaled', '1-0', nextIndex: 0),
     MatchSeed('Mohammad Al-Khatib', 'Amr Zaidan', '1-0', nextIndex: 1),
   ]),
-  RoundSeed('Major Semifinal', [
+  RoundSeed('Lower Round 4', [
     MatchSeed('Leen Haddad', 'Sara Nasser', '0-1'),
     MatchSeed('Dana Aqel', 'Mohammad Al-Khatib', '0-1'),
   ]),
-  RoundSeed('Minor Final', [
+  RoundSeed('Lower Round 5', [
     MatchSeed('Sara Nasser', 'Mohammad Al-Khatib', '1-0'),
   ]),
-  RoundSeed('Major Final', [MatchSeed('Omar Saleh', 'Sara Nasser', 'live')]),
+  RoundSeed('Lower Final', [MatchSeed('Omar Saleh', 'Sara Nasser', 'live')]),
 ];
 
 const doubleEliminationFinalRounds = [
