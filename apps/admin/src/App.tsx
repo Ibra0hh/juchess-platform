@@ -2969,12 +2969,14 @@ const broadcastChannels = [
 ] as const
 
 type BroadcastChannel = typeof broadcastChannels[number]['key']
+type AnnouncementAudienceMode = 'all' | 'tournament'
 
 function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournament[] }) {
   const eligibleTournaments = useMemo(() => (
     tournaments.filter((item) => item.status === 'upcoming' || item.status === 'active')
   ), [tournaments])
-  const [selectedTournamentKey, setSelectedTournamentKey] = useState('')
+  const [audienceMode, setAudienceMode] = useState<AnnouncementAudienceMode>('all')
+  const [selectedTournamentKeys, setSelectedTournamentKeys] = useState<string[]>([])
   const [channels, setChannels] = useState<Record<BroadcastChannel, boolean>>({
     app: true,
     email: true,
@@ -2983,27 +2985,39 @@ function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournament[] }
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const selectedChannels = broadcastChannels.filter((item) => channels[item.key])
-  const selectedTournament = eligibleTournaments.find((item) => tournamentKey(item) === selectedTournamentKey) ?? eligibleTournaments[0] ?? null
+  const selectedTournaments = eligibleTournaments.filter((item) => selectedTournamentKeys.includes(tournamentKey(item)))
+  const audienceCount = audienceMode === 'all'
+    ? 248
+    : selectedTournaments.reduce((total, item) => total + item.players, 0)
+  const audienceLabel = audienceMode === 'all'
+    ? 'All users'
+    : selectedTournaments.length === 1
+    ? selectedTournaments[0].name
+    : selectedTournaments.length > 1
+    ? `${selectedTournaments.length} tournaments`
+    : 'Tournament audience'
   const channelLabel = selectedChannels.length
     ? selectedChannels.map((item) => item.label).join(' + ')
     : 'No channel selected'
 
   useEffect(() => {
-    if (!eligibleTournaments.length) {
-      if (selectedTournamentKey) setSelectedTournamentKey('')
-      return
-    }
-
-    if (!eligibleTournaments.some((item) => tournamentKey(item) === selectedTournamentKey)) {
-      setSelectedTournamentKey(tournamentKey(eligibleTournaments[0]))
-    }
-  }, [eligibleTournaments, selectedTournamentKey])
+    const validKeys = new Set(eligibleTournaments.map((item) => tournamentKey(item)))
+    setSelectedTournamentKeys((current) => current.filter((key) => validKeys.has(key)))
+  }, [eligibleTournaments])
 
   function toggleChannel(channel: BroadcastChannel) {
     setChannels((current) => ({
       ...current,
       [channel]: !current[channel],
     }))
+  }
+
+  function toggleTournamentAudience(key: string) {
+    setSelectedTournamentKeys((current) => (
+      current.includes(key)
+        ? current.filter((item) => item !== key)
+        : [...current, key]
+    ))
   }
 
   return (
@@ -3013,19 +3027,39 @@ function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournament[] }
           <strong>Broadcast composer</strong>
           <span>{channelLabel}</span>
         </div>
-        <div className="audience-tabs tournament-audience-tabs">
-          {eligibleTournaments.length ? eligibleTournaments.map((item) => {
-            const key = tournamentKey(item)
-            return (
-              <button key={key} type="button" className={selectedTournament && tournamentKey(selectedTournament) === key ? 'active' : undefined} onClick={() => setSelectedTournamentKey(key)}>
-                <strong>{item.name}</strong>
-                <small>{item.status === 'active' ? 'Live' : 'Upcoming'} · {item.players}/{item.capacity || 'open'} players · {item.format}</small>
-              </button>
-            )
-          }) : (
-            <div className="empty-row">No upcoming or live tournaments available.</div>
-          )}
+        <div className="audience-choice-row">
+          <button type="button" className={audienceMode === 'all' ? 'active' : undefined} onClick={() => setAudienceMode('all')}>
+            <strong>All users</strong>
+            <small>Send to the full user base</small>
+          </button>
+          <button type="button" className={audienceMode === 'tournament' ? 'active' : undefined} onClick={() => setAudienceMode('tournament')}>
+            <strong>Tournament</strong>
+            <small>Pick upcoming or live tournaments</small>
+          </button>
         </div>
+        {audienceMode === 'tournament' ? (
+          <div className="tournament-check-list">
+            {eligibleTournaments.length ? eligibleTournaments.map((item) => {
+              const key = tournamentKey(item)
+              const checked = selectedTournamentKeys.includes(key)
+              return (
+                <label className={checked ? 'active' : undefined} key={key}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleTournamentAudience(key)}
+                  />
+                  <span>
+                    <strong>{item.name}</strong>
+                    <small>{item.status === 'active' ? 'Live' : 'Upcoming'} · {item.players}/{item.capacity || 'open'} players · {item.format}</small>
+                  </span>
+                </label>
+              )
+            }) : (
+              <div className="empty-row">No upcoming or live tournaments available.</div>
+            )}
+          </div>
+        ) : null}
         <div className="channel-picker" aria-label="Broadcast delivery channels">
           {broadcastChannels.map((item) => (
             <label className={channels[item.key] ? 'active' : undefined} key={item.key}>
@@ -3044,7 +3078,7 @@ function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournament[] }
         <div className="post-form">
           <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Announcement title" />
           <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write the message..." />
-          <button type="button" className="primary-button" disabled={!selectedChannels.length || !selectedTournament}>Send announcement</button>
+          <button type="button" className="primary-button" disabled={!selectedChannels.length || (audienceMode === 'tournament' && !selectedTournaments.length)}>Send announcement</button>
         </div>
       </section>
       <section className="panel-card">
@@ -3052,9 +3086,9 @@ function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournament[] }
         <QueueRow
           icon="◈"
           tint="#EAF0FA"
-          label={selectedTournament ? selectedTournament.name : 'Tournament audience'}
-          count={selectedTournament?.players ?? 0}
-          action={selectedTournament ? selectedTournament.status === 'active' ? 'Live' : 'Upcoming' : 'Choose'}
+          label={audienceLabel}
+          count={audienceCount}
+          action={audienceMode === 'all' ? 'All users' : selectedTournaments.length ? 'Selected' : 'Choose'}
           onClick={() => undefined}
         />
         <QueueRow icon="▣" tint="#FBF1E2" label="Selected channels" count={selectedChannels.length} action={selectedChannels.length ? channelLabel : 'Choose'} onClick={() => undefined} />

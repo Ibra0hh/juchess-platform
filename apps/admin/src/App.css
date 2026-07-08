@@ -2872,37 +2872,85 @@ button {
   color: #fff;
 }
 
-.tournament-audience-tabs {
+.audience-choice-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 18px 20px 0;
 }
 
-.tournament-audience-tabs button {
+.audience-choice-row button {
   display: grid;
   gap: 4px;
+  border: 1.5px solid #e6dfd3;
+  border-radius: 10px;
+  background: #fff;
+  color: #4a4f5a;
+  padding: 12px;
   text-align: left;
+  cursor: pointer;
 }
 
-.tournament-audience-tabs button strong {
+.audience-choice-row button.active {
+  border-color: #7d2434;
+  background: #7d2434;
+  color: #fff;
+}
+
+.audience-choice-row button strong,
+.tournament-check-list strong {
   color: inherit;
   font-size: 13px;
+  font-weight: 900;
 }
 
-.tournament-audience-tabs button small {
+.audience-choice-row button small,
+.tournament-check-list small {
   color: #8b8577;
   font-size: 11.5px;
   font-weight: 800;
+  line-height: 1.3;
 }
 
-.tournament-audience-tabs button.active small {
+.audience-choice-row button.active small {
   color: rgba(255, 255, 255, 0.82);
 }
 
-.tournament-audience-tabs .empty-row {
-  grid-column: 1 / -1;
+.tournament-check-list {
+  display: grid;
+  gap: 8px;
+  padding: 12px 20px 0;
+}
+
+.tournament-check-list label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   border: 1px solid #f4f0e8;
   border-radius: 9px;
-  background: #fffaf0;
+  background: #fff;
+  padding: 11px 12px;
+  cursor: pointer;
+}
+
+.tournament-check-list label.active {
+  border-color: rgba(125, 36, 52, 0.5);
+  background: #fff7ee;
+}
+
+.tournament-check-list input {
+  margin-top: 2px;
+  accent-color: #7d2434;
+}
+
+.tournament-check-list span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tournament-check-list strong {
+  color: #14213d;
 }
 
 .channel-picker {
@@ -2968,7 +3016,7 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .tournament-audience-tabs {
+  .audience-choice-row {
     grid-template-columns: 1fr;
   }
 
