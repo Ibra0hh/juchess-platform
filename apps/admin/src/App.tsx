@@ -1618,12 +1618,30 @@ function TournamentManageView({
   tournament: AdminTournament
 }) {
   const knockout = isKnockoutTournament(tournament)
+  const multiStage = isMultiStageTournament(tournament)
   const swissFlow = usesSwissPublishFlow(tournament)
   const roundRobin = isRoundRobinTournament(tournament)
   const playStage = knockout ? 'bracket' : 'rounds'
-  const manageStages = knockout
-    ? ['participants', playStage, 'procedure']
-    : ['participants', playStage, 'procedure', 'standings']
+  const manageStages = multiStage
+    ? [
+        { key: 'participants', label: 'Participants' },
+        { key: 'rounds', label: 'Phase One' },
+        { key: 'bracket', label: 'Phase Two' },
+        { key: 'procedure', label: 'Procedure' },
+        { key: 'standings', label: 'Standings' },
+      ]
+    : knockout
+    ? [
+        { key: 'participants', label: 'Participants' },
+        { key: playStage, label: capitalize(playStage) },
+        { key: 'procedure', label: 'Procedure' },
+      ]
+    : [
+        { key: 'participants', label: 'Participants' },
+        { key: playStage, label: capitalize(playStage) },
+        { key: 'procedure', label: 'Procedure' },
+        { key: 'standings', label: 'Standings' },
+      ]
   const [stage, setStage] = useState(playStage)
   const [bracketView, setBracketView] = useState<AdminBracketView>('winners')
   const [selectedBoardKey, setSelectedBoardKey] = useState('')
@@ -1638,8 +1656,12 @@ function TournamentManageView({
     published ? parsePublishedAdminBracketSnapshot(tournament.bracketSnapshot) : null
   ), [published, tournament.bracketSnapshot])
   const generatedBracketConfig = useMemo(() => (
-    knockout ? buildAdminBracketConfig(tournament, tournamentPlayers, bracketPhase) : null
-  ), [bracketPhase, knockout, tournament, tournamentPlayers])
+    knockout
+      ? buildAdminBracketConfig(tournament, tournamentPlayers, bracketPhase)
+      : multiStage
+      ? buildAdminMultiStageBracketConfig(tournament, tournamentPlayers, bracketPhase)
+      : null
+  ), [bracketPhase, knockout, multiStage, tournament, tournamentPlayers])
   const bracketConfig = savedBracketConfig ?? generatedBracketConfig
   const activeBracketRounds = bracketConfig?.type === 'double'
     ? bracketConfig.brackets[bracketView]
@@ -1648,20 +1670,20 @@ function TournamentManageView({
     bracketConfig ? getAllAdminBracketRounds(bracketConfig) : []
   ), [bracketConfig])
   const liveBoardRounds = tournament.status === 'active' ? allBracketRounds : EMPTY_ADMIN_BRACKET_ROUNDS
-  const playableBoards = useMemo(() => (knockout
+  const playableBoards = useMemo(() => (knockout || (multiStage && stage === 'bracket')
     ? buildPlayableBracketBoards(liveBoardRounds)
     : buildPlayableBoardsFromPairings(currentRoundPairings)
-  ), [currentRoundPairings, liveBoardRounds, knockout])
+  ), [currentRoundPairings, liveBoardRounds, knockout, multiStage, stage])
   const procedureMatches = useMemo(() => (
     stage !== 'procedure'
       ? []
-      : knockout
+      : knockout || (multiStage && isMultiStagePhaseTwo(tournament))
       ? buildProcedureMatchesFromBracket(allBracketRounds)
       : buildProcedureMatchesFromPairings(
         roundRobin ? pairings : currentRoundPairings,
         tournament,
       )
-  ), [allBracketRounds, currentRoundPairings, knockout, pairings, roundRobin, stage, tournament])
+  ), [allBracketRounds, currentRoundPairings, knockout, multiStage, pairings, roundRobin, stage, tournament])
   const procedurePlan = useMemo(() => (
     stage === 'procedure' ? buildProcedurePlan(procedureMatches, physicalBoards) : []
   ), [physicalBoards, procedureMatches, stage])
@@ -1769,8 +1791,8 @@ function TournamentManageView({
 
       <div className="manage-nav">
         {manageStages.map((item) => (
-          <button key={item} type="button" className={stage === item ? 'active' : undefined} onClick={() => setStage(item)}>
-            {capitalize(item)}
+          <button key={item.key} type="button" className={stage === item.key ? 'active' : undefined} onClick={() => setStage(item.key)}>
+            {item.label}
           </button>
         ))}
       </div>
@@ -1794,7 +1816,7 @@ function TournamentManageView({
         {stage === 'rounds' ? (
           <>
             <div className="manage-panel-head">
-              <strong>{roundRobin ? 'Full round schedule' : tournament.status === 'upcoming' ? 'Round 1 pairings' : 'Live — current round'}</strong>
+              <strong>{multiStage ? 'Phase One - Swiss rounds' : roundRobin ? 'Full round schedule' : tournament.status === 'upcoming' ? 'Round 1 pairings' : 'Live — current round'}</strong>
               <span>{publishState}</span>
             </div>
             {participantsLoading ? (
@@ -1827,6 +1849,12 @@ function TournamentManageView({
         ) : null}
         {stage === 'bracket' ? (
           <>
+            {multiStage ? (
+              <div className="manage-panel-head">
+                <strong>Phase Two - Knockout bracket</strong>
+                <span>Top qualifiers advance from Phase One</span>
+              </div>
+            ) : null}
             <AdminBracketPreview
               bracketView={bracketConfig?.type === 'double' ? bracketView : undefined}
               onBracketViewChange={bracketConfig?.type === 'double' ? setBracketView : undefined}
@@ -3288,6 +3316,10 @@ function isMultiStageTournament(item: AdminTournament) {
   return /multi[-\s]?stage|stage/i.test(item.format.trim())
 }
 
+function isMultiStagePhaseTwo(item: AdminTournament) {
+  return isMultiStageTournament(item) && /stage\s*(?:2|two)|phase\s*(?:2|two)|knockout|quarter|semi|final/i.test(item.round)
+}
+
 function usesSwissPublishFlow(item: AdminTournament) {
   return isSwissTournament(item) || isMultiStageTournament(item)
 }
@@ -3656,6 +3688,25 @@ function buildAdminBracketConfig(
     type: 'single',
     title: `${tournament.format} bracket`,
     rounds: buildAdminSingleEliminationRounds(tournament, players, phase),
+  }
+}
+
+function buildAdminMultiStageBracketConfig(
+  tournament: AdminTournament,
+  players: Player[],
+  phase: AdminBracketPhase,
+): AdminBracketConfig {
+  const phaseTwoPlayers = players.slice(0, Math.min(8, Math.max(2, players.length)))
+  const phaseTwoPhase = isMultiStagePhaseTwo(tournament) ? phase : 'setup'
+
+  return {
+    type: 'single',
+    title: 'Phase Two knockout bracket',
+    rounds: buildAdminSingleEliminationRounds(
+      { ...tournament, format: 'Single elimination' },
+      phaseTwoPlayers,
+      phaseTwoPhase,
+    ),
   }
 }
 
