@@ -2531,9 +2531,9 @@ class _TournamentMainTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (_mainTabLabel(event) == 'Bracket') {
       if (_isDoubleElimination(event)) {
-        return const TournamentDoubleEliminationBracketView();
+        return TournamentDoubleEliminationBracketView(event: event);
       }
-      return const TournamentBracketView(rounds: bracketRounds);
+      return TournamentBracketView(rounds: buildSingleEliminationRounds(event));
     }
 
     return Padding(
@@ -2561,7 +2561,12 @@ class _TournamentMainTab extends StatelessWidget {
 }
 
 class TournamentDoubleEliminationBracketView extends StatefulWidget {
-  const TournamentDoubleEliminationBracketView({super.key});
+  const TournamentDoubleEliminationBracketView({
+    required this.event,
+    super.key,
+  });
+
+  final TournamentSeed event;
 
   @override
   State<TournamentDoubleEliminationBracketView> createState() =>
@@ -2573,10 +2578,11 @@ class _TournamentDoubleEliminationBracketViewState
   int _selectedView = 0;
 
   List<RoundSeed> get _rounds {
+    final brackets = buildDoubleEliminationRounds(widget.event);
     return switch (_selectedView) {
-      1 => doubleEliminationLosersRounds,
-      2 => doubleEliminationFinalRounds,
-      _ => doubleEliminationWinnersRounds,
+      1 => brackets.losers,
+      2 => brackets.finalRounds,
+      _ => brackets.winners,
     };
   }
 
@@ -3010,7 +3016,11 @@ class BracketPlayerRow extends StatelessWidget {
   final bool faded;
   final bool bottomBorder;
 
-  bool get _pending => name == 'TBD' || name.startsWith('Winner ');
+  bool get _pending =>
+      name == 'TBD' ||
+      name.startsWith('Winner ') ||
+      name.startsWith('Loser ') ||
+      name.startsWith('Reset ');
 
   @override
   Widget build(BuildContext context) {
@@ -6644,6 +6654,308 @@ const clubPlayers = [
   PlayerSeed(15, 'Adam Kareem', 1305, 'adam_k'),
   PlayerSeed(16, 'Jana Taha', 1288, 'jana_t'),
 ];
+
+class DoubleEliminationRoundSets {
+  const DoubleEliminationRoundSets({
+    required this.winners,
+    required this.losers,
+    required this.finalRounds,
+  });
+
+  final List<RoundSeed> winners;
+  final List<RoundSeed> losers;
+  final List<RoundSeed> finalRounds;
+}
+
+List<RoundSeed> buildSingleEliminationRounds(
+  TournamentSeed event, {
+  String prefix = '',
+  int? forceActiveRound,
+}) {
+  final players = _bracketPlayerNames(event);
+  final counts = _bracketRoundCounts(players.length);
+  final labels = counts
+      .map((count) => '$prefix${_bracketRoundName(count)}')
+      .toList();
+  final activeRound =
+      forceActiveRound ?? _activeBracketRoundIndex(labels, event);
+  final baseSize = _previousPowerOfTwo(players.length);
+  final hasPlayIn = players.length != baseSize;
+  final byeCount = hasPlayIn ? math.max(0, baseSize * 2 - players.length) : 0;
+  final byes = players.take(byeCount).toList();
+  var current = hasPlayIn ? players.skip(byeCount).toList() : players;
+  final rounds = <RoundSeed>[];
+
+  for (var roundIndex = 0; roundIndex < labels.length; roundIndex++) {
+    final complete =
+        event.status == 'completed' ||
+        (event.status == 'active' && roundIndex < activeRound);
+    final live = event.status == 'active' && roundIndex == activeRound;
+    final sourceCode = _bracketRoundCode(labels[roundIndex]);
+    final games = <MatchSeed>[];
+    final winners = <String>[];
+
+    for (var index = 0; index + 1 < current.length; index += 2) {
+      final matchIndex = games.length;
+      final result = live
+          ? 'live'
+          : complete
+          ? (matchIndex.isEven ? '1-0' : '0-1')
+          : '-';
+      final nextIndex = hasPlayIn && roundIndex == 0
+          ? ((byeCount + matchIndex) / 2).floor()
+          : null;
+      final match = MatchSeed(
+        current[index],
+        current[index + 1],
+        result,
+        nextIndex: nextIndex,
+      );
+      games.add(match);
+      winners.add(
+        complete ? _matchWinner(match) : 'Winner $sourceCode-${matchIndex + 1}',
+      );
+    }
+
+    rounds.add(RoundSeed(labels[roundIndex], games));
+    current = hasPlayIn && roundIndex == 0
+        ? _interleaveNames(byes, winners)
+        : winners;
+  }
+
+  return rounds;
+}
+
+DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
+  final winnerRoundActive = RegExp(
+    r'winner|w-',
+    caseSensitive: false,
+  ).hasMatch(event.current);
+  final winners = buildSingleEliminationRounds(
+    event,
+    prefix: 'W-',
+    forceActiveRound: winnerRoundActive ? null : 999,
+  );
+  final firstLoserPool = _losersFromRound(
+    winners.isNotEmpty ? winners.first : null,
+    'W-Round',
+  );
+  final incomingLosers = winners.length > 2
+      ? winners
+            .sublist(1, winners.length - 1)
+            .map((round) => _losersFromRound(round, round.label))
+            .toList()
+      : <List<String>>[];
+  final loserRounds = _buildLoserRounds(firstLoserPool, incomingLosers, event);
+  final winnersFinal = winners.isNotEmpty ? winners.last : null;
+  final winnersFinalMatch = winnersFinal?.games.isNotEmpty == true
+      ? winnersFinal!.games.first
+      : null;
+  final loserFinalOpponent =
+      loserRounds.isNotEmpty && loserRounds.last.games.isNotEmpty
+      ? _matchWinner(loserRounds.last.games.first)
+      : firstLoserPool.isNotEmpty
+      ? firstLoserPool.first
+      : 'Losers qualifier';
+  final loserFinal = MatchSeed(
+    _matchLoser(winnersFinalMatch, winnersFinal?.label ?? 'W-Final', 1),
+    loserFinalOpponent,
+    event.status == 'active' ? 'live' : '-',
+  );
+  final grandFinal = MatchSeed(
+    _matchWinner(winnersFinalMatch, winnersFinal?.label ?? 'W-Final', 1),
+    loserFinal.result == 'live' ? 'Winner L-Final' : _matchWinner(loserFinal),
+    event.status == 'completed' ? '1-0' : '-',
+  );
+
+  return DoubleEliminationRoundSets(
+    winners: winners,
+    losers: [
+      ...loserRounds,
+      RoundSeed('L-Final', [loserFinal]),
+    ],
+    finalRounds: [
+      RoundSeed('Grand Final', [grandFinal]),
+      const RoundSeed('Reset if needed', [
+        MatchSeed('Winner Grand Final', 'Reset only if needed', '-'),
+      ]),
+    ],
+  );
+}
+
+List<String> _bracketPlayerNames(TournamentSeed event) {
+  final declared = event.players > 0
+      ? event.players
+      : event.capacity ?? clubPlayers.length;
+  final count = math.max(2, math.min(clubPlayers.length, declared));
+  return clubPlayers.take(count).map((player) => player.name).toList();
+}
+
+List<int> _bracketRoundCounts(int playerCount) {
+  final baseSize = _previousPowerOfTwo(playerCount);
+  final counts = playerCount == baseSize
+      ? <int>[playerCount]
+      : <int>[playerCount, baseSize];
+  var next = (counts.last / 2).floor();
+  while (next >= 2) {
+    counts.add(next);
+    next = (next / 2).floor();
+  }
+  return counts;
+}
+
+int _previousPowerOfTwo(int value) {
+  var result = 1;
+  while (result * 2 <= value) {
+    result *= 2;
+  }
+  return math.max(2, result);
+}
+
+String _bracketRoundName(int playersInRound) {
+  if (playersInRound == 2) return 'Final';
+  if (playersInRound == 4) return 'Semifinal';
+  if (playersInRound == 8) return 'Quarterfinal';
+  return 'Round of $playersInRound';
+}
+
+String _bracketRoundCode(String label) {
+  final lower = label.toLowerCase();
+  if (lower.contains('final') && !lower.contains('semi')) return 'F';
+  if (lower.contains('semifinal')) return 'SF';
+  if (lower.contains('quarterfinal')) return 'QF';
+  final roundMatch = RegExp(
+    r'round of\s*(\d+)',
+    caseSensitive: false,
+  ).firstMatch(label);
+  if (roundMatch != null) return 'R${roundMatch.group(1)}';
+  final loserMatch = RegExp(
+    r'l-round\s*(\d+)',
+    caseSensitive: false,
+  ).firstMatch(label);
+  if (loserMatch != null) return 'L${loserMatch.group(1)}';
+  return label.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '');
+}
+
+int _activeBracketRoundIndex(List<String> labels, TournamentSeed event) {
+  if (event.status == 'completed') return labels.length;
+  if (event.status != 'active') return 0;
+  final current = event.current.toLowerCase();
+  final parsed = labels.indexWhere((label) {
+    final lower = label.toLowerCase();
+    if (current.contains('final') &&
+        lower.contains('final') &&
+        !lower.contains('semi')) {
+      return true;
+    }
+    if (current.contains('semi') && lower.contains('semi')) return true;
+    if (current.contains('quarter') && lower.contains('quarter')) return true;
+    final count = RegExp(
+      r'round of\s*(\d+)',
+      caseSensitive: false,
+    ).firstMatch(lower)?.group(1);
+    return count != null && current.contains(count);
+  });
+  if (parsed >= 0) return parsed;
+  return math.max(0, math.min(labels.length - 1, labels.length - 2));
+}
+
+List<String> _interleaveNames(List<String> byes, List<String> winners) {
+  final rows = <String>[];
+  final maxLength = math.max(byes.length, winners.length);
+  for (var index = 0; index < maxLength; index++) {
+    if (index < byes.length) rows.add(byes[index]);
+    if (index < winners.length) rows.add(winners[index]);
+  }
+  return rows;
+}
+
+List<String> _losersFromRound(RoundSeed? round, String sourceLabel) {
+  if (round == null) return const [];
+  return [
+    for (var i = 0; i < round.games.length; i++)
+      _matchLoser(round.games[i], sourceLabel, i + 1),
+  ];
+}
+
+List<RoundSeed> _buildLoserRounds(
+  List<String> firstPool,
+  List<List<String>> incomingPools,
+  TournamentSeed event,
+) {
+  final rounds = <RoundSeed>[];
+  var pool = [...firstPool];
+
+  void reducePool() {
+    if (pool.length < 2) return;
+    final pairable = pool.length.isEven
+        ? pool
+        : pool.sublist(0, pool.length - 1);
+    final carry = pool.length.isEven ? <String>[] : <String>[pool.last];
+    final roundNumber = rounds.length + 1;
+    final complete = event.status == 'active' || event.status == 'completed';
+    final games = <MatchSeed>[];
+    final winners = <String>[];
+
+    for (var index = 0; index + 1 < pairable.length; index += 2) {
+      final matchIndex = games.length;
+      final match = MatchSeed(
+        pairable[index],
+        pairable[index + 1],
+        complete ? (matchIndex.isEven ? '1-0' : '0-1') : '-',
+      );
+      games.add(match);
+      winners.add(
+        complete
+            ? _matchWinner(match)
+            : 'Winner L$roundNumber-${matchIndex + 1}',
+      );
+    }
+
+    rounds.add(RoundSeed('L-Round $roundNumber', games));
+    pool = [...winners, ...carry];
+  }
+
+  for (final incoming in incomingPools) {
+    reducePool();
+    pool = [...pool, ...incoming];
+  }
+  while (pool.length > 1) {
+    reducePool();
+  }
+
+  return [
+    for (var i = 0; i < rounds.length; i++)
+      RoundSeed(
+        i == rounds.length - 1 && rounds[i].games.length == 1
+            ? 'L-Semifinal'
+            : 'L-Round ${i + 1}',
+        rounds[i].games,
+      ),
+  ];
+}
+
+String _matchWinner(
+  MatchSeed? match, [
+  String sourceLabel = 'Round',
+  int matchNumber = 1,
+]) {
+  if (match == null) {
+    return 'Winner ${_bracketRoundCode(sourceLabel)}-$matchNumber';
+  }
+  if (match.result == '0-1') return match.black;
+  if (match.result == '1-0') return match.white;
+  return 'Winner ${_bracketRoundCode(sourceLabel)}-$matchNumber';
+}
+
+String _matchLoser(MatchSeed? match, String sourceLabel, int matchNumber) {
+  if (match == null) {
+    return 'Loser ${_bracketRoundCode(sourceLabel)}-$matchNumber';
+  }
+  if (match.result == '0-1') return match.white;
+  if (match.result == '1-0') return match.black;
+  return 'Loser ${_bracketRoundCode(sourceLabel)}-$matchNumber';
+}
 
 const sampleGames = [
   GameSeed('Ibrahim Ahmad vs Rania Odeh', 'Blitz 3+2 · Jun 29', '1-0'),

@@ -101,6 +101,10 @@ export const members: Member[] = [
   { id: 'hasan', name: 'Hasan Qasem', rating: 1370, universityId: 'hqasem' },
   { id: 'noor', name: 'Noor Barakat', rating: 1340, universityId: 'noorb' },
   { id: 'zaid', name: 'Zaid Hamdan', rating: 1310, universityId: 'zhamdan' },
+  { id: 'amr', name: 'Amr Zaidan', rating: 1295, universityId: 'amr_zaidan' },
+  { id: 'lina', name: 'Lina Shami', rating: 1270, universityId: 'lina_shami' },
+  { id: 'fadi', name: 'Fadi Rimawi', rating: 1245, universityId: 'fadi_rimawi' },
+  { id: 'dana', name: 'Dana Aqel', rating: 1220, universityId: 'dana_aqel' },
 ]
 
 export const demoTournaments: Tournament[] = [
@@ -198,14 +202,14 @@ export const demoTournaments: Tournament[] = [
   {
     id: 'arena',
     name: 'Arena',
-    status: 'Upcoming',
-    date: 'Aug 7, 2026',
+    status: 'Active',
+    date: 'Jul 3, 2026',
     location: 'Club Room',
     format: 'Arena',
     timeControl: '5+0 Blitz',
-    participants: 0,
+    participants: 10,
     capacity: 48,
-    round: 'Registration open',
+    round: 'In progress',
     desc: 'Arena test tournament.',
   },
   {

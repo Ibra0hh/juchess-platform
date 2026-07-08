@@ -714,8 +714,8 @@ class Component extends DCLogic {
     var deBtns = false, resultsBracket = null;
     if (isDoubleElim) {
       deBtns = [
-        { key: 'winners', label: 'Winners Bracket' },
-        { key: 'losers', label: 'Losers Bracket' },
+        { key: 'winners', label: 'Winners' },
+        { key: 'losers', label: 'Losers' },
         { key: 'final', label: 'Final' }
       ].map(function (b) {
         var on = self.state.deView === b.key;

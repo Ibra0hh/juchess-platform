@@ -552,7 +552,10 @@ function TableTab({
   standings: StandingRow[]
   tournament: Tournament
 }) {
-  const bracketConfig = bracketConfigs[tournament.id]
+  const bracketConfig = buildTournamentBracketConfig(
+    tournament,
+    standings.map((row) => row.member),
+  ) ?? bracketConfigs[tournament.id]
 
   if (isBracketTournament(tournament)) {
     if (bracketConfig) {
@@ -626,6 +629,314 @@ function TableTab({
       </div>
     </section>
   )
+}
+
+function buildTournamentBracketConfig(tournament: Tournament, players: Member[]): BracketConfig | null {
+  const bracketPlayers = players.slice(0, effectiveBracketPlayerCount(tournament, players.length))
+  if (bracketPlayers.length < 2) return null
+
+  if (/double elimination/i.test(tournament.format)) {
+    return {
+      type: 'double',
+      title: 'Double elimination bracket',
+      brackets: buildDoubleEliminationBrackets(tournament, bracketPlayers),
+    }
+  }
+
+  if (isBracketTournament(tournament)) {
+    return {
+      type: 'single',
+      title: `${tournament.format} bracket`,
+      bracket: buildSingleEliminationBracket(tournament, bracketPlayers),
+    }
+  }
+
+  return null
+}
+
+function buildSingleEliminationBracket(
+  tournament: Tournament,
+  players: Member[],
+  options: { forceActiveRound?: number; prefix?: string } = {},
+): BracketDefinition {
+  const names = players.map((player) => player.name)
+  const counts = bracketRoundCounts(names.length)
+  const labels = counts.map((count) => prefixedRoundName(count, options.prefix))
+  const activeRound = options.forceActiveRound ?? activeBracketRoundIndex(labels, tournament)
+  const baseSize = previousPowerOfTwo(names.length)
+  const hasPlayIn = names.length !== baseSize
+  const byeCount = hasPlayIn ? Math.max(0, baseSize * 2 - names.length) : 0
+  const byeNames = names.slice(0, byeCount)
+  let current = hasPlayIn ? names.slice(byeCount) : names
+
+  const matches = labels.map((label, roundIndex) => {
+    const sourceCode = bracketRoundCode(label)
+    const complete = tournament.status === 'Completed' || (tournament.status === 'Active' && roundIndex < activeRound)
+    const live = tournament.status === 'Active' && roundIndex === activeRound
+    const roundMatches = pairNames(current).map(([a, b], matchIndex) => (
+      makeBracketMatch(a, b, {
+        complete,
+        live,
+        matchIndex,
+        next: hasPlayIn && roundIndex === 0
+          ? Math.floor((byeNames.length + matchIndex) / 2)
+          : undefined,
+      })
+    ))
+    const winners = roundMatches.map((match, matchIndex) => (
+      complete ? bracketWinner(match) : `Winner ${sourceCode}-${matchIndex + 1}`
+    ))
+
+    current = hasPlayIn && roundIndex === 0
+      ? interleaveByesAndWinners(byeNames, winners)
+      : winners
+
+    return roundMatches
+  })
+
+  return { rounds: labels, matches }
+}
+
+function buildDoubleEliminationBrackets(
+  tournament: Tournament,
+  players: Member[],
+): Record<BracketView, BracketDefinition> {
+  const winnersTournament = {
+    ...tournament,
+    round: /winner|w-/i.test(tournament.round) ? tournament.round : 'W-Final',
+  }
+  const winners = buildSingleEliminationBracket(winnersTournament, players, {
+    ...(/winner|w-/i.test(tournament.round) ? {} : { forceActiveRound: Number.POSITIVE_INFINITY }),
+    prefix: 'W-',
+  })
+  const winnerMatches = winners.matches
+  const winnerLabels = winners.rounds
+  const firstLoserPool = losersFromBracketRound(winnerMatches[0] || [], winnerLabels[0] || 'W-Round')
+  const incomingLosers = winnerMatches
+    .slice(1, -1)
+    .map((round, index) => losersFromBracketRound(round, winnerLabels[index + 1] || `W-Round ${index + 2}`))
+  const winnersFinalLoser = loserName(
+    winnerMatches[winnerMatches.length - 1]?.[0],
+    winnerLabels[winnerLabels.length - 1] || 'W-Final',
+    1,
+  )
+  const loserRounds = buildLoserBracketRounds(firstLoserPool, incomingLosers, tournament)
+  const loserChampion = loserRounds.length
+    ? winnerNameFromMatch(
+      loserRounds[loserRounds.length - 1].matches[0],
+      loserRounds[loserRounds.length - 1].round,
+      1,
+    )
+    : firstLoserPool[0] ?? 'Losers qualifier'
+  const losersFinalLive = tournament.status === 'Active' && !/grand|reset/i.test(tournament.round)
+  const losersFinal = makeBracketMatch(winnersFinalLoser, loserChampion, {
+    complete: tournament.status === 'Completed',
+    live: losersFinalLive,
+    matchIndex: 0,
+  })
+  const grandFinal = makeBracketMatch(
+    winnerNameFromMatch(winnerMatches[winnerMatches.length - 1]?.[0], 'W-Final', 1),
+    losersFinal.live || !losersFinal.w ? 'Winner L-Final' : bracketWinner(losersFinal),
+    {
+      complete: tournament.status === 'Completed',
+      live: tournament.status === 'Active' && /grand/i.test(tournament.round),
+      matchIndex: 0,
+    },
+  )
+
+  return {
+    winners,
+    losers: {
+      rounds: [...loserRounds.map((round) => round.round), 'L-Final'],
+      matches: [...loserRounds.map((round) => round.matches), [losersFinal]],
+    },
+    final: {
+      rounds: ['Grand Final', 'Reset if needed'],
+      matches: [
+        [grandFinal],
+        [{ a: 'Winner Grand Final', b: 'Reset only if needed' }],
+      ],
+    },
+  }
+}
+
+function buildLoserBracketRounds(
+  firstPool: string[],
+  incomingPools: string[][],
+  tournament: Tournament,
+) {
+  const rawRounds: Array<{ round: string; matches: BracketMatch[] }> = []
+  let pool = firstPool
+
+  const pushReduction = (preferredLive = false) => {
+    if (pool.length < 2) return
+    const pairable = pool.length % 2 === 0 ? pool : pool.slice(0, -1)
+    const carry = pool.length % 2 === 0 ? [] : [pool[pool.length - 1]]
+    const roundNumber = rawRounds.length + 1
+    const complete = tournament.status === 'Completed' || (tournament.status === 'Active' && !preferredLive)
+    const live = tournament.status === 'Active' && preferredLive
+    const matches = pairNames(pairable).map(([a, b], matchIndex) => (
+      makeBracketMatch(a, b, { complete, live, matchIndex })
+    ))
+    const winners = matches.map((match, index) => (
+      complete ? bracketWinner(match) : `Winner L${roundNumber}-${index + 1}`
+    ))
+    rawRounds.push({ round: `L-Round ${roundNumber}`, matches })
+    pool = [...winners, ...carry]
+  }
+
+  incomingPools.forEach((incoming) => {
+    pushReduction()
+    pool = [...pool, ...incoming]
+  })
+
+  while (pool.length > 1) {
+    pushReduction(false)
+  }
+
+  return rawRounds.map((round, index) => ({
+    ...round,
+    round: index === rawRounds.length - 1 && round.matches.length === 1
+      ? 'L-Semifinal'
+      : `L-Round ${index + 1}`,
+  }))
+}
+
+function bracketRoundCounts(playerCount: number) {
+  const baseSize = previousPowerOfTwo(playerCount)
+  const counts: number[] = playerCount === baseSize ? [playerCount] : [playerCount, baseSize]
+  let next = counts[counts.length - 1] / 2
+  while (next >= 2) {
+    counts.push(next)
+    next /= 2
+  }
+  return counts
+}
+
+function effectiveBracketPlayerCount(tournament: Tournament, availablePlayers: number) {
+  const declared = tournament.participants > 0
+    ? tournament.participants
+    : tournament.capacity && tournament.capacity > 0
+      ? tournament.capacity
+      : availablePlayers
+
+  return Math.max(2, Math.min(availablePlayers, declared))
+}
+
+function previousPowerOfTwo(value: number) {
+  let result = 1
+  while (result * 2 <= value) result *= 2
+  return Math.max(2, result)
+}
+
+function pairNames(names: string[]) {
+  const pairs: Array<[string, string]> = []
+  for (let index = 0; index < names.length - 1; index += 2) {
+    pairs.push([names[index], names[index + 1]])
+  }
+  return pairs
+}
+
+function interleaveByesAndWinners(byes: string[], winners: string[]) {
+  const rows: string[] = []
+  const max = Math.max(byes.length, winners.length)
+  for (let index = 0; index < max; index += 1) {
+    if (byes[index]) rows.push(byes[index])
+    if (winners[index]) rows.push(winners[index])
+  }
+  return rows
+}
+
+function makeBracketMatch(
+  a: string,
+  b: string,
+  {
+    complete,
+    live,
+    matchIndex,
+    next,
+  }: {
+    complete: boolean
+    live: boolean
+    matchIndex: number
+    next?: number
+  },
+): BracketMatch {
+  if (live) return { a, b, live: true, next }
+  if (!complete) return { a, b, next }
+
+  const winner = matchIndex % 2 === 0 ? 'a' : 'b'
+  return {
+    a,
+    b,
+    next,
+    sa: winner === 'a' ? 1 : 0,
+    sb: winner === 'b' ? 1 : 0,
+    w: winner,
+  }
+}
+
+function bracketWinner(match: BracketMatch) {
+  if (match.w === 'b') return match.b
+  return match.a
+}
+
+function bracketLoser(match: BracketMatch) {
+  if (match.w === 'b') return match.a
+  return match.b
+}
+
+function winnerNameFromMatch(match: BracketMatch | undefined, roundLabel: string, matchNumber: number) {
+  if (!match) return `Winner ${bracketRoundCode(roundLabel)}-${matchNumber}`
+  if (match.w) return bracketWinner(match)
+  return `Winner ${bracketRoundCode(roundLabel)}-${matchNumber}`
+}
+
+function loserName(match: BracketMatch | undefined, roundLabel: string, matchNumber: number) {
+  if (!match) return `Loser ${bracketRoundCode(roundLabel)}-${matchNumber}`
+  if (match.w) return bracketLoser(match)
+  return `Loser ${bracketRoundCode(roundLabel)}-${matchNumber}`
+}
+
+function losersFromBracketRound(matches: BracketMatch[], roundLabel: string) {
+  return matches.map((match, index) => loserName(match, roundLabel, index + 1))
+}
+
+function prefixedRoundName(playersInRound: number, prefix = '') {
+  return `${prefix}${bracketRoundName(playersInRound)}`
+}
+
+function bracketRoundName(playersInRound: number) {
+  if (playersInRound === 2) return 'Final'
+  if (playersInRound === 4) return 'Semifinal'
+  if (playersInRound === 8) return 'Quarterfinal'
+  return `Round of ${playersInRound}`
+}
+
+function bracketRoundCode(label: string) {
+  if (/final/i.test(label) && !/semi/i.test(label)) return 'F'
+  if (/semifinal/i.test(label)) return 'SF'
+  if (/quarterfinal/i.test(label)) return 'QF'
+  const count = /round of\s*(\d+)/i.exec(label)?.[1]
+  return count ? `R${count}` : label.replace(/[^A-Za-z0-9]+/g, '').slice(0, 6) || 'R'
+}
+
+function activeBracketRoundIndex(labels: string[], tournament: Tournament) {
+  if (tournament.status === 'Completed') return labels.length
+  if (tournament.status !== 'Active') return 0
+
+  const round = tournament.round.toLowerCase()
+  const parsed = labels.findIndex((label) => {
+    const lower = label.toLowerCase()
+    if (round.includes('final') && lower.includes('final') && !lower.includes('semi')) return true
+    if (round.includes('semi') && lower.includes('semi')) return true
+    if (round.includes('quarter') && lower.includes('quarter')) return true
+    const count = /round of\s*(\d+)/i.exec(lower)?.[1]
+    return Boolean(count && round.includes(count))
+  })
+
+  if (parsed >= 0) return parsed
+  return Math.max(0, Math.min(labels.length - 1, labels.length - 2))
 }
 
 function BracketPanel({
@@ -719,8 +1030,8 @@ function BracketPanel({
         {bracketConfig.type === 'double' ? (
           <div className="bracket-switch" aria-label="Double elimination bracket view">
             {[
-              ['winners', 'Winners Bracket'],
-              ['losers', 'Losers Bracket'],
+              ['winners', 'Winners'],
+              ['losers', 'Losers'],
               ['final', 'Final'],
             ].map(([view, label]) => (
               <button

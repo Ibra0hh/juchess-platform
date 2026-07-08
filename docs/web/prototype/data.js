@@ -247,8 +247,8 @@
     },
     {
       id: 'double-elimination', name: 'Double elimination', format: 'Double elimination', status: 'Active',
-      timeControl: '5+3 Blitz', date: 'Jun 26 \u2013 Jul 5, 2026', location: 'Hall A', participants: 16,
-      round: 'Losers Final', desc: 'Sixteen blitz players, two lives each. Lose once, drop to the losers bracket; lose twice, you\u2019re out.',
+      timeControl: '5+3 Blitz', date: 'Jun 26 \u2013 Jul 5, 2026', location: 'Hall A', participants: 12,
+      round: 'Losers Final', desc: 'Twelve blitz players, two lives each. Lose once, drop to the losers bracket; lose twice, you\u2019re out.',
       winners: {
         rounds: ['W-Round of 16', 'W-Quarterfinal', 'W-Semifinal', 'W-Final'],
         matches: [

@@ -122,11 +122,15 @@ type ProcedureSlot = {
   nextMatch?: ProcedureMatch
 }
 
-const DEFAULT_KNOCKOUT_BRACKET_SIZE = 16
+type BracketEntrant = {
+  name: string
+  rating: number | string
+}
+
 const EMPTY_LIVE_BOARD_STATE: LiveBoardState = { moves: [], result: 'Live' }
 const adminBracketViews: Array<[AdminBracketView, string]> = [
-  ['winners', 'Winners Bracket'],
-  ['losers', 'Losers Bracket'],
+  ['winners', 'Winners'],
+  ['losers', 'Losers'],
   ['final', 'Final'],
 ]
 
@@ -146,7 +150,7 @@ const formatOptions = [
   { value: 'Round robin', icon: '◍', layout: 'Standings + schedule' },
   { value: 'Double round robin', icon: '◎', layout: 'Double cycle standings' },
   { value: 'Single elimination', icon: '▲', layout: 'Bracket only' },
-  { value: 'Double elimination', icon: '⧗', layout: 'Winners + losers bracket' },
+  { value: 'Double elimination', icon: '⧗', layout: 'Winners / Losers / Final' },
   { value: 'League', icon: '▤', layout: 'League table + fixtures' },
   { value: 'Team', icon: '⚑', layout: 'Team boards + match points' },
   { value: 'Arena', icon: '⚡', layout: 'Leaderboard + streaks' },
@@ -1499,13 +1503,12 @@ function TournamentManageView({
   const [selectedBoardKey, setSelectedBoardKey] = useState('')
   const [physicalBoards, setPhysicalBoards] = useState(3)
   const liveBoardRef = useRef<HTMLElement | null>(null)
-  const bracketMatchCount = knockout ? getBracketMatchCount(tournament) : undefined
   const bracketPhase = getBracketPhase(tournament)
-  const tournamentPlayers = useMemo(() => buildTournamentPlayers(shuffleSeed), [shuffleSeed])
-  const pairings = useMemo(() => buildPairings(tournamentPlayers, bracketMatchCount), [bracketMatchCount, tournamentPlayers])
+  const tournamentPlayers = useMemo(() => buildTournamentPlayers(tournament, shuffleSeed), [shuffleSeed, tournament])
+  const pairings = useMemo(() => buildPairings(tournamentPlayers), [tournamentPlayers])
   const bracketConfig = useMemo(() => (
-    knockout ? buildAdminBracketConfig(tournament, pairings, bracketPhase) : null
-  ), [bracketPhase, knockout, pairings, tournament])
+    knockout ? buildAdminBracketConfig(tournament, tournamentPlayers, bracketPhase) : null
+  ), [bracketPhase, knockout, tournament, tournamentPlayers])
   const activeBracketRounds = bracketConfig?.type === 'double'
     ? bracketConfig.brackets[bracketView]
     : bracketConfig?.rounds ?? []
@@ -2807,10 +2810,21 @@ function isDoubleEliminationTournament(item: AdminTournament) {
   return /double elimination/i.test(item.format)
 }
 
-function buildTournamentPlayers(seed: number) {
-  const players = demoPlayers.slice(0, 16)
+function buildTournamentPlayers(tournament: AdminTournament, seed: number) {
+  const count = effectiveAdminPlayerCount(tournament)
+  const players = demoPlayers.slice(0, count)
   if (!seed) return players
   return seededShuffle(players, seed)
+}
+
+function effectiveAdminPlayerCount(tournament: AdminTournament) {
+  const declared = tournament.players > 0
+    ? tournament.players
+    : tournament.capacity && tournament.capacity > 0
+      ? tournament.capacity
+      : demoPlayers.length
+
+  return Math.max(2, Math.min(demoPlayers.length, declared))
 }
 
 function seededShuffle<T>(items: T[], seed: number) {
@@ -2828,9 +2842,9 @@ function seededShuffle<T>(items: T[], seed: number) {
   return result
 }
 
-function buildPairings(players: Player[], targetMatchCount?: number): Pairing[] {
+function buildPairings(players: Player[]): Pairing[] {
   const half = Math.ceil(players.length / 2)
-  const pairings: Pairing[] = players.slice(0, half).map((player, index) => {
+  return players.slice(0, half).map((player, index) => {
     const opponent = players[index + half]
     return {
       board: index + 1,
@@ -2840,20 +2854,6 @@ function buildPairings(players: Player[], targetMatchCount?: number): Pairing[] 
       blackRating: opponent?.rating ?? '-',
     }
   })
-
-  const matchCount = Math.max(pairings.length, targetMatchCount ?? pairings.length)
-  while (pairings.length < matchCount) {
-    const board = pairings.length + 1
-    pairings.push({
-      board,
-      white: `Open seed ${board * 2 - 1}`,
-      whiteRating: '-',
-      black: `Open seed ${board * 2}`,
-      blackRating: '-',
-    })
-  }
-
-  return pairings.slice(0, matchCount)
 }
 
 function buildPlayableBoardsFromPairings(pairings: Pairing[]): PlayableBoard[] {
@@ -2926,20 +2926,6 @@ function buildProcedurePlan(matches: ProcedureMatch[], boardCount: number): Proc
   ))
 }
 
-function getBracketMatchCount(tournament: AdminTournament) {
-  const capacity = typeof tournament.capacity === 'number' && Number.isFinite(tournament.capacity) && tournament.capacity > 0
-    ? tournament.capacity
-    : DEFAULT_KNOCKOUT_BRACKET_SIZE
-  const bracketSize = Math.max(2, nextPowerOfTwo(capacity))
-  return Math.floor(bracketSize / 2)
-}
-
-function nextPowerOfTwo(value: number) {
-  let result = 1
-  while (result < value) result *= 2
-  return result
-}
-
 function getBracketPhase(tournament: AdminTournament): AdminBracketPhase {
   if (tournament.status === 'active') return 'active'
   if (tournament.status === 'completed') return 'completed'
@@ -2948,21 +2934,21 @@ function getBracketPhase(tournament: AdminTournament): AdminBracketPhase {
 
 function buildAdminBracketConfig(
   tournament: AdminTournament,
-  pairings: Pairing[],
+  players: Player[],
   phase: AdminBracketPhase,
 ): AdminBracketConfig {
   if (isDoubleEliminationTournament(tournament)) {
     return {
       type: 'double',
       title: 'Double elimination bracket',
-      brackets: buildAdminDoubleEliminationBrackets(pairings, phase),
+      brackets: buildAdminDoubleEliminationBrackets(tournament, players, phase),
     }
   }
 
   return {
     type: 'single',
     title: `${tournament.format} bracket`,
-    rounds: buildAdminBracketRounds(pairings, phase),
+    rounds: buildAdminSingleEliminationRounds(tournament, players, phase),
   }
 }
 
@@ -2976,143 +2962,225 @@ function getAllAdminBracketRounds(config: AdminBracketConfig) {
 }
 
 function buildAdminDoubleEliminationBrackets(
-  pairings: Pairing[],
+  tournament: AdminTournament,
+  players: Player[],
   phase: AdminBracketPhase,
 ): Record<AdminBracketView, AdminBracketRound[]> {
-  const roundOf16 = pairings.map((pairing, index) => (
-    buildBracketMatchForPhase(pairing, phase, index % 2 === 0 ? 'white' : 'black')
-  ))
-  const quarterfinalPairings = pairMatchesFromNames(winnersFrom(roundOf16, 'R16'))
-  const quarterfinals = quarterfinalPairings.map((pairing, index) => (
-    buildBracketMatchForPhase(pairing, phase, index === 3 ? 'black' : 'white')
-  ))
-  const semifinalPairings = pairMatchesFromNames(winnersFrom(quarterfinals, 'WQF'))
-  const semifinals = semifinalPairings.map((pairing) => buildBracketMatchForPhase(pairing, phase, 'white'))
-  const winnersFinal = [
-    buildBracketMatchForPhase(
-      makeBracketPairing(
-        bracketAdvancementName(semifinals[0], 'winner', 'WSF', 1),
-        bracketAdvancementName(semifinals[1], 'winner', 'WSF', 2),
-        1,
-      ),
-      phase,
-      'white',
+  const winnersPhase = phase === 'active' && !/winner|w-/i.test(tournament.round)
+    ? 'completed'
+    : phase
+  const winnersForceRound = phase === 'active' && !/winner|w-/i.test(tournament.round)
+    ? Number.POSITIVE_INFINITY
+    : undefined
+  const winners = buildAdminSingleEliminationRounds(tournament, players, winnersPhase, {
+    forceActiveRound: winnersForceRound,
+    prefix: 'W-',
+  })
+  const firstLoserPool = adminLosersFromRound(winners[0], 'W-Round')
+  const incomingLosers = winners
+    .slice(1, -1)
+    .map((round) => adminLosersFromRound(round, round.name))
+  const loserRounds = buildAdminLoserRounds(firstLoserPool, incomingLosers, phase)
+  const winnersFinal = winners[winners.length - 1]
+  const winnersFinalMatch = winnersFinal?.matches[0]
+  const loserFinalOpponent = loserRounds.length
+    ? adminWinnerName(loserRounds[loserRounds.length - 1].matches[0], loserRounds[loserRounds.length - 1].name, 1)
+    : firstLoserPool[0] ?? 'Losers qualifier'
+  const loserFinalPairing = makeBracketPairing(
+    adminLoserName(winnersFinalMatch, winnersFinal?.name ?? 'W-Final', 1),
+    loserFinalOpponent,
+    1,
+  )
+  const loserFinal = buildBracketMatchForPhase(
+    loserFinalPairing,
+    phase === 'active' || phase === 'completed' ? phase : 'setup',
+    'white',
+    phase === 'active' && !/grand|reset/i.test(tournament.round),
+  )
+  const grandFinal = buildBracketMatchForPhase(
+    makeBracketPairing(
+      adminWinnerName(winnersFinalMatch, winnersFinal?.name ?? 'W-Final', 1),
+      loserFinal.winner ? adminWinnerName(loserFinal, 'L-Final', 1) : 'Winner L-Final',
+      1,
     ),
-  ]
-
-  const loserRound1Pairings = pairMatchesFromNames(losersFrom(roundOf16, 'R16'), [0, 1, 2, 3])
-  const loserRound1 = loserRound1Pairings.map((pairing) => buildBracketMatchForPhase(pairing, phase, 'white'))
-  const loserRound2 = winnersFrom(loserRound1, 'L1').map((winner, index) => (
-    buildBracketMatchForPhase(
-      makeBracketPairing(
-        bracketAdvancementName(quarterfinals[index], 'loser', 'WQF', index + 1),
-        winner,
-        index + 1,
-      ),
-      phase,
-      'white',
-    )
-  ))
-  const loserRound3Pairings = pairMatchesFromNames(winnersFrom(loserRound2, 'L2'), [0, 1])
-  const loserRound3 = loserRound3Pairings.map((pairing) => buildBracketMatchForPhase(pairing, phase, 'white'))
-  const loserRound4 = winnersFrom(loserRound3, 'L3').map((winner, index) => (
-    buildBracketMatchForPhase(
-      makeBracketPairing(
-        bracketAdvancementName(semifinals[index], 'loser', 'WSF', index + 1),
-        winner,
-        index + 1,
-      ),
-      phase,
-      'black',
-    )
-  ))
-  const loserSemifinal = [
-    buildBracketMatchForPhase(
-      makeBracketPairing(
-        bracketAdvancementName(loserRound4[0], 'winner', 'L4', 1),
-        bracketAdvancementName(loserRound4[1], 'winner', 'L4', 2),
-        1,
-      ),
-      phase,
-      'white',
-    ),
-  ]
-  const loserFinal = [
-    buildBracketMatchForPhase(
-      makeBracketPairing(
-        bracketAdvancementName(winnersFinal[0], 'loser', 'WF', 1),
-        bracketAdvancementName(loserSemifinal[0], 'winner', 'LSF', 1),
-        1,
-      ),
-      phase,
-      'white',
-      phase === 'active',
-    ),
-  ]
-  const grandFinal = [
-    buildBracketMatchForPhase(
-      makeBracketPairing(
-        bracketAdvancementName(winnersFinal[0], 'winner', 'WF', 1),
-        bracketAdvancementName(loserFinal[0], 'winner', 'LF', 1),
-        1,
-      ),
-      phase === 'completed' ? phase : 'setup',
-      'white',
-    ),
-  ]
-  const resetFinal = [
-    buildOpenMatch(makeBracketPairing('Winner Grand Final', 'Reset only if needed', 1)),
-  ]
+    phase === 'completed' || (phase === 'active' && /grand/i.test(tournament.round)) ? phase : 'setup',
+    'white',
+    phase === 'active' && /grand/i.test(tournament.round),
+  )
 
   return {
-    winners: [
-      { name: 'W-Round of 16', matches: roundOf16 },
-      { name: 'W-Quarterfinal', matches: quarterfinals },
-      { name: 'W-Semifinal', matches: semifinals },
-      { name: 'W-Final', matches: winnersFinal },
-    ],
+    winners,
     losers: [
-      { name: 'L-Round 1', matches: loserRound1 },
-      { name: 'L-Round 2', matches: loserRound2 },
-      { name: 'L-Round 3', matches: loserRound3 },
-      { name: 'L-Round 4', matches: loserRound4 },
-      { name: 'L-Semifinal', matches: loserSemifinal },
-      { name: 'L-Final', matches: loserFinal },
+      ...loserRounds,
+      { name: 'L-Final', matches: [loserFinal] },
     ],
     final: [
-      { name: 'Grand Final', matches: grandFinal },
-      { name: 'Reset if needed', matches: resetFinal },
+      { name: 'Grand Final', matches: [grandFinal] },
+      { name: 'Reset if needed', matches: [buildOpenMatch(makeBracketPairing('Winner Grand Final', 'Reset only if needed', 1))] },
     ],
   }
 }
 
-function buildAdminBracketRounds(pairings: Pairing[], phase: AdminBracketPhase): AdminBracketRound[] {
-  const firstRound: AdminBracketMatch[] = pairings.map((pairing, index) => (
-    phase === 'setup' || !hasKnownPlayers(pairing)
-      ? buildOpenMatch(pairing)
-      : buildCompletedMatch(pairing, index % 2 === 0 ? 'white' : 'black')
-  ))
-  const rounds: AdminBracketRound[] = [
-    { name: bracketRoundName(firstRound.length * 2), matches: firstRound },
-  ]
-  let currentRound = firstRound
-  let sourceLabel = bracketRoundCode(currentRound.length * 2)
+function buildAdminSingleEliminationRounds(
+  tournament: AdminTournament,
+  players: Player[],
+  phase: AdminBracketPhase,
+  options: { forceActiveRound?: number; prefix?: string } = {},
+): AdminBracketRound[] {
+  const entrants: BracketEntrant[] = players.map((player) => ({ name: player.name, rating: player.rating }))
+  const counts = bracketRoundCounts(entrants.length)
+  const labels = counts.map((count) => `${options.prefix ?? ''}${bracketRoundName(count)}`)
+  const activeRound = options.forceActiveRound ?? activeAdminBracketRoundIndex(labels, tournament, phase)
+  const baseSize = previousPowerOfTwo(entrants.length)
+  const hasPlayIn = entrants.length !== baseSize
+  const byeCount = hasPlayIn ? Math.max(0, baseSize * 2 - entrants.length) : 0
+  const byes = entrants.slice(0, byeCount)
+  let current = hasPlayIn ? entrants.slice(byeCount) : entrants
 
-  while (currentRound.length > 1) {
-    const matchCount = Math.ceil(currentRound.length / 2)
-    const nextRound = buildDerivedBracketMatches({
-      activeBoards: phase === 'active' && rounds.length === 1 ? 2 : 0,
-      complete: phase === 'completed',
-      count: matchCount,
-      source: currentRound,
-      sourceLabel,
+  return labels.map((name, roundIndex) => {
+    const complete = phase === 'completed' || (phase === 'active' && roundIndex < activeRound)
+    const live = phase === 'active' && roundIndex === activeRound
+    const matches = pairEntrants(current).map(([white, black], matchIndex) => {
+      const next = hasPlayIn && roundIndex === 0
+        ? Math.floor((byeCount + matchIndex) / 2)
+        : undefined
+      return buildBracketMatchForPhase(
+        makeBracketPairing(white.name, black.name, matchIndex + 1, next, white.rating, black.rating),
+        complete ? 'completed' : live ? 'active' : 'setup',
+        matchIndex % 2 === 0 ? 'white' : 'black',
+        live,
+      )
     })
-    rounds.push({ name: bracketRoundName(matchCount * 2), matches: nextRound })
-    currentRound = nextRound
-    sourceLabel = bracketRoundCode(matchCount * 2)
+    const winners: BracketEntrant[] = matches.map((match, index) => ({
+      name: match.winner ? adminWinnerName(match, name, index + 1) : `Winner ${bracketRoundCodeFromName(name)}-${index + 1}`,
+      rating: '',
+    }))
+    current = hasPlayIn && roundIndex === 0
+      ? interleaveEntrants(byes, winners)
+      : winners
+
+    return { name, matches }
+  })
+}
+
+function bracketRoundCounts(playerCount: number) {
+  const baseSize = previousPowerOfTwo(playerCount)
+  const counts = playerCount === baseSize ? [playerCount] : [playerCount, baseSize]
+  let next = counts[counts.length - 1] / 2
+  while (next >= 2) {
+    counts.push(next)
+    next /= 2
+  }
+  return counts
+}
+
+function previousPowerOfTwo(value: number) {
+  let result = 1
+  while (result * 2 <= value) result *= 2
+  return Math.max(2, result)
+}
+
+function pairEntrants<T>(entrants: T[]) {
+  const pairs: Array<[T, T]> = []
+  for (let index = 0; index < entrants.length - 1; index += 2) {
+    pairs.push([entrants[index], entrants[index + 1]])
+  }
+  return pairs
+}
+
+function interleaveEntrants<T>(byes: T[], winners: T[]) {
+  const rows: T[] = []
+  const max = Math.max(byes.length, winners.length)
+  for (let index = 0; index < max; index += 1) {
+    if (byes[index]) rows.push(byes[index])
+    if (winners[index]) rows.push(winners[index])
+  }
+  return rows
+}
+
+function activeAdminBracketRoundIndex(
+  labels: string[],
+  tournament: AdminTournament,
+  phase: AdminBracketPhase,
+) {
+  if (phase === 'completed') return labels.length
+  if (phase !== 'active') return 0
+
+  const current = tournament.round.toLowerCase()
+  const parsed = labels.findIndex((label) => {
+    const lower = label.toLowerCase()
+    if (current.includes('final') && lower.includes('final') && !lower.includes('semi')) return true
+    if (current.includes('semi') && lower.includes('semi')) return true
+    if (current.includes('quarter') && lower.includes('quarter')) return true
+    const count = /round of\s*(\d+)/i.exec(lower)?.[1]
+    return Boolean(count && current.includes(count))
+  })
+
+  if (parsed >= 0) return parsed
+  return Math.max(0, Math.min(labels.length - 1, labels.length - 2))
+}
+
+function adminLosersFromRound(round: AdminBracketRound | undefined, sourceLabel: string) {
+  return (round?.matches ?? []).map((match, index) => adminLoserName(match, sourceLabel, index + 1))
+}
+
+function buildAdminLoserRounds(
+  firstPool: string[],
+  incomingPools: string[][],
+  phase: AdminBracketPhase,
+): AdminBracketRound[] {
+  const rounds: AdminBracketRound[] = []
+  let pool = firstPool
+
+  const reducePool = () => {
+    if (pool.length < 2) return
+    const pairable = pool.length % 2 === 0 ? pool : pool.slice(0, -1)
+    const carry = pool.length % 2 === 0 ? [] : [pool[pool.length - 1]]
+    const roundNumber = rounds.length + 1
+    const complete = phase === 'active' || phase === 'completed'
+    const matches = pairEntrants(pairable).map(([white, black], index) => (
+      buildBracketMatchForPhase(
+        makeBracketPairing(white, black, index + 1),
+        complete ? 'completed' : 'setup',
+        index % 2 === 0 ? 'white' : 'black',
+      )
+    ))
+    const winners = matches.map((match, index) => (
+      match.winner ? adminWinnerName(match, `L${roundNumber}`, index + 1) : `Winner L${roundNumber}-${index + 1}`
+    ))
+    rounds.push({ name: `L-Round ${roundNumber}`, matches })
+    pool = [...winners, ...carry]
   }
 
-  return rounds
+  incomingPools.forEach((incoming) => {
+    reducePool()
+    pool = [...pool, ...incoming]
+  })
+
+  while (pool.length > 1) {
+    reducePool()
+  }
+
+  return rounds.map((round, index) => ({
+    ...round,
+    name: index === rounds.length - 1 && round.matches.length === 1
+      ? 'L-Semifinal'
+      : `L-Round ${index + 1}`,
+  }))
+}
+
+function adminWinnerName(match: AdminBracketMatch | undefined, sourceLabel: string, matchNumber: number) {
+  if (!match) return `Winner ${bracketRoundCodeFromName(sourceLabel)}-${matchNumber}`
+  if (match.winner === 'white') return match.white
+  if (match.winner === 'black') return match.black
+  return `Winner ${bracketRoundCodeFromName(sourceLabel)}-${matchNumber}`
+}
+
+function adminLoserName(match: AdminBracketMatch | undefined, sourceLabel: string, matchNumber: number) {
+  if (!match) return `Loser ${bracketRoundCodeFromName(sourceLabel)}-${matchNumber}`
+  if (match.winner === 'white') return match.black
+  if (match.winner === 'black') return match.white
+  return `Loser ${bracketRoundCodeFromName(sourceLabel)}-${matchNumber}`
 }
 
 function buildBracketMatchForPhase(
@@ -3126,48 +3194,23 @@ function buildBracketMatchForPhase(
   return buildCompletedMatch(pairing, winner)
 }
 
-function pairMatchesFromNames(names: string[], nextIndexes?: number[]) {
-  const pairings: Pairing[] = []
-  for (let index = 0; index < names.length; index += 2) {
-    pairings.push(makeBracketPairing(
-      names[index] ?? `Open seed ${index + 1}`,
-      names[index + 1] ?? `Open seed ${index + 2}`,
-      pairings.length + 1,
-      nextIndexes?.[pairings.length],
-    ))
-  }
-  return pairings
-}
-
-function makeBracketPairing(white: string, black: string, board: number, next?: number): Pairing {
-  return {
+function makeBracketPairing(
+  white: string,
+  black: string,
+  board: number,
+  next?: number,
+  whiteRating: number | string = '',
+  blackRating: number | string = '',
+): Pairing {
+  const pairing: Pairing = {
     black,
-    blackRating: '',
+    blackRating,
     board,
-    next,
     white,
-    whiteRating: '',
+    whiteRating,
   }
-}
-
-function winnersFrom(matches: AdminBracketMatch[], sourceLabel: string) {
-  return matches.map((match, index) => bracketAdvancementName(match, 'winner', sourceLabel, index + 1))
-}
-
-function losersFrom(matches: AdminBracketMatch[], sourceLabel: string) {
-  return matches.map((match, index) => bracketAdvancementName(match, 'loser', sourceLabel, index + 1))
-}
-
-function bracketAdvancementName(
-  match: AdminBracketMatch | undefined,
-  direction: 'winner' | 'loser',
-  sourceLabel: string,
-  matchNumber: number,
-) {
-  const fallback = `${direction === 'winner' ? 'Winner' : 'Loser'} ${sourceLabel}-${matchNumber}`
-  if (!match?.winner) return fallback
-  if (direction === 'winner') return match.winner === 'white' ? match.white : match.black
-  return match.winner === 'white' ? match.black : match.white
+  if (next !== undefined) pairing.next = next
+  return pairing
 }
 
 function buildOpenMatch(pairing: Pairing): AdminBracketMatch {
@@ -3199,46 +3242,6 @@ function buildLiveMatch(pairing: Pairing): AdminBracketMatch {
   }
 }
 
-function buildDerivedBracketMatches({
-  activeBoards,
-  complete,
-  count,
-  source,
-  sourceLabel,
-}: {
-  activeBoards: number
-  complete: boolean
-  count: number
-  source: AdminBracketMatch[]
-  sourceLabel: string
-}): AdminBracketMatch[] {
-  return Array.from({ length: count }, (_, index) => {
-    const a = source[index * 2]
-    const b = source[index * 2 + 1]
-    const pairing = {
-      board: index + 1,
-      white: advancerName(a, sourceLabel, index * 2 + 1),
-      whiteRating: '',
-      black: advancerName(b, sourceLabel, index * 2 + 2),
-      blackRating: '',
-    }
-
-    if (complete && hasKnownPlayers(pairing)) return buildCompletedMatch(pairing, index % 2 === 0 ? 'white' : 'black')
-    if (index < activeBoards && hasKnownPlayers(pairing)) return buildLiveMatch(pairing)
-    return {
-      ...buildOpenMatch(pairing),
-      pending: !hasKnownPlayers(pairing),
-    }
-  })
-}
-
-function advancerName(match: AdminBracketMatch | undefined, sourceLabel: string, matchNumber: number) {
-  if (!match) return `Winner ${sourceLabel}-${matchNumber}`
-  if (match.winner === 'white') return match.white
-  if (match.winner === 'black') return match.black
-  return `Winner ${sourceLabel}-${matchNumber}`
-}
-
 function hasKnownPlayers(pairing: Pairing) {
   return isKnownBracketPlayer(pairing.white) && isKnownBracketPlayer(pairing.black)
 }
@@ -3252,7 +3255,6 @@ function isKnownBracketPlayer(name: string) {
     name !== 'TBD'
     && !name.startsWith('Winner ')
     && !name.startsWith('Loser ')
-    && !name.startsWith('Open seed ')
     && !name.startsWith('Reset ')
   )
 }
@@ -3268,11 +3270,15 @@ function bracketRoundName(playersInRound: number) {
   return `Round of ${playersInRound}`
 }
 
-function bracketRoundCode(playersInRound: number) {
-  if (playersInRound === 2) return 'F'
-  if (playersInRound === 4) return 'SF'
-  if (playersInRound === 8) return 'QF'
-  return `R${playersInRound}`
+function bracketRoundCodeFromName(label: string) {
+  if (/final/i.test(label) && !/semi/i.test(label)) return 'F'
+  if (/semifinal/i.test(label)) return 'SF'
+  if (/quarterfinal/i.test(label)) return 'QF'
+  const count = /round of\s*(\d+)/i.exec(label)?.[1]
+  if (count) return `R${count}`
+  const loserRound = /l-round\s*(\d+)/i.exec(label)?.[1]
+  if (loserRound) return `L${loserRound}`
+  return label.replace(/[^A-Za-z0-9]+/g, '').slice(0, 6) || 'R'
 }
 
 function buildBracketRoundKey(rounds: AdminBracketRound[]) {
