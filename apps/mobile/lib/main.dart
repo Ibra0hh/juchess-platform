@@ -687,7 +687,15 @@ PublishedBracketSnapshot? parsePublishedBracketSnapshot(String? value) {
       final brackets = parsed['brackets'];
       if (brackets is! Map<String, dynamic>) return null;
       final winners = _snapshotRounds(brackets['winners']);
-      final losers = _snapshotRounds(brackets['losers']);
+      final losers = _normalizeLowerBracketRounds(
+        _snapshotRounds(brackets['losers']),
+        preferredLabels: _lowerBracketRoundLabelsFromWinnerRounds([
+          for (final round in winners) round.label,
+        ]),
+        firstWinnerRoundCode: winners.isNotEmpty
+            ? _bracketRoundCode(winners.first.label)
+            : null,
+      );
       final finalRounds = _snapshotRounds(brackets['final']);
       if (winners.isEmpty && losers.isEmpty && finalRounds.isEmpty) {
         return null;
@@ -7387,7 +7395,7 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
   );
   final firstLoserPool = _losersFromRound(
     winners.isNotEmpty ? winners.first : null,
-    'W-Round',
+    winners.isNotEmpty ? winners.first.label : 'W-Round',
   );
   final incomingLosers = winners.length > 2
       ? winners
@@ -7395,7 +7403,14 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
             .map((round) => _losersFromRound(round, round.label))
             .toList()
       : <List<String>>[];
-  final loserRounds = _buildLoserRounds(firstLoserPool, incomingLosers, event);
+  final loserRounds = _buildLoserRounds(
+    firstLoserPool,
+    incomingLosers,
+    event,
+    _lowerBracketRoundLabelsFromWinnerRounds([
+      for (final round in winners) round.label,
+    ]),
+  );
   final winnersFinal = winners.isNotEmpty ? winners.last : null;
   final winnersFinalMatch = winnersFinal?.games.isNotEmpty == true
       ? winnersFinal!.games.first
@@ -7413,7 +7428,9 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
   );
   final grandFinal = MatchSeed(
     _matchWinner(winnersFinalMatch, winnersFinal?.label ?? 'W-Final', 1),
-    loserFinal.result == 'live' ? 'Winner L-Final' : _matchWinner(loserFinal),
+    loserFinal.result == 'live'
+        ? 'Winner Losers Final'
+        : _matchWinner(loserFinal, 'Final', 1),
     event.status == 'completed' ? '1-0' : '-',
   );
 
@@ -7421,7 +7438,7 @@ DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
     winners: winners,
     losers: [
       ...loserRounds,
-      RoundSeed('L-Final', [loserFinal]),
+      RoundSeed('Final', [loserFinal]),
     ],
     finalRounds: [
       RoundSeed('Grand Final', [grandFinal]),
@@ -7501,14 +7518,19 @@ String _bracketRoundName(int playersInRound) {
 
 String _bracketRoundCode(String label) {
   final lower = label.toLowerCase();
-  if (lower.contains('final') && !lower.contains('semi')) return 'F';
-  if (lower.contains('semifinal')) return 'SF';
-  if (lower.contains('quarterfinal')) return 'QF';
+  final qualifier = lower.contains('qualifier');
+  if (lower.contains('quarterfinal')) return qualifier ? 'QFQ' : 'QF';
+  if (lower.contains('semifinal')) return qualifier ? 'SFQ' : 'SF';
+  if (lower.contains('final')) {
+    return qualifier ? 'FQ' : 'F';
+  }
   final roundMatch = RegExp(
     r'round of\s*(\d+)',
     caseSensitive: false,
   ).firstMatch(label);
-  if (roundMatch != null) return 'R${roundMatch.group(1)}';
+  if (roundMatch != null) {
+    return qualifier ? 'R${roundMatch.group(1)}Q' : 'R${roundMatch.group(1)}';
+  }
   final loserMatch = RegExp(
     r'l-round\s*(\d+)',
     caseSensitive: false,
@@ -7563,6 +7585,7 @@ List<RoundSeed> _buildLoserRounds(
   List<String> firstPool,
   List<List<String>> incomingPools,
   TournamentSeed event,
+  List<String> lowerRoundLabels,
 ) {
   final rounds = <RoundSeed>[];
   var pool = [...firstPool];
@@ -7635,15 +7658,198 @@ List<RoundSeed> _buildLoserRounds(
     reducePool();
   }
 
+  return _normalizeLowerBracketRounds(
+    rounds,
+    preferredLabels: lowerRoundLabels,
+  );
+}
+
+List<RoundSeed> _normalizeLowerBracketRounds(
+  List<RoundSeed> rounds, {
+  List<String> preferredLabels = const [],
+  String? firstWinnerRoundCode,
+}) {
+  final fallbackLabels = _lowerBracketRoundLabels(
+    [for (final round in rounds) round.games.length],
+    includesFinalRound: _isLowerBracketFinalRound(
+      rounds.isEmpty ? null : rounds.last.label,
+    ),
+  );
+  final includesFinalRound = _isLowerBracketFinalRound(
+    rounds.isEmpty ? null : rounds.last.label,
+  );
+  final labels = [
+    for (var i = 0; i < rounds.length; i++)
+      if (includesFinalRound && i == rounds.length - 1)
+        'Final'
+      else if (i < preferredLabels.length)
+        preferredLabels[i]
+      else if (i < fallbackLabels.length)
+        fallbackLabels[i]
+      else
+        rounds[i].label,
+  ];
+  final rawToLabel = {
+    for (var i = 0; i < labels.length; i++) 'L${i + 1}': labels[i],
+  };
+  final codeToIndex = {
+    for (var i = 0; i < labels.length; i++)
+      _bracketRoundCode(labels[i]).toUpperCase(): i,
+  };
+  final lastRoundIndex = rounds.length - 1;
+
   return [
     for (var i = 0; i < rounds.length; i++)
-      RoundSeed(
-        i == rounds.length - 1 && rounds[i].games.length == 1
-            ? 'L-Semifinal'
-            : 'L-Round ${i + 1}',
-        rounds[i].games,
+      RoundSeed(labels[i], [
+        for (final match in rounds[i].games)
+          _rewriteLowerBracketMatch(
+            match,
+            rawToLabel,
+            finalFeed: i == lastRoundIndex,
+            firstWinnerRoundCode: firstWinnerRoundCode,
+            roundIndex: i,
+            labels: labels,
+            codeToIndex: codeToIndex,
+          ),
+      ]),
+  ];
+}
+
+MatchSeed _rewriteLowerBracketMatch(
+  MatchSeed match,
+  Map<String, String> rawToLabel, {
+  required bool finalFeed,
+  String? firstWinnerRoundCode,
+  required int roundIndex,
+  required List<String> labels,
+  required Map<String, int> codeToIndex,
+}) {
+  return MatchSeed(
+    _rewriteLowerBracketPlaceholder(
+      match.white,
+      rawToLabel,
+      firstWinnerRoundCode: firstWinnerRoundCode,
+      roundIndex: roundIndex,
+      labels: labels,
+      codeToIndex: codeToIndex,
+    ),
+    _rewriteLowerBracketPlaceholder(
+      match.black,
+      rawToLabel,
+      firstWinnerRoundCode: firstWinnerRoundCode,
+      roundIndex: roundIndex,
+      labels: labels,
+      codeToIndex: codeToIndex,
+    ),
+    match.result,
+    nextIndex: finalFeed ? 0 : match.nextIndex,
+  );
+}
+
+String _rewriteLowerBracketPlaceholder(
+  String value,
+  Map<String, String> rawToLabel, {
+  String? firstWinnerRoundCode,
+  required int roundIndex,
+  required List<String> labels,
+  required Map<String, int> codeToIndex,
+}) {
+  final winnerMatch = RegExp(
+    r'^Winner L(\d+)-(\d+)$',
+    caseSensitive: false,
+  ).firstMatch(value);
+  var rewritten = value;
+  if (winnerMatch != null) {
+    final label = rawToLabel['L${winnerMatch.group(1)}'];
+    rewritten = label == null
+        ? value
+        : 'Winner ${_bracketRoundCode(label)}-${winnerMatch.group(2)}';
+  } else {
+    final genericWinnerDrop = RegExp(
+      r'^Loser WRound-(\d+)$',
+      caseSensitive: false,
+    ).firstMatch(value);
+    if (genericWinnerDrop != null && firstWinnerRoundCode != null) {
+      rewritten = 'Loser $firstWinnerRoundCode-${genericWinnerDrop.group(1)}';
+    }
+  }
+
+  final stageWinner = RegExp(
+    r'^Winner ([A-Z0-9]+)-(\d+)$',
+    caseSensitive: false,
+  ).firstMatch(rewritten);
+  if (stageWinner == null || roundIndex < 1) return rewritten;
+
+  final sourceCode = stageWinner.group(1)!.toUpperCase();
+  final sourceIndex = codeToIndex[sourceCode];
+  final pointsToFutureStage = sourceIndex == null
+      ? RegExp(r'^(?:FQ|F)$').hasMatch(sourceCode)
+      : sourceIndex >= roundIndex;
+  if (!pointsToFutureStage) return rewritten;
+
+  return 'Winner ${_bracketRoundCode(labels[roundIndex - 1])}-${stageWinner.group(2)}';
+}
+
+List<String> _lowerBracketRoundLabels(
+  List<int> matchCounts, {
+  bool includesFinalRound = false,
+}) {
+  return [
+    for (var i = 0; i < matchCounts.length; i++)
+      _lowerBracketRoundLabel(
+        matchCounts,
+        i,
+        includesFinalRound: includesFinalRound,
       ),
   ];
+}
+
+List<String> _lowerBracketRoundLabelsFromWinnerRounds(
+  List<String> winnerRoundLabels,
+) {
+  if (winnerRoundLabels.length < 3) return const [];
+
+  final stages = [
+    for (final label in winnerRoundLabels.sublist(
+      1,
+      winnerRoundLabels.length - 1,
+    ))
+      _stripWinnerBracketPrefix(label),
+  ].where((label) => label.isNotEmpty).toList();
+
+  if (stages.isEmpty) return const [];
+
+  return [
+    for (final stage in stages) ...['$stage Qualifier', stage],
+    'Final Qualifier',
+  ];
+}
+
+String _stripWinnerBracketPrefix(String label) {
+  return label
+      .replaceFirst(RegExp(r'^W[-\s]*', caseSensitive: false), '')
+      .trim();
+}
+
+String _lowerBracketRoundLabel(
+  List<int> matchCounts,
+  int index, {
+  required bool includesFinalRound,
+}) {
+  final matchCount = matchCounts[index];
+  final stage = _bracketRoundName(math.max(2, matchCount * 2));
+  final nextSame =
+      index + 1 < matchCounts.length && matchCounts[index + 1] == matchCount;
+  final previousSame = index > 0 && matchCounts[index - 1] == matchCount;
+  if (includesFinalRound && index == matchCounts.length - 1) return 'Final';
+  if (index == matchCounts.length - 1) return 'Final Qualifier';
+  if (nextSame && !previousSame) return '$stage Qualifier';
+  return stage;
+}
+
+bool _isLowerBracketFinalRound(String? label) {
+  if (label == null) return false;
+  return RegExp(r'^(?:l-)?final$', caseSensitive: false).hasMatch(label.trim());
 }
 
 String _matchWinner(
@@ -7768,34 +7974,36 @@ const doubleEliminationWinnersRounds = [
 ];
 
 const doubleEliminationLosersRounds = [
-  RoundSeed('L-Round 1', [
+  RoundSeed('Quarterfinal Qualifier', [
     MatchSeed('Zaid Hamdan', 'Hasan Qasem', '1-0', nextIndex: 0),
     MatchSeed('Noor Barakat', 'Khaled Mansour', '1-0', nextIndex: 1),
     MatchSeed('Tala Suleiman', 'Rania Odeh', '1-0', nextIndex: 2),
     MatchSeed('Lina Shami', 'Fadi Rimawi', '1-0', nextIndex: 3),
   ]),
-  RoundSeed('L-Round 2', [
+  RoundSeed('Quarterfinal', [
     MatchSeed('Sara Nasser', 'Zaid Hamdan', '1-0'),
     MatchSeed('Yazan Khaled', 'Noor Barakat', '1-0'),
     MatchSeed('Mohammad Al-Khatib', 'Tala Suleiman', '1-0'),
     MatchSeed('Amr Zaidan', 'Lina Shami', '1-0'),
   ]),
-  RoundSeed('L-Round 3', [
+  RoundSeed('Semifinal Qualifier', [
     MatchSeed('Sara Nasser', 'Yazan Khaled', '1-0', nextIndex: 0),
     MatchSeed('Mohammad Al-Khatib', 'Amr Zaidan', '1-0', nextIndex: 1),
   ]),
-  RoundSeed('L-Round 4', [
+  RoundSeed('Semifinal', [
     MatchSeed('Leen Haddad', 'Sara Nasser', '0-1'),
     MatchSeed('Dana Aqel', 'Mohammad Al-Khatib', '0-1'),
   ]),
-  RoundSeed('L-Semifinal', [
+  RoundSeed('Final Qualifier', [
     MatchSeed('Sara Nasser', 'Mohammad Al-Khatib', '1-0'),
   ]),
-  RoundSeed('L-Final', [MatchSeed('Omar Saleh', 'Sara Nasser', 'live')]),
+  RoundSeed('Final', [MatchSeed('Omar Saleh', 'Sara Nasser', 'live')]),
 ];
 
 const doubleEliminationFinalRounds = [
-  RoundSeed('Grand Final', [MatchSeed('Ibrahim Ahmad', 'Winner L-Final', '-')]),
+  RoundSeed('Grand Final', [
+    MatchSeed('Ibrahim Ahmad', 'Winner Losers Final', '-'),
+  ]),
   RoundSeed('Reset if needed', [
     MatchSeed('Winner Grand Final', 'Reset only if needed', '-'),
   ]),
