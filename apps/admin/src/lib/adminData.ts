@@ -56,6 +56,17 @@ type AppwriteProfileRow = Models.Row & {
   rating?: number
 }
 
+const tournamentFormatOrder = [
+  'Swiss',
+  'Round robin',
+  'Double round robin',
+  'Single elimination',
+  'Double elimination',
+  'Multi-stage',
+  'Team',
+  'Arena',
+] as const
+
 export type AdminTournament = {
   id: string
   rowId?: string
@@ -255,7 +266,7 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
     const tournaments = uniqueTournamentsByFormat(rows.rows
       .map((row) => mapTournament(row, participantCounts))
       .filter((tournament): tournament is AdminTournament => Boolean(tournament)))
-      .sort((a, b) => statusOrder(a.status) - statusOrder(b.status) || a.name.localeCompare(b.name))
+      .sort(compareTournaments)
 
     return {
       tournaments,
@@ -583,11 +594,22 @@ function formatRound(row: AppwriteTournamentRow) {
 }
 
 function statusOrder(status: TournamentStatus) {
-  if (status === 'draft') return 0
-  if (status === 'upcoming') return 1
+  if (status === 'upcoming') return 0
+  if (status === 'draft') return 1
   if (status === 'active') return 2
   if (status === 'completed') return 3
   return 4
+}
+
+function compareTournaments(a: AdminTournament, b: AdminTournament) {
+  return statusOrder(a.status) - statusOrder(b.status) ||
+    tournamentFormatRank(a.format) - tournamentFormatRank(b.format) ||
+    a.name.localeCompare(b.name)
+}
+
+function tournamentFormatRank(format: string) {
+  const index = tournamentFormatOrder.findIndex((item) => item === format)
+  return index >= 0 ? index : tournamentFormatOrder.length
 }
 
 async function runAdminAction<T>({

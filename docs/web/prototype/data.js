@@ -580,6 +580,26 @@
     rounds.forEach(function (rd) { rd.games.forEach(function (g, i) { g.board = i + 1; g.round = rd.label; }); });
     return rounds;
   }
+  var tournamentOrder = ['Swiss', 'Round robin', 'Double round robin', 'Single elimination', 'Double elimination', 'Multi-stage', 'Team', 'Arena'];
+  var upcomingDates = {
+    'Swiss': 'Jul 20 - Aug 10, 2026',
+    'Round robin': 'Jul 22 - Aug 5, 2026',
+    'Double round robin': 'Jul 24 - Aug 21, 2026',
+    'Single elimination': 'Jul 26 - Aug 2, 2026',
+    'Double elimination': 'Jul 28 - Aug 8, 2026',
+    'Multi-stage': 'Jul 30 - Aug 20, 2026',
+    'Team': 'Aug 1 - Aug 15, 2026',
+    'Arena': 'Aug 3, 2026'
+  };
+  tournaments = tournaments
+    .filter(function (t) { return tournamentOrder.indexOf(t.format) !== -1; })
+    .map(function (t) {
+      t.status = 'Upcoming';
+      t.round = 'Registration open';
+      t.date = upcomingDates[t.format] || t.date;
+      return t;
+    })
+    .sort(function (a, b) { return tournamentOrder.indexOf(a.format) - tournamentOrder.indexOf(b.format); });
   tournaments.forEach(function (t) { t.gameRounds = buildRounds(t); });
 
   window.JU = {

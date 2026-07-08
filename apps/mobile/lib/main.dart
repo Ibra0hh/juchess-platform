@@ -383,7 +383,11 @@ class AppwriteService {
           final status = _statusOrder(
             a.status,
           ).compareTo(_statusOrder(b.status));
-          return status == 0 ? a.name.compareTo(b.name) : status;
+          if (status != 0) return status;
+          final format = _tournamentFormatRank(
+            a.format,
+          ).compareTo(_tournamentFormatRank(b.format));
+          return format == 0 ? a.name.compareTo(b.name) : format;
         });
 
     return rows;
@@ -506,7 +510,7 @@ class AppState extends ChangeNotifier {
   int tab = _initialPreviewTab();
   bool authLoading = false;
   bool dataLoading = false;
-  String tournamentFilter = 'active';
+  String tournamentFilter = 'upcoming';
   String? userName = _initialPreviewUserName();
   String? userEmail = _initialPreviewEmail();
   String? profileId;
@@ -967,9 +971,25 @@ int? _asInt(Object? value) {
 }
 
 int _statusOrder(String status) {
-  if (status == 'active') return 0;
-  if (status == 'upcoming') return 1;
+  if (status == 'upcoming') return 0;
+  if (status == 'active') return 1;
   return 2;
+}
+
+const tournamentFormatOrder = [
+  'Swiss',
+  'Round robin',
+  'Double round robin',
+  'Single elimination',
+  'Double elimination',
+  'Multi-stage',
+  'Team',
+  'Arena',
+];
+
+int _tournamentFormatRank(String format) {
+  final index = tournamentFormatOrder.indexOf(format);
+  return index == -1 ? tournamentFormatOrder.length : index;
 }
 
 String _checkInCode() {
@@ -2013,15 +2033,15 @@ class TournamentTabs extends StatelessWidget {
             Expanded(
               child: GestureDetector(
                 onTap: () =>
-                    context.read<AppState>().selectTournamentFilter('active'),
-                child: TabPill('Active', selected: selected == 'active'),
+                    context.read<AppState>().selectTournamentFilter('upcoming'),
+                child: TabPill('Upcoming', selected: selected == 'upcoming'),
               ),
             ),
             Expanded(
               child: GestureDetector(
                 onTap: () =>
-                    context.read<AppState>().selectTournamentFilter('upcoming'),
-                child: TabPill('Upcoming', selected: selected == 'upcoming'),
+                    context.read<AppState>().selectTournamentFilter('active'),
+                child: TabPill('Active', selected: selected == 'active'),
               ),
             ),
             Expanded(

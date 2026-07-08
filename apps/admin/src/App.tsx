@@ -151,10 +151,9 @@ const formatOptions = [
   { value: 'Double round robin', icon: '◎', layout: 'Double cycle standings' },
   { value: 'Single elimination', icon: '▲', layout: 'Bracket only' },
   { value: 'Double elimination', icon: '⧗', layout: 'Winners / Losers / Final' },
-  { value: 'League', icon: '▤', layout: 'League table + fixtures' },
+  { value: 'Multi-stage', icon: '⬒', layout: 'Stage tabs + finals bracket' },
   { value: 'Team', icon: '⚑', layout: 'Team boards + match points' },
   { value: 'Arena', icon: '⚡', layout: 'Leaderboard + streaks' },
-  { value: 'Multi-stage', icon: '⬒', layout: 'Stage tabs + finals bracket' },
 ] as const
 const timeOptions = [
   { label: 'Classical', minutes: '90', increment: '30' },
@@ -657,14 +656,14 @@ function DashboardScreen({
     { icon: '♞', tint: '#F3E4E6', title: 'Swiss - Round 3 pairings generated', meta: 'By Amina Osei · Swiss', time: '12m ago' },
     { icon: '✓', tint: '#EAF6F0', title: 'Multi-stage published to public site', meta: 'Visibility: Public', time: '1h ago' },
     { icon: '⚑', tint: '#FBEAEA', title: 'Result disputed on Board 4', meta: 'Single elimination', time: '2h ago' },
-    { icon: '+', tint: '#EAF0FA', title: '6 new registrations approved', meta: 'League', time: '4h ago' },
+    { icon: '+', tint: '#EAF0FA', title: '6 new registrations approved', meta: 'Swiss', time: '4h ago' },
     { icon: '▦', tint: '#FBF1E2', title: 'Winner photos uploaded', meta: 'Single elimination', time: 'Yesterday' },
   ]
 
   const disputes = [
     { match: 'Board 4 · Rahimi vs Carter', event: 'Single elimination', reason: 'Illegal move claim', severity: 'HIGH', tint: '#FBEAEA', color: '#B23A3A' },
     { match: 'Board 2 · Tan vs Nair', event: 'Swiss', reason: 'Clock dispute', severity: 'MED', tint: '#FBF1E2', color: '#C77D0A' },
-    { match: 'Board 7 · Rossi vs Bianchi', event: 'League', reason: 'Score mismatch', severity: 'LOW', tint: '#F0EBE1', color: '#8B8577' },
+    { match: 'Board 7 · Rossi vs Bianchi', event: 'Arena', reason: 'Score mismatch', severity: 'LOW', tint: '#F0EBE1', color: '#8B8577' },
   ]
 
   return (
@@ -869,7 +868,7 @@ function TournamentsScreen({
   session: AdminSession
   tournaments: AdminTournament[]
 }) {
-  const [tab, setTab] = useState<TournamentTab>('draft')
+  const [tab, setTab] = useState<TournamentTab>('upcoming')
   const [showCreate, setShowCreate] = useState(false)
   const [createStep, setCreateStep] = useState(0)
   const [editingTournament, setEditingTournament] = useState<AdminTournament | null>(null)

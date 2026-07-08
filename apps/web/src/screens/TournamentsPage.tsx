@@ -23,7 +23,7 @@ const filters: TournamentStatus[] = ['Upcoming', 'Active', 'Completed']
 
 function TournamentsPage() {
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<TournamentStatus>('Active')
+  const [filter, setFilter] = useState<TournamentStatus>('Upcoming')
   const [view, setView] = useState<ViewMode>('list')
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
