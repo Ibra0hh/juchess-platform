@@ -398,42 +398,33 @@ class AppwriteService {
   }
 
   Future<_TournamentCloudData> _loadTournamentCloudData() async {
+    final registrationsFuture = _tryListRows(AppConfig.registrationsTableId);
+    final profilesFuture = _tryListRows(AppConfig.profilesTableId);
+    final gamesFuture = _tryListRows(AppConfig.gamesTableId);
+
+    final registrations = await registrationsFuture;
+    final profiles = _mapProfileRows(await profilesFuture);
+    final games = await gamesFuture;
+
+    return _TournamentCloudData(
+      playerCountsByTournament: _groupRegistrationCounts(registrations),
+      playersByTournament: _groupRegisteredPlayers(registrations, profiles),
+      roundsByTournament: _groupPublishedRounds(games, profiles),
+    );
+  }
+
+  Future<List<models.Row>> _tryListRows(String tableId) async {
     try {
-      final registrationsFuture = tablesDB.listRows(
+      final response = await tablesDB.listRows(
         databaseId: AppConfig.databaseId,
-        tableId: AppConfig.registrationsTableId,
+        tableId: tableId,
         queries: [Query.limit(1000)],
         total: false,
         ttl: 30,
       );
-      final profilesFuture = tablesDB.listRows(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.profilesTableId,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 30,
-      );
-      final gamesFuture = tablesDB.listRows(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.gamesTableId,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 30,
-      );
-
-      final registrations = await registrationsFuture;
-      final profiles = _mapProfileRows((await profilesFuture).rows);
-      final games = await gamesFuture;
-
-      return _TournamentCloudData(
-        playersByTournament: _groupRegisteredPlayers(
-          registrations.rows,
-          profiles,
-        ),
-        roundsByTournament: _groupPublishedRounds(games.rows, profiles),
-      );
+      return response.rows;
     } catch (_) {
-      return const _TournamentCloudData();
+      return const [];
     }
   }
 
@@ -489,7 +480,9 @@ class AppwriteService {
         cloudData.playersByTournament[row.$id] ?? const <PlayerSeed>[];
     final publishedRounds =
         cloudData.roundsByTournament[row.$id] ?? const <RoundSeed>[];
-    final players = registeredPlayers.length;
+    final players = registeredPlayers.isNotEmpty
+        ? registeredPlayers.length
+        : cloudData.playerCountsByTournament[row.$id] ?? 0;
     final displayedPlayers = capacity == null
         ? players
         : players.clamp(0, capacity).toInt();
@@ -531,10 +524,12 @@ class AppwriteService {
 
 class _TournamentCloudData {
   const _TournamentCloudData({
+    this.playerCountsByTournament = const {},
     this.playersByTournament = const {},
     this.roundsByTournament = const {},
   });
 
+  final Map<String, int> playerCountsByTournament;
   final Map<String, List<PlayerSeed>> playersByTournament;
   final Map<String, List<RoundSeed>> roundsByTournament;
 }
@@ -594,6 +589,18 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
         ),
     ]);
   });
+}
+
+Map<String, int> _groupRegistrationCounts(List<models.Row> rows) {
+  final groups = <String, int>{};
+  for (final row in rows) {
+    final data = row.data;
+    final tournamentId = data['tournamentId']?.toString();
+    final status = data['status']?.toString();
+    if (tournamentId == null || status == 'cancelled') continue;
+    groups[tournamentId] = (groups[tournamentId] ?? 0) + 1;
+  }
+  return groups;
 }
 
 Map<String, List<RoundSeed>> _groupPublishedRounds(
