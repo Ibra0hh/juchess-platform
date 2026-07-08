@@ -2588,27 +2588,21 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                         bottom: BorderSide(color: Color(0x1a21304e)),
                       ),
                     ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: tabs
-                            .map(
-                              (item) => Padding(
-                                padding: const EdgeInsets.only(right: 7),
-                                child: GestureDetector(
-                                  onTap: () => setState(() => tab = item.key),
-                                  child: DetailTabPill(
-                                    item.label,
-                                    selected: tab == item.key,
-                                    live:
-                                        item.key == 'games' &&
-                                        event.status == 'active',
-                                  ),
-                                ),
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < tabs.length; i++) ...[
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => tab = tabs[i].key),
+                              child: DetailTabPill(
+                                tabs[i].label,
+                                selected: tab == tabs[i].key,
                               ),
-                            )
-                            .toList(),
-                      ),
+                            ),
+                          ),
+                          if (i != tabs.length - 1) const SizedBox(width: 6),
+                        ],
+                      ],
                     ),
                   ),
                   if (tab == 'overview')
@@ -2646,8 +2640,6 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     _TournamentMainTab(event: event)
                   else if (tab == 'rounds')
                     _TournamentRoundsTab(event: event)
-                  else if (tab == 'games')
-                    _TournamentLiveTab(event: event)
                   else
                     _TournamentPlayersTab(event: event),
                 ],
@@ -2664,7 +2656,6 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     items.add(const DetailTab('players', 'Players'));
     if (_hasBracketTab(event)) {
       items.add(DetailTab('main', _mainTabLabel(event)));
-      items.add(const DetailTab('games', 'Games'));
     } else {
       items.add(const DetailTab('rounds', 'Rounds'));
       items.add(const DetailTab('main', 'Standings'));
@@ -2696,14 +2687,15 @@ class DetailTabPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
       decoration: BoxDecoration(
         color: selected ? PrototypeColors.navy : Colors.transparent,
         border: Border.all(color: const Color(0x4021304e)),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (live) ...[
             Container(
@@ -2716,12 +2708,17 @@ class DetailTabPill extends StatelessWidget {
             ),
             const SizedBox(width: 5),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              color: selected ? PrototypeColors.cream : PrototypeColors.navy,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: selected ? PrototypeColors.cream : PrototypeColors.navy,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -2761,100 +2758,6 @@ class _TournamentOverview extends StatelessWidget {
             onTap: completed ? onMain : onRegister,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TournamentLiveTab extends StatelessWidget {
-  const _TournamentLiveTab({required this.event});
-
-  final TournamentSeed event;
-
-  @override
-  Widget build(BuildContext context) {
-    final games = [
-      for (final round in event.publishedRounds)
-        for (var index = 0; index < round.games.length; index++)
-          (board: index + 1, round: round.label, match: round.games[index]),
-    ];
-    if (games.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
-        child: TournamentEmptyPanel(
-          title: 'Games not published',
-          subtitle: 'Games will appear after the organizer publishes pairings.',
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-      child: Column(
-        children: games
-            .map(
-              (game) => PrototypeCard(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Board ${game.board}',
-                          style: const TextStyle(
-                            color: Color(0x8021304e),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          game.round,
-                          style: const TextStyle(
-                            color: Color(0x7321304e),
-                            fontSize: 11,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (game.match.result == 'live')
-                          const LivePill(small: true),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              PlayerColorLine(
-                                color: PrototypeColors.surface,
-                                name: game.match.white,
-                                border: true,
-                              ),
-                              const SizedBox(height: 6),
-                              PlayerColorLine(
-                                color: const Color(0xff232a36),
-                                name: game.match.black,
-                              ),
-                            ],
-                          ),
-                        ),
-                        PrototypeOutlineButton(
-                          label: 'Watch',
-                          onTap: () => openPrototypeRoute(
-                            context,
-                            const AnalysisBoardScreen(mode: 'live'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
       ),
     );
   }
@@ -2918,7 +2821,9 @@ class _TournamentMainTab extends StatelessWidget {
         );
       }
       final snapshot = event.bracketSnapshot;
-      if (snapshot != null && !snapshot.isDouble && snapshot.rounds.isNotEmpty) {
+      if (snapshot != null &&
+          !snapshot.isDouble &&
+          snapshot.rounds.isNotEmpty) {
         return TournamentBracketView(rounds: snapshot.rounds);
       }
       if (_isDoubleElimination(event)) {
