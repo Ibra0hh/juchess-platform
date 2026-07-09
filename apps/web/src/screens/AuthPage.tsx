@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/AuthContext'
@@ -18,6 +19,7 @@ function AuthPage({ mode }: AuthPageProps) {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -128,15 +130,26 @@ function AuthPage({ mode }: AuthPageProps) {
                 Password
                 {!isSignup ? <Link to="/forgot-password">Forgot?</Link> : null}
               </span>
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-                minLength={8}
-                autoComplete={isSignup ? 'new-password' : 'current-password'}
-                placeholder="••••••••"
-              />
+              <span className="auth-password-field">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  minLength={8}
+                  autoComplete={isSignup ? 'new-password' : 'current-password'}
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  className="auth-password-toggle"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </span>
             </label>
 
             {passwordHint ? <small className="auth-hint">{passwordHint}</small> : null}
@@ -147,7 +160,7 @@ function AuthPage({ mode }: AuthPageProps) {
               </div>
             ) : null}
 
-            <button type="submit" disabled={!ready || submitting}>
+            <button className="auth-submit-button" type="submit" disabled={!ready || submitting}>
               {submitting ? 'Working...' : isSignup ? 'Create account' : 'Sign in'}
             </button>
           </form>
