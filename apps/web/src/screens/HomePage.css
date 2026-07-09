@@ -78,12 +78,17 @@
 
 .home-fall-layer span {
   position: absolute;
-  top: 16%;
+  top: 0;
   left: var(--fall-left);
   color: #16213b;
   font-size: var(--fall-size);
   opacity: var(--fall-opacity);
-  transform: translateY(0);
+  transform: translate3d(0, -24vh, 0) rotate(0deg);
+  animation: home-fall var(--fall-duration) linear infinite;
+  animation-delay: var(--fall-delay);
+  animation-fill-mode: both;
+  line-height: 1;
+  will-change: transform, opacity;
 }
 
 .home-hero-grid {
@@ -238,10 +243,64 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
+.home-feature-carousel {
+  min-width: 0;
+  width: 100%;
+}
+
+.home-feature-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  border-radius: 20px;
+}
+
+.home-feature-track::-webkit-scrollbar {
+  display: none;
+}
+
+.home-feature-slide {
+  min-width: 0;
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+}
+
+.home-feature-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.home-feature-dots button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(22, 33, 59, 0.24);
+  cursor: pointer;
+  transition: width 0.18s ease, background-color 0.18s ease;
+}
+
+.home-feature-dots button.active {
+  width: 24px;
+  background: #7a2431;
+}
+
 .home-feature-card::before {
   content: "";
   position: absolute;
   pointer-events: none;
+}
+
+.home-feature-card::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
 }
 
 .home-feature-card::before {
@@ -254,31 +313,9 @@
   background-size: auto, 58px 58px, 58px 58px;
 }
 
-.feature-watermark {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  z-index: 0;
-  width: 118px;
-  height: 118px;
-  opacity: 0.055;
-  pointer-events: none;
-}
-
-.feature-watermark img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.home-feature-card > :not(.feature-watermark) {
+.home-feature-card > * {
   position: relative;
   z-index: 1;
-}
-
-.home-feature-card > .feature-watermark {
-  position: absolute;
-  z-index: 0;
 }
 
 .home-feature-card:hover {
@@ -994,7 +1031,7 @@
 @keyframes home-fall {
   0% {
     opacity: 0;
-    transform: translateY(-20vh) rotate(0deg);
+    transform: translate3d(0, -24vh, 0) rotate(0deg);
   }
 
   9%,
@@ -1004,7 +1041,7 @@
 
   100% {
     opacity: 0;
-    transform: translateY(118vh) rotate(320deg);
+    transform: translate3d(0, 112vh, 0) rotate(320deg);
   }
 }
 
@@ -1028,15 +1065,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-fall-layer span,
   .feature-eyebrow span.live::before,
   .home-scroll-hint,
   .skeleton::before {
     animation: none;
-  }
-
-  .home-fall-layer span {
-    opacity: 0.08;
   }
 }
 
@@ -1119,14 +1151,6 @@
   .home-feature-card {
     min-height: 330px;
     padding: 26px;
-  }
-
-  .feature-watermark {
-    top: 16px;
-    right: 16px;
-    width: 90px;
-    height: 90px;
-    opacity: 0.045;
   }
 
   .home-feature-card h2 {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ArrowRight, CalendarDays, MapPin, Trophy, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
@@ -53,6 +53,14 @@ type HomeNewsItem = {
   to?: string
 }
 
+type FeatureSlot = {
+  key: Tournament['status']
+  label: string
+  emptyTitle: string
+  emptyBody: string
+  tournament: Tournament | null
+}
+
 function HomePage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -77,11 +85,7 @@ function HomePage() {
     }
   }, [])
 
-  const featured = useMemo(() => {
-    const active = tournaments.find((item) => item.status === 'Active')
-    const upcoming = tournaments.find((item) => item.status === 'Upcoming')
-    return active ?? upcoming ?? tournaments[0] ?? null
-  }, [tournaments])
+  const featureSlots = useMemo(() => buildFeatureSlots(tournaments), [tournaments])
 
   const newsItems = useMemo<HomeNewsItem[]>(() => {
     const publishedNews = announcements.slice(0, 3).map((item) => ({
@@ -153,7 +157,7 @@ function HomePage() {
               </div>
             </div>
 
-            <FeaturedTournament tournament={featured} loading={loading} cloudError={cloudError} />
+            <FeaturedTournamentCarousel slots={featureSlots} loading={loading} cloudError={cloudError} />
           </div>
 
           <a href="#news" className="home-scroll-hint" aria-label="Scroll to news">↓</a>
@@ -170,41 +174,93 @@ function HomePage() {
   )
 }
 
-function FeaturedTournament({
+function FeaturedTournamentCarousel({
   cloudError,
   loading,
-  tournament,
+  slots,
 }: {
   cloudError: boolean
   loading: boolean
-  tournament: Tournament | null
+  slots: FeatureSlot[]
 }) {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const trackRef = useRef<HTMLDivElement>(null)
+
   if (loading) {
-    return <div className="home-feature-card skeleton" aria-label="Loading featured tournament" />
+    return (
+      <div className="home-feature-carousel">
+        <div className="home-feature-card skeleton" aria-label="Loading featured tournaments" />
+      </div>
+    )
   }
+
+  const scrollTo = (index: number) => {
+    const track = trackRef.current
+    if (!track) return
+    track.scrollTo({ left: index * track.clientWidth, behavior: 'smooth' })
+    setActiveIndex(index)
+  }
+
+  const updateActiveSlide = () => {
+    const track = trackRef.current
+    if (!track) return
+    const index = Math.round(track.scrollLeft / Math.max(track.clientWidth, 1))
+    setActiveIndex(Math.min(Math.max(index, 0), slots.length - 1))
+  }
+
+  return (
+    <div className="home-feature-carousel">
+      <div
+        ref={trackRef}
+        className="home-feature-track"
+        onScroll={updateActiveSlide}
+        aria-label="Featured tournament carousel"
+      >
+        {slots.map((slot) => (
+          <div className="home-feature-slide" key={slot.key}>
+            <FeaturedTournamentCard slot={slot} cloudError={cloudError} />
+          </div>
+        ))}
+      </div>
+      <div className="home-feature-dots" aria-label="Featured tournament slides">
+        {slots.map((slot, index) => (
+          <button
+            key={slot.key}
+            type="button"
+            className={activeIndex === index ? 'active' : undefined}
+            aria-label={`Show ${slot.label.toLowerCase()} tournament`}
+            aria-current={activeIndex === index ? 'true' : undefined}
+            onClick={() => scrollTo(index)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FeaturedTournamentCard({ slot, cloudError }: { slot: FeatureSlot; cloudError: boolean }) {
+  const tournament = slot.tournament
 
   if (!tournament) {
     return (
       <div className="home-feature-card empty-feature">
-        <span className="feature-watermark" aria-hidden="true"><img src={crestUrl} alt="" /></span>
         <div className="feature-eyebrow">
           <span>{cloudError ? 'Cloud unavailable' : 'Not published yet'}</span>
-          <strong>Featured tournament</strong>
+          <strong>{slot.label} tournament</strong>
         </div>
-        <h2>{cloudError ? 'Tournaments will return shortly' : 'No tournament published yet'}</h2>
-        <p>{cloudError ? 'The club cloud could not be reached.' : 'Create a tournament in the control center to publish it here.'}</p>
+        <h2>{cloudError ? 'Tournaments will return shortly' : slot.emptyTitle}</h2>
+        <p>{cloudError ? 'The club cloud could not be reached.' : slot.emptyBody}</p>
       </div>
     )
   }
 
   return (
     <Link to={`/tournament/${tournament.id}`} className="home-feature-card">
-      <span className="feature-watermark" aria-hidden="true"><img src={crestUrl} alt="" /></span>
       <div className="feature-eyebrow">
         <span className={tournament.status === 'Active' ? 'live' : undefined}>
           {tournament.status === 'Active' ? `Live - ${tournament.round}` : tournament.status}
         </span>
-        <strong>Featured tournament</strong>
+        <strong>{slot.label} tournament</strong>
       </div>
       <h2>{tournament.name}</h2>
       <p>{tournament.format} / {tournament.timeControl}</p>
@@ -225,6 +281,32 @@ function FeaturedTournament({
       </div>
     </Link>
   )
+}
+
+function buildFeatureSlots(tournaments: Tournament[]): FeatureSlot[] {
+  return [
+    {
+      key: 'Upcoming',
+      label: 'Upcoming',
+      emptyTitle: 'No upcoming tournament',
+      emptyBody: 'Upcoming events will appear here after they are published.',
+      tournament: tournaments.find((item) => item.status === 'Upcoming') ?? null,
+    },
+    {
+      key: 'Active',
+      label: 'Live',
+      emptyTitle: 'No live tournament',
+      emptyBody: 'Active tournaments will appear here when games begin.',
+      tournament: tournaments.find((item) => item.status === 'Active') ?? null,
+    },
+    {
+      key: 'Completed',
+      label: 'Completed',
+      emptyTitle: 'No completed tournament',
+      emptyBody: 'Finished tournaments will appear here with results.',
+      tournament: tournaments.find((item) => item.status === 'Completed') ?? null,
+    },
+  ]
 }
 
 function MarqueeStrip() {

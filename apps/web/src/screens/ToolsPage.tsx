@@ -59,7 +59,7 @@ function ToolsPage() {
 
   return (
     <div className="club-screen tools-screen" data-screen-label="Tools">
-      <SiteHeader active="tools" />
+      <SiteHeader active="games" />
       <main className="tools-main">
         <section className="tools-hero" aria-labelledby="tools-title">
           <div>

@@ -46,7 +46,7 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
 
   try {
     const user = await account.get()
-    const profile = await loadProfile(user.$id)
+    const profile = await ensureProfileForUser(user)
     if (profile?.status === 'suspended') {
       throw new AccessBlockedError('This account is blocked by club administration.')
     }
@@ -155,7 +155,7 @@ export async function loadProfile(accountId: string): Promise<AuthProfile | null
   return response.rows[0] ?? null
 }
 
-export async function loadPreviewProfileByEmail(email: string): Promise<AuthProfile | null> {
+export async function loadProfileByEmail(email: string): Promise<AuthProfile | null> {
   if (!appwriteReady) return null
 
   const normalizedEmail = email.trim()
@@ -170,6 +170,23 @@ export async function loadPreviewProfileByEmail(email: string): Promise<AuthProf
   })
 
   return response.rows[0] ?? null
+}
+
+export async function loadPreviewProfileByEmail(email: string): Promise<AuthProfile | null> {
+  return await loadProfileByEmail(email)
+}
+
+export async function ensureProfileForUser(user: Models.User): Promise<AuthProfile | null> {
+  const accountProfile = await loadProfile(user.$id)
+  if (accountProfile) return accountProfile
+
+  const emailProfile = await loadProfileByEmail(user.email)
+  if (emailProfile) return emailProfile
+
+  return await createProfileForUser(user, {
+    fullName: user.name || user.email,
+    email: user.email,
+  })
 }
 
 export function formatAppwriteError(error: unknown) {
@@ -187,15 +204,15 @@ function cloudMessage(value: string) {
   return value.replace(/appwrite/gi, 'cloud')
 }
 
-async function createProfileForUser(user: Models.User, input: SignUpInput) {
+async function createProfileForUser(user: Models.User, input: Partial<SignUpInput> & Pick<SignUpInput, 'email'>) {
   try {
-    await tablesDB.createRow<AuthProfile>({
+    return await tablesDB.createRow<AuthProfile>({
       databaseId: appwriteConfig.databaseId,
       tableId: tableIds.profiles,
       rowId: ID.unique(),
       data: {
         accountId: user.$id,
-        displayName: input.fullName,
+        displayName: input.fullName?.trim() || user.name || input.email,
         universityId: input.universityId?.trim() || undefined,
         phone: normalizeJordanPhone(input.phone),
         email: input.email,
@@ -211,6 +228,7 @@ async function createProfileForUser(user: Models.User, input: SignUpInput) {
     })
   } catch (error) {
     console.warn('JuChess profile creation failed after signup.', error)
+    return null
   }
 }
 

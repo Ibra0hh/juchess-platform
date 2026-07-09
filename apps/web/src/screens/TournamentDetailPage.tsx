@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   LayoutGrid,
@@ -6,8 +6,11 @@ import {
   ShieldCheck,
   Trophy,
 } from 'lucide-react'
+import QRCode from 'qrcode'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
+import { useAuth } from '../context/AuthContext'
+import { ensureProfileForUser } from '../lib/auth'
 import {
   loadTournaments,
   type Member,
@@ -17,6 +20,13 @@ import {
   type Tournament,
   type TournamentGame,
 } from '../lib/juchess'
+import {
+  cancelMyRegistration,
+  checkInQrPayload,
+  loadMyRegistration,
+  registerForTournament,
+  type MyRegistration,
+} from '../lib/registrations'
 import './TournamentDetailPage.css'
 
 type DetailTab = 'registration' | 'players' | 'rounds' | 'games' | 'table'
@@ -349,7 +359,9 @@ function RegistrationTab({
   tournament: Tournament
   detail: ReturnType<typeof buildDetail>
 }) {
-  const leader = detail.standings.find((row) => row.points > 0 || row.status === 'Playing')
+  const leader = tournament.status === 'Upcoming'
+    ? undefined
+    : detail.standings.find((row) => row.points > 0 || row.status === 'Playing')
 
   return (
     <section className="detail-tab-panel">
@@ -363,6 +375,47 @@ function RegistrationTab({
 
       <p className="detail-description">{tournament.desc}</p>
 
+      <RegistrationActions tournament={tournament} />
+    </section>
+  )
+}
+
+function RegistrationActions({ tournament }: { tournament: Tournament }) {
+  const { loading: authLoading, profile, refresh, user } = useAuth()
+  const [registration, setRegistration] = useState<MyRegistration | null>(null)
+  const [registrationLoading, setRegistrationLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const tournamentRowId = tournament.rowId
+  const profileId = profile?.$id
+
+  const refreshRegistration = useCallback(async () => {
+    if (!tournamentRowId || !profileId) {
+      setRegistration(null)
+      return
+    }
+
+    setRegistrationLoading(true)
+    try {
+      setRegistration(await loadMyRegistration(tournamentRowId, profileId))
+    } catch {
+      setRegistration(null)
+    } finally {
+      setRegistrationLoading(false)
+    }
+  }, [profileId, tournamentRowId])
+
+  useEffect(() => {
+    void refreshRegistration()
+  }, [refreshRegistration])
+
+  if (authLoading) {
+    return <div className="register-card muted">Checking your club account...</div>
+  }
+
+  if (!user) {
+    return (
       <div className="register-card">
         <div className="register-icon">
           <ShieldCheck size={24} aria-hidden="true" />
@@ -380,7 +433,131 @@ function RegistrationTab({
           </Link>
         </div>
       </div>
-    </section>
+    )
+  }
+
+  if (!tournamentRowId) {
+    return <div className="register-card muted">Registration opens when this event is published.</div>
+  }
+
+  async function handleRegister() {
+    if (!tournamentRowId || !user) return
+    setBusy(true)
+    setMessage(null)
+    try {
+      let resolvedProfileId = profileId
+      if (!resolvedProfileId) {
+        const resolvedProfile = await ensureProfileForUser(user)
+        resolvedProfileId = resolvedProfile?.$id
+        await refresh()
+      }
+
+      if (!resolvedProfileId) {
+        throw new Error('Player profile is not ready yet.')
+      }
+
+      setRegistration(await registerForTournament(tournamentRowId, resolvedProfileId, user.$id))
+      setMessage('Registration received. The organizers will review your spot.')
+    } catch {
+      setMessage('Could not prepare your player profile. Please sign out and sign in again, then try registering.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleCancel() {
+    if (!registration) return
+    setBusy(true)
+    setMessage(null)
+    try {
+      setRegistration(await cancelMyRegistration(registration.$id))
+      setMessage('Your registration was cancelled.')
+    } catch {
+      setMessage('Could not cancel right now. Ask an organizer for help at the venue.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const status = registration?.status
+  const isRegistered = Boolean(registration) && status !== 'cancelled'
+
+  return (
+    <div className="register-card signed-in">
+      <div className="register-icon">
+        <ShieldCheck size={24} aria-hidden="true" />
+      </div>
+      <div className="register-body">
+        {registrationLoading ? (
+          <p>Loading your registration...</p>
+        ) : !isRegistered ? (
+          <>
+            <h2>Play in this tournament</h2>
+            <p>One tap to request a spot. An organizer approves registrations before the event.</p>
+          </>
+        ) : status === 'pending' ? (
+          <>
+            <h2>Registration pending</h2>
+            <p>Your spot is waiting for organizer approval. Your check-in code will appear here once you are accepted.</p>
+          </>
+        ) : status === 'waitlisted' ? (
+          <>
+            <h2>You are on the waitlist</h2>
+            <p>The organizers will move you in if a spot opens up.</p>
+          </>
+        ) : (
+          <>
+            <h2>You are in!</h2>
+            <p>Show this code at the venue to check in for {tournament.name}.</p>
+            <CheckInPass registration={registration as MyRegistration} />
+          </>
+        )}
+        {message ? <p className="register-message" role="status">{message}</p> : null}
+      </div>
+      <div className="register-actions">
+        {!isRegistered ? (
+          <button type="button" className="primary-action" disabled={busy} onClick={handleRegister}>
+            {busy ? 'Registering...' : 'Register'}
+          </button>
+        ) : registration?.checkedIn ? (
+          <span className="checkin-done">Checked in</span>
+        ) : (
+          <button type="button" className="secondary-action" disabled={busy} onClick={handleCancel}>
+            {busy ? 'Cancelling...' : 'Cancel registration'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CheckInPass({ registration }: { registration: MyRegistration }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !registration.checkInCode) return
+
+    QRCode.toCanvas(canvas, checkInQrPayload(registration), {
+      width: 148,
+      margin: 1,
+      color: { dark: '#1E2B45', light: '#FDF8EC' },
+    }).catch(() => undefined)
+  }, [registration])
+
+  if (!registration.checkInCode) {
+    return <p className="checkin-note">Your check-in code is on its way. Check back before the event.</p>
+  }
+
+  return (
+    <div className="checkin-pass">
+      <canvas ref={canvasRef} aria-label="Check-in QR code" />
+      <div>
+        <span>Check-in code</span>
+        <strong>{registration.checkInCode}</strong>
+        <small>{registration.checkedIn ? 'Checked in at the venue' : 'Keep this ready at the venue'}</small>
+      </div>
+    </div>
   )
 }
 
