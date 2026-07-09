@@ -417,6 +417,23 @@ export async function submitTournamentGameResult(input: {
   return response.row
 }
 
+export type AdvanceRoundResult = {
+  advanced: boolean
+  completed?: boolean
+  currentRound?: number
+  stageTwo?: boolean
+  reset?: boolean
+  reason?: string
+}
+
+export async function advanceTournamentRound(rowId: string, completedRound?: number) {
+  return await runAdminAction<AdvanceRoundResult>({
+    method: ExecutionMethod.POST,
+    path: `/tournaments/${rowId}/rounds/next`,
+    body: cleanBlockInput({ completedRound }),
+  })
+}
+
 export async function loadTournamentRegistrations(tournamentRowId: string): Promise<RegistrationLoadResult> {
   if (!appwriteReady || !tournamentRowId) return { registrations: [] }
 

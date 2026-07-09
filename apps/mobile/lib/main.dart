@@ -9,6 +9,7 @@ import 'package:chess/chess.dart' as chess;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -181,10 +182,24 @@ class AppwriteService {
     }
   }
 
+  Future<Map<String, String?>> ensureProfileIdentity(models.User user) async {
+    var profile = await loadProfileIdentity(user.$id);
+    if (profile['profileId'] != null) return profile;
+
+    profile = await loadProfileIdentityByEmail(user.email);
+    if (profile['profileId'] != null) return profile;
+
+    await _createProfile(user);
+    profile = await loadProfileIdentity(user.$id);
+    if (profile['profileId'] != null) return profile;
+
+    return loadProfileIdentityByEmail(user.email);
+  }
+
   Future<Map<String, String?>> assertCurrentUserAllowed(
     models.User user,
   ) async {
-    final profile = await loadProfileIdentity(user.$id);
+    final profile = await ensureProfileIdentity(user);
     if (profile['status'] == 'suspended') {
       throw Exception('This account is blocked by club administration.');
     }
@@ -277,13 +292,16 @@ class AppwriteService {
           databaseId: AppConfig.databaseId,
           tableId: AppConfig.registrationsTableId,
           rowId: row.$id,
-          data: {'status': 'confirmed', 'checkedIn': false},
+          data: {'status': 'pending', 'checkedIn': false},
         );
         break;
       }
       return;
     }
 
+    // New spots stay pending until an organizer approves them; the admin
+    // function assigns the check-in code on approval.
+    final user = await account.get();
     await tablesDB.createRow(
       databaseId: AppConfig.databaseId,
       tableId: AppConfig.registrationsTableId,
@@ -291,10 +309,13 @@ class AppwriteService {
       data: {
         'tournamentId': tournamentRowId,
         'profileId': profileId,
-        'status': 'confirmed',
+        'status': 'pending',
         'checkedIn': false,
-        'checkInCode': _checkInCode(),
       },
+      permissions: [
+        Permission.read(Role.user(user.$id)),
+        Permission.update(Role.user(user.$id)),
+      ],
     );
   }
 
@@ -324,7 +345,9 @@ class AppwriteService {
     }
   }
 
-  Future<Set<String>> loadRegisteredTournamentIds(String profileId) async {
+  Future<Map<String, MyRegistrationInfo>> loadMyRegistrations(
+    String profileId,
+  ) async {
     final response = await tablesDB.listRows(
       databaseId: AppConfig.databaseId,
       tableId: AppConfig.registrationsTableId,
@@ -337,10 +360,18 @@ class AppwriteService {
       ttl: 0,
     );
 
-    return response.rows
-        .map((row) => row.data['tournamentId']?.toString())
-        .whereType<String>()
-        .toSet();
+    final registrations = <String, MyRegistrationInfo>{};
+    for (final row in response.rows) {
+      final tournamentId = row.data['tournamentId']?.toString();
+      if (tournamentId == null) continue;
+      registrations[tournamentId] = MyRegistrationInfo(
+        rowId: row.$id,
+        status: row.data['status']?.toString() ?? 'pending',
+        checkInCode: row.data['checkInCode']?.toString(),
+        checkedIn: row.data['checkedIn'] == true,
+      );
+    }
+    return registrations;
   }
 
   Future<void> assertAccessAllowed({
@@ -551,6 +582,22 @@ class AppwriteService {
   }
 }
 
+class MyRegistrationInfo {
+  const MyRegistrationInfo({
+    required this.rowId,
+    required this.status,
+    this.checkInCode,
+    this.checkedIn = false,
+  });
+
+  final String rowId;
+  final String status;
+  final String? checkInCode;
+  final bool checkedIn;
+
+  String get qrPayload => 'JUCHESS-CHECKIN:$rowId:${checkInCode ?? ''}';
+}
+
 class _TournamentCloudData {
   const _TournamentCloudData({
     this.playerCountsByTournament = const {},
@@ -712,16 +759,21 @@ PublishedBracketSnapshot? parsePublishedBracketSnapshot(String? value) {
     if (type == 'double') {
       final brackets = parsed['brackets'];
       if (brackets is! Map<String, dynamic>) return null;
+      final version = _asInt(parsed['version']) ?? 1;
       final winners = _snapshotRounds(brackets['winners']);
-      final losers = _normalizeLowerBracketRounds(
-        _snapshotRounds(brackets['losers']),
-        preferredLabels: _lowerBracketRoundLabelsFromWinnerRounds([
-          for (final round in winners) round.label,
-        ]),
-        firstWinnerRoundCode: winners.isNotEmpty
-            ? _bracketRoundCode(winners.first.label)
-            : null,
-      );
+      // Version 2+ snapshots carry authoritative server-generated labels;
+      // only legacy snapshots need lower-bracket label re-derivation.
+      final losers = version >= 2
+          ? _snapshotRounds(brackets['losers'])
+          : _normalizeLowerBracketRounds(
+              _snapshotRounds(brackets['losers']),
+              preferredLabels: _lowerBracketRoundLabelsFromWinnerRounds([
+                for (final round in winners) round.label,
+              ]),
+              firstWinnerRoundCode: winners.isNotEmpty
+                  ? _bracketRoundCode(winners.first.label)
+                  : null,
+            );
       final finalRounds = _snapshotRounds(brackets['final']);
       if (winners.isEmpty && losers.isEmpty && finalRounds.isEmpty) {
         return null;
@@ -806,7 +858,9 @@ class AppState extends ChangeNotifier {
   String? profileId;
   String? error;
   List<TournamentSeed> tournamentItems = const [];
-  Set<String> registeredTournamentRowIds = <String>{};
+  Map<String, MyRegistrationInfo> myRegistrations = {};
+
+  Set<String> get registeredTournamentRowIds => myRegistrations.keys.toSet();
 
   bool get appwriteReady => service.ready;
   bool get signedIn => userEmail != null;
@@ -864,8 +918,7 @@ class AppState extends ChangeNotifier {
           userName = displayName;
         }
         if (profileId != null) {
-          registeredTournamentRowIds = await service
-              .loadRegisteredTournamentIds(profileId!);
+          myRegistrations = await service.loadMyRegistrations(profileId!);
         }
       } else {
         profileId = 'preview-profile';
@@ -891,9 +944,7 @@ class AppState extends ChangeNotifier {
       userEmail = user.email;
       error = null;
       if (profileId != null) {
-        registeredTournamentRowIds = await service.loadRegisteredTournamentIds(
-          profileId!,
-        );
+        myRegistrations = await service.loadMyRegistrations(profileId!);
       }
     } catch (caught) {
       if (service.ready) {
@@ -934,14 +985,12 @@ class AppState extends ChangeNotifier {
 
     try {
       final user = await service.signIn(email: email, password: password);
-      final profile = await service.loadProfileIdentity(user.$id);
+      final profile = await service.ensureProfileIdentity(user);
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
       profileId = profile['profileId'];
       if (profileId != null) {
-        registeredTournamentRowIds = await service.loadRegisteredTournamentIds(
-          profileId!,
-        );
+        myRegistrations = await service.loadMyRegistrations(profileId!);
       }
       return true;
     } catch (caught) {
@@ -989,14 +1038,12 @@ class AppState extends ChangeNotifier {
         universityId: universityId,
         phone: phone,
       );
-      final profile = await service.loadProfileIdentity(user.$id);
+      final profile = await service.ensureProfileIdentity(user);
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
       profileId = profile['profileId'];
       if (profileId != null) {
-        registeredTournamentRowIds = await service.loadRegisteredTournamentIds(
-          profileId!,
-        );
+        myRegistrations = await service.loadMyRegistrations(profileId!);
       }
       return true;
     } catch (caught) {
@@ -1048,12 +1095,54 @@ class AppState extends ChangeNotifier {
     userName = null;
     userEmail = null;
     profileId = null;
-    registeredTournamentRowIds = <String>{};
+    myRegistrations = {};
     notifyListeners();
   }
 
   bool isRegisteredFor(TournamentSeed event) {
     return registeredTournamentRowIds.contains(event.rowId);
+  }
+
+  MyRegistrationInfo? registrationFor(TournamentSeed event) {
+    return myRegistrations[event.rowId];
+  }
+
+  Future<bool> ensurePlayerProfile() async {
+    if (profileId != null) return true;
+
+    if (!service.ready) {
+      error = 'Account service is not ready yet.';
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      final user = await service.currentUser();
+      final profile = await service.ensureProfileIdentity(user);
+      final displayName = profile['displayName'];
+      userName = displayName != null && displayName.isNotEmpty
+          ? displayName
+          : user.name.isNotEmpty
+          ? user.name
+          : user.email;
+      userEmail = user.email;
+      profileId = profile['profileId'];
+      if (profileId != null) {
+        myRegistrations = await service.loadMyRegistrations(profileId!);
+        error = null;
+        notifyListeners();
+        return true;
+      }
+
+      error =
+          'Your player profile is not ready yet. Please try signing out and signing in again.';
+      notifyListeners();
+      return false;
+    } catch (caught) {
+      error = appwriteMessage(caught);
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> registerForTournament(TournamentSeed event) async {
@@ -1064,15 +1153,20 @@ class AppState extends ChangeNotifier {
     }
 
     if (_isMemberPreview()) {
-      registeredTournamentRowIds = {...registeredTournamentRowIds, event.rowId};
+      myRegistrations = {
+        ...myRegistrations,
+        event.rowId: const MyRegistrationInfo(
+          rowId: 'preview-registration',
+          status: 'confirmed',
+          checkInCode: 'JU-PREVIEW',
+        ),
+      };
       error = null;
       notifyListeners();
       return true;
     }
 
-    if (!service.ready || profileId == null) {
-      error = 'Account service is not ready yet.';
-      notifyListeners();
+    if (!await ensurePlayerProfile()) {
       return false;
     }
 
@@ -1085,7 +1179,7 @@ class AppState extends ChangeNotifier {
         tournamentRowId: event.rowId,
         profileId: profileId!,
       );
-      registeredTournamentRowIds = {...registeredTournamentRowIds, event.rowId};
+      myRegistrations = await service.loadMyRegistrations(profileId!);
       await loadTournaments();
       return true;
     } catch (caught) {
@@ -1105,16 +1199,13 @@ class AppState extends ChangeNotifier {
     }
 
     if (_isMemberPreview()) {
-      registeredTournamentRowIds = {...registeredTournamentRowIds}
-        ..remove(event.rowId);
+      myRegistrations = {...myRegistrations}..remove(event.rowId);
       error = null;
       notifyListeners();
       return true;
     }
 
-    if (!service.ready || profileId == null) {
-      error = 'Account service is not ready yet.';
-      notifyListeners();
+    if (!await ensurePlayerProfile()) {
       return false;
     }
 
@@ -1127,8 +1218,7 @@ class AppState extends ChangeNotifier {
         tournamentRowId: event.rowId,
         profileId: profileId!,
       );
-      registeredTournamentRowIds = {...registeredTournamentRowIds}
-        ..remove(event.rowId);
+      myRegistrations = {...myRegistrations}..remove(event.rowId);
       await loadTournaments();
       return true;
     } catch (caught) {
@@ -1161,6 +1251,79 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> refreshTournaments() async {
+    if (!service.ready) return;
+
+    try {
+      final loaded = await service.loadTournaments();
+      if (profileId != null) {
+        try {
+          myRegistrations = await service.loadMyRegistrations(profileId!);
+        } catch (_) {}
+      }
+      tournamentItems = loaded;
+      error = null;
+    } catch (_) {
+      error = null;
+    } finally {
+      notifyListeners();
+    }
+  }
+}
+
+class HomeTournamentSlot {
+  const HomeTournamentSlot({
+    required this.label,
+    required this.filter,
+    required this.emptyTitle,
+    required this.emptyBody,
+    this.event,
+  });
+
+  final String label;
+  final String filter;
+  final String emptyTitle;
+  final String emptyBody;
+  final TournamentSeed? event;
+}
+
+List<HomeTournamentSlot> buildHomeTournamentSlots(
+  List<TournamentSeed> tournaments,
+) {
+  return [
+    HomeTournamentSlot(
+      label: 'Upcoming',
+      filter: 'upcoming',
+      emptyTitle: 'No upcoming tournament',
+      emptyBody: 'Upcoming events will appear here after they are published.',
+      event: _firstTournamentByStatus(tournaments, 'upcoming'),
+    ),
+    HomeTournamentSlot(
+      label: 'Live',
+      filter: 'active',
+      emptyTitle: 'No live tournament',
+      emptyBody: 'Active tournaments will appear here when games begin.',
+      event: _firstTournamentByStatus(tournaments, 'active'),
+    ),
+    HomeTournamentSlot(
+      label: 'Completed',
+      filter: 'completed',
+      emptyTitle: 'No completed tournament',
+      emptyBody: 'Finished tournaments will appear here with results.',
+      event: _firstTournamentByStatus(tournaments, 'completed'),
+    ),
+  ];
+}
+
+TournamentSeed? _firstTournamentByStatus(
+  List<TournamentSeed> tournaments,
+  String status,
+) {
+  for (final tournament in tournaments) {
+    if (tournament.status == status) return tournament;
+  }
+  return null;
 }
 
 bool _isAdminPreview() => Uri.base.queryParameters['adminPreview'] == '1';
@@ -1280,11 +1443,6 @@ const tournamentFormatOrder = [
 int _tournamentFormatRank(String format) {
   final index = tournamentFormatOrder.indexOf(format);
   return index == -1 ? tournamentFormatOrder.length : index;
-}
-
-String _checkInCode() {
-  final value = DateTime.now().microsecondsSinceEpoch % 900000;
-  return (value + 100000).toString();
 }
 
 String normalizeTournamentFormat(String value) {
@@ -1934,14 +2092,16 @@ class _TabletNavItem {
 }
 
 class AppScroll extends StatelessWidget {
-  const AppScroll({required this.children, super.key});
+  const AppScroll({required this.children, this.physics, super.key});
 
   final List<Widget> children;
+  final ScrollPhysics? physics;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: SingleChildScrollView(
+        physics: physics,
         padding: const EdgeInsets.only(bottom: 118),
         child: Center(
           child: ConstrainedBox(
@@ -1961,13 +2121,13 @@ class PrototypeHeader extends StatelessWidget {
   const PrototypeHeader({
     required this.title,
     this.subtitle,
-    this.showGuest = false,
+    this.showNotifications = false,
     super.key,
   });
 
   final String title;
   final String? subtitle;
-  final bool showGuest;
+  final bool showNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -2003,7 +2163,7 @@ class PrototypeHeader extends StatelessWidget {
               ],
             ),
           ),
-          if (showGuest) const GuestPill(),
+          if (showNotifications) const HeaderNotificationButton(),
         ],
       ),
     );
@@ -2015,27 +2175,17 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final featuredTournament = context.watch<AppState>().featuredTournament;
-
     return AppScroll(
       children: [
         const PrototypeHeader(
           title: 'JuChess',
           subtitle: 'University of Jordan Chess Club',
-          showGuest: true,
+          showNotifications: true,
         ),
         const GuestCard(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: featuredTournament == null
-              ? EmptyTournamentCard(
-                  onTap: () => context.read<AppState>().selectTab(1),
-                )
-              : FeaturedTournamentCard(
-                  event: featuredTournament,
-                  onTap: () =>
-                      openTournamentDetail(context, featuredTournament),
-                ),
+          child: const HomeTournamentCarousel(),
         ),
         SectionHeading(
           title: 'Quick actions',
@@ -2051,13 +2201,104 @@ class HomeScreen extends StatelessWidget {
         ),
         const LeaderboardPreview(),
         SectionHeading(
-          title: 'Announcements',
+          title: 'News',
           margin: const EdgeInsets.fromLTRB(16, 22, 16, 10),
         ),
         const NewsList(),
       ],
     );
   }
+}
+
+class HomeTournamentCarousel extends StatefulWidget {
+  const HomeTournamentCarousel({super.key});
+
+  @override
+  State<HomeTournamentCarousel> createState() => _HomeTournamentCarouselState();
+}
+
+class _HomeTournamentCarouselState extends State<HomeTournamentCarousel> {
+  late final PageController _controller;
+  int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final slots = buildHomeTournamentSlots(
+      context.watch<AppState>().tournamentItems,
+    );
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 264,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: slots.length,
+            onPageChanged: (value) => setState(() => _page = value),
+            itemBuilder: (context, index) {
+              final slot = slots[index];
+              final event = slot.event;
+              if (event == null) {
+                return HomeTournamentEmptyCard(slot: slot);
+              }
+
+              return FeaturedTournamentCard(
+                event: event,
+                eyebrow: '${slot.label.toUpperCase()} TOURNAMENT',
+                onTap: () => openTournamentDetail(context, event),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < slots.length; i++)
+              GestureDetector(
+                onTap: () => _controller.animateToPage(
+                  i,
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                ),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: _page == i ? 20 : 7,
+                  height: 7,
+                  margin: const EdgeInsets.symmetric(horizontal: 3.5),
+                  decoration: BoxDecoration(
+                    color: _page == i
+                        ? PrototypeColors.burgundy
+                        : const Color(0x3321304e),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+String _firstNameForGreeting(AppState state) {
+  final name = state.userName?.trim();
+  final emailName = state.userEmail?.split('@').first.trim();
+  final source = name != null && name.isNotEmpty ? name : emailName;
+  if (source == null || source.isEmpty) return 'player';
+  return source.split(RegExp(r'\s+')).first;
 }
 
 class GuestCard extends StatelessWidget {
@@ -2077,7 +2318,7 @@ class GuestCard extends StatelessWidget {
               children: [
                 Text(
                   state.signedIn
-                      ? 'Signed in as ${state.userName}'
+                      ? 'Welcome back, ${_firstNameForGreeting(state)}'
                       : "You're browsing as a guest",
                   style: const TextStyle(
                     fontSize: 13.5,
@@ -2087,7 +2328,7 @@ class GuestCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   state.signedIn
-                      ? 'Registrations and analyses stay saved to your account'
+                      ? 'Ready for your next club game.'
                       : 'Sign in to register and save analyses',
                   style: const TextStyle(
                     color: Color(0x9921304e),
@@ -2097,16 +2338,13 @@ class GuestCard extends StatelessWidget {
               ],
             ),
           ),
-          PrototypeButton(
-            label: state.signedIn ? 'Sign out' : 'Sign in',
-            onTap: () {
-              if (state.signedIn) {
-                context.read<AppState>().signOut();
-              } else {
-                showAuthSheet(context);
-              }
-            },
-          ),
+          if (!state.signedIn) ...[
+            const SizedBox(width: 12),
+            PrototypeButton(
+              label: 'Sign in',
+              onTap: () => showAuthSheet(context),
+            ),
+          ],
         ],
       ),
     );
@@ -2117,11 +2355,13 @@ class FeaturedTournamentCard extends StatelessWidget {
   const FeaturedTournamentCard({
     required this.event,
     required this.onTap,
+    this.eyebrow = 'FEATURED TOURNAMENT',
     super.key,
   });
 
   final TournamentSeed event;
   final VoidCallback onTap;
+  final String eyebrow;
 
   @override
   Widget build(BuildContext context) {
@@ -2135,9 +2375,9 @@ class FeaturedTournamentCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
-                'FEATURED TOURNAMENT',
-                style: TextStyle(
+              Text(
+                eyebrow,
+                style: const TextStyle(
                   color: Color(0x8021304e),
                   fontSize: 9.8,
                   fontWeight: FontWeight.w800,
@@ -2214,6 +2454,69 @@ class FeaturedTournamentCard extends StatelessWidget {
     }
 
     return 0.75;
+  }
+}
+
+class HomeTournamentEmptyCard extends StatelessWidget {
+  const HomeTournamentEmptyCard({required this.slot, super.key});
+
+  final HomeTournamentSlot slot;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.read<AppState>();
+
+    return PrototypeCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '${slot.label.toUpperCase()} TOURNAMENT',
+                style: const TextStyle(
+                  color: Color(0x8021304e),
+                  fontSize: 9.8,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const Spacer(),
+              StatusPill(slot.filter),
+            ],
+          ),
+          const Spacer(),
+          SerifText(
+            slot.emptyTitle,
+            size: 17,
+            weight: FontWeight.w700,
+            height: 1.25,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            slot.emptyBody,
+            style: const TextStyle(
+              color: Color(0x9921304e),
+              fontSize: 12.5,
+              height: 1.35,
+            ),
+          ),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            child: PrototypeButton(
+              label: 'Open Tournaments',
+              onTap: () {
+                state.selectTournamentFilter(slot.filter);
+                state.selectTab(1);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -2354,37 +2657,42 @@ class TournamentsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
 
-    return AppScroll(
-      children: [
-        const PrototypeHeader(title: 'Tournaments'),
-        const TournamentTabs(),
-        if (state.error != null && state.appwriteReady)
-          AppNotice(text: state.error!),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: Column(
-            children: state.dataLoading
-                ? const [
-                    Padding(
-                      padding: EdgeInsets.only(top: 24),
-                      child: CircularProgressIndicator(
-                        color: PrototypeColors.burgundy,
-                      ),
-                    ),
-                  ]
-                : state.visibleTournaments.isEmpty
-                ? [TournamentEmptyState(filter: state.tournamentFilter)]
-                : state.visibleTournaments
-                      .map(
-                        (event) => Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
-                          child: TournamentCard(event: event),
+    return RefreshIndicator(
+      color: PrototypeColors.burgundy,
+      onRefresh: () => context.read<AppState>().refreshTournaments(),
+      child: AppScroll(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          const PrototypeHeader(title: 'Tournaments'),
+          const TournamentTabs(),
+          if (state.error != null && state.appwriteReady)
+            AppNotice(text: state.error!),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Column(
+              children: state.dataLoading
+                  ? const [
+                      Padding(
+                        padding: EdgeInsets.only(top: 24),
+                        child: CircularProgressIndicator(
+                          color: PrototypeColors.burgundy,
                         ),
-                      )
-                      .toList(),
+                      ),
+                    ]
+                  : state.visibleTournaments.isEmpty
+                  ? [TournamentEmptyState(filter: state.tournamentFilter)]
+                  : state.visibleTournaments
+                        .map(
+                          (event) => Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: TournamentCard(event: event),
+                          ),
+                        )
+                        .toList(),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -2530,158 +2838,165 @@ class TournamentDetailScreen extends StatefulWidget {
 class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   String tab = 'overview';
 
-  TournamentSeed get event => widget.event;
-
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final event = _currentEvent(state);
     final registered = state.isRegisteredFor(event);
     final tabs = _tabsFor(event);
 
     return Scaffold(
       backgroundColor: PrototypeColors.screen,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 28),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 460),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    decoration: const BoxDecoration(
-                      color: PrototypeColors.header,
-                      border: Border(
-                        bottom: BorderSide(color: Color(0x1f21304e)),
+      body: RefreshIndicator(
+        color: PrototypeColors.burgundy,
+        onRefresh: () => context.read<AppState>().refreshTournaments(),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 28),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      decoration: const BoxDecoration(
+                        color: PrototypeColors.header,
+                        border: Border(
+                          bottom: BorderSide(color: Color(0x1f21304e)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          SquareIconButton(
+                            icon: Icons.chevron_left,
+                            onTap: () => Navigator.of(context).pop(),
+                            tooltip: 'Back',
+                          ),
+                          const SizedBox(width: 10),
+                          ClipOval(
+                            child: Image.asset(
+                              'assets/juchess-logo.png',
+                              width: 32,
+                              height: 32,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: SerifText(
+                              'JuChess',
+                              size: 15,
+                              weight: FontWeight.w700,
+                            ),
+                          ),
+                          if (event.status == 'active')
+                            const LivePill(small: true)
+                          else
+                            StatusPill(event.status),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        SquareIconButton(
-                          icon: Icons.chevron_left,
-                          onTap: () => Navigator.of(context).pop(),
-                          tooltip: 'Back',
-                        ),
-                        const SizedBox(width: 10),
-                        ClipOval(
-                          child: Image.asset(
-                            'assets/juchess-logo.png',
-                            width: 32,
-                            height: 32,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: SerifText(
-                            'JuChess',
-                            size: 15,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SerifText(
+                            event.name,
+                            size: 20,
                             weight: FontWeight.w700,
+                            height: 1.3,
                           ),
-                        ),
-                        if (event.status == 'active')
-                          const LivePill(small: true)
-                        else
-                          StatusPill(event.status),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SerifText(
-                          event.name,
-                          size: 20,
-                          weight: FontWeight.w700,
-                          height: 1.3,
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: event.chips
-                              .map((item) => ChipPill(item))
-                              .toList(),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          event.current,
-                          style: const TextStyle(
-                            color: PrototypeColors.burgundy,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w800,
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: event.chips
+                                .map((item) => ChipPill(item))
+                                .toList(),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                    decoration: const BoxDecoration(
-                      color: PrototypeColors.screen,
-                      border: Border(
-                        top: BorderSide(color: Color(0x1421304e)),
-                        bottom: BorderSide(color: Color(0x1a21304e)),
+                          const SizedBox(height: 14),
+                          Text(
+                            event.current,
+                            style: const TextStyle(
+                              color: PrototypeColors.burgundy,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        for (var i = 0; i < tabs.length; i++) ...[
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => tab = tabs[i].key),
-                              child: DetailTabPill(
-                                tabs[i].label,
-                                selected: tab == tabs[i].key,
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                      decoration: const BoxDecoration(
+                        color: PrototypeColors.screen,
+                        border: Border(
+                          top: BorderSide(color: Color(0x1421304e)),
+                          bottom: BorderSide(color: Color(0x1a21304e)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          for (var i = 0; i < tabs.length; i++) ...[
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => tab = tabs[i].key),
+                                child: DetailTabPill(
+                                  tabs[i].label,
+                                  selected: tab == tabs[i].key,
+                                ),
                               ),
                             ),
-                          ),
-                          if (i != tabs.length - 1) const SizedBox(width: 6),
+                            if (i != tabs.length - 1) const SizedBox(width: 6),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                  if (tab == 'overview')
-                    _TournamentOverview(
-                      event: event,
-                      registered: registered,
-                      onRegister: () async {
-                        if (!state.signedIn) {
-                          showAuthSheet(context);
-                          return;
-                        }
-                        final appState = context.read<AppState>();
-                        final messenger = ScaffoldMessenger.of(context);
-                        final wasRegistered = appState.isRegisteredFor(event);
-                        final ok = wasRegistered
-                            ? await appState.cancelTournamentRegistration(event)
-                            : await appState.registerForTournament(event);
-                        if (!mounted) return;
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              ok
-                                  ? wasRegistered
-                                        ? 'Registration cancelled.'
-                                        : 'Registration saved.'
-                                  : appState.error ??
-                                        'Could not register right now.',
+                    if (tab == 'overview')
+                      _TournamentOverview(
+                        event: event,
+                        registered: registered,
+                        registration: state.registrationFor(event),
+                        onRegister: () async {
+                          if (!state.signedIn) {
+                            showAuthSheet(context);
+                            return;
+                          }
+                          final appState = context.read<AppState>();
+                          final messenger = ScaffoldMessenger.of(context);
+                          final wasRegistered = appState.isRegisteredFor(event);
+                          final ok = wasRegistered
+                              ? await appState.cancelTournamentRegistration(
+                                  event,
+                                )
+                              : await appState.registerForTournament(event);
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                ok
+                                    ? wasRegistered
+                                          ? 'Registration cancelled.'
+                                          : 'Registration received. Organizers will review your spot.'
+                                    : appState.error ??
+                                          'Could not register right now.',
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      onMain: () => setState(() => tab = _mainTabKey(event)),
-                    )
-                  else if (tab == 'main')
-                    _TournamentMainTab(event: event)
-                  else if (tab == 'rounds')
-                    _TournamentRoundsTab(event: event)
-                  else
-                    _TournamentPlayersTab(event: event),
-                ],
+                          );
+                        },
+                        onMain: () => setState(() => tab = _mainTabKey(event)),
+                      )
+                    else if (tab == 'main')
+                      _TournamentMainTab(event: event)
+                    else if (tab == 'rounds')
+                      _TournamentRoundsTab(event: event)
+                    else
+                      _TournamentPlayersTab(event: event),
+                  ],
+                ),
               ),
             ),
           ),
@@ -2701,6 +3016,16 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     }
     if (!items.any((item) => item.key == tab)) tab = 'overview';
     return items;
+  }
+
+  TournamentSeed _currentEvent(AppState state) {
+    for (final item in state.tournamentItems) {
+      if (item.rowId == widget.event.rowId) return item;
+    }
+    for (final item in state.tournamentItems) {
+      if (item.id == widget.event.id) return item;
+    }
+    return widget.event;
   }
 }
 
@@ -2772,10 +3097,12 @@ class _TournamentOverview extends StatelessWidget {
     required this.registered,
     required this.onRegister,
     required this.onMain,
+    this.registration,
   });
 
   final TournamentSeed event;
   final bool registered;
+  final MyRegistrationInfo? registration;
   final VoidCallback onRegister;
   final VoidCallback onMain;
 
@@ -2788,6 +3115,10 @@ class _TournamentOverview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (!completed && registered && registration != null) ...[
+            _RegistrationStatusCard(registration: registration!),
+            const SizedBox(height: 12),
+          ],
           PrototypeButton(
             label: completed
                 ? 'View final ${_mainTabLabel(event).toLowerCase()}'
@@ -2795,6 +3126,142 @@ class _TournamentOverview extends StatelessWidget {
                 ? 'Cancel registration'
                 : 'Register',
             onTap: completed ? onMain : onRegister,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RegistrationStatusCard extends StatelessWidget {
+  const _RegistrationStatusCard({required this.registration});
+
+  final MyRegistrationInfo registration;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = registration.status;
+
+    if (status == 'pending') {
+      return const _RegistrationNotice(
+        title: 'Registration pending',
+        body:
+            'Your spot is waiting for organizer approval. Your check-in code '
+            'will appear here once you are accepted.',
+      );
+    }
+
+    if (status == 'waitlisted') {
+      return const _RegistrationNotice(
+        title: 'You are on the waitlist',
+        body: 'The organizers will move you in if a spot opens up.',
+      );
+    }
+
+    final code = registration.checkInCode;
+    if (code == null || code.isEmpty) {
+      return const _RegistrationNotice(
+        title: 'You are in!',
+        body: 'Your check-in code is on its way. Check back before the event.',
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF8EC),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: const Color(0x8CA98A3F)),
+      ),
+      child: Row(
+        children: [
+          QrImageView(
+            data: registration.qrPayload,
+            version: QrVersions.auto,
+            size: 104,
+            backgroundColor: const Color(0xFFFDF8EC),
+            eyeStyle: const QrEyeStyle(
+              eyeShape: QrEyeShape.square,
+              color: PrototypeColors.navy,
+            ),
+            dataModuleStyle: const QrDataModuleStyle(
+              dataModuleShape: QrDataModuleShape.square,
+              color: PrototypeColors.navy,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'CHECK-IN CODE',
+                  style: TextStyle(
+                    color: Color(0x9921304e),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  code,
+                  style: const TextStyle(
+                    color: PrototypeColors.navy,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  registration.checkedIn
+                      ? 'Checked in at the venue'
+                      : 'Show this at the venue to check in',
+                  style: const TextStyle(
+                    color: Color(0x9921304e),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RegistrationNotice extends StatelessWidget {
+  const _RegistrationNotice({required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF8EC),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: const Color(0x4021304e)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: PrototypeColors.navy,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            body,
+            style: const TextStyle(color: Color(0x9921304e), fontSize: 12.5),
           ),
         ],
       ),
@@ -4272,6 +4739,12 @@ class GamesScreen extends StatelessWidget {
           onTap: () => openPrototypeRoute(context, const GameReviewScreen()),
         ),
         BigActionCard(
+          title: 'Puzzles',
+          subtitle: 'Solve tactics from real chess patterns',
+          icon: '♛',
+          onTap: () => openPrototypeRoute(context, const PuzzlesScreen()),
+        ),
+        BigActionCard(
           title: 'New Analysis',
           subtitle: 'Set up a board and record lines',
           icon: '♝',
@@ -4791,6 +5264,188 @@ class GameReviewScreen extends StatelessWidget {
   }
 }
 
+class PuzzlesScreen extends StatelessWidget {
+  const PuzzlesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeRouteScaffold(
+      title: 'Puzzles',
+      children: [
+        const SizedBox(height: 14),
+        PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              SerifText('Daily tactics', size: 18, weight: FontWeight.w700),
+              SizedBox(height: 5),
+              Text(
+                'Pick a puzzle, find the best move, and solve it on the board.',
+                style: TextStyle(color: Color(0x9921304e), height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...puzzleSeeds.map(
+          (puzzle) => PrototypeOptionTile(
+            title: puzzle.title,
+            subtitle:
+                '${puzzle.theme} · ${puzzle.rating} · ${_sideToMoveLabel(puzzle.setupMoves)}',
+            icon: puzzle.icon,
+            onTap: () =>
+                openPrototypeRoute(context, PuzzleBoardScreen(puzzle: puzzle)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class PuzzleBoardScreen extends StatefulWidget {
+  const PuzzleBoardScreen({required this.puzzle, super.key});
+
+  final PuzzleSeed puzzle;
+
+  @override
+  State<PuzzleBoardScreen> createState() => _PuzzleBoardScreenState();
+}
+
+class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
+  late List<String> moves = [...widget.puzzle.setupMoves];
+  late bool flipped = widget.puzzle.setupMoves.length.isOdd;
+  String notice = 'Find the best move.';
+  bool solved = false;
+
+  void _handleMove(List<String> nextMoves, String result) {
+    if (solved || nextMoves.length <= widget.puzzle.setupMoves.length) return;
+
+    final attempt = nextMoves.sublist(widget.puzzle.setupMoves.length);
+    final expected = widget.puzzle.solutionMoves;
+    final moveIndex = attempt.length - 1;
+    final correct =
+        moveIndex < expected.length &&
+        _normalizePuzzleMove(attempt.last) ==
+            _normalizePuzzleMove(expected[moveIndex]);
+
+    setState(() {
+      if (!correct) {
+        moves = [...widget.puzzle.setupMoves];
+        notice = 'Not that move. Try again.';
+        return;
+      }
+
+      moves = nextMoves;
+      if (attempt.length >= expected.length) {
+        solved = true;
+        notice = 'Solved: ${_formatStoredMoves(expected)}';
+      } else {
+        notice = 'Correct. Continue the line.';
+      }
+    });
+  }
+
+  void _reset() {
+    setState(() {
+      moves = [...widget.puzzle.setupMoves];
+      notice = 'Find the best move.';
+      solved = false;
+    });
+  }
+
+  void _showAnswer() {
+    setState(() {
+      moves = [...widget.puzzle.setupMoves, ...widget.puzzle.solutionMoves];
+      notice = 'Answer: ${_formatStoredMoves(widget.puzzle.solutionMoves)}';
+      solved = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeRouteScaffold(
+      title: 'Puzzle',
+      trailing: SquareIconButton(
+        icon: Icons.flip,
+        tooltip: 'Flip board',
+        onTap: () => setState(() => flipped = !flipped),
+      ),
+      children: [
+        const SizedBox(height: 14),
+        PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.puzzle.theme.toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0x9921304e),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(height: 7),
+              SerifText(widget.puzzle.title, size: 19, weight: FontWeight.w700),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  ChipPill(_sideToMoveLabel(widget.puzzle.setupMoves)),
+                  const SizedBox(width: 8),
+                  ChipPill('${widget.puzzle.rating}'),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: PrototypeChessBoard(
+            flipped: flipped,
+            moves: moves,
+            onChanged: _handleMove,
+          ),
+        ),
+        const SizedBox(height: 12),
+        PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            notice,
+            style: TextStyle(
+              color: solved ? PrototypeColors.burgundy : PrototypeColors.navy,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              height: 1.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: PrototypeOutlineButton(label: 'Reset', onTap: _reset),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: PrototypeButton(
+                  label: 'Show Answer',
+                  onTap: _showAnswer,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+      ],
+    );
+  }
+}
+
 class NewAnalysisScreen extends StatelessWidget {
   const NewAnalysisScreen({super.key});
 
@@ -5171,7 +5826,9 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
   chess.Chess _gameFromMoves() {
     final game = chess.Chess();
     for (final move in widget.moves) {
-      game.move(move);
+      for (final token in _moveTokens(move)) {
+        game.move(token);
+      }
     }
     return game;
   }
@@ -5189,7 +5846,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
       return;
     }
 
-    final san = game.san_moves().last?.toString();
+    final san = _lastSanMove(game);
     if (san == null || san.isEmpty) return;
     widget.onChanged([...widget.moves, san], _resultFor(game));
     setState(() {
@@ -5448,6 +6105,32 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
     return null;
   }
 
+  String? _lastSanMove(chess.Chess game) {
+    final history = game.san_moves();
+    if (history.isEmpty) return null;
+    final tokens = _moveTokens(history.last?.toString() ?? '').toList();
+    if (tokens.isEmpty) return null;
+    return tokens.last;
+  }
+
+  Iterable<String> _moveTokens(String value) sync* {
+    final cleaned = value
+        .replaceAll(RegExp(r'\{[^}]*\}'), ' ')
+        .replaceAll(RegExp(r'\([^)]*\)'), ' ');
+
+    for (final raw in cleaned.split(RegExp(r'\s+'))) {
+      var token = raw.trim();
+      if (token.isEmpty) continue;
+      if (RegExp(r'^\d+\.(\.\.)?$').hasMatch(token)) continue;
+      token = token.replaceFirst(RegExp(r'^\d+\.(\.\.)?'), '');
+      if (token.isEmpty) continue;
+      if (const {'1-0', '0-1', '1/2-1/2', '*', 'live'}.contains(token)) {
+        continue;
+      }
+      yield token;
+    }
+  }
+
   chess.PieceType _pieceTypeFor(String promotion) {
     switch (promotion) {
       case 'r':
@@ -5517,19 +6200,31 @@ class ChessClockScreen extends StatefulWidget {
 }
 
 class _ChessClockScreenState extends State<ChessClockScreen> {
-  static const presets = [
-    ('3+2', 180, 2),
-    ('5+0', 300, 0),
-    ('10+5', 600, 5),
-    ('15+10', 900, 10),
+  static const timeFormats = [
+    ('1 min', 60, 0),
+    ('1 min | 1 sec', 60, 1),
+    ('2 min | 1 sec', 120, 1),
+    ('3 min', 180, 0),
+    ('3 min | 2 sec', 180, 2),
+    ('5 min', 300, 0),
+    ('5 min | 5 sec', 300, 5),
+    ('10 min', 600, 0),
+    ('15 min | 10 sec', 900, 10),
+    ('20 min', 1200, 0),
+    ('30 min', 1800, 0),
   ];
 
-  String preset = '5+0';
+  int whiteStart = 300;
+  int blackStart = 300;
   int white = 300;
   int black = 300;
   int increment = 0;
   String turn = 'white';
   bool running = false;
+  bool clockStarted = false;
+  bool soundOn = true;
+  int whiteMoves = 0;
+  int blackMoves = 0;
   Timer? timer;
 
   @override
@@ -5557,84 +6252,161 @@ class _ChessClockScreenState extends State<ChessClockScreen> {
 
   void tapSide(String side) {
     if (!running) {
+      if (!clockStarted) {
+        setState(() {
+          clockStarted = true;
+          turn = _otherSide(side);
+        });
+      }
       toggleRun();
       return;
     }
+    if (side != turn) return;
+
     setState(() {
-      if (side == 'white' && turn == 'white') {
+      if (side == 'white') {
+        whiteMoves++;
         white += increment;
-        turn = 'black';
-      } else if (side == 'black' && turn == 'black') {
+      } else {
+        blackMoves++;
         black += increment;
-        turn = 'white';
+      }
+      turn = _otherSide(side);
+    });
+  }
+
+  void applySideTime(String side, int seconds) {
+    timer?.cancel();
+    setState(() {
+      running = false;
+      if (side == 'white') {
+        whiteStart = seconds;
+        white = seconds;
+      } else {
+        blackStart = seconds;
+        black = seconds;
       }
     });
   }
 
-  void applyPreset((String, int, int) value) {
+  void applyTimeFormat((String, int, int) format) {
     timer?.cancel();
     setState(() {
-      preset = value.$1;
-      white = value.$2;
-      black = value.$2;
-      increment = value.$3;
+      whiteStart = format.$2;
+      blackStart = format.$2;
+      white = whiteStart;
+      black = blackStart;
+      increment = format.$3;
       running = false;
+      clockStarted = false;
       turn = 'white';
+      whiteMoves = 0;
+      blackMoves = 0;
+    });
+  }
+
+  void resetClock() {
+    timer?.cancel();
+    setState(() {
+      white = whiteStart;
+      black = blackStart;
+      running = false;
+      clockStarted = false;
+      turn = 'white';
+      whiteMoves = 0;
+      blackMoves = 0;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return PrototypeRouteScaffold(
-      title: 'Chess Clock',
-      children: [
-        const SizedBox(height: 14),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SegmentedPills(
-            labels: presets.map((item) => item.$1).toList(),
-            selected: preset,
-            onSelected: (label) =>
-                applyPreset(presets.firstWhere((item) => item.$1 == label)),
-          ),
-        ),
-        const SizedBox(height: 14),
-        ClockPanel(
-          label: 'Black',
-          time: _clock(black),
-          active: running && turn == 'black',
-          onTap: () => tapSide('black'),
-        ),
-        ClockPanel(
-          label: 'White',
-          time: _clock(white),
-          active: running && turn == 'white',
-          onTap: () => tapSide('white'),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: PrototypeOutlineButton(
-                  label: 'Reset',
-                  onTap: () =>
-                      applyPreset(presets.firstWhere((p) => p.$1 == preset)),
-                ),
+    return Scaffold(
+      backgroundColor: PrototypeColors.navy,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: _ClockSide(
+                time: _clock(black),
+                moves: blackMoves,
+                controlLabel: _sideTimeLabel(blackStart),
+                active: running && turn == 'black',
+                rotated: true,
+                onTap: () => tapSide('black'),
+                onSettings: () => showTimeSettings('black'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: PrototypeButton(
-                  label: running ? 'Pause' : 'Resume',
-                  onTap: toggleRun,
-                ),
+            ),
+            _ClockControls(
+              running: running,
+              soundOn: soundOn,
+              onBack: () => Navigator.of(context).maybePop(),
+              onReset: resetClock,
+              onToggleRun: toggleRun,
+              onSettings: showFormatSettings,
+              onSound: () => setState(() => soundOn = !soundOn),
+            ),
+            Expanded(
+              child: _ClockSide(
+                time: _clock(white),
+                moves: whiteMoves,
+                controlLabel: _sideTimeLabel(whiteStart),
+                active: running && turn == 'white',
+                onTap: () => tapSide('white'),
+                onSettings: () => showTimeSettings('white'),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
+
+  String _sideTimeLabel(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final rest = seconds % 60;
+    final base = hours > 0
+        ? '$hours:${minutes.toString().padLeft(2, '0')}:${rest.toString().padLeft(2, '0')}'
+        : rest > 0
+        ? '$minutes:${rest.toString().padLeft(2, '0')}'
+        : '$minutes min';
+    return increment == 0 ? base : '$base + $increment';
+  }
+
+  Future<void> showTimeSettings(String side) async {
+    timer?.cancel();
+    if (running) setState(() => running = false);
+
+    final selected = await showDialog<int>(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (context) => _AdjustTimeDialog(
+        initialSeconds: side == 'white' ? white : black,
+        rotated: side == 'black',
+      ),
+    );
+
+    if (selected != null) applySideTime(side, selected);
+  }
+
+  Future<void> showFormatSettings() async {
+    timer?.cancel();
+    if (running) setState(() => running = false);
+
+    final selected = await showDialog<(String, int, int)>(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (context) => _TimeFormatDialog(
+        formats: timeFormats,
+        currentSeconds: whiteStart == blackStart ? whiteStart : null,
+        currentIncrement: increment,
+      ),
+    );
+
+    if (selected != null) applyTimeFormat(selected);
+  }
+
+  String _otherSide(String side) => side == 'white' ? 'black' : 'white';
 
   String _clock(int seconds) {
     final minutes = seconds ~/ 60;
@@ -5643,73 +6415,603 @@ class _ChessClockScreenState extends State<ChessClockScreen> {
   }
 }
 
-class ClockPanel extends StatelessWidget {
-  const ClockPanel({
+class _AdjustTimeDialog extends StatefulWidget {
+  const _AdjustTimeDialog({
+    required this.initialSeconds,
+    required this.rotated,
+  });
+
+  final int initialSeconds;
+  final bool rotated;
+
+  @override
+  State<_AdjustTimeDialog> createState() => _AdjustTimeDialogState();
+}
+
+class _AdjustTimeDialogState extends State<_AdjustTimeDialog> {
+  late final TextEditingController hoursController;
+  late final TextEditingController minutesController;
+  late final TextEditingController secondsController;
+
+  @override
+  void initState() {
+    super.initState();
+    final hours = widget.initialSeconds ~/ 3600;
+    final minutes = (widget.initialSeconds % 3600) ~/ 60;
+    final seconds = widget.initialSeconds % 60;
+    hoursController = TextEditingController(text: _part(hours));
+    minutesController = TextEditingController(text: _part(minutes));
+    secondsController = TextEditingController(text: _part(seconds));
+  }
+
+  @override
+  void dispose() {
+    hoursController.dispose();
+    minutesController.dispose();
+    secondsController.dispose();
+    super.dispose();
+  }
+
+  void save() {
+    final hours = _readPart(hoursController);
+    final minutes = _readPart(minutesController).clamp(0, 59);
+    final seconds = _readPart(secondsController).clamp(0, 59);
+    final total = (hours * 3600) + (minutes * 60) + seconds;
+    Navigator.of(context).pop(total <= 0 ? 1 : total);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dialog = Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 30),
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(38, 34, 38, 34),
+        decoration: BoxDecoration(
+          color: const Color(0xff1f1d1a),
+          borderRadius: BorderRadius.circular(5),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x80000000),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.timer_outlined, color: Color(0xffc9c5bf), size: 22),
+                SizedBox(width: 10),
+                Text(
+                  'ADJUST TIME',
+                  style: TextStyle(
+                    color: Color(0xffc9c5bf),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 30),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _AdjustTimeField(
+                    label: 'Hour',
+                    controller: hoursController,
+                  ),
+                ),
+                const _AdjustTimeSeparator(),
+                Expanded(
+                  child: _AdjustTimeField(
+                    label: 'Minute',
+                    controller: minutesController,
+                  ),
+                ),
+                const _AdjustTimeSeparator(),
+                Expanded(
+                  child: _AdjustTimeField(
+                    label: 'Second',
+                    controller: secondsController,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 42),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: const Text('CANCEL'),
+                ),
+                const SizedBox(width: 22),
+                TextButton(
+                  onPressed: save,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: const Text('SAVE TIME'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return widget.rotated ? RotatedBox(quarterTurns: 2, child: dialog) : dialog;
+  }
+
+  static String _part(int value) => value.toString().padLeft(2, '0');
+
+  static int _readPart(TextEditingController controller) {
+    return int.tryParse(controller.text.trim()) ?? 0;
+  }
+}
+
+class _AdjustTimeField extends StatelessWidget {
+  const _AdjustTimeField({required this.label, required this.controller});
+
+  final String label;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          maxLength: 2,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 42,
+            fontWeight: FontWeight.w400,
+            height: 1.15,
+          ),
+          decoration: InputDecoration(
+            counterText: '',
+            filled: true,
+            fillColor: const Color(0xff2f2c29),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          textAlign: TextAlign.left,
+          style: const TextStyle(
+            color: Color(0xffaaa6a0),
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AdjustTimeSeparator extends StatelessWidget {
+  const _AdjustTimeSeparator();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Text(
+        ':',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 42,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeFormatDialog extends StatelessWidget {
+  const _TimeFormatDialog({
+    required this.formats,
+    required this.currentSeconds,
+    required this.currentIncrement,
+  });
+
+  final List<(String, int, int)> formats;
+  final int? currentSeconds;
+  final int currentIncrement;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      backgroundColor: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 430, maxHeight: 690),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        decoration: BoxDecoration(
+          color: const Color(0xff1f1d1a),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x80000000),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Presets',
+              style: TextStyle(
+                color: Color(0xffaaa6a0),
+                fontSize: 28,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: formats.length,
+                itemBuilder: (context, index) {
+                  final format = formats[index];
+                  return _TimeFormatRow(
+                    label: format.$1,
+                    selected:
+                        currentSeconds == format.$2 &&
+                        currentIncrement == format.$3,
+                    onTap: () => Navigator.of(context).pop(format),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  textStyle: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                child: const Text('CANCEL'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeFormatRow extends StatelessWidget {
+  const _TimeFormatRow({
     required this.label,
-    required this.time,
-    required this.active,
+    required this.selected,
     required this.onTap,
-    super.key,
   });
 
   final String label;
-  final String time;
-  final bool active;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Container(
-          height: 170,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: active ? PrototypeColors.navy : PrototypeColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: active ? PrototypeColors.navy : const Color(0x3821304e),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
                 label,
-                style: TextStyle(
-                  color: active ? PrototypeColors.cream : PrototypeColors.navy,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w400,
+                  height: 1.1,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                time,
-                style: TextStyle(
-                  color: active ? PrototypeColors.cream : PrototypeColors.navy,
-                  fontFamily: 'monospace',
-                  fontSize: 52,
-                  fontWeight: FontWeight.w900,
+            ),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xff8ac263)
+                      : const Color(0xff56534f),
+                  width: 3,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                active ? 'Running...' : 'Tap to start opponent',
-                style: TextStyle(
-                  color: active
-                      ? const Color(0xccf7f1e3)
-                      : const Color(0x9921304e),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
+              child: selected
+                  ? Center(
+                      child: Container(
+                        width: 18,
+                        height: 18,
+                        decoration: const BoxDecoration(
+                          color: Color(0xff8ac263),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _ClockSide extends StatelessWidget {
+  const _ClockSide({
+    required this.time,
+    required this.moves,
+    required this.controlLabel,
+    required this.active,
+    required this.onTap,
+    required this.onSettings,
+    this.rotated = false,
+  });
+
+  final String time;
+  final int moves;
+  final String controlLabel;
+  final bool active;
+  final bool rotated;
+  final VoidCallback onTap;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        final double timeSize = math
+            .min(constraints.maxWidth * 0.34, constraints.maxHeight * 0.42)
+            .clamp(76.0, 138.0)
+            .toDouble();
+        final backgroundColor = active
+            ? PrototypeColors.burgundy
+            : const Color(0xffefe3c7);
+        final foregroundColor = active
+            ? PrototypeColors.cream
+            : PrototypeColors.navy;
+        final accentColor = active
+            ? PrototypeColors.gold
+            : PrototypeColors.burgundy;
+        final mutedColor = active
+            ? const Color(0xdff6f0e2)
+            : const Color(0xcc7d2434);
+        return Material(
+          color: backgroundColor,
+          child: InkWell(
+            onTap: onTap,
+            splashColor: active
+                ? const Color(0x18f6f0e2)
+                : const Color(0x187d2434),
+            highlightColor: active
+                ? const Color(0x10f6f0e2)
+                : const Color(0x107d2434),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: Text(
+                      'Moves: $moves',
+                      style: TextStyle(
+                        color: mutedColor,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          time,
+                          style: TextStyle(
+                            color: foregroundColor,
+                            fontFamily: 'monospace',
+                            fontSize: timeSize,
+                            fontWeight: FontWeight.w900,
+                            height: 0.9,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: _ClockTimeControl(
+                      label: controlLabel,
+                      foregroundColor: foregroundColor,
+                      accentColor: accentColor,
+                      onTap: onSettings,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    return rotated ? RotatedBox(quarterTurns: 2, child: content) : content;
+  }
+}
+
+class _ClockTimeControl extends StatelessWidget {
+  const _ClockTimeControl({
+    required this.label,
+    required this.foregroundColor,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color foregroundColor;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.tune, color: accentColor, size: 34),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: foregroundColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClockControls extends StatelessWidget {
+  const _ClockControls({
+    required this.running,
+    required this.soundOn,
+    required this.onBack,
+    required this.onReset,
+    required this.onToggleRun,
+    required this.onSettings,
+    required this.onSound,
+  });
+
+  final bool running;
+  final bool soundOn;
+  final VoidCallback onBack;
+  final VoidCallback onReset;
+  final VoidCallback onToggleRun;
+  final VoidCallback onSettings;
+  final VoidCallback onSound;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 96,
+      color: Colors.black,
+      child: Row(
+        children: [
+          _ClockControlButton(
+            icon: Icons.arrow_back,
+            tooltip: 'Back',
+            onTap: onBack,
+          ),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _ClockControlButton(
+                  icon: Icons.replay,
+                  tooltip: 'Reset',
+                  onTap: onReset,
+                ),
+                _ClockControlButton(
+                  icon: running ? Icons.pause : Icons.play_arrow,
+                  tooltip: running ? 'Pause' : 'Start',
+                  size: 48,
+                  onTap: onToggleRun,
+                ),
+                _ClockControlButton(
+                  icon: Icons.tune,
+                  tooltip: 'Clock settings',
+                  onTap: onSettings,
+                ),
+                _ClockControlButton(
+                  icon: soundOn ? Icons.volume_up : Icons.volume_off,
+                  tooltip: soundOn ? 'Mute' : 'Unmute',
+                  onTap: onSound,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 18),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClockControlButton extends StatelessWidget {
+  const _ClockControlButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.size = 38,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      iconSize: size,
+      splashRadius: 30,
+      style: IconButton.styleFrom(
+        foregroundColor: PrototypeColors.cream,
+        backgroundColor: Colors.transparent,
+      ),
+      icon: Icon(icon),
     );
   }
 }
@@ -6130,6 +7432,14 @@ String _formatStoredMoves(List<String> moves) {
       .join('  ');
 }
 
+String _sideToMoveLabel(List<String> moves) {
+  return moves.length.isEven ? 'White to move' : 'Black to move';
+}
+
+String _normalizePuzzleMove(String move) {
+  return move.replaceAll(RegExp(r'[+#?!]'), '').trim();
+}
+
 void openPrototypeRoute(BuildContext context, Widget screen) {
   Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
 }
@@ -6211,30 +7521,197 @@ class PrototypeButton extends StatelessWidget {
   }
 }
 
-class GuestPill extends StatelessWidget {
-  const GuestPill({super.key});
+class HeaderNotificationButton extends StatelessWidget {
+  const HeaderNotificationButton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final signedIn = context.watch<AppState>().signedIn;
+    final state = context.watch<AppState>();
+    final notification = latestNotificationFor(state);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: signedIn ? const Color(0x147d2434) : const Color(0x1021304e),
-        border: Border.all(
-          color: signedIn ? const Color(0x337d2434) : const Color(0x2e21304e),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          tooltip: 'Latest notification',
+          onPressed: () => openLatestNotification(context, notification),
+          icon: const Icon(Icons.notifications_none),
+          style: IconButton.styleFrom(
+            backgroundColor: PrototypeColors.surface,
+            foregroundColor: PrototypeColors.navy,
+            fixedSize: const Size(42, 42),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(13),
+              side: const BorderSide(color: Color(0x3021304e)),
+            ),
+          ),
         ),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        signedIn ? 'Signed In' : 'Guest Mode',
-        style: TextStyle(
-          color: signedIn ? PrototypeColors.burgundy : const Color(0xcc21304e),
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
+        if (state.signedIn)
+          Positioned(
+            right: 7,
+            top: 7,
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: PrototypeColors.burgundy,
+                shape: BoxShape.circle,
+                border: Border.all(color: PrototypeColors.surface, width: 1.5),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class AppNotificationSeed {
+  const AppNotificationSeed({
+    required this.title,
+    required this.body,
+    required this.time,
+    this.actionLabel,
+  });
+
+  final String title;
+  final String body;
+  final String time;
+  final String? actionLabel;
+}
+
+AppNotificationSeed latestNotificationFor(AppState state) {
+  if (!state.signedIn) {
+    return const AppNotificationSeed(
+      title: 'Sign in for notifications',
+      body:
+          'Club invitations, registration updates, and round notices will appear here after you sign in.',
+      time: 'Account required',
+      actionLabel: 'Sign in',
+    );
+  }
+
+  for (final entry in state.myRegistrations.entries) {
+    final registration = entry.value;
+    if (registration.status == 'pending') {
+      return const AppNotificationSeed(
+        title: 'Registration pending',
+        body: 'Your tournament registration is waiting for organizer approval.',
+        time: 'Latest',
+      );
+    }
+    if (registration.status == 'confirmed' && !registration.checkedIn) {
+      return const AppNotificationSeed(
+        title: 'You are registered',
+        body:
+            'Your check-in code is ready. Open the tournament page before the event.',
+        time: 'Latest',
+      );
+    }
+  }
+
+  final featured = state.featuredTournament;
+  if (featured != null && featured.status == 'active') {
+    return AppNotificationSeed(
+      title: 'Tournament is active',
+      body:
+          '${featured.name} is live. Open the tournament to follow pairings, rounds, and results.',
+      time: 'Now',
+    );
+  }
+
+  return const AppNotificationSeed(
+    title: 'No new notifications',
+    body:
+        'You are all caught up. New club and tournament updates will appear here.',
+    time: 'Latest',
+  );
+}
+
+void openLatestNotification(
+  BuildContext context,
+  AppNotificationSeed notification,
+) {
+  openPrototypeRoute(context, NotificationScreen(notification: notification));
+}
+
+class NotificationScreen extends StatelessWidget {
+  const NotificationScreen({required this.notification, super.key});
+
+  final AppNotificationSeed notification;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeRouteScaffold(
+      title: 'Notifications',
+      children: [
+        const SizedBox(height: 16),
+        PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0x147d2434),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.notifications_none,
+                      color: PrototypeColors.burgundy,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          notification.time,
+                          style: const TextStyle(
+                            color: Color(0x9921304e),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          notification.title,
+                          style: const TextStyle(
+                            color: PrototypeColors.navy,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                notification.body,
+                style: const TextStyle(
+                  color: Color(0xcc21304e),
+                  fontSize: 13.5,
+                  height: 1.45,
+                ),
+              ),
+              if (notification.actionLabel != null) ...[
+                const SizedBox(height: 18),
+                PrototypeButton(
+                  label: notification.actionLabel!,
+                  onTap: () => showAuthSheet(context),
+                ),
+              ],
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -6488,6 +7965,11 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     });
   }
 
+  void _continueAsGuest() {
+    context.read<AppState>().clearError();
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -6576,6 +8058,8 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
               ? null
               : _submitSignIn,
         ),
+        const SizedBox(height: 10),
+        AuthGuestButton(onTap: _continueAsGuest),
         const AuthDivider(),
         AuthSocialButton(
           icon: const Icon(Icons.apple, size: 20, color: Colors.black),
@@ -6722,6 +8206,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
           action: 'Sign in',
           onTap: () => _setMode(AuthMode.signIn),
         ),
+        AuthGuestTextButton(onTap: _continueAsGuest),
       ],
     );
   }
@@ -7059,6 +8544,10 @@ class AuthField extends StatelessWidget {
               vertical: 13,
             ),
             suffixIcon: suffix,
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 48,
+              minHeight: 48,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: Color(0x4721304e)),
@@ -7106,6 +8595,10 @@ class PasswordToggle extends StatelessWidget {
       icon: Icon(visible ? Icons.visibility_off_outlined : Icons.visibility),
       color: const Color(0x9921304e),
       tooltip: visible ? 'Hide password' : 'Show password',
+      style: IconButton.styleFrom(
+        fixedSize: const Size(48, 48),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
     );
   }
 }
@@ -7288,6 +8781,48 @@ class AuthInlineSwitch extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class AuthGuestButton extends StatelessWidget {
+  const AuthGuestButton({required this.onTap, super.key});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.person_outline, size: 18),
+      label: const Text('Continue as guest'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: PrototypeColors.navy,
+        backgroundColor: PrototypeColors.surface,
+        side: const BorderSide(color: Color(0x4021304e)),
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+}
+
+class AuthGuestTextButton extends StatelessWidget {
+  const AuthGuestTextButton({required this.onTap, super.key});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        foregroundColor: PrototypeColors.navy,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+      ),
+      child: const Text('Continue as guest'),
     );
   }
 }
@@ -7546,6 +9081,24 @@ class SavedAnalysisSeed {
 
   final String title;
   final String subtitle;
+}
+
+class PuzzleSeed {
+  const PuzzleSeed({
+    required this.title,
+    required this.theme,
+    required this.rating,
+    required this.icon,
+    required this.setupMoves,
+    required this.solutionMoves,
+  });
+
+  final String title;
+  final String theme;
+  final int rating;
+  final String icon;
+  final List<String> setupMoves;
+  final List<String> solutionMoves;
 }
 
 const clubPlayers = [
@@ -8539,4 +10092,31 @@ const doubleEliminationFinalRounds = [
 const savedAnalyses = [
   SavedAnalysisSeed("King's Indian prep vs Omar", '32 moves · Jun 25'),
   SavedAnalysisSeed('Rapid round 2 endgame', '18 moves · Jun 28'),
+];
+
+const puzzleSeeds = [
+  PuzzleSeed(
+    title: 'Finish Scholar\'s Mate',
+    theme: 'Mate in 1',
+    rating: 900,
+    icon: 'M1',
+    setupMoves: ['e4', 'e5', 'Qh5', 'Nc6', 'Bc4', 'Nf6'],
+    solutionMoves: ['Qxf7#'],
+  ),
+  PuzzleSeed(
+    title: 'Fool\'s Mate Punishment',
+    theme: 'Mate in 1',
+    rating: 700,
+    icon: 'M1',
+    setupMoves: ['f3', 'e5', 'g4'],
+    solutionMoves: ['Qh4#'],
+  ),
+  PuzzleSeed(
+    title: 'Castle Into Safety',
+    theme: 'Best move',
+    rating: 1050,
+    icon: 'T',
+    setupMoves: ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6', 'Ba4', 'Nf6'],
+    solutionMoves: ['O-O'],
+  ),
 ];

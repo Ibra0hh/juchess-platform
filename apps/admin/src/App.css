@@ -1468,6 +1468,16 @@ button {
   min-width: 940px;
 }
 
+.registration-table .checkin-code {
+  display: block;
+  margin-top: 2px;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #7d2434;
+}
+
 .tournament-manage-view {
   max-width: 1440px;
   margin: 0 auto;
@@ -1702,6 +1712,48 @@ button {
 
 .procedure-wave-row.idle strong {
   color: #8b8577;
+}
+
+.procedure-wave-row.live {
+  box-shadow: inset 4px 0 0 #a98a3f;
+}
+
+.procedure-wave-row.done {
+  background: rgba(46, 125, 91, 0.05);
+}
+
+.procedure-wave-row.done > span {
+  color: #2e7d5b;
+}
+
+.procedure-wave-row.queued {
+  background: rgba(253, 250, 241, 0.85);
+}
+
+.procedure-byes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 22px;
+  font-size: 12.5px;
+  font-style: italic;
+  color: #6a6350;
+  border-top: 1px solid #efe7d6;
+}
+
+.procedure-advance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 22px;
+  border-top: 1px solid #efe7d6;
+  background: #fdfaf1;
+}
+
+.procedure-advance span {
+  font-size: 12.5px;
+  color: #6a6350;
 }
 
 .manage-row {

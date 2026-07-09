@@ -158,6 +158,64 @@ Implemented/working:
 - Android native launch screen and launcher icon use the club logo.
 - Bottom Home tab in the Flutter app uses the club logo.
 
+Registration and check-in flow (added Jul 9, 2026):
+
+- Player registrations are created as `pending` from web and mobile; players
+  never self-confirm. Rows are created with per-user read/update permissions so
+  players can cancel their own registration.
+- The admin function `POST /registrations/:id/confirm|status` generates a
+  `checkInCode` (format `JU-XXXXXX`, unambiguous alphabet) the first time a
+  registration is confirmed. Requires redeploying `admin-actions` after pulling.
+- Web tournament detail Registration tab is auth-aware: guests see the sign-in
+  prompt; signed-in players get one-tap Register, pending/waitlist status
+  panels, and a check-in pass (code + QR via the `qrcode` npm package) once
+  confirmed. QR payload format: `JUCHESS-CHECKIN:<registrationRowId>:<code>`.
+- Mobile Registration tab mirrors this with `MyRegistrationInfo` state and
+  `qr_flutter`. Same QR payload format.
+- Admin registration queue shows the check-in code under the Check-in column
+  for confirmed players.
+
+Round progression engine (added Jul 9, 2026 — server-side in admin-actions):
+
+- All format progression lives in `advanceTournamentIfReady` in
+  `appwrite/functions/admin-actions/src/main.js`. It runs automatically after
+  every completed game result, and manually via
+  `POST /tournaments/:id/rounds/next` (admin "Advance round" button).
+- Swiss: real score-group pairing with rematch avoidance and color balance
+  (`buildSwissPairings`). Odd fields get a rotating full-point bye recorded as
+  a completed game against the `system_bye` profile (auto-created).
+- Round robin / double round robin: full schedule at activation; rounds go
+  live one at a time as the previous round finishes; auto-completes.
+- Single + double elimination: `buildKnockoutStructure` derives the whole
+  bracket (byes, losers bracket, grand final + reset) from the entrant order
+  frozen in the snapshot at activation/publish. Next-round games are created
+  when resolvable; the bracketSnapshot is REGENERATED from real results on
+  every advancement, so admin/web/mobile brackets update live. Loser round
+  labels come out as "Round of 16 Qualifier"..."Final Qualifier"/"Final".
+- Multi-stage: Swiss stage one (`roundsTotal - knockout rounds` rounds, min 3
+  when unset), then auto-cutover seeding the top 8 from real standings into a
+  single-elim stage two (snapshot carries `stageTwoFromRound`).
+- Arena: rolling Swiss re-pairing each round, never auto-completes (admin uses
+  Complete tournament). Team: single generic round until a team model exists.
+- Standings are recalculated into the `standings` table after every result,
+  including one-sided (bye/withdrawal) games.
+- Engine dry-run harness: scratchpad `engine-dryrun.mjs` pattern — extracts the
+  pure functions and simulates SE6/SE8/DE8/DE20/Swiss5; all checks pass.
+- Admin Procedure tab now uses a stable table queue (live games anchor to
+  tables by board number, free tables pull the ready queue), shows byes,
+  finished games, an Up next queue, round progress, and an Advance round
+  button. Physical table count persists per tournament in localStorage.
+- IMPORTANT: the function must be redeployed for any of this to take effect:
+  `appwrite push functions --function-id admin-actions`.
+- VERIFIED LIVE (Jul 9, 2026): deployed and smoke-tested against production.
+  Activating the seeded Swiss generated 10 round-1 games; saving the last
+  result via the admin digital board auto-paired round 2 with correct score
+  groups, color flips, and no rematches; the manual "Advance round" button
+  paired round 3; standings recalculated after every result; the public web
+  showed "Round 3 of 7" with identical pairings. The seeded Swiss was left in
+  that active round-3 state — run `npm run seed:appwrite-demo` (needs
+  APPWRITE_API_KEY env) to restore pristine demo data.
+
 Tournament detail tab rules:
 
 - Public website and Flutter mobile should match.

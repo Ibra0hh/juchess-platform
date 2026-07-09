@@ -4,6 +4,7 @@ import { JuChessBoard, type JuChessBoardChange } from './components/JuChessBoard
 import { buildChessGame, deriveResult } from './components/JuChessRules'
 import { appwriteReady } from './lib/appwrite'
 import {
+  advanceTournamentRound,
   blockIdentity,
   blockIp,
   createAdminProfile,
@@ -142,7 +143,10 @@ type ProcedureMatch = {
   board?: number
   boardLabel: string
   boardKey: string
+  bye?: boolean
+  completed?: boolean
   gameId?: string
+  live?: boolean
   matchNumber: number
   playable: boolean
   round?: number
@@ -151,10 +155,17 @@ type ProcedureMatch = {
   white: string
 }
 
-type ProcedureSlot = {
-  boardNumber: number
+type ProcedureTable = {
+  tableNumber: number
   match?: ProcedureMatch
-  nextMatch?: ProcedureMatch
+  startNow: boolean
+}
+
+type ProcedureQueue = {
+  tables: ProcedureTable[]
+  waiting: ProcedureMatch[]
+  finished: ProcedureMatch[]
+  byes: ProcedureMatch[]
 }
 
 type BracketEntrant = {
@@ -1318,11 +1329,39 @@ function TournamentsScreen({
     }
   }
 
+  async function handleAdvanceRound(item: AdminTournament) {
+    if (!item.rowId) {
+      setMessage('Only cloud tournaments can advance rounds.')
+      return
+    }
+
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      const outcome = await advanceTournamentRound(item.rowId)
+      setMessage(
+        outcome.completed
+          ? `${item.name} is complete.`
+          : outcome.stageTwo
+          ? `Stage two bracket is ready. Round ${outcome.currentRound} pairings are live.`
+          : outcome.advanced
+          ? `Round ${outcome.currentRound} pairings are live.`
+          : outcome.reason ?? 'The round is not ready to advance yet.',
+      )
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (managedTournament) {
     return (
       <div className="tournament-screen">
         <TournamentManageView
           disabled={submitting}
+          onAdvanceRound={handleAdvanceRound}
           onBack={() => setManageTournamentKey('')}
           onComplete={(item) => {
             void handleStatusChange(item, 'completed')
@@ -1644,6 +1683,7 @@ function TournamentActionButtons({
 
 function TournamentManageView({
   disabled,
+  onAdvanceRound,
   onBack,
   onComplete,
   onGameResult,
@@ -1658,6 +1698,7 @@ function TournamentManageView({
   tournament,
 }: {
   disabled: boolean
+  onAdvanceRound: (item: AdminTournament) => Promise<void>
   onBack: () => void
   onComplete: (item: AdminTournament) => void
   onGameResult: (input: {
@@ -1707,7 +1748,19 @@ function TournamentManageView({
   const [stage, setStage] = useState(playStage)
   const [bracketView, setBracketView] = useState<AdminBracketView>('winners')
   const [selectedBoardKey, setSelectedBoardKey] = useState('')
-  const [physicalBoards, setPhysicalBoards] = useState(3)
+  const tablesStorageKey = `juchess-admin-tables:${tournament.rowId ?? tournament.id}`
+  const [physicalBoards, setPhysicalBoardsState] = useState(() => {
+    const saved = Number(window.localStorage.getItem(tablesStorageKey))
+    return Number.isFinite(saved) && saved >= 1 ? Math.min(64, Math.floor(saved)) : 3
+  })
+  const setPhysicalBoards = (count: number) => {
+    setPhysicalBoardsState(count)
+    try {
+      window.localStorage.setItem(tablesStorageKey, String(count))
+    } catch {
+      // Persisting the table count is a convenience; ignore storage failures.
+    }
+  }
   const liveBoardRef = useRef<HTMLElement | null>(null)
   const bracketPhase = getBracketPhase(tournament)
   const tournamentPlayers = useMemo(() => buildTournamentPlayers(tournament, shuffleSeed, participants), [participants, shuffleSeed, tournament])
@@ -1756,8 +1809,10 @@ function TournamentManageView({
         tournament,
       )
   ), [allBracketRounds, currentRoundPairings, knockout, multiStage, pairings, roundRobin, stage, tournament])
-  const procedurePlan = useMemo(() => (
-    stage === 'procedure' ? buildProcedurePlan(procedureMatches, physicalBoards) : []
+  const procedureQueue = useMemo(() => (
+    stage === 'procedure'
+      ? buildProcedureQueue(procedureMatches, physicalBoards)
+      : { tables: [], waiting: [], finished: [], byes: [] }
   ), [physicalBoards, procedureMatches, stage])
   const liveBoardOptions: LiveBoardOption[] = useMemo(() => (
     stage === 'procedure'
@@ -1872,7 +1927,7 @@ function TournamentManageView({
             </>
           ) : (
             <>
-              <button type="button" className="mini-button" disabled={disabled} onClick={() => onMessage('Round closed.')}>End current round</button>
+              <button type="button" className="mini-button" disabled={disabled} onClick={() => void onAdvanceRound(tournament)}>Advance round</button>
               <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onComplete(tournament)}>Complete tournament</button>
             </>
           )}
@@ -1970,11 +2025,14 @@ function TournamentManageView({
           <>
             <ProcedurePlanner
               active={tournament.status === 'active'}
-              boards={physicalBoards}
-              onBoardsChange={setPhysicalBoards}
+              advanceDisabled={disabled}
+              onAdvanceRound={() => void onAdvanceRound(tournament)}
               onMatchSelect={tournament.status === 'active' ? selectLiveBoard : undefined}
-              plan={procedurePlan}
+              onTablesChange={setPhysicalBoards}
+              queue={procedureQueue}
+              roundLabel={procedureMatches[0]?.roundLabel ?? `Round ${currentRoundNumber(tournament)}`}
               selectedBoardKey={selectedBoardKey}
+              tables={physicalBoards}
               totalMatches={procedureMatches.length}
             />
             {tournament.status === 'active' && liveBoardOptions.length ? (
@@ -2012,81 +2070,154 @@ function TournamentManageView({
 
 function ProcedurePlanner({
   active,
-  boards,
-  onBoardsChange,
+  advanceDisabled,
+  onAdvanceRound,
   onMatchSelect,
-  plan,
+  onTablesChange,
+  queue,
+  roundLabel,
   selectedBoardKey,
+  tables,
   totalMatches,
 }: {
   active: boolean
-  boards: number
-  onBoardsChange: (boards: number) => void
+  advanceDisabled: boolean
+  onAdvanceRound: () => void
   onMatchSelect?: (boardKey: string) => void
-  plan: ProcedureSlot[][]
+  onTablesChange: (tables: number) => void
+  queue: ProcedureQueue
+  roundLabel: string
   selectedBoardKey: string
+  tables: number
   totalMatches: number
 }) {
-  const boardCount = Math.max(1, Math.min(64, Math.floor(boards) || 1))
+  const tableCount = Math.max(1, Math.min(64, Math.floor(tables) || 1))
+  const finishedCount = queue.finished.length + queue.byes.length
+  const roundDone = totalMatches > 0 && finishedCount >= totalMatches
 
   return (
     <div className="procedure-planner">
       <div className="manage-panel-head procedure-head">
         <strong>Tournament procedure</strong>
         <label>
-          Physical boards
+          Physical tables
           <input
             type="number"
             min={1}
             max={64}
-            value={boardCount}
-            onChange={(event) => onBoardsChange(Math.max(1, Math.min(64, Math.floor(Number(event.target.value) || 1))))}
+            value={tableCount}
+            onChange={(event) => onTablesChange(Math.max(1, Math.min(64, Math.floor(Number(event.target.value) || 1))))}
           />
         </label>
       </div>
       <div className="procedure-summary">
-        <span>{totalMatches} matches</span>
-        <span>{boardCount} boards available</span>
-        <span>{plan.length} waves required</span>
+        <span>{roundLabel}</span>
+        <span>{finishedCount} of {totalMatches} games finished</span>
+        <span>{queue.waiting.length} waiting for a table</span>
       </div>
       <div className="procedure-rules">
-        <span>Start every board in Wave 1 first.</span>
-        <span>When a board finishes, start that board's match in the next wave.</span>
-        <span>Record result and moves from Bracket or Rounds before advancing.</span>
+        <span>Each table shows its current game; free tables pull the next waiting game.</span>
+        <span>Record results on the digital board — the next round is paired automatically when every game finishes.</span>
       </div>
-      {plan.map((wave, waveIndex) => (
-        <section className="pairing-round-block procedure-wave-block" key={`wave-${waveIndex + 1}`}>
+
+      <section className="pairing-round-block procedure-wave-block">
+        <div className="pairing-round-title procedure-wave-title">
+          Tables
+          <span>{queue.tables.filter((table) => table.match).length} in use</span>
+        </div>
+        {queue.tables.map((table) => (
+          <ProcedureTableRow
+            active={active}
+            key={`table-${table.tableNumber}`}
+            onMatchSelect={onMatchSelect}
+            selectedBoardKey={selectedBoardKey}
+            table={table}
+          />
+        ))}
+      </section>
+
+      {queue.waiting.length ? (
+        <section className="pairing-round-block procedure-wave-block">
           <div className="pairing-round-title procedure-wave-title">
-            Wave {waveIndex + 1}
-            <span>{wave.filter((slot) => slot.match).length} active boards</span>
+            Up next
+            <span>{queue.waiting.length} queued</span>
           </div>
-          {wave.map((slot) => (
-            <ProcedureWaveRow
-              active={active}
-              key={`${waveIndex}-${slot.boardNumber}`}
-              onMatchSelect={onMatchSelect}
-              selectedBoardKey={selectedBoardKey}
-              slot={slot}
-            />
+          {queue.waiting.map((match, index) => (
+            <div className="pairing-row procedure-wave-row queued" key={match.boardKey}>
+              <span>#{index + 1}</span>
+              <strong>
+                {match.white}
+                <small>{match.roundLabel} · Board {match.matchNumber}</small>
+              </strong>
+              <em>vs</em>
+              <strong>
+                {match.black}
+                <small>Starts when a table is free</small>
+              </strong>
+            </div>
           ))}
         </section>
-      ))}
+      ) : null}
+
+      {queue.byes.length ? (
+        <div className="procedure-byes">
+          {queue.byes.map((match) => (
+            <span key={match.boardKey}>{match.white} has a full-point bye this round.</span>
+          ))}
+        </div>
+      ) : null}
+
+      {queue.finished.length ? (
+        <section className="pairing-round-block procedure-wave-block finished">
+          <div className="pairing-round-title procedure-wave-title">
+            Finished
+            <span>{queue.finished.length} games</span>
+          </div>
+          {queue.finished.map((match) => (
+            <div className="pairing-row procedure-wave-row done" key={match.boardKey}>
+              <span>✓</span>
+              <strong>
+                {match.white}
+                <small>{match.roundLabel} · Board {match.matchNumber}</small>
+              </strong>
+              <em>vs</em>
+              <strong>
+                {match.black}
+                <small>{match.status}</small>
+              </strong>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {active ? (
+        <div className="procedure-advance">
+          <span>
+            {roundDone
+              ? 'All games are finished. The next round should appear automatically — use this if it has not.'
+              : 'Rounds advance automatically when the last result is saved.'}
+          </span>
+          <button type="button" className="mini-button dark" disabled={advanceDisabled} onClick={onAdvanceRound}>
+            Advance round
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
 
-function ProcedureWaveRow({
+function ProcedureTableRow({
   active,
   onMatchSelect,
   selectedBoardKey,
-  slot,
+  table,
 }: {
   active: boolean
   onMatchSelect?: (boardKey: string) => void
   selectedBoardKey: string
-  slot: ProcedureSlot
+  table: ProcedureTable
 }) {
-  const match = slot.match
+  const match = table.match
   const selectable = Boolean(active && match && onMatchSelect && isProcedureMatchPlayable(match))
   const selected = Boolean(match && selectedBoardKey === match.boardKey)
   const className = [
@@ -2095,31 +2226,32 @@ function ProcedureWaveRow({
     selectable ? 'selectable' : '',
     selected ? 'selected-board' : '',
     match ? '' : 'idle',
+    match?.live ? 'live' : '',
   ].filter(Boolean).join(' ')
   const content = match ? (
     <>
-      <span>B{slot.boardNumber}</span>
+      <span>T{table.tableNumber}</span>
       <strong>
         {match.white}
-        <small>{match.roundLabel} · Match {match.matchNumber}</small>
+        <small>{match.roundLabel} · Board {match.matchNumber}</small>
       </strong>
       <em>vs</em>
       <strong>
         {match.black}
-        <small>{slot.nextMatch ? `Next: ${slot.nextMatch.roundLabel} · Match ${slot.nextMatch.matchNumber}` : match.status}</small>
+        <small>{table.startNow ? 'Start now on this table' : match.status}</small>
       </strong>
     </>
   ) : (
     <>
-      <span>B{slot.boardNumber}</span>
+      <span>T{table.tableNumber}</span>
       <strong>
-        Board idle
-        <small>No match assigned</small>
+        Table free
+        <small>No game assigned</small>
       </strong>
       <em>-</em>
       <strong>
         Waiting
-        <small>No queued match in this wave</small>
+        <small>No queued game right now</small>
       </strong>
     </>
   )
@@ -2712,7 +2844,12 @@ function RegistrationQueue({
                     <td className="mono center">{item.rating ?? '-'}</td>
                     <td><StatusPill status={item.status} /></td>
                     <td className="mono center">{item.seed ?? '-'}</td>
-                    <td>{item.checkedIn ? 'Checked in' : 'Not checked in'}</td>
+                    <td>
+                      {item.checkedIn ? 'Checked in' : 'Not checked in'}
+                      {item.status === 'confirmed' && item.checkInCode ? (
+                        <small className="checkin-code">{item.checkInCode}</small>
+                      ) : null}
+                    </td>
                     <td className="right">
                       <select
                         aria-label={`Update ${item.playerName} registration status`}
@@ -3769,6 +3906,8 @@ function buildProcedureMatchesFromBracket(rounds: AdminBracketRound[]): Procedur
       board: index + 1,
       boardLabel: `${targetRound.name} Match ${matchNumber}`,
       boardKey: bracketBoardKey(targetRound.name, index),
+      completed: Boolean(match.winner),
+      live: Boolean(match.live),
       matchNumber,
       playable,
       round: undefined,
@@ -3782,25 +3921,31 @@ function buildProcedureMatchesFromBracket(rounds: AdminBracketRound[]): Procedur
 function buildProcedureMatchesFromAdminGames(tournament: AdminTournament, games: AdminGame[]): ProcedureMatch[] {
   const currentRound = currentRoundNumber(tournament)
   const source = games.filter((game) => (
-    game.status === 'live' ||
-    (game.status !== 'completed' && game.round === currentRound)
+    game.status === 'live' || game.round === currentRound
   ))
 
   return source
     .sort((a, b) => a.round - b.round || a.board - b.board)
-    .map((game) => ({
-      black: game.blackName,
-      board: game.board,
-      boardLabel: `${pairingRoundLabel(tournament, game.round)} Board ${game.board}`,
-      boardKey: `game:${game.id}`,
-      gameId: game.id,
-      matchNumber: game.board,
-      playable: true,
-      round: game.round,
-      roundLabel: pairingRoundLabel(tournament, game.round),
-      status: game.status === 'live' ? 'Live now' : 'Ready',
-      white: game.whiteName,
-    }))
+    .map((game) => {
+      const bye = game.blackName === 'Bye' || game.blackProfileId === 'system_bye'
+      const completed = game.status === 'completed' || game.status === 'forfeit'
+      return {
+        black: game.blackName,
+        board: game.board,
+        boardLabel: `${pairingRoundLabel(tournament, game.round)} Board ${game.board}`,
+        boardKey: `game:${game.id}`,
+        bye,
+        completed,
+        gameId: game.id,
+        live: game.status === 'live',
+        matchNumber: game.board,
+        playable: !completed && !bye,
+        round: game.round,
+        roundLabel: pairingRoundLabel(tournament, game.round),
+        status: bye ? 'Full-point bye' : completed ? `Finished ${game.result}` : game.status === 'live' ? 'Live now' : 'Ready',
+        white: game.whiteName,
+      }
+    })
 }
 
 function isProcedureMatchPlayable(match: ProcedureMatch) {
@@ -3815,21 +3960,56 @@ function normalizeAdminBoardResult(value: string): '1-0' | '0-1' | '1/2-1/2' | '
   return value === '1-0' || value === '0-1' || value === '1/2-1/2' ? value : '*'
 }
 
-function buildProcedurePlan(matches: ProcedureMatch[], boardCount: number): ProcedureSlot[][] {
-  const boards = Math.max(1, Math.min(64, Math.floor(boardCount) || 1))
-  const waveCount = Math.max(1, Math.ceil(matches.length / boards))
+function buildProcedureQueue(matches: ProcedureMatch[], tableCount: number): ProcedureQueue {
+  const tables = Math.max(1, Math.min(64, Math.floor(tableCount) || 1))
+  const byes = matches.filter((match) => match.bye)
+  const finished = matches.filter((match) => match.completed && !match.bye)
+  const live = matches.filter((match) => match.live && !match.completed)
+  const ready = matches.filter((match) => match.playable && !match.live)
 
-  return Array.from({ length: waveCount }, (_, waveIndex) => (
-    Array.from({ length: boards }, (_, boardIndex) => {
-      const matchIndex = waveIndex * boards + boardIndex
-      const nextIndex = (waveIndex + 1) * boards + boardIndex
-      return {
-        boardNumber: boardIndex + 1,
-        match: matches[matchIndex],
-        nextMatch: matches[nextIndex],
+  // Live games anchor to a table derived from their own board number, so a
+  // result landing on another table never moves a game that is being played.
+  const byTable = new Map<number, ProcedureMatch>()
+  const overflow: ProcedureMatch[] = []
+  for (const match of live) {
+    const preferred = ((match.board ?? match.matchNumber) - 1) % tables + 1
+    let slot = preferred
+    let placed = false
+    for (let step = 0; step < tables; step += 1) {
+      if (!byTable.has(slot)) {
+        byTable.set(slot, match)
+        placed = true
+        break
       }
-    })
-  ))
+      slot = (slot % tables) + 1
+    }
+    if (!placed) overflow.push(match)
+  }
+
+  // Free tables pull the next waiting match from the ready queue.
+  let readyCursor = 0
+  const assigned: ProcedureTable[] = []
+  for (let tableNumber = 1; tableNumber <= tables; tableNumber += 1) {
+    const liveMatch = byTable.get(tableNumber)
+    if (liveMatch) {
+      assigned.push({ tableNumber, match: liveMatch, startNow: false })
+      continue
+    }
+    const nextReady = ready[readyCursor]
+    if (nextReady) {
+      readyCursor += 1
+      assigned.push({ tableNumber, match: nextReady, startNow: true })
+      continue
+    }
+    assigned.push({ tableNumber, startNow: false })
+  }
+
+  return {
+    tables: assigned,
+    waiting: [...overflow, ...ready.slice(readyCursor)],
+    finished,
+    byes,
+  }
 }
 
 function getBracketPhase(tournament: AdminTournament): AdminBracketPhase {

@@ -781,7 +781,10 @@ function TableTab({
   const savedBracketConfig = tournament.bracketSnapshot
     ? bracketConfigFromPublishedSnapshot(tournament.bracketSnapshot)
     : null
-  const bracketConfig = gameBracketConfig ?? savedBracketConfig
+  // The published snapshot is the source of truth — the server regenerates it
+  // from real results on every advancement. The game-derived config is only a
+  // fallback for brackets published before snapshots existed.
+  const bracketConfig = savedBracketConfig ?? gameBracketConfig
 
   if (isBracketTournament(tournament)) {
     if (bracketConfig) {
@@ -879,10 +882,12 @@ function bracketConfigFromPublishedSnapshot(snapshot: PublishedBracketSnapshot):
 
   const winners = bracketDefinitionFromPublishedRounds(snapshot.brackets.winners)
   const winnerRoundLabels = snapshot.brackets.winners.map((round) => round.name)
-  const losers = bracketDefinitionFromPublishedRounds(normalizePublishedLowerBracketRounds(
-    snapshot.brackets.losers,
-    winnerRoundLabels,
-  ))
+  // Snapshots from version 2+ are generated server-side with authoritative,
+  // play-order labels already applied; only legacy snapshots need re-derivation.
+  const losersRounds = (snapshot.version ?? 1) >= 2
+    ? snapshot.brackets.losers
+    : normalizePublishedLowerBracketRounds(snapshot.brackets.losers, winnerRoundLabels)
+  const losers = bracketDefinitionFromPublishedRounds(losersRounds)
   const final = bracketDefinitionFromPublishedRounds(snapshot.brackets.final)
   if (!winners && !losers && !final) return null
 
