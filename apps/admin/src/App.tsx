@@ -17,6 +17,7 @@ import {
   publishTournamentPairings,
   signInAdmin,
   signOutAdmin,
+  submitTournamentGameResult,
   unblockIdentity,
   unblockIp,
   updateAdminStatus,
@@ -25,6 +26,7 @@ import {
   unpublishTournamentPairings,
   type AdminRegistration,
   type AdminRegistrationStatus,
+  type AdminGame,
   type AdminProfile,
   type AdminProfileLoadResult,
   type AdminRole,
@@ -81,12 +83,18 @@ type LiveBoardOption = {
   boardKey: string
   boardLabel: string
   black: string
+  board?: number
+  gameId?: string
+  round?: number
+  status?: string
   white: string
 }
 
 type PlayableBoard = Pairing & {
   boardKey: string
   boardLabel: string
+  gameId?: string
+  status?: string
 }
 
 type AdminBracketMatch = Pairing & {
@@ -131,10 +139,13 @@ type LiveBoardState = {
 
 type ProcedureMatch = {
   black: string
+  board?: number
   boardLabel: string
   boardKey: string
+  gameId?: string
   matchNumber: number
   playable: boolean
+  round?: number
   roundLabel: string
   status: string
   white: string
@@ -1284,6 +1295,29 @@ function TournamentsScreen({
     }
   }
 
+  async function handleGameResult(input: {
+    gameId?: string
+    tournamentId?: string
+    round?: number
+    board?: number
+    result: '1-0' | '0-1' | '1/2-1/2' | '*'
+    status?: 'live' | 'completed'
+    pgn?: string
+  }) {
+    setSubmitting(true)
+    setMessage(null)
+
+    try {
+      await submitTournamentGameResult(input)
+      setMessage(input.status === 'completed' ? 'Result saved and standings updated.' : 'Live game saved.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (managedTournament) {
     return (
       <div className="tournament-screen">
@@ -1295,6 +1329,7 @@ function TournamentsScreen({
             setManageTournamentKey('')
           }}
           onMessage={setMessage}
+          onGameResult={handleGameResult}
           onPublish={handlePublishPairings}
           onShuffle={handleShufflePairings}
           onUnpublish={handleUnpublishPairings}
@@ -1611,6 +1646,7 @@ function TournamentManageView({
   disabled,
   onBack,
   onComplete,
+  onGameResult,
   onMessage,
   onPublish,
   onShuffle,
@@ -1624,6 +1660,15 @@ function TournamentManageView({
   disabled: boolean
   onBack: () => void
   onComplete: (item: AdminTournament) => void
+  onGameResult: (input: {
+    gameId?: string
+    tournamentId?: string
+    round?: number
+    board?: number
+    result: '1-0' | '0-1' | '1/2-1/2' | '*'
+    status?: 'live' | 'completed'
+    pgn?: string
+  }) => Promise<void>
   onMessage: (message: string) => void
   onPublish: (item: AdminTournament, games: PairingPublishInput[], bracketSnapshot?: string) => void
   onShuffle: (item: AdminTournament) => void
@@ -1687,13 +1732,23 @@ function TournamentManageView({
     bracketConfig ? getAllAdminBracketRounds(bracketConfig) : []
   ), [bracketConfig])
   const liveBoardRounds = tournament.status === 'active' ? allBracketRounds : EMPTY_ADMIN_BRACKET_ROUNDS
+  const cloudGameBoards = useMemo(
+    () => buildPlayableBoardsFromAdminGames(tournament, tournament.publishedGameRows),
+    [tournament],
+  )
   const playableBoards = useMemo(() => (knockout || (multiStage && stage === 'bracket')
-    ? buildPlayableBracketBoards(liveBoardRounds)
-    : buildPlayableBoardsFromPairings(currentRoundPairings)
-  ), [currentRoundPairings, liveBoardRounds, knockout, multiStage, stage])
+    ? cloudGameBoards.length
+      ? cloudGameBoards
+      : buildPlayableBracketBoards(liveBoardRounds)
+    : cloudGameBoards.length
+      ? cloudGameBoards
+      : buildPlayableBoardsFromPairings(currentRoundPairings)
+  ), [cloudGameBoards, currentRoundPairings, liveBoardRounds, knockout, multiStage, stage])
   const procedureMatches = useMemo(() => (
     stage !== 'procedure'
       ? []
+      : tournament.publishedGameRows.length
+      ? buildProcedureMatchesFromAdminGames(tournament, tournament.publishedGameRows)
       : knockout || (multiStage && isMultiStagePhaseTwo(tournament))
       ? buildProcedureMatchesFromBracket(allBracketRounds)
       : buildProcedureMatchesFromPairings(
@@ -1753,6 +1808,24 @@ function TournamentManageView({
     window.setTimeout(() => {
       liveBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 0)
+  }
+
+  async function saveLiveBoardResult(board: LiveBoardOption, state: LiveBoardState) {
+    const result = normalizeAdminBoardResult(state.result)
+    if (!board.gameId && (!tournament.rowId || !board.round || !board.board)) {
+      onMessage('This board is not published as a game yet.')
+      return
+    }
+
+    await onGameResult({
+      gameId: board.gameId,
+      tournamentId: tournament.rowId,
+      round: board.round,
+      board: board.board,
+      result,
+      status: result === '*' ? 'live' : 'completed',
+      pgn: state.moves.join(' '),
+    })
   }
 
   const manageMode = tournament.status === 'upcoming' ? 'Prepare Tournament' : 'Live Tournament'
@@ -1858,6 +1931,7 @@ function TournamentManageView({
                 boards={playableBoards}
                 onBoardSelect={selectLiveBoard}
                 onMessage={onMessage}
+                onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
               />
@@ -1885,6 +1959,7 @@ function TournamentManageView({
                 boards={playableBoards}
                 onBoardSelect={selectLiveBoard}
                 onMessage={onMessage}
+                onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
               />
@@ -1907,6 +1982,7 @@ function TournamentManageView({
                 boards={liveBoardOptions}
                 onBoardSelect={selectLiveBoard}
                 onMessage={onMessage}
+                onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
               />
@@ -2418,16 +2494,19 @@ function LiveTournamentBoard({
   boards,
   onBoardSelect,
   onMessage,
+  onSaveGame,
   panelRef,
   selectedBoardKey,
 }: {
   boards: LiveBoardOption[]
   onBoardSelect: (boardKey: string) => void
   onMessage: (message: string) => void
+  onSaveGame: (board: LiveBoardOption, state: LiveBoardState) => Promise<void>
   panelRef: RefObject<HTMLElement | null>
   selectedBoardKey: string
 }) {
   const [boardStates, setBoardStates] = useState<Record<string, LiveBoardState>>({})
+  const [saving, setSaving] = useState(false)
   const pairing = boards.find((board) => board.boardKey === selectedBoardKey) ?? boards[0]
   const boardState = pairing ? boardStates[pairing.boardKey] ?? EMPTY_LIVE_BOARD_STATE : EMPTY_LIVE_BOARD_STATE
   const movePairs = buildMovePairs(boardState.moves)
@@ -2468,6 +2547,16 @@ function LiveTournamentBoard({
       result: value,
     })
     onMessage(`${pairing.white} vs ${pairing.black} result set to ${value}.`)
+  }
+
+  async function saveBoard() {
+    if (!pairing) return
+    setSaving(true)
+    try {
+      await onSaveGame(pairing, boardState)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -2534,8 +2623,8 @@ function LiveTournamentBoard({
           <div className="live-board-actions">
             <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!boardState.moves.length}>Undo</button>
             <button type="button" className="mini-button ghost" onClick={resetGame} disabled={!pairing}>Reset</button>
-            <button type="button" className="mini-button dark" disabled={!pairing} onClick={() => pairing && onMessage(`${pairing.boardLabel} saved with result ${boardState.result}.`)}>
-              Save board
+            <button type="button" className="mini-button dark" disabled={!pairing || saving} onClick={saveBoard}>
+              {saving ? 'Saving...' : 'Save board'}
             </button>
           </div>
         </aside>
@@ -3592,13 +3681,42 @@ function buildPlayableBoardsFromPairings(pairings: Pairing[]): PlayableBoard[] {
     }))
 }
 
+function buildPlayableBoardsFromAdminGames(tournament: AdminTournament, games: AdminGame[]): PlayableBoard[] {
+  const currentRound = currentRoundNumber(tournament)
+  const activeGames = games.filter((game) => (
+    game.status === 'live' ||
+    (game.status !== 'completed' && game.round === currentRound)
+  ))
+  const source = activeGames.length ? activeGames : games.filter((game) => game.status !== 'completed')
+
+  return source
+    .sort((a, b) => a.round - b.round || a.board - b.board)
+    .map((game) => ({
+      board: game.board,
+      black: game.blackName,
+      blackProfileId: game.blackProfileId,
+      blackRating: game.blackRating,
+      boardKey: `game:${game.id}`,
+      boardLabel: game.round > 1 ? `Round ${game.round} Board ${game.board}` : `Board ${game.board}`,
+      gameId: game.id,
+      round: game.round,
+      status: game.status,
+      white: game.whiteName,
+      whiteProfileId: game.whiteProfileId,
+      whiteRating: game.whiteRating,
+    }))
+}
+
 function buildPlayableBoardsFromProcedureMatches(matches: ProcedureMatch[]): LiveBoardOption[] {
   return matches
     .filter(isProcedureMatchPlayable)
     .map((match) => ({
+      board: match.board,
       boardKey: match.boardKey,
       boardLabel: match.boardLabel,
       black: match.black,
+      gameId: match.gameId,
+      round: match.round,
       white: match.white,
     }))
 }
@@ -3623,10 +3741,12 @@ function buildProcedureMatchesFromPairings(pairings: Pairing[], tournament: Admi
     const playable = hasKnownPlayers(pairing)
     return {
       black: pairing.black,
+      board: pairing.board,
       boardLabel: `${pairingRoundLabel(tournament, pairing.round ?? 1)} Board ${pairing.board}`,
       boardKey: pairingBoardKey(pairing.round ?? 1, pairing.board),
       matchNumber: pairing.board,
       playable,
+      round: pairing.round ?? 1,
       roundLabel: pairingRoundLabel(tournament, pairing.round ?? 1),
       status: playable ? 'Ready' : 'Waiting for player',
       white: pairing.white,
@@ -3646,15 +3766,41 @@ function buildProcedureMatchesFromBracket(rounds: AdminBracketRound[]): Procedur
     const matchNumber = match.matchNumber ?? index + 1
     return {
       black: match.black,
+      board: index + 1,
       boardLabel: `${targetRound.name} Match ${matchNumber}`,
       boardKey: bracketBoardKey(targetRound.name, index),
       matchNumber,
       playable,
+      round: undefined,
       roundLabel: targetRound.name,
       status: match.live ? 'Live now' : match.winner ? 'Complete' : playable ? 'Ready' : 'Waiting for player',
       white: match.white,
     }
   }).filter(isProcedureMatchPlayable)
+}
+
+function buildProcedureMatchesFromAdminGames(tournament: AdminTournament, games: AdminGame[]): ProcedureMatch[] {
+  const currentRound = currentRoundNumber(tournament)
+  const source = games.filter((game) => (
+    game.status === 'live' ||
+    (game.status !== 'completed' && game.round === currentRound)
+  ))
+
+  return source
+    .sort((a, b) => a.round - b.round || a.board - b.board)
+    .map((game) => ({
+      black: game.blackName,
+      board: game.board,
+      boardLabel: `${pairingRoundLabel(tournament, game.round)} Board ${game.board}`,
+      boardKey: `game:${game.id}`,
+      gameId: game.id,
+      matchNumber: game.board,
+      playable: true,
+      round: game.round,
+      roundLabel: pairingRoundLabel(tournament, game.round),
+      status: game.status === 'live' ? 'Live now' : 'Ready',
+      white: game.whiteName,
+    }))
 }
 
 function isProcedureMatchPlayable(match: ProcedureMatch) {
@@ -3663,6 +3809,10 @@ function isProcedureMatchPlayable(match: ProcedureMatch) {
 
 function pairingBoardKey(round: number, board: number) {
   return `pairing:${round}:${board}`
+}
+
+function normalizeAdminBoardResult(value: string): '1-0' | '0-1' | '1/2-1/2' | '*' {
+  return value === '1-0' || value === '0-1' || value === '1/2-1/2' ? value : '*'
 }
 
 function buildProcedurePlan(matches: ProcedureMatch[], boardCount: number): ProcedureSlot[][] {
@@ -4085,6 +4235,10 @@ function activeAdminBracketRoundIndex(
 ) {
   if (phase === 'completed') return labels.length
   if (phase !== 'active') return 0
+
+  if (tournament.currentRound && tournament.currentRound > 0) {
+    return Math.max(0, Math.min(labels.length - 1, tournament.currentRound - 1))
+  }
 
   const current = tournament.round.toLowerCase()
   const parsed = labels.findIndex((label) => {

@@ -98,7 +98,26 @@ export type AdminTournament = {
   location?: string
   description?: string
   publishedGames: number
+  publishedGameRows: AdminGame[]
   bracketSnapshot?: string
+}
+
+export type AdminGame = {
+  id: string
+  tournamentId: string
+  round: number
+  board: number
+  whiteProfileId: string
+  blackProfileId: string
+  whiteName: string
+  blackName: string
+  whiteRating: number
+  blackRating: number
+  status: 'scheduled' | 'live' | 'completed' | 'forfeit'
+  result: '1-0' | '0-1' | '1/2-1/2' | '*'
+  pgn?: string
+  startedAt?: string
+  finishedAt?: string
 }
 
 export type AdminRegistrationStatus = 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
@@ -279,7 +298,7 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
   }
 
   try {
-    const [rows, participantCounts, gameCounts] = await Promise.all([
+    const [rows, participantCounts, gamesByTournament] = await Promise.all([
       tablesDB.listRows<AppwriteTournamentRow>({
         databaseId: appwriteConfig.databaseId,
         tableId: tableIds.tournaments,
@@ -287,11 +306,11 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
         total: false,
       }),
       loadRegistrationCounts(),
-      loadPublishedGameCounts(),
+      loadPublishedGamesByTournament(),
     ])
 
     const tournaments = uniqueTournamentsByFormat(rows.rows
-      .map((row) => mapTournament(row, participantCounts, gameCounts))
+      .map((row) => mapTournament(row, participantCounts, gamesByTournament))
       .filter((tournament): tournament is AdminTournament => Boolean(tournament)))
       .sort(compareTournaments)
 
@@ -370,6 +389,32 @@ export async function unpublishTournamentPairings(rowId: string) {
   })
 
   return response.deleted
+}
+
+export async function submitTournamentGameResult(input: {
+  gameId?: string
+  tournamentId?: string
+  round?: number
+  board?: number
+  result: '1-0' | '0-1' | '1/2-1/2' | '*'
+  status?: 'live' | 'completed'
+  pgn?: string
+}) {
+  const response = await runAdminAction<{ row: AppwriteGameRow }>({
+    method: ExecutionMethod.POST,
+    path: input.gameId
+      ? `/games/${input.gameId}/result`
+      : `/tournaments/${input.tournamentId}/games/result`,
+    body: cleanBlockInput({
+      round: input.round,
+      board: input.board,
+      result: input.result,
+      status: input.status,
+      pgn: input.pgn,
+    }),
+  })
+
+  return response.row
 }
 
 export async function loadTournamentRegistrations(tournamentRowId: string): Promise<RegistrationLoadResult> {
@@ -538,26 +583,58 @@ async function loadRegistrationCounts() {
   return counts
 }
 
-async function loadPublishedGameCounts() {
-  const counts = new Map<string, number>()
+async function loadPublishedGamesByTournament() {
+  const gamesByTournament = new Map<string, AdminGame[]>()
 
   try {
-    const response = await tablesDB.listRows<AppwriteGameRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.games,
-      queries: [Query.limit(1000)],
-      total: false,
-    })
+    const [gameResponse, profileResponse] = await Promise.all([
+      tablesDB.listRows<AppwriteGameRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.games,
+        queries: [Query.limit(1000)],
+        total: false,
+      }),
+      tablesDB.listRows<AppwriteProfileRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.profiles,
+        queries: [Query.limit(1000)],
+        total: false,
+      }),
+    ])
+    const profiles = new Map(profileResponse.rows.map((row) => [row.$id, row]))
 
-    response.rows.forEach((row) => {
-      if (!row.tournamentId) return
-      counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
+    gameResponse.rows.forEach((row) => {
+      if (!row.tournamentId || !row.whiteProfileId || !row.blackProfileId) return
+      const white = profiles.get(row.whiteProfileId)
+      const black = profiles.get(row.blackProfileId)
+      const list = gamesByTournament.get(row.tournamentId) ?? []
+      list.push({
+        id: row.$id,
+        tournamentId: row.tournamentId,
+        round: row.round ?? 1,
+        board: row.board ?? list.length + 1,
+        whiteProfileId: row.whiteProfileId,
+        blackProfileId: row.blackProfileId,
+        whiteName: white?.displayName || white?.email || row.whiteProfileId,
+        blackName: black?.displayName || black?.email || row.blackProfileId,
+        whiteRating: white?.rating ?? 1200,
+        blackRating: black?.rating ?? 1200,
+        status: row.status ?? 'scheduled',
+        result: row.result ?? '*',
+        pgn: row.pgn,
+        startedAt: row.startedAt,
+        finishedAt: row.finishedAt,
+      })
+      gamesByTournament.set(row.tournamentId, list)
     })
   } catch (error) {
-    console.warn('Admin game count read failed.', error)
+    console.warn('Admin game read failed.', error)
   }
 
-  return counts
+  return new Map(Array.from(gamesByTournament.entries()).map(([tournamentId, games]) => [
+    tournamentId,
+    games.sort((a, b) => a.round - b.round || a.board - b.board),
+  ]))
 }
 
 async function loadProfilesById(profileIds: string[]) {
@@ -599,7 +676,7 @@ async function loadProfilesById(profileIds: string[]) {
 function mapTournament(
   row: AppwriteTournamentRow,
   participantCounts: Map<string, number>,
-  gameCounts: Map<string, number>,
+  gamesByTournament: Map<string, AdminGame[]>,
 ): AdminTournament | null {
   if (!row.format || !row.timeControl) return null
   const status = row.status === 'cancelled' ? 'archived' : row.status
@@ -607,6 +684,7 @@ function mapTournament(
   const format = normalizeTournamentFormat(row.format)
   const name = row.name?.trim() || format
   const slug = row.slug?.trim() || formatRouteId(name) || row.$id
+  const games = gamesByTournament.get(row.$id) ?? []
 
   return {
     id: slug,
@@ -624,7 +702,8 @@ function mapTournament(
     startsAt: row.startsAt,
     location: row.location,
     description: row.description,
-    publishedGames: gameCounts.get(row.$id) ?? 0,
+    publishedGames: games.length,
+    publishedGameRows: games,
     bracketSnapshot: row.bracketSnapshot,
   }
 }

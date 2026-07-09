@@ -489,14 +489,14 @@ class AppwriteService {
     }
     final displayFormat = normalizeTournamentFormat(format);
     final rawName = data['name']?.toString().trim();
-    final displayName =
-        rawName == null || rawName.isEmpty ? displayFormat : rawName;
+    final displayName = rawName == null || rawName.isEmpty
+        ? displayFormat
+        : rawName;
     final rawSlug = data['slug']?.toString().trim();
     final fallbackId = tournamentFormatId(displayName);
-    final tournamentId =
-        rawSlug == null || rawSlug.isEmpty
-            ? (fallbackId.isEmpty ? row.$id : fallbackId)
-            : rawSlug;
+    final tournamentId = rawSlug == null || rawSlug.isEmpty
+        ? (fallbackId.isEmpty ? row.$id : fallbackId)
+        : rawSlug;
 
     final roundsTotal = _asInt(data['roundsTotal']);
     final currentRound = _asInt(data['currentRound']);
@@ -663,6 +663,8 @@ Map<String, List<RoundSeed>> _groupPublishedRounds(
           : result == '*' || result == null
           ? '-'
           : result,
+      gameId: row.$id,
+      pgn: data['pgn']?.toString(),
     );
     groups.putIfAbsent(tournamentId, () => {});
     groups[tournamentId]!.putIfAbsent(round, () => []).add((
@@ -771,6 +773,8 @@ MatchSeed? _snapshotMatch(dynamic value) {
     _snapshotResult(value),
     matchNumber: _asInt(value['matchNumber']),
     nextIndex: _asInt(value['next']),
+    gameId: value['gameId']?.toString(),
+    pgn: value['pgn']?.toString(),
   );
 }
 
@@ -3239,7 +3243,10 @@ class BracketColumn extends StatelessWidget {
               left: 0,
               right: 0,
               height: BracketMetrics.matchHeight,
-              child: BracketMatchCard(match: round.games[i]),
+              child: BracketMatchCard(
+                match: round.games[i],
+                roundLabel: round.label,
+              ),
             ),
         ],
       ),
@@ -3372,9 +3379,14 @@ class BracketConnectorPainter extends CustomPainter {
 }
 
 class BracketMatchCard extends StatelessWidget {
-  const BracketMatchCard({required this.match, super.key});
+  const BracketMatchCard({
+    required this.match,
+    required this.roundLabel,
+    super.key,
+  });
 
   final MatchSeed match;
+  final String roundLabel;
 
   bool get _live => match.result.toLowerCase() == 'live';
   bool get _whiteWon => match.result == '1-0';
@@ -3387,7 +3399,7 @@ class BracketMatchCard extends StatelessWidget {
         : _whiteWon || _blackWon
         ? const Color(0x66a98a3f)
         : const Color(0x2421304e);
-    return Container(
+    final content = Container(
       decoration: BoxDecoration(
         color: _live ? const Color(0xfffff7ee) : const Color(0xfffffcf4),
         borderRadius: BorderRadius.circular(8),
@@ -3463,6 +3475,17 @@ class BracketMatchCard extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+
+    if (match.gameId == null) return content;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => openTournamentGameDetail(context, match, roundLabel),
+        child: content,
       ),
     );
   }
@@ -3718,6 +3741,7 @@ class TournamentRoundPanel extends StatelessWidget {
               bottomBorder: index != round.games.length - 1,
               event: event,
               match: round.games[index],
+              roundLabel: round.label,
             ),
         ],
       ),
@@ -3731,6 +3755,7 @@ class TournamentPairingRow extends StatelessWidget {
     required this.bottomBorder,
     required this.event,
     required this.match,
+    required this.roundLabel,
     super.key,
   });
 
@@ -3738,10 +3763,11 @@ class TournamentPairingRow extends StatelessWidget {
   final bool bottomBorder;
   final TournamentSeed event;
   final MatchSeed match;
+  final String roundLabel;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       decoration: BoxDecoration(
         border: bottomBorder
@@ -3785,6 +3811,16 @@ class TournamentPairingRow extends StatelessWidget {
             child: TournamentPairingPlayer(event: event, name: match.black),
           ),
         ],
+      ),
+    );
+
+    if (match.gameId == null) return content;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => openTournamentGameDetail(context, match, roundLabel),
+        child: content,
       ),
     );
   }
@@ -4842,6 +4878,119 @@ class PickGameScreen extends StatelessWidget {
   }
 }
 
+class TournamentGameDetailScreen extends StatefulWidget {
+  const TournamentGameDetailScreen({
+    required this.match,
+    required this.roundLabel,
+    super.key,
+  });
+
+  final MatchSeed match;
+  final String roundLabel;
+
+  @override
+  State<TournamentGameDetailScreen> createState() =>
+      _TournamentGameDetailScreenState();
+}
+
+class _TournamentGameDetailScreenState
+    extends State<TournamentGameDetailScreen> {
+  late final List<String> moves = _parseStoredMoves(widget.match.pgn);
+  bool flipped = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = widget.match.result == '-'
+        ? 'Scheduled'
+        : widget.match.result == 'live'
+        ? 'Live'
+        : widget.match.result;
+
+    return PrototypeRouteScaffold(
+      title: 'Tournament Game',
+      trailing: SquareIconButton(
+        icon: Icons.flip,
+        tooltip: 'Flip board',
+        onTap: () => setState(() => flipped = !flipped),
+      ),
+      children: [
+        const SizedBox(height: 14),
+        PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.roundLabel,
+                style: const TextStyle(
+                  color: Color(0x9921304e),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 7),
+              SerifText(
+                '${widget.match.white} vs ${widget.match.black}',
+                size: 19,
+                weight: FontWeight.w700,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  ChipPill(result),
+                  if (widget.match.matchNumber != null) ...[
+                    const SizedBox(width: 8),
+                    ChipPill('Match ${widget.match.matchNumber}'),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: PrototypeChessBoard(
+            flipped: flipped,
+            moves: moves,
+            readOnly: true,
+            onChanged: (_, _) {},
+          ),
+        ),
+        const SizedBox(height: 12),
+        PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Moves',
+                style: TextStyle(
+                  color: PrototypeColors.navy,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                moves.isEmpty
+                    ? 'No moves have been saved for this game yet.'
+                    : _formatStoredMoves(moves),
+                style: const TextStyle(
+                  color: PrototypeColors.navy,
+                  fontSize: 13,
+                  height: 1.55,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+      ],
+    );
+  }
+}
+
 class AnalysisBoardScreen extends StatefulWidget {
   const AnalysisBoardScreen({this.mode = 'analysis', super.key});
 
@@ -4990,12 +5139,14 @@ class PrototypeChessBoard extends StatefulWidget {
     required this.flipped,
     required this.moves,
     required this.onChanged,
+    this.readOnly = false,
     super.key,
   });
 
   final bool flipped;
   final List<String> moves;
   final void Function(List<String> moves, String result) onChanged;
+  final bool readOnly;
 
   @override
   State<PrototypeChessBoard> createState() => _PrototypeChessBoardState();
@@ -5150,7 +5301,9 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
 
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => _handleSquareTap(square, game, legalMoves),
+                    onTap: widget.readOnly
+                        ? null
+                        : () => _handleSquareTap(square, game, legalMoves),
                     child: Container(
                       decoration: BoxDecoration(
                         color: dark
@@ -5927,6 +6080,54 @@ class SectionHeading extends StatelessWidget {
       ),
     );
   }
+}
+
+void openTournamentGameDetail(
+  BuildContext context,
+  MatchSeed match,
+  String roundLabel,
+) {
+  openPrototypeRoute(
+    context,
+    TournamentGameDetailScreen(match: match, roundLabel: roundLabel),
+  );
+}
+
+List<String> _parseStoredMoves(String? value) {
+  final source = value?.trim();
+  if (source == null || source.isEmpty) return const [];
+
+  final tokens = source
+      .replaceAll(RegExp(r'\{[^}]*\}'), ' ')
+      .replaceAll(RegExp(r'\([^)]*\)'), ' ')
+      .split(RegExp(r'\s+'));
+  final moves = <String>[];
+
+  for (final rawToken in tokens) {
+    var token = rawToken.trim();
+    if (token.isEmpty) continue;
+    if (RegExp(r'^\d+\.(\.\.)?$').hasMatch(token)) continue;
+    token = token.replaceFirst(RegExp(r'^\d+\.(\.\.)?'), '');
+    if (token.isEmpty) continue;
+    if (const {'1-0', '0-1', '1/2-1/2', '*', 'live'}.contains(token)) {
+      continue;
+    }
+    moves.add(token);
+  }
+
+  return moves;
+}
+
+String _formatStoredMoves(List<String> moves) {
+  return moves
+      .asMap()
+      .entries
+      .map((entry) {
+        final index = entry.key;
+        final move = entry.value;
+        return index.isEven ? '${(index ~/ 2) + 1}. $move' : move;
+      })
+      .join('  ');
 }
 
 void openPrototypeRoute(BuildContext context, Widget screen) {
@@ -7325,15 +7526,19 @@ class MatchSeed {
     this.white,
     this.black,
     this.result, {
+    this.gameId,
     this.matchNumber,
     this.nextIndex,
+    this.pgn,
   });
 
   final String white;
   final String black;
   final String result;
+  final String? gameId;
   final int? matchNumber;
   final int? nextIndex;
+  final String? pgn;
 }
 
 class SavedAnalysisSeed {
@@ -7440,7 +7645,79 @@ List<RoundSeed> buildSingleEliminationRounds(
     current = winners;
   }
 
-  return rounds;
+  return _mergePublishedBracketRounds(rounds, event.publishedRounds);
+}
+
+List<RoundSeed> _mergePublishedBracketRounds(
+  List<RoundSeed> generated,
+  List<RoundSeed> published,
+) {
+  if (published.isEmpty) return generated;
+
+  final merged = <RoundSeed>[];
+  final maxRounds = math.max(generated.length, published.length);
+  for (var roundIndex = 0; roundIndex < maxRounds; roundIndex++) {
+    final generatedRound = roundIndex < generated.length
+        ? generated[roundIndex]
+        : null;
+    final publishedRound = roundIndex < published.length
+        ? published[roundIndex]
+        : null;
+
+    if (generatedRound == null) {
+      merged.add(publishedRound!);
+      continue;
+    }
+    if (publishedRound == null) {
+      merged.add(generatedRound);
+      continue;
+    }
+
+    merged.add(
+      RoundSeed(
+        generatedRound.label,
+        _mergePublishedBracketMatches(
+          generatedRound.games,
+          publishedRound.games,
+        ),
+      ),
+    );
+  }
+  return merged;
+}
+
+List<MatchSeed> _mergePublishedBracketMatches(
+  List<MatchSeed> generated,
+  List<MatchSeed> published,
+) {
+  final matches = <MatchSeed>[];
+  final maxMatches = math.max(generated.length, published.length);
+  for (var index = 0; index < maxMatches; index++) {
+    final generatedMatch = index < generated.length ? generated[index] : null;
+    final publishedMatch = index < published.length ? published[index] : null;
+
+    if (generatedMatch == null) {
+      matches.add(publishedMatch!);
+      continue;
+    }
+    if (publishedMatch == null) {
+      matches.add(generatedMatch);
+      continue;
+    }
+
+    matches.add(
+      MatchSeed(
+        publishedMatch.white,
+        publishedMatch.black,
+        publishedMatch.result,
+        gameId: publishedMatch.gameId,
+        matchNumber: generatedMatch.matchNumber ?? publishedMatch.matchNumber,
+        nextIndex: generatedMatch.nextIndex ?? publishedMatch.nextIndex,
+        pgn: publishedMatch.pgn,
+      ),
+    );
+  }
+  return matches;
 }
 
 DoubleEliminationRoundSets buildDoubleEliminationRounds(TournamentSeed event) {
@@ -7722,6 +7999,11 @@ bool _isByeName(String name) => name == bracketByeName;
 int _activeBracketRoundIndex(List<String> labels, TournamentSeed event) {
   if (event.status == 'completed') return labels.length;
   if (event.status != 'active') return 0;
+  final currentRound = event.currentRound;
+  if (currentRound != null && currentRound > 0) {
+    return math.max(0, math.min(labels.length - 1, currentRound - 1));
+  }
+
   final current = event.current.toLowerCase();
   final parsed = labels.indexWhere((label) {
     final lower = label.toLowerCase();

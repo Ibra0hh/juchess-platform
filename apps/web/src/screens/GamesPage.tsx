@@ -4,6 +4,8 @@ import { JuChessBoard, type JuChessBoardChange } from '../components/JuChessBoar
 import SiteHeader from '../components/SiteHeader'
 import {
   findSampleGame,
+  loadTournamentGame,
+  loadTournamentGameArchive,
   sampleGamesBySource,
   type GameSource,
   type MoveClassification,
@@ -43,7 +45,8 @@ const classificationOrder: MoveClassification[] = ['Brilliant', 'Great', 'Best',
 
 function GamesPage() {
   const [searchParams] = useSearchParams()
-  const queryGame = findSampleGame(searchParams.get('game'))
+  const queryGameId = searchParams.get('game')
+  const queryGame = findSampleGame(queryGameId)
   const queryMode = searchParams.get('mode') === 'analysis' ? 'analysis' : 'review'
   const [mode, setMode] = useState<GameMode>(queryMode)
   const [step, setStep] = useState<WorkspaceStep>(queryGame ? 'review' : 'source')
@@ -51,8 +54,10 @@ function GamesPage() {
   const [searchText, setSearchText] = useState('')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [game, setGame] = useState<SampleGame | null>(queryGame)
-  const [moveIdx, setMoveIdx] = useState(queryGame ? queryGame.moves.length - 1 : 0)
+  const [moveIdx, setMoveIdx] = useState(queryGame ? Math.max(0, queryGame.moves.length - 1) : 0)
   const [pgnText, setPgnText] = useState('')
+  const [loadingGame, setLoadingGame] = useState(Boolean(queryGameId && !queryGame))
+  const [tournamentArchive, setTournamentArchive] = useState<SampleGame[]>(sampleGamesBySource.tournament)
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false)
   const [workspaceMoves, setWorkspaceMoves] = useState<string[]>([])
   const [workspaceResult, setWorkspaceResult] = useState('Live')
@@ -60,14 +65,57 @@ function GamesPage() {
   const [ran, setRan] = useState(false)
 
   useEffect(() => {
-    const fromUrl = findSampleGame(searchParams.get('game'))
-    if (!fromUrl) return
+    const gameId = queryGameId
+    if (!gameId) {
+      setLoadingGame(false)
+      return
+    }
+
+    const fromUrl = findSampleGame(gameId)
+    if (fromUrl) {
+      setMode('review')
+      setStep('review')
+      setGame(fromUrl)
+      setMoveIdx(Math.max(0, fromUrl.moves.length - 1))
+      setLoadingGame(false)
+      return
+    }
 
     setMode('review')
-    setStep('review')
-    setGame(fromUrl)
-    setMoveIdx(fromUrl.moves.length - 1)
-  }, [searchParams])
+    setLoadingGame(true)
+
+    let active = true
+    loadTournamentGame(gameId).then((cloudGame) => {
+      if (!active) return
+
+      if (cloudGame) {
+        setStep('review')
+        setGame(cloudGame)
+        setMoveIdx(Math.max(0, cloudGame.moves.length - 1))
+      } else {
+        setStep('source')
+        setGame(null)
+      }
+      setLoadingGame(false)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [queryGameId])
+
+  useEffect(() => {
+    if (source !== 'tournament') return
+
+    let active = true
+    loadTournamentGameArchive().then((games) => {
+      if (active) setTournamentArchive(games)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [source])
 
   useEffect(() => {
     if (step !== 'review' || !game) return
@@ -76,7 +124,7 @@ function GamesPage() {
       if (event.key === 'ArrowLeft') {
         setMoveIdx((current) => Math.max(0, current - 1))
       }
-      if (event.key === 'ArrowRight') {
+      if (event.key === 'ArrowRight' && game.moves.length > 0) {
         setMoveIdx((current) => Math.min(game.moves.length - 1, current + 1))
       }
     }
@@ -89,7 +137,7 @@ function GamesPage() {
   const visiblePool = useMemo(() => {
     if (!source) return []
 
-    const rawPool = sampleGamesBySource[source]
+    const rawPool = source === 'tournament' ? tournamentArchive : sampleGamesBySource[source]
     if (source !== 'tournament') return rawPool
 
     const needle = searchText.trim().toLowerCase()
@@ -100,7 +148,7 @@ function GamesPage() {
     ))
 
     return filtered.length ? filtered : rawPool
-  }, [searchText, source])
+  }, [searchText, source, tournamentArchive])
 
   const selectedGame = visiblePool.find((item) => item.key === selectedKey) || null
   const isReviewMode = mode === 'review'
@@ -132,7 +180,7 @@ function GamesPage() {
     if (!selectedGame) return
 
     setGame(selectedGame)
-    setMoveIdx(selectedGame.moves.length - 1)
+    setMoveIdx(Math.max(0, selectedGame.moves.length - 1))
     setSaved(false)
     setRan(mode === 'analysis')
     setWorkspaceLoaded(mode === 'analysis')
@@ -205,27 +253,33 @@ function GamesPage() {
           />
 
           {inReview && game ? (
-            <div className="move-controls" aria-label="Move controls">
-              <button type="button" aria-label="Go to start" onClick={() => setMoveIdx(0)}>
-                &laquo;
-              </button>
-              <button type="button" aria-label="Previous move" onClick={() => setMoveIdx((current) => Math.max(0, current - 1))}>
-                &lsaquo;
-              </button>
-              <span>
-                Move {moveIdx + 1} / {game.moves.length}
-              </span>
-              <button
-                type="button"
-                aria-label="Next move"
-                onClick={() => setMoveIdx((current) => Math.min(game.moves.length - 1, current + 1))}
-              >
-                &rsaquo;
-              </button>
-              <button type="button" aria-label="Go to end" onClick={() => setMoveIdx(game.moves.length - 1)}>
-                &raquo;
-              </button>
-            </div>
+            game.moves.length > 0 ? (
+              <div className="move-controls" aria-label="Move controls">
+                <button type="button" aria-label="Go to start" onClick={() => setMoveIdx(0)}>
+                  &laquo;
+                </button>
+                <button type="button" aria-label="Previous move" onClick={() => setMoveIdx((current) => Math.max(0, current - 1))}>
+                  &lsaquo;
+                </button>
+                <span>
+                  Move {moveIdx + 1} / {game.moves.length}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next move"
+                  onClick={() => setMoveIdx((current) => Math.min(game.moves.length - 1, current + 1))}
+                >
+                  &rsaquo;
+                </button>
+                <button type="button" aria-label="Go to end" onClick={() => setMoveIdx(game.moves.length - 1)}>
+                  &raquo;
+                </button>
+              </div>
+            ) : (
+              <div className="move-controls" aria-label="Move controls">
+                <span>No moves saved yet</span>
+              </div>
+            )
           ) : null}
         </section>
 
@@ -263,7 +317,14 @@ function GamesPage() {
             </button>
           </div>
 
-          {step === 'source' ? (
+          {loadingGame ? (
+            <section className="rail-panel search-panel">
+              <h2>Opening game</h2>
+              <p>Loading the saved tournament board.</p>
+            </section>
+          ) : null}
+
+          {step === 'source' && !loadingGame ? (
             <SourceStep
               isAnalysis={!isReviewMode}
               onBlank={openBlankBoard}
@@ -350,7 +411,7 @@ function GamesPage() {
                 setGame(nextGame)
                 setMode('review')
                 setStep('review')
-                setMoveIdx(nextGame.moves.length - 1)
+                setMoveIdx(Math.max(0, nextGame.moves.length - 1))
               }}
               onRun={() => setRan(true)}
               onSave={() => setSaved(true)}

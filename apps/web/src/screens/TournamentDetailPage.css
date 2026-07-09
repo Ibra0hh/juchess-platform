@@ -613,6 +613,12 @@
   gap: 8px;
   padding: 12px 22px;
   border-bottom: 1px solid #f4f0e8;
+  color: inherit;
+  text-decoration: none;
+}
+
+.round-admin-pairing.clickable-game:hover {
+  background: #fff7ee;
 }
 
 .round-admin-pairing:last-child {
@@ -985,6 +991,13 @@
   border-radius: 8px;
   background: #fffcf4;
   box-shadow: 0 1px 3px rgba(30, 43, 69, 0.06);
+  color: inherit;
+  text-decoration: none;
+}
+
+.bracket-match.rich.clickable-game:hover {
+  border-color: rgba(122, 36, 49, 0.36);
+  box-shadow: 0 5px 16px rgba(30, 43, 69, 0.12);
 }
 
 .bracket-match.rich.complete {

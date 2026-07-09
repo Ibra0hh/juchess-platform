@@ -14,6 +14,8 @@ export type Tournament = {
   timeControl: string
   participants: number
   capacity?: number
+  roundsTotal?: number
+  currentRound?: number
   round: string
   desc: string
   registeredPlayers?: Member[]
@@ -59,6 +61,9 @@ type AppwriteGameRow = Models.Row & {
   blackProfileId?: string
   status?: 'scheduled' | 'live' | 'completed' | 'forfeit'
   result?: '1-0' | '0-1' | '1/2-1/2' | '*'
+  pgn?: string
+  startedAt?: string
+  finishedAt?: string
 }
 
 type AppwriteAnnouncementRow = Models.Row & {
@@ -85,12 +90,16 @@ export type TournamentGame = {
   black: Member
   status: 'scheduled' | 'live' | 'completed' | 'forfeit'
   result: '1-0' | '0-1' | '1/2-1/2' | '*'
+  pgn?: string
+  startedAt?: string
+  finishedAt?: string
 }
 
 export type PublishedBracketSide = 'white' | 'black'
 export type PublishedBracketView = 'winners' | 'losers' | 'final'
 
 export type PublishedBracketMatch = {
+  gameId?: string
   board?: number
   matchNumber?: number
   white: string
@@ -583,6 +592,128 @@ export function findSampleGame(value: string | null | undefined): SampleGame | n
     .find((game) => game.key === value || game.id === value) || null
 }
 
+export async function loadTournamentGame(gameId: string | null | undefined): Promise<SampleGame | null> {
+  if (!appwriteReady || !gameId) return null
+
+  try {
+    const row = await tablesDB.getRow<AppwriteGameRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.games,
+      rowId: gameId,
+    })
+    const profiles = await loadProfilesForGame(row)
+    return appwriteGameToSampleGame(row, profiles)
+  } catch (error) {
+    console.warn('JuChess cloud game read failed.', error)
+    return null
+  }
+}
+
+export async function loadTournamentGameArchive(): Promise<SampleGame[]> {
+  if (!appwriteReady) return sampleGamesBySource.tournament
+
+  try {
+    const [games, profiles] = await Promise.all([
+      tablesDB.listRows<AppwriteGameRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.games,
+        queries: [Query.limit(1000)],
+        total: false,
+      }),
+      tablesDB.listRows<AppwriteProfileRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.profiles,
+        queries: [Query.limit(1000)],
+        total: false,
+      }),
+    ])
+    const profileMap = mapProfiles(profiles.rows)
+    const mapped = games.rows
+      .map((row) => appwriteGameToSampleGame(row, profileMap))
+      .filter((game): game is SampleGame => Boolean(game))
+      .sort((a, b) => b.date.localeCompare(a.date))
+
+    return mapped.length ? mapped : sampleGamesBySource.tournament
+  } catch (error) {
+    console.warn('JuChess cloud game archive read failed.', error)
+    return sampleGamesBySource.tournament
+  }
+}
+
+async function loadProfilesForGame(row: AppwriteGameRow) {
+  const profiles = new Map<string, Member>()
+  await Promise.all([row.whiteProfileId, row.blackProfileId].filter(Boolean).map(async (profileId) => {
+    try {
+      const profile = await tablesDB.getRow<AppwriteProfileRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.profiles,
+        rowId: profileId as string,
+      })
+      profiles.set(profile.$id, {
+        id: profile.$id,
+        name: profile.displayName || profile.email || profile.$id,
+        rating: profile.rating ?? 1200,
+        universityId: profile.universityId || profile.email || profile.$id,
+      })
+    } catch {
+      // Missing profile rows should not block opening a saved game.
+    }
+  }))
+  return profiles
+}
+
+function appwriteGameToSampleGame(row: AppwriteGameRow, profiles: Map<string, Member>): SampleGame | null {
+  if (!row.whiteProfileId || !row.blackProfileId) return null
+
+  const white = profiles.get(row.whiteProfileId) ?? {
+    id: row.whiteProfileId,
+    name: row.whiteProfileId,
+    rating: 1200,
+    universityId: row.whiteProfileId,
+  }
+  const black = profiles.get(row.blackProfileId) ?? {
+    id: row.blackProfileId,
+    name: row.blackProfileId,
+    rating: 1200,
+    universityId: row.blackProfileId,
+  }
+  const moves = parseStoredMoves(row.pgn)
+  const moveCount = Math.max(1, moves.length)
+
+  return {
+    key: row.$id,
+    id: row.$id,
+    source: 'tournament',
+    white: white.name,
+    black: black.name,
+    wRating: white.rating,
+    bRating: black.rating,
+    result: row.status === 'live' ? 'Live' : row.result || '*',
+    date: formatDate(row.finishedAt || row.startedAt || row.$updatedAt || row.$createdAt),
+    opening: moves.length ? 'Saved tournament PGN' : 'Tournament game',
+    round: `Round ${row.round ?? 1} · Board ${row.board ?? 1}`,
+    fen: sampleFens[0],
+    moves,
+    classes: Array.from({ length: moveCount }, (_value, index) => sampleClasses[index % sampleClasses.length]),
+    evals: Array.from({ length: moveCount }, (_value, index) => sampleEvals[index % sampleEvals.length] ?? 0.2),
+    wAcc: 0,
+    bAcc: 0,
+    live: row.status === 'live',
+  }
+}
+
+function parseStoredMoves(value?: string) {
+  if (!value) return []
+
+  return value
+    .replace(/\{[^}]*\}/g, ' ')
+    .replace(/\d+\.(\.\.)?/g, ' ')
+    .replace(/\b(?:1-0|0-1|1\/2-1\/2|\*)\b/g, ' ')
+    .split(/\s+/)
+    .map((move) => move.trim())
+    .filter(Boolean)
+}
+
 export type TournamentLoadResult = {
   tournaments: Tournament[]
   source: 'cloud' | 'unavailable'
@@ -770,6 +901,9 @@ function groupPublishedGames(rows: AppwriteGameRow[], profiles: Map<string, Memb
       black,
       status: row.status ?? 'scheduled',
       result: row.result ?? '*',
+      pgn: row.pgn,
+      startedAt: row.startedAt,
+      finishedAt: row.finishedAt,
     })
     groups.set(row.tournamentId, list)
   })
@@ -805,6 +939,8 @@ function mapAppwriteTournament(
     timeControl: row.timeControl,
     participants: participantCounts.get(row.$id) ?? 0,
     capacity: row.capacity,
+    roundsTotal: row.roundsTotal,
+    currentRound: row.currentRound,
     round: formatRound(row),
     desc: row.description || 'Club tournament details will be published by the organizers.',
     registeredPlayers: playersByTournament.get(row.$id) ?? [],
@@ -877,6 +1013,7 @@ function sanitizePublishedBracketMatch(value: unknown): PublishedBracketMatch | 
     black: match.black,
     blackScore: typeof match.blackScore === 'string' ? match.blackScore : undefined,
     board: typeof match.board === 'number' ? match.board : undefined,
+    gameId: typeof match.gameId === 'string' ? match.gameId : undefined,
     live: Boolean(match.live),
     matchNumber: typeof match.matchNumber === 'number' ? match.matchNumber : undefined,
     next: typeof match.next === 'number' ? match.next : undefined,

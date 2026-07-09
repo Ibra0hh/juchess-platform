@@ -112,6 +112,378 @@ function actorProfileId(req, body, actor) {
   return body.actorProfileId || actor?.$id || req.headers['x-appwrite-user-id'] || 'system';
 }
 
+function normalizeResult(value) {
+  const result = String(value ?? '').trim();
+  if (result === 'Live' || result === 'live' || result === '*') return '*';
+  if (['1-0', '0-1', '1/2-1/2'].includes(result)) return result;
+  return null;
+}
+
+function statusForResult(result, requestedStatus) {
+  if (requestedStatus && ['scheduled', 'live', 'completed', 'forfeit'].includes(requestedStatus)) {
+    return requestedStatus;
+  }
+
+  return result === '*' ? 'live' : 'completed';
+}
+
+function normalizeTournamentFormat(value) {
+  return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+}
+
+function isSingleEliminationTournament(tournament) {
+  const format = normalizeTournamentFormat(tournament.format);
+  return format.includes('single elimination') || format.includes('knockout');
+}
+
+function isRoundRobinTournament(tournament) {
+  const format = normalizeTournamentFormat(tournament.format);
+  return format === 'round robin' || format === 'double round robin';
+}
+
+function isDoubleRoundRobinTournament(tournament) {
+  return normalizeTournamentFormat(tournament.format) === 'double round robin';
+}
+
+function isGameDecided(game) {
+  return game.status === 'completed' && ['1-0', '0-1', '1/2-1/2'].includes(game.result);
+}
+
+function decisiveWinnerProfileId(game) {
+  if (game.result === '1-0') return game.whiteProfileId;
+  if (game.result === '0-1') return game.blackProfileId;
+  return null;
+}
+
+function compareRegistrationSeeds(a, b) {
+  return (Number(a.seed) || 9999) - (Number(b.seed) || 9999)
+    || String(a.$createdAt || '').localeCompare(String(b.$createdAt || ''))
+    || String(a.profileId || '').localeCompare(String(b.profileId || ''));
+}
+
+function splitSeededPairings(profileIds) {
+  const half = Math.ceil(profileIds.length / 2);
+  return profileIds.slice(0, half).flatMap((whiteProfileId, index) => {
+    const blackProfileId = profileIds[index + half];
+    if (!blackProfileId || whiteProfileId === blackProfileId) return [];
+    return [{ whiteProfileId, blackProfileId, board: index + 1 }];
+  });
+}
+
+function buildRoundRobinSchedule(profileIds, doubleCycle = false) {
+  if (profileIds.length < 2) return [];
+
+  const entrants = profileIds.length % 2 === 0 ? [...profileIds] : [...profileIds, null];
+  let rotation = [...entrants];
+  const roundCount = entrants.length - 1;
+  const games = [];
+
+  for (let round = 1; round <= roundCount; round += 1) {
+    let board = 1;
+    for (let index = 0; index < entrants.length / 2; index += 1) {
+      const first = rotation[index];
+      const second = rotation[rotation.length - 1 - index];
+      if (first && second && first !== second) {
+        games.push({
+          round,
+          board,
+          whiteProfileId: round % 2 === 0 ? second : first,
+          blackProfileId: round % 2 === 0 ? first : second,
+        });
+        board += 1;
+      }
+    }
+
+    rotation = [rotation[0], rotation[rotation.length - 1], ...rotation.slice(1, -1)];
+  }
+
+  if (!doubleCycle) return games;
+
+  return [
+    ...games,
+    ...games.map((game) => ({
+      round: game.round + roundCount,
+      board: game.board,
+      whiteProfileId: game.blackProfileId,
+      blackProfileId: game.whiteProfileId,
+    })),
+  ];
+}
+
+async function listRowsByTournament(tablesDB, databaseId, tableId, tournamentId) {
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId,
+    queries: [Query.equal('tournamentId', tournamentId), Query.limit(500)],
+    total: false,
+  });
+
+  return response.rows;
+}
+
+async function listConfirmedRegistrations(tablesDB, databaseId, tournamentId) {
+  const rows = await listRowsByTournament(tablesDB, databaseId, tableIds.registrations, tournamentId);
+  return rows
+    .filter((row) => row.status === 'confirmed' || row.checkedIn)
+    .filter((row) => row.profileId)
+    .toSorted(compareRegistrationSeeds);
+}
+
+async function createTournamentGames(tablesDB, databaseId, tournamentId, games, liveRound = 1) {
+  const rows = [];
+  for (const game of games) {
+    const row = await tablesDB.createRow({
+      databaseId,
+      tableId: tableIds.games,
+      rowId: ID.unique(),
+      data: cleanObject({
+        tournamentId,
+        round: Number(game.round),
+        board: Number(game.board),
+        whiteProfileId: String(game.whiteProfileId),
+        blackProfileId: String(game.blackProfileId),
+        status: Number(game.round) === liveRound ? 'live' : 'scheduled',
+        result: '*',
+        startedAt: Number(game.round) === liveRound ? new Date().toISOString() : undefined,
+      }),
+      permissions: [Permission.read(Role.any())],
+    });
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextData = {}) {
+  const tournament = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.tournaments,
+    rowId: tournamentId,
+  });
+  const nextTournament = { ...tournament, ...nextData };
+
+  const existingGames = await listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId);
+  if (existingGames.length > 0) {
+    return { createdGames: [], roundsTotal: nextTournament.roundsTotal || tournament.roundsTotal || 1 };
+  }
+
+  const registrations = await listConfirmedRegistrations(tablesDB, databaseId, tournamentId);
+  const profileIds = registrations.map((row) => row.profileId).filter(Boolean);
+  if (profileIds.length < 2) {
+    throw new HttpError(400, 'At least two confirmed players are required before a tournament can go active.');
+  }
+
+  const schedule = isRoundRobinTournament(nextTournament)
+    ? buildRoundRobinSchedule(profileIds, isDoubleRoundRobinTournament(nextTournament))
+    : splitSeededPairings(profileIds).map((game) => ({ ...game, round: 1 }));
+  if (!schedule.length) {
+    throw new HttpError(400, 'Could not build first-round games for this tournament.');
+  }
+
+  const roundsTotal = Math.max(
+    1,
+    ...schedule.map((game) => Number(game.round)).filter(Number.isFinite),
+    Number(nextTournament.roundsTotal) || 0,
+  );
+  const createdGames = await createTournamentGames(tablesDB, databaseId, tournamentId, schedule, 1);
+  return { createdGames, roundsTotal };
+}
+
+async function recalculateStandings(tablesDB, databaseId, tournamentId) {
+  const [registrations, games, standings] = await Promise.all([
+    listConfirmedRegistrations(tablesDB, databaseId, tournamentId),
+    listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId),
+    listRowsByTournament(tablesDB, databaseId, tableIds.standings, tournamentId),
+  ]);
+  const existingByProfile = new Map(standings.map((row) => [row.profileId, row]));
+  const seedByProfile = new Map(registrations.map((row, index) => [row.profileId, Number(row.seed) || index + 1]));
+  const stats = new Map();
+
+  for (const registration of registrations) {
+    stats.set(registration.profileId, {
+      points: 0,
+      played: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      tieBreak: 0,
+    });
+  }
+
+  for (const game of games) {
+    if (!isGameDecided(game)) continue;
+    const white = stats.get(game.whiteProfileId);
+    const black = stats.get(game.blackProfileId);
+    if (!white || !black) continue;
+
+    white.played += 1;
+    black.played += 1;
+    if (game.result === '1-0') {
+      white.points += 1;
+      white.wins += 1;
+      black.losses += 1;
+    } else if (game.result === '0-1') {
+      black.points += 1;
+      black.wins += 1;
+      white.losses += 1;
+    } else {
+      white.points += 0.5;
+      black.points += 0.5;
+      white.draws += 1;
+      black.draws += 1;
+    }
+  }
+
+  const ranked = Array.from(stats.entries()).toSorted(([profileA, a], [profileB, b]) => (
+    b.points - a.points ||
+    b.wins - a.wins ||
+    b.played - a.played ||
+    (seedByProfile.get(profileA) ?? 9999) - (seedByProfile.get(profileB) ?? 9999) ||
+    profileA.localeCompare(profileB)
+  ));
+
+  for (let index = 0; index < ranked.length; index += 1) {
+    const [profileId, rowStats] = ranked[index];
+    const existing = existingByProfile.get(profileId);
+    const data = {
+      tournamentId,
+      profileId,
+      rank: index + 1,
+      points: rowStats.points,
+      tieBreak: rowStats.tieBreak,
+      played: rowStats.played,
+      wins: rowStats.wins,
+      draws: rowStats.draws,
+      losses: rowStats.losses,
+    };
+
+    if (existing) {
+      await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.standings,
+        rowId: existing.$id,
+        data,
+      });
+    } else {
+      await tablesDB.createRow({
+        databaseId,
+        tableId: tableIds.standings,
+        rowId: ID.unique(),
+        data,
+      });
+    }
+  }
+}
+
+async function advanceSingleEliminationIfReady(tablesDB, databaseId, tournamentId, completedRound) {
+  const tournament = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.tournaments,
+    rowId: tournamentId,
+  });
+  if (!isSingleEliminationTournament(tournament) || tournament.status !== 'active') return;
+
+  const games = await listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId);
+  const roundGames = games
+    .filter((game) => Number(game.round) === Number(completedRound))
+    .toSorted((a, b) => Number(a.board) - Number(b.board));
+  if (!roundGames.length || !roundGames.every((game) => game.status === 'completed')) return;
+
+  const winners = roundGames.map(decisiveWinnerProfileId);
+  if (winners.some((winner) => !winner)) return;
+
+  if (winners.length === 1) {
+    await tablesDB.updateRow({
+      databaseId,
+      tableId: tableIds.tournaments,
+      rowId: tournamentId,
+      data: cleanObject({
+        status: 'completed',
+        currentRound: Number(completedRound),
+        endsAt: tournament.endsAt || new Date().toISOString(),
+      }),
+    });
+    return;
+  }
+
+  const nextRound = Number(completedRound) + 1;
+  const existingNextRound = games.some((game) => Number(game.round) === nextRound);
+  if (existingNextRound) return;
+
+  const nextGames = [];
+  for (let index = 0; index < winners.length; index += 2) {
+    const whiteProfileId = winners[index];
+    const blackProfileId = winners[index + 1];
+    if (!whiteProfileId || !blackProfileId || whiteProfileId === blackProfileId) continue;
+    nextGames.push({
+      round: nextRound,
+      board: Math.floor(index / 2) + 1,
+      whiteProfileId,
+      blackProfileId,
+    });
+  }
+
+  await createTournamentGames(tablesDB, databaseId, tournamentId, nextGames, nextRound);
+  await tablesDB.updateRow({
+    databaseId,
+    tableId: tableIds.tournaments,
+    rowId: tournamentId,
+    data: cleanObject({
+      currentRound: nextRound,
+      roundsTotal: Math.max(Number(tournament.roundsTotal) || 0, nextRound),
+    }),
+  });
+}
+
+async function submitGameResult(tablesDB, databaseId, gameId, body) {
+  const result = normalizeResult(body.result);
+  if (!result) {
+    throw new HttpError(400, 'Unsupported game result.');
+  }
+  const status = statusForResult(result, body.status);
+  const current = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.games,
+    rowId: gameId,
+  });
+
+  const row = await tablesDB.updateRow({
+    databaseId,
+    tableId: tableIds.games,
+    rowId: gameId,
+    data: cleanObject({
+      status,
+      result,
+      pgn: body.pgn,
+      startedAt: current.startedAt || body.startedAt || new Date().toISOString(),
+      finishedAt: status === 'completed' ? body.finishedAt ?? new Date().toISOString() : undefined,
+    }),
+  });
+
+  await recalculateStandings(tablesDB, databaseId, row.tournamentId);
+  if (status === 'completed') {
+    await advanceSingleEliminationIfReady(tablesDB, databaseId, row.tournamentId, row.round);
+  }
+
+  return row;
+}
+
+async function findTournamentGameByBoard(tablesDB, databaseId, tournamentId, round, board) {
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.games,
+    queries: [
+      Query.equal('tournamentId', tournamentId),
+      Query.equal('round', Number(round)),
+      Query.equal('board', Number(board)),
+      Query.limit(1),
+    ],
+    total: false,
+  });
+
+  return response.rows[0] ?? null;
+}
+
 async function writeAudit(tablesDB, databaseId, { actorProfileId, action, targetTable, targetRowId, payload }) {
   try {
     await tablesDB.createRow({
@@ -258,6 +630,7 @@ export default async ({ req, res, log, error }) => {
         'DELETE /tournaments/:id',
         'POST /tournaments/:id/pairings/publish',
         'POST /tournaments/:id/pairings/unpublish',
+        'POST /tournaments/:id/games/result',
         'POST /profiles/lookup',
         'GET /admin/session',
         'GET /admin/admins',
@@ -599,6 +972,9 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (method === 'PATCH' && segments[0] === 'tournaments' && segments[1]) {
+      const activation = body.status === 'active'
+        ? await startTournamentIfNeeded(tablesDB, databaseId, segments[1], body)
+        : null;
       const row = await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.tournaments,
@@ -609,18 +985,22 @@ export default async ({ req, res, log, error }) => {
           status: body.status,
           format: body.format,
           timeControl: body.timeControl,
-          roundsTotal: body.roundsTotal,
-          currentRound: body.currentRound,
+          currentRound: body.status === 'active' ? body.currentRound ?? 1 : body.currentRound,
           startsAt: body.startsAt,
           endsAt: body.endsAt,
           location: body.location,
           capacity: body.capacity,
           description: body.description,
-          bracketSnapshot: body.bracketSnapshot,
+          roundsTotal: activation?.roundsTotal ?? body.roundsTotal,
+          bracketSnapshot: body.status === 'active' ? null : body.bracketSnapshot,
         }),
       });
 
-      return res.json({ ok: true, action: 'updateTournament', row });
+      if (activation?.createdGames?.length) {
+        await recalculateStandings(tablesDB, databaseId, segments[1]);
+      }
+
+      return res.json({ ok: true, action: 'updateTournament', row, createdGames: activation?.createdGames ?? [] });
     }
 
     if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'pairings' && segments[3] === 'publish') {
@@ -799,19 +1179,32 @@ export default async ({ req, res, log, error }) => {
         return badRequest(res, 'Missing game result.', { missing });
       }
 
-      const row = await tablesDB.updateRow({
-        databaseId,
-        tableId: tableIds.games,
-        rowId: segments[1],
-        data: cleanObject({
-          status: body.status ?? 'completed',
-          result: body.result,
-          pgn: body.pgn,
-          finishedAt: body.finishedAt ?? new Date().toISOString(),
-        }),
-      });
+      const row = await submitGameResult(tablesDB, databaseId, segments[1], body);
 
       return res.json({ ok: true, action: 'submitGameResult', row });
+    }
+
+    if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'games' && segments[3] === 'result') {
+      const missing = requireFields(body, ['round', 'board', 'result']);
+      if (missing.length > 0) {
+        return badRequest(res, 'Missing tournament game result fields.', { missing });
+      }
+
+      const game = await findTournamentGameByBoard(tablesDB, databaseId, segments[1], body.round, body.board);
+      if (!game) {
+        return badRequest(res, 'No published game exists for that round and board.');
+      }
+
+      const row = await submitGameResult(tablesDB, databaseId, game.$id, body);
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'submitTournamentGameResult',
+        targetTable: tableIds.games,
+        targetRowId: row.$id,
+        payload: { tournamentId: segments[1], round: body.round, board: body.board, result: row.result },
+      });
+
+      return res.json({ ok: true, action: 'submitTournamentGameResult', row });
     }
 
     if (method === 'POST' && segments[0] === 'profiles' && segments[1] && segments[2] === 'role') {
