@@ -1098,11 +1098,52 @@
 
 @media (max-width: 760px) {
   .home-screen .site-header-inner {
-    padding: 0 20px;
+    height: auto;
+    min-height: 104px;
+    padding: 8px 20px 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand auth"
+      "nav nav";
+    gap: 8px 12px;
+  }
+
+  .home-screen .brand-link {
+    grid-area: brand;
+    min-width: 0;
+  }
+
+  .home-screen .auth-nav {
+    grid-area: auth;
+  }
+
+  .home-screen .main-nav {
+    grid-area: nav;
+    width: 100%;
+    max-width: 100%;
+    min-height: 36px;
+    gap: 0;
+    justify-content: flex-start;
+    justify-self: stretch;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .home-screen .main-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .home-screen .main-nav a {
+    flex: 0 0 auto;
+    padding: 8px 6px;
+    font-size: clamp(12px, 3.25vw, 13px);
   }
 
   .home-hero-grid {
-    padding: 92px 20px 34px;
+    padding: 132px 20px 34px;
   }
 
   .hero-kicker {
