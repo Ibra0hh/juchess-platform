@@ -707,6 +707,9 @@ function buildSwissPairings(playerIds, games, seedByProfile, byeProfileId) {
 async function writeSwissRound(tablesDB, databaseId, tournamentId, round, pairings, byePlayerId, byeProfileId) {
   const games = pairings.map((pairing) => ({ ...pairing, round }));
   if (byePlayerId) {
+    // The sentinel row only exists for clubs that actually need a bye; creating
+    // it eagerly would put a "Bye" player in every member list.
+    await ensureSystemByeProfile(tablesDB, databaseId);
     games.push({
       round,
       board: pairings.length + 1,
@@ -992,7 +995,7 @@ async function advanceSwiss(tablesDB, databaseId, tournament, games, completedRo
     return { advanced: true, completed: true };
   }
 
-  const byeProfileId = await ensureSystemByeProfile(tablesDB, databaseId);
+  const byeProfileId = SYSTEM_BYE_PROFILE_ID;
   const seedByProfile = new Map(registrations.map((row, index) => [row.profileId, Number(row.seed) || index + 1]));
   const { pairings, byePlayerId } = buildSwissPairings(playerIds, games, seedByProfile, byeProfileId);
   if (!pairings.length && !byePlayerId) {
@@ -1215,7 +1218,7 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
   }
 
   if (isSwissTournament(nextTournament) || isMultiStageTournament(nextTournament) || isArenaTournament(nextTournament)) {
-    const byeProfileId = await ensureSystemByeProfile(tablesDB, databaseId);
+    const byeProfileId = SYSTEM_BYE_PROFILE_ID;
     const seedByProfile = new Map(registrations.map((row, index) => [row.profileId, Number(row.seed) || index + 1]));
     const { pairings, byePlayerId } = buildSwissPairings(profileIds, [], seedByProfile, byeProfileId);
     if (!pairings.length) {

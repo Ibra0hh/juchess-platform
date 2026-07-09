@@ -20,6 +20,10 @@ const tableIds = {
   announcements: 'announcements',
 }
 
+// Loaded before the row definitions below: they call Permission/Role while the
+// module body evaluates, so these bindings must already be initialized.
+const { Client, Permission, Query, Role, TablesDB } = await loadAppwriteSdk()
+
 const players = [
   player('seed_profile_01', 'Ibrahim Ahmad', 'ibrahim_ju', 'ibrahim.seed@juchess.test', 1810, '+962790000001'),
   player('seed_profile_02', 'Omar Saleh', 'omar_saleh', 'omar.seed@juchess.test', 1740, '+962790000002'),
@@ -264,7 +268,6 @@ if (!apiKey) {
   process.exit(1)
 }
 
-const { Client, Permission, Query, Role, TablesDB } = await loadAppwriteSdk()
 const client = new Client().setEndpoint(endpoint).setProject(projectId).setKey(apiKey)
 const tablesDB = new TablesDB(client)
 
