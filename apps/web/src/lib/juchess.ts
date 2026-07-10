@@ -699,7 +699,7 @@ function appwriteGameToSampleGame(row: AppwriteGameRow, profiles: Map<string, Me
     date: formatDate(row.finishedAt || row.startedAt || row.$updatedAt || row.$createdAt),
     opening: moves.length ? 'Saved tournament PGN' : 'Tournament game',
     round: `Round ${row.round ?? 1} · Board ${row.board ?? 1}`,
-    fen: sampleFens[0],
+    fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     moves,
     classes: Array.from({ length: moveCount }, (_value, index) => sampleClasses[index % sampleClasses.length]),
     evals: Array.from({ length: moveCount }, (_value, index) => sampleEvals[index % sampleEvals.length] ?? 0.2),
