@@ -266,6 +266,7 @@ function createInitialTournamentForm(): TournamentInput {
     timeControl: '15+10 Rapid',
     roundsTotal: 5,
     capacity: 16,
+    playMode: 'inPerson',
     location: '',
   }
 }
@@ -1545,13 +1546,34 @@ function TournamentsScreen({
                     />
                   </label>
                   <label className="wide">Description<textarea value={form.description ?? ''} onChange={(event) => update('description', event.target.value)} placeholder="Short description..." rows={3} /></label>
+                  <div className="create-field wide">
+                    <span>Tournament mode</span>
+                    <div className="create-chip-row" role="group" aria-label="Tournament mode">
+                      <button
+                        type="button"
+                        className={form.playMode !== 'online' ? 'active' : undefined}
+                        aria-pressed={form.playMode !== 'online'}
+                        onClick={() => update('playMode', 'inPerson')}
+                      >
+                        In person
+                      </button>
+                      <button
+                        type="button"
+                        className={form.playMode === 'online' ? 'active' : undefined}
+                        aria-pressed={form.playMode === 'online'}
+                        onClick={() => update('playMode', 'online')}
+                      >
+                        Online
+                      </button>
+                    </div>
+                  </div>
                   <label>Number of players<input type="number" min={2} value={form.capacity ?? ''} onChange={(event) => update('capacity', Number(event.target.value))} /></label>
                   <label>
-                    Location / platform
+                    {form.playMode === 'online' ? 'Online platform / room' : 'Venue'}
                     <input
                       value={form.location ?? ''}
                       onChange={(event) => update('location', event.target.value)}
-                      placeholder="Type venue / platform..."
+                      placeholder={form.playMode === 'online' ? 'Type platform or room...' : 'Type venue...'}
                     />
                   </label>
                   <div className="create-field wide">
@@ -5830,6 +5852,7 @@ function tournamentToEditForm(item: AdminTournament): TournamentInput {
     timeControl: item.timeControl,
     roundsTotal: item.roundsTotal,
     capacity: item.capacity || undefined,
+    playMode: item.playMode,
     location: item.location ?? '',
     description: item.description ?? '',
     startsAt: item.startsAt,

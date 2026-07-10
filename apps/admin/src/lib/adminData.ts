@@ -49,6 +49,7 @@ type AppwriteTournamentRow = Models.Row & {
   currentRound?: number
   startsAt?: string
   endsAt?: string
+  playMode?: 'inPerson' | 'online'
   location?: string
   capacity?: number
   description?: string
@@ -128,6 +129,7 @@ export type AdminTournament = {
   roundsTotal?: number
   currentRound?: number
   startsAt?: string
+  playMode: 'inPerson' | 'online'
   location?: string
   description?: string
   publishedGames: number
@@ -202,6 +204,7 @@ export type TournamentInput = {
   currentRound?: number
   startsAt?: string
   endsAt?: string
+  playMode?: 'inPerson' | 'online'
   location?: string
   capacity?: number
   description?: string
@@ -1015,6 +1018,7 @@ function mapTournament(
     roundsTotal: row.roundsTotal,
     currentRound: row.currentRound,
     startsAt: row.startsAt,
+    playMode: row.playMode === 'online' ? 'online' : 'inPerson',
     location: row.location,
     description: row.description,
     publishedGames: games.length,

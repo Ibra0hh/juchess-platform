@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import './SiteHeader.css'
 
 type SiteHeaderProps = {
-  active: 'home' | 'tournaments' | 'tools' | 'games' | 'leaderboard' | 'profile'
+  active: 'home' | 'tournaments' | 'tools' | 'games' | 'analysis' | 'leaderboard' | 'profile'
   profilePreview?: {
     displayName: string
     initials: string

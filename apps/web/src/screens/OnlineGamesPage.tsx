@@ -54,7 +54,7 @@ function OnlineGamesPage() {
   }, [])
 
   const activeTournaments = useMemo(
-    () => tournaments.filter((tournament) => tournament.status === 'Active'),
+    () => tournaments.filter((tournament) => tournament.status === 'Active' && tournament.playMode === 'online'),
     [tournaments],
   )
   const gameChoices = useMemo<TournamentGameChoice[]>(() => (
@@ -158,10 +158,6 @@ function OnlineGamesPage() {
                 <p>Choose an active event, follow its boards, and enter through the tournament page.</p>
               </div>
             </div>
-
-            <Link to="/tournaments" className="online-primary-action">
-              Browse tournaments
-            </Link>
 
             <div className="online-event-list">
               {loading ? (

@@ -83,6 +83,7 @@ Fields:
 - `currentRound` integer, optional.
 - `startsAt` datetime, optional.
 - `endsAt` datetime, optional.
+- `playMode` enum: `inPerson`, `online`; defaults to `inPerson`.
 - `location` string, optional.
 - `capacity` integer, optional.
 - `description` string, optional.

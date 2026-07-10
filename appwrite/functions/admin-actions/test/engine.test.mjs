@@ -32,6 +32,7 @@ const EXPORTED = [
   'assertPublishedParticipantSet',
   'swissRoundsTotal',
   'validateTournamentRoundCount',
+  'validateTournamentPlayMode',
   'multiStageStageOneRounds',
   'isGameDecided',
   'decisiveWinnerProfileId',
@@ -775,6 +776,15 @@ test('Swiss tournament setup requires an explicit valid round count', () => {
   assert.throws(
     () => engine.validateTournamentRoundCount('Swiss', 2.5),
     /require a round count between 1 and 50/,
+  )
+})
+
+test('tournament mode accepts only in-person or online play', () => {
+  assert.equal(engine.validateTournamentPlayMode('inPerson'), 'inPerson')
+  assert.equal(engine.validateTournamentPlayMode('online'), 'online')
+  assert.throws(
+    () => engine.validateTournamentPlayMode('hybrid'),
+    /must be inPerson or online/,
   )
 })
 

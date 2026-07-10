@@ -1122,6 +1122,13 @@ function validateTournamentRoundCount(format, roundsTotal) {
   return count;
 }
 
+function validateTournamentPlayMode(playMode) {
+  if (playMode !== 'inPerson' && playMode !== 'online') {
+    throw new HttpError(400, 'Tournament mode must be inPerson or online.');
+  }
+  return playMode;
+}
+
 function multiStageStageOneRounds(tournament, qualifierCount) {
   const knockoutRounds = Math.ceil(Math.log2(Math.max(2, qualifierCount)));
   const declared = Number(tournament.roundsTotal) || 0;
@@ -2619,6 +2626,7 @@ export default async ({ req, res, log, error }) => {
         return badRequest(res, 'Missing required tournament fields.', { missing });
       }
       const roundsTotal = validateTournamentRoundCount(body.format, body.roundsTotal);
+      const playMode = validateTournamentPlayMode(body.playMode ?? 'inPerson');
 
       const row = await tablesDB.createRow({
         databaseId,
@@ -2634,6 +2642,7 @@ export default async ({ req, res, log, error }) => {
           currentRound: body.currentRound,
           startsAt: body.startsAt,
           endsAt: body.endsAt,
+          playMode,
           location: body.location,
           capacity: body.capacity,
           description: body.description,
@@ -2647,6 +2656,7 @@ export default async ({ req, res, log, error }) => {
 
     if (method === 'PATCH' && segments[0] === 'tournaments' && segments[1]) {
       const roundsTotal = validateTournamentRoundCount(body.format, body.roundsTotal);
+      const playMode = body.playMode === undefined ? undefined : validateTournamentPlayMode(body.playMode);
       const activation = body.status === 'active'
         ? await startTournamentIfNeeded(tablesDB, databaseId, segments[1], body)
         : null;
@@ -2663,6 +2673,7 @@ export default async ({ req, res, log, error }) => {
           currentRound: body.status === 'active' ? body.currentRound ?? 1 : body.currentRound,
           startsAt: body.startsAt,
           endsAt: body.endsAt,
+          playMode,
           location: body.location,
           capacity: body.capacity,
           description: body.description,

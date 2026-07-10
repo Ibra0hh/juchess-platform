@@ -12,6 +12,7 @@ export type Tournament = {
   name: string
   status: TournamentStatus
   date: string
+  playMode: 'inPerson' | 'online'
   location: string
   format: string
   timeControl: string
@@ -47,6 +48,7 @@ type AppwriteTournamentRow = Models.Row & {
   currentRound?: number
   startsAt?: string
   endsAt?: string
+  playMode?: 'inPerson' | 'online'
   location?: string
   capacity?: number
   description?: string
@@ -239,6 +241,7 @@ export const demoTournaments: Tournament[] = [
     name: 'Swiss',
     status: 'Upcoming',
     date: 'Jul 20, 2026',
+    playMode: 'inPerson',
     location: 'Student Union Hall B',
     format: 'Swiss',
     timeControl: '15+10 Rapid',
@@ -252,6 +255,7 @@ export const demoTournaments: Tournament[] = [
     name: 'Round robin',
     status: 'Upcoming',
     date: 'Jul 22, 2026',
+    playMode: 'inPerson',
     location: 'Engineering Lounge',
     format: 'Round robin',
     timeControl: '10+5 Rapid',
@@ -265,6 +269,7 @@ export const demoTournaments: Tournament[] = [
     name: 'Double round robin',
     status: 'Upcoming',
     date: 'Jul 24, 2026',
+    playMode: 'inPerson',
     location: 'Library Seminar Room 2',
     format: 'Double round robin',
     timeControl: '25+10 Classical',
@@ -278,6 +283,7 @@ export const demoTournaments: Tournament[] = [
     name: 'Single elimination',
     status: 'Upcoming',
     date: 'Jul 26, 2026',
+    playMode: 'inPerson',
     location: 'Hall A',
     format: 'Single elimination',
     timeControl: '10+0 Blitz',
@@ -291,6 +297,7 @@ export const demoTournaments: Tournament[] = [
     name: 'Double elimination',
     status: 'Upcoming',
     date: 'Jul 28, 2026',
+    playMode: 'inPerson',
     location: 'Hall A',
     format: 'Double elimination',
     timeControl: '5+3 Blitz',
@@ -304,6 +311,7 @@ export const demoTournaments: Tournament[] = [
     name: 'Multi-stage',
     status: 'Upcoming',
     date: 'Jul 30, 2026',
+    playMode: 'inPerson',
     location: 'Library Seminar Room 2',
     format: 'Multi-stage',
     timeControl: '10+5 Rapid',
@@ -317,6 +325,7 @@ export const demoTournaments: Tournament[] = [
     name: 'Team',
     status: 'Upcoming',
     date: 'Aug 1, 2026',
+    playMode: 'inPerson',
     location: 'Hall A',
     format: 'Team',
     timeControl: '10+0 Rapid',
@@ -330,6 +339,7 @@ export const demoTournaments: Tournament[] = [
     name: 'Arena',
     status: 'Upcoming',
     date: 'Aug 3, 2026',
+    playMode: 'inPerson',
     location: 'Club Room',
     format: 'Arena',
     timeControl: '5+0 Blitz',
@@ -995,6 +1005,7 @@ function mapAppwriteTournament(
     name,
     status,
     date: formatDateRange(row.startsAt, row.endsAt),
+    playMode: row.playMode === 'online' ? 'online' : 'inPerson',
     location: row.location || 'University of Jordan',
     format,
     timeControl: row.timeControl,
