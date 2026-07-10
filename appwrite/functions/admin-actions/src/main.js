@@ -969,12 +969,16 @@ function allocateSwissColors(
   return pairWithColor(neutral.profileId, neutral.color);
 }
 
+function randomSwissColors(playerId, opponentId, random) {
+  const [firstProfileId, secondProfileId] = [playerId, opponentId].sort((a, b) => a.localeCompare(b));
+  return random() < 0.5
+    ? { whiteProfileId: firstProfileId, blackProfileId: secondProfileId }
+    : { whiteProfileId: secondProfileId, blackProfileId: firstProfileId };
+}
+
 function buildSwissPairings(playerIds, games, seedByProfile, byeProfileId, options = {}) {
   const stats = new Map(playerIds.map((profileId) => [profileId, {
     points: 0,
-    whites: 0,
-    blacks: 0,
-    colorHistory: [],
     opponents: new Set(),
     hadBye: false,
   }]));
@@ -994,16 +998,6 @@ function buildSwissPairings(playerIds, games, seedByProfile, byeProfileId, optio
     }
     if (white) white.opponents.add(game.blackProfileId);
     if (black) black.opponents.add(game.whiteProfileId);
-    if (game.status === 'completed') {
-      if (white) {
-        white.whites += 1;
-        white.colorHistory.push({ round: Number(game.round) || 0, color: 'white' });
-      }
-      if (black) {
-        black.blacks += 1;
-        black.colorHistory.push({ round: Number(game.round) || 0, color: 'black' });
-      }
-    }
     if (!isGameDecided(game)) continue;
     if (game.result === '1-0') {
       if (white) white.points += 1;
@@ -1020,10 +1014,7 @@ function buildSwissPairings(playerIds, games, seedByProfile, byeProfileId, optio
     || (seedByProfile.get(a) ?? 9999) - (seedByProfile.get(b) ?? 9999)
     || a.localeCompare(b)
   ));
-  const inferredInitialColor = inferSwissInitialColor(playerIds, games, seedByProfile, byeProfileId);
-  const initialColor = options.initialColor === 'white' || options.initialColor === 'black'
-    ? options.initialColor
-    : inferredInitialColor ?? ((options.random?.() ?? Math.random()) < 0.5 ? 'white' : 'black');
+  const random = typeof options.random === 'function' ? options.random : Math.random;
 
   let byePlayerId = null;
   let field = ordered;
@@ -1041,32 +1032,14 @@ function buildSwissPairings(playerIds, games, seedByProfile, byeProfileId, optio
     if (paired.has(playerId)) continue;
 
     const candidates = field.slice(index + 1).filter((candidate) => !paired.has(candidate));
-    const colorCompatible = (candidate) => {
-      const first = swissColorPreference(stats.get(playerId));
-      const second = swissColorPreference(stats.get(candidate));
-      return !(
-        first.strength === 3 &&
-        second.strength === 3 &&
-        first.color === second.color
-      );
-    };
-    const opponentId = candidates.find((candidate) => (
-      !stats.get(playerId)?.opponents.has(candidate) && colorCompatible(candidate)
-    ))
-      ?? candidates.find((candidate) => !stats.get(playerId)?.opponents.has(candidate))
-      ?? candidates.find(colorCompatible)
+    const opponentId = candidates.find((candidate) => !stats.get(playerId)?.opponents.has(candidate))
       ?? candidates[0];
     if (!opponentId) break;
 
     paired.add(playerId);
     paired.add(opponentId);
 
-    const colors = allocateSwissColors(
-      playerId,
-      opponentId,
-      stats,
-      initialColor,
-    );
+    const colors = randomSwissColors(playerId, opponentId, random);
 
     pairings.push({
       board: pairings.length + 1,
