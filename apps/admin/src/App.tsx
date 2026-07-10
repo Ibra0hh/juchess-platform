@@ -59,11 +59,9 @@ import {
 } from './lib/adminData'
 import { type TournamentStatus } from './lib/juchess'
 
-type Screen = 'dashboard' | 'windows' | 'tournaments' | 'players' | 'news' | 'announcements' | 'adminAccess'
+type Screen = 'dashboard' | 'tournaments' | 'players' | 'news' | 'announcements' | 'adminAccess'
 type TournamentTab = TournamentStatus
 type TournamentDataSource = 'cloud' | 'unavailable'
-type WindowKey = 'home' | 'tournaments' | 'games' | 'tools' | 'profile' | 'auth'
-type DeviceKey = 'ios' | 'android' | 'tablet' | 'web'
 
 type Player = {
   id: string
@@ -232,7 +230,6 @@ const adminBracketViews: Array<[AdminBracketView, string]> = [
 
 const navItems: Array<{ key: Screen; label: string; icon: string }> = [
   { key: 'dashboard', label: 'Dashboard', icon: '▤' },
-  { key: 'windows', label: 'App Windows', icon: '▧' },
   { key: 'tournaments', label: 'Tournaments', icon: '♞' },
   { key: 'players', label: 'Players', icon: '◍' },
   { key: 'news', label: 'News', icon: '◫' },
@@ -274,7 +271,6 @@ function createInitialTournamentForm(): TournamentInput {
 
 const pageText: Record<Screen, { title: string; sub: string }> = {
   dashboard: { title: 'Dashboard', sub: 'Live overview of your club operations' },
-  windows: { title: 'App Windows', sub: 'Control every screen and section players see' },
   tournaments: { title: 'Tournament Control Center', sub: 'Create, publish and run every event' },
   players: { title: 'Player Management', sub: 'Roster, ratings and player records' },
   news: { title: 'News', sub: 'Public posts shown on the app & website' },
@@ -357,29 +353,6 @@ const demoPlayers: Player[] = [
     blocked: true,
   },
 ]
-
-const windowModel: Array<{ key: WindowKey; label: string; icon: string; sections: string[] }> = [
-  { key: 'home', label: 'Home', icon: '⌂', sections: ['Header', 'Featured tournament', 'Quick tools', 'Club leaderboard', 'News'] },
-  { key: 'tournaments', label: 'Tournaments', icon: '♞', sections: ['Tabs', 'Tournament cards', 'Detail hero', 'Registration'] },
-  { key: 'tools', label: 'Tools', icon: '◫', sections: ['Game review', 'Analysis board', 'PGN upload'] },
-  { key: 'games', label: 'Games', icon: '♟', sections: ['Chess board', 'Online tournaments', 'Live games'] },
-  { key: 'profile', label: 'Profile', icon: '◍', sections: ['Stats', 'Recent games', 'Account details'] },
-  { key: 'auth', label: 'Auth', icon: '◇', sections: ['Sign in', 'Sign up', 'Forgot password', 'Guest browsing'] },
-]
-
-const previewRoutes: Record<WindowKey, string> = {
-  home: '/home',
-  tournaments: '/tournaments',
-  games: '/games',
-  tools: '/tools',
-  profile: '/profile',
-  auth: '/sign-in',
-}
-
-const mobilePreviewBase = import.meta.env.VITE_MOBILE_PREVIEW_BASE_URL as string | undefined
-const webPreviewBase = import.meta.env.VITE_WEB_PREVIEW_BASE_URL as string | undefined
-const appPreviewBase = import.meta.env.VITE_APP_PREVIEW_BASE_URL as string | undefined
-const defaultPreviewEmail = 'student.preview@ju.edu.jo'
 
 function App() {
   const [session, setSession] = useState<AdminSession | null>(null)
@@ -505,7 +478,6 @@ function App() {
           goNews={() => setScreen('news')}
         />
       ) : null}
-      {screen === 'windows' ? <WindowsScreen /> : null}
       {screen === 'tournaments' ? (
         <TournamentsScreen
           dataSource={dataSource}
@@ -705,7 +677,7 @@ function AdminAppShell({
             </button>
           </div>
         </header>
-        <main className={`prototype-content ${screen === 'windows' ? 'windows-content' : ''}`}>{children}</main>
+        <main className="prototype-content">{children}</main>
       </div>
     </div>
   )
@@ -875,105 +847,6 @@ function QueueRow({
       <span>{label}</span>
       <strong>{count}</strong>
       <button type="button" onClick={onClick}>{action}</button>
-    </div>
-  )
-}
-
-function WindowsScreen() {
-  const [selected, setSelected] = useState<WindowKey>('home')
-  const [device, setDevice] = useState<DeviceKey>('ios')
-  const [guestMode, setGuestMode] = useState(false)
-  const current = windowModel.find((item) => item.key === selected) ?? windowModel[0]
-  const previewUrl = buildPreviewUrl(selected, device, guestMode, defaultPreviewEmail)
-  const previewAccount = guestMode ? 'Guest preview' : defaultPreviewEmail
-
-  return (
-    <div className={`windows-screen ${device === 'web' ? 'web-preview-layout' : 'mobile-preview-layout'}`}>
-      <div className="device-switchbar" aria-label="Preview device">
-        <div className="device-tabs">
-          {(['ios', 'android', 'tablet', 'web'] as DeviceKey[]).map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={device === item ? 'active' : undefined}
-              onClick={() => setDevice(item)}
-            >
-              {item === 'ios' ? 'iOS' : item === 'web' ? 'Web' : item[0].toUpperCase() + item.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-      <section className="window-control">
-        <div className="window-toolbar">
-          <button type="button" className={guestMode ? 'solid-green' : ''} onClick={() => setGuestMode((value) => !value)}>
-            {guestMode ? 'Guest mode: ON' : 'Guest mode: OFF'}
-          </button>
-          <span>0 items hidden from players</span>
-          <button type="button">↺ Reset to defaults</button>
-        </div>
-        <div className="preview-email-field preview-member-card">
-          <span>Preview member</span>
-          <strong>{defaultPreviewEmail}</strong>
-          <small>Used by the live cloud preview session</small>
-        </div>
-        <div className="panel-card window-list">
-          <div className="panel-title">Windows</div>
-          {windowModel.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={item.key === selected ? 'selected' : undefined}
-              onClick={() => setSelected(item.key)}
-            >
-              <i>{item.icon}</i>
-              <span>
-                <strong>{item.label}</strong>
-                <small>{item.sections.length} sections shown</small>
-              </span>
-              <em>Visible</em>
-              <b>●</b>
-              <b>🔓</b>
-            </button>
-          ))}
-        </div>
-        <div className="panel-card window-list section-list">
-          <div className="panel-title">{current.label} · sections</div>
-          {current.sections.map((section) => (
-            <button key={section} type="button">
-              <i />
-              <span><strong>{section}</strong></span>
-              <em>Shown</em>
-              <b>●</b>
-              <b>🔓</b>
-              <b>✎</b>
-              <b>↑</b>
-              <b>↓</b>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="device-preview">
-        <div className="preview-panel">
-          <div className="preview-stage">
-            <div className={`device-frame ${device}`}>
-              <div className="device-screen">
-                <div className="device-status">
-                  <span>{device === 'web' ? 'Live web' : '9:41'}</span>
-                  <b>{device === 'web' ? previewHostLabel(previewUrl) : 'JuChess'}</b>
-                  <span>{device === 'web' ? 'Desktop' : '▰▰'}</span>
-                </div>
-                <iframe
-                  key={`${device}-${selected}-${guestMode ? 'guest' : 'member'}-${previewAccount}`}
-                  className="live-app-frame"
-                  src={previewUrl}
-                  title={`Live ${current.label} app preview`}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   )
 }
@@ -5897,54 +5770,6 @@ function fromDateTimeLocalValue(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return undefined
   return date.toISOString()
-}
-
-function buildPreviewUrl(windowKey: WindowKey, device: DeviceKey, guestMode: boolean, previewEmail: string) {
-  const target = previewTargetForDevice(device)
-  const url = new URL(target.routeMode === 'query' ? '/' : previewRoutes[windowKey], withTrailingSlash(target.base))
-  url.searchParams.set('adminPreview', '1')
-  url.searchParams.set('screen', windowKey)
-  url.searchParams.set('device', device)
-  url.searchParams.set('mode', guestMode ? 'guest' : 'member')
-  url.searchParams.set('previewEmail', previewEmail.trim() || defaultPreviewEmail)
-  return url.toString()
-}
-
-function previewTargetForDevice(device: DeviceKey): { base: string; routeMode: 'path' | 'query' } {
-  if (device === 'web' && isUsablePreviewBase(webPreviewBase)) return { base: webPreviewBase, routeMode: 'path' }
-  if (device !== 'web' && isUsablePreviewBase(mobilePreviewBase)) return { base: mobilePreviewBase, routeMode: 'query' }
-  if (isUsablePreviewBase(appPreviewBase)) return { base: appPreviewBase, routeMode: 'path' }
-
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    const port = device === 'web' ? '8062' : '8063'
-    return { base: `${window.location.protocol}//${window.location.hostname}:${port}`, routeMode: device === 'web' ? 'path' : 'query' }
-  }
-
-  return { base: window.location.origin, routeMode: 'path' }
-}
-
-function isUsablePreviewBase(value?: string): value is string {
-  if (!value?.trim()) return false
-
-  try {
-    new URL(value)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function withTrailingSlash(value: string) {
-  return value.endsWith('/') ? value : `${value}/`
-}
-
-function previewHostLabel(value: string) {
-  try {
-    const url = new URL(value)
-    return `${url.host}${url.pathname === '/' ? '' : url.pathname}`
-  } catch {
-    return 'Live app'
-  }
 }
 
 export default App
