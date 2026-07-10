@@ -20,6 +20,7 @@ import {
   loadBlockLists,
   loadAdminTournaments,
   publishTournamentPairings,
+  SYSTEM_BYE_PROFILE_ID,
   signInAdmin,
   signOutAdmin,
   submitTournamentGameResult,
@@ -1085,11 +1086,11 @@ function TournamentsScreen({
       // Codes are stored outside the registration row, so join them back on.
       const codeByProfile = new Map(checkIns.map((entry) => [entry.profileId, entry]))
       setManagedRegistrations(result.registrations
-        .filter((item) => item.status !== 'cancelled')
         .map((item) => {
           const entry = codeByProfile.get(item.profileId)
           return entry ? { ...item, checkInCode: entry.code, checkedIn: entry.checkedIn } : item
-        }))
+        })
+        .filter((item) => item.status === 'confirmed' || item.checkedIn))
       if (result.error) setMessage('Tournament participants are unavailable right now.')
       setManagedRegistrationsLoading(false)
     }
@@ -1880,7 +1881,7 @@ function TournamentManageView({
   const [physicalBoards, setPhysicalBoards] = useState(tournament.physicalBoards || 3)
   const liveBoardRef = useRef<HTMLElement | null>(null)
   const bracketPhase = getBracketPhase(tournament)
-  const tournamentPlayers = useMemo(() => buildTournamentPlayers(tournament, shuffleSeed, participants), [participants, shuffleSeed, tournament])
+  const tournamentPlayers = useMemo(() => buildTournamentPlayers(shuffleSeed, participants), [participants, shuffleSeed])
   const pairings = useMemo(() => buildTournamentPairingSchedule(tournament, tournamentPlayers, shuffleSeed), [shuffleSeed, tournament, tournamentPlayers])
   const currentRoundPairings = useMemo(() => currentRoundPairingsForTournament(tournament, pairings), [pairings, tournament])
   const pairingRounds = useMemo(() => groupPairingsByRound(pairings), [pairings])
@@ -3895,10 +3896,8 @@ function isDoubleRoundRobinTournament(item: AdminTournament) {
   return /^double round robin$/i.test(item.format.trim())
 }
 
-function buildTournamentPlayers(tournament: AdminTournament, seed: number, registrations: AdminRegistration[]) {
-  const count = targetAdminPlayerCount(tournament, registrations.length)
+function buildTournamentPlayers(seed: number, registrations: AdminRegistration[]) {
   const players = registrations
-    .slice(0, count)
     .map((registration, index) => ({
       id: registration.profileId,
       profileId: registration.profileId,
@@ -3915,16 +3914,6 @@ function buildTournamentPlayers(tournament: AdminTournament, seed: number, regis
 
   if (!seed) return players
   return seededShuffle(players, seed)
-}
-
-function targetAdminPlayerCount(tournament: AdminTournament, availablePlayers: number) {
-  const declared = tournament.capacity && tournament.capacity > 0
-    ? tournament.capacity
-    : tournament.players > 0
-      ? tournament.players
-      : availablePlayers
-
-  return Math.max(0, declared)
 }
 
 function seededShuffle<T>(items: T[], seed: number) {
@@ -4034,7 +4023,8 @@ function buildColorAwarePairing(
       white: first.name,
       whiteProfileId: first.profileId ?? first.id,
       whiteRating: first.rating,
-      black: 'TBD',
+      black: 'Bye',
+      blackProfileId: SYSTEM_BYE_PROFILE_ID,
       blackRating: '-',
     }
   }

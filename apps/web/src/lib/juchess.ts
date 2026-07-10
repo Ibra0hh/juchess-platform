@@ -44,6 +44,7 @@ type AppwriteRegistrationRow = Models.Row & {
   profileId?: string
   status?: 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
   seed?: number
+  checkedIn?: boolean
 }
 
 type AppwriteProfileRow = Models.Row & {
@@ -227,8 +228,8 @@ export const demoTournaments: Tournament[] = [
     location: 'Student Union Hall B',
     format: 'Swiss',
     timeControl: '15+10 Rapid',
-    participants: 20,
-    capacity: 20,
+    participants: 6,
+    capacity: 6,
     round: 'Registration open',
     desc: 'Swiss test tournament.',
   },
@@ -602,6 +603,7 @@ export async function loadTournamentGame(gameId: string | null | undefined): Pro
       tableId: tableIds.games,
       rowId: gameId,
     })
+    if (row.status === 'scheduled' || row.blackProfileId === 'system_bye') return null
     const profiles = await loadProfilesForGame(row)
     return appwriteGameToSampleGame(row, profiles)
   } catch (error) {
@@ -630,11 +632,15 @@ export async function loadTournamentGameArchive(): Promise<SampleGame[]> {
     ])
     const profileMap = mapProfiles(profiles.rows)
     const mapped = games.rows
+      .filter((row) => (
+        row.blackProfileId !== 'system_bye'
+        && (row.status === 'live' || row.status === 'completed' || row.status === 'forfeit')
+      ))
       .map((row) => appwriteGameToSampleGame(row, profileMap))
       .filter((game): game is SampleGame => Boolean(game))
       .sort((a, b) => b.date.localeCompare(a.date))
 
-    return mapped.length ? mapped : sampleGamesBySource.tournament
+    return mapped
   } catch (error) {
     console.warn('JuChess cloud game archive read failed.', error)
     return sampleGamesBySource.tournament
@@ -857,7 +863,7 @@ function groupRegistrationCounts(rows: AppwriteRegistrationRow[]) {
   const counts = new Map<string, number>()
 
   rows.forEach((row) => {
-    if (!row.tournamentId || row.status === 'cancelled') return
+    if (!row.tournamentId || (row.status !== 'confirmed' && !row.checkedIn)) return
     counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
   })
 
@@ -868,7 +874,7 @@ function groupRegisteredPlayers(rows: AppwriteRegistrationRow[], profiles: Map<s
   const groups = new Map<string, Array<Member & { seed?: number }>>()
 
   rows.forEach((row) => {
-    if (!row.tournamentId || !row.profileId || row.status === 'cancelled') return
+    if (!row.tournamentId || !row.profileId || (row.status !== 'confirmed' && !row.checkedIn)) return
     const profile = profiles.get(row.profileId)
     if (!profile) return
     const list = groups.get(row.tournamentId) ?? []

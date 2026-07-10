@@ -28,6 +28,8 @@ const EXPORTED = [
   'splitSeededPairings',
   'buildKnockoutSnapshot',
   'seededKnockoutOrder',
+  'publishedParticipantIds',
+  'assertPublishedParticipantSet',
   'swissRoundsTotal',
   'multiStageStageOneRounds',
   'isGameDecided',
@@ -173,6 +175,7 @@ test('double elimination: an undefeated favourite reaches the grand final', () =
 test('double elimination: 20 entrants complete without deadlock', () => {
   const entrants = Array.from({ length: 20 }, (_, i) => `p${i + 1}`)
   const structure = engine.buildKnockoutStructure(20, true)
+  assert.equal(engine.knockoutGameRoundMap(structure).size, 14)
   // Alternate winners so the losers bracket receives an irregular pool.
   let flip = false
   const games = playKnockout(structure, entrants, (a, b) => {
@@ -510,6 +513,28 @@ test('procedure: start changes one assigned game to live and rejects an occupied
   )
 })
 
+test('procedure: a future round cannot start before the current round finishes', async () => {
+  const game = {
+    $id: 'g2',
+    tournamentId: 't1',
+    round: 2,
+    queuePosition: 1,
+    physicalBoard: 1,
+    status: 'scheduled',
+    whiteProfileId: 'w1',
+    blackProfileId: 'b1',
+  }
+  const tournament = { $id: 't1', status: 'active', currentRound: 1, physicalBoards: 2 }
+  const tablesDB = {
+    getRow: async ({ tableId }) => tableId === 'games' ? game : tournament,
+  }
+
+  await assert.rejects(
+    () => engine.startProcedureGame(tablesDB, 'juchess', 'g2', 1),
+    (error) => error.statusCode === 409 && /only round 1/i.test(error.message),
+  )
+})
+
 test('procedure: a queued game cannot receive a result before Start', async () => {
   const tablesDB = {
     getRow: async () => ({
@@ -527,11 +552,50 @@ test('procedure: a queued game cannot receive a result before Start', async () =
   )
 })
 
+test('procedure: a finished result cannot be submitted twice', async () => {
+  const tablesDB = {
+    getRow: async () => ({
+      $id: 'g1',
+      tournamentId: 't1',
+      round: 1,
+      status: 'completed',
+      result: '1-0',
+    }),
+  }
+
+  await assert.rejects(
+    () => engine.submitGameResult(tablesDB, 'juchess', 'g1', { result: '1-0' }),
+    (error) => error.statusCode === 409 && /already finished/i.test(error.message),
+  )
+})
+
+test('published pairings must contain exactly the confirmed participants', () => {
+  const registrations = ['p1', 'p2', 'p3', 'p4'].map((profileId) => ({ profileId }))
+  const validGames = [
+    { whiteProfileId: 'p1', blackProfileId: 'p2' },
+    { whiteProfileId: 'p3', blackProfileId: 'p4' },
+  ]
+
+  assert.doesNotThrow(() => (
+    engine.assertPublishedParticipantSet({ format: 'Swiss' }, validGames, registrations)
+  ))
+  assert.throws(
+    () => engine.assertPublishedParticipantSet(
+      { format: 'Swiss' },
+      [{ whiteProfileId: 'p1', blackProfileId: 'p2' }],
+      registrations,
+    ),
+    (error) => error.statusCode === 409 && /no longer match/i.test(error.message),
+  )
+})
+
 test('round counts', () => {
   assert.equal(engine.swissRoundsTotal({ roundsTotal: 0 }, 20), 6)
   assert.equal(engine.swissRoundsTotal({ roundsTotal: 9 }, 20), 9, 'an explicit count wins')
   assert.equal(engine.multiStageStageOneRounds({ roundsTotal: 5 }, 8), 2)
   assert.equal(engine.multiStageStageOneRounds({ roundsTotal: 0 }, 8), 3, 'defaults to three qualifying rounds')
+  assert.equal(Math.max(...engine.buildRoundRobinSchedule(Array.from({ length: 16 }, (_, i) => `p${i}`), false).map((game) => game.round)), 15)
+  assert.equal(Math.max(...engine.buildRoundRobinSchedule(Array.from({ length: 18 }, (_, i) => `p${i}`), true).map((game) => game.round)), 34)
 })
 
 test('round robin: every planned round has balanced color assignments', () => {

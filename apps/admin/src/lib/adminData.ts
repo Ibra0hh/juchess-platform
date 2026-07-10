@@ -734,7 +734,7 @@ async function loadRegistrationCounts() {
     })
 
     response.rows.forEach((row) => {
-      if (!row.tournamentId || row.status === 'cancelled') return
+      if (!row.tournamentId || (row.status !== 'confirmed' && !row.checkedIn)) return
       counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
     })
   } catch (error) {

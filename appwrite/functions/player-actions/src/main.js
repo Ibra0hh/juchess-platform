@@ -11,7 +11,7 @@ const tableIds = {
   checkIns: 'check_ins',
 };
 
-const OPEN_TOURNAMENT_STATUSES = ['upcoming', 'active'];
+const OPEN_TOURNAMENT_STATUSES = ['upcoming'];
 
 class HttpError extends Error {
   constructor(statusCode, message) {

@@ -521,6 +521,9 @@
   }
   function buildRounds(t) {
     var rounds = [];
+    if (String(t.status).toLowerCase() === 'upcoming' && /registration/i.test(t.round || '')) {
+      return rounds;
+    }
     if (t.format === 'Round robin' || t.format === 'Double round robin') {
       var ids = t.rrPlayers.slice();
       var base = circle(ids);
@@ -592,7 +595,7 @@
     'Arena': 'Aug 3, 2026'
   };
   var participantCounts = {
-    'Swiss': 12,
+    'Swiss': 6,
     'Round robin': 10,
     'Double round robin': 10,
     'Single elimination': 16,

@@ -718,6 +718,45 @@ function knockoutEntrantsFromSnapshot(snapshot) {
   return entrants.length >= 2 ? entrants : null;
 }
 
+function parsedBracketSnapshot(value) {
+  const serialized = normalizeBracketSnapshot(value);
+  if (!serialized) return null;
+  try {
+    return JSON.parse(serialized);
+  } catch {
+    return null;
+  }
+}
+
+function publishedParticipantIds(tournament, games) {
+  if (isKnockoutTournament(tournament)) {
+    const entrants = knockoutEntrantsFromSnapshot(parsedBracketSnapshot(tournament.bracketSnapshot));
+    if (entrants?.length) return [...new Set(entrants)];
+  }
+
+  return [...new Set(games.flatMap((game) => [game.whiteProfileId, game.blackProfileId])
+    .filter((profileId) => profileId && profileId !== SYSTEM_BYE_PROFILE_ID)
+    .map(String))];
+}
+
+function assertPublishedParticipantSet(tournament, games, registrations) {
+  const confirmed = [...new Set(registrations.map((row) => row.profileId).filter(Boolean).map(String))];
+  const published = publishedParticipantIds(tournament, games);
+  const confirmedSet = new Set(confirmed);
+  const publishedSet = new Set(published);
+  const missing = confirmed.filter((profileId) => !publishedSet.has(profileId));
+  const removed = published.filter((profileId) => !confirmedSet.has(profileId));
+
+  if (missing.length || removed.length || confirmed.length < 2) {
+    throw new HttpError(
+      409,
+      'Published pairings no longer match the confirmed participants. Unpublish the pairings, update participants, then publish again.',
+    );
+  }
+
+  return { confirmed, published };
+}
+
 function buildKnockoutSnapshot(structure, entrants, games, names, tournament, options = {}) {
   const resolver = knockoutResolver(structure, entrants, games);
   const double = structure.finalsIndices.length > 0;
@@ -1573,15 +1612,22 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
   const nextTournament = { ...tournament, ...nextData };
   const physicalBoards = normalizePhysicalBoards(nextTournament.physicalBoards);
 
-  const existingGames = await listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId);
-  if (existingGames.length > 0) {
-    return { createdGames: [], roundsTotal: nextTournament.roundsTotal || tournament.roundsTotal || 1 };
-  }
-
-  const registrations = await listConfirmedRegistrations(tablesDB, databaseId, tournamentId);
+  const [existingGames, registrations] = await Promise.all([
+    listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId),
+    listConfirmedRegistrations(tablesDB, databaseId, tournamentId),
+  ]);
   const profileIds = registrations.map((row) => row.profileId).filter(Boolean);
   if (profileIds.length < 2) {
     throw new HttpError(400, 'At least two confirmed players are required before a tournament can go active.');
+  }
+
+  if (existingGames.length > 0) {
+    assertPublishedParticipantSet(nextTournament, existingGames, registrations);
+    const publishedRounds = Math.max(1, ...existingGames.map((game) => Number(game.round) || 0));
+    return {
+      createdGames: [],
+      roundsTotal: Math.max(publishedRounds, Number(nextTournament.roundsTotal) || 0),
+    };
   }
 
   if (isKnockoutTournament(nextTournament)) {
@@ -1882,6 +1928,10 @@ async function startProcedureGame(tablesDB, databaseId, gameId, requestedBoard) 
   if (tournament.status !== 'active') {
     throw new HttpError(409, 'The tournament must be active before a game can start.');
   }
+  const currentRound = Number(tournament.currentRound) || 1;
+  if (Number(game.round) !== currentRound) {
+    throw new HttpError(409, `Only round ${currentRound} can start right now.`);
+  }
   if (game.status === 'completed' || game.status === 'forfeit') {
     throw new HttpError(409, 'This game is already finished.');
   }
@@ -1934,6 +1984,15 @@ async function updateGamePgn(tablesDB, databaseId, gameId, value) {
   if (!pgn) throw new HttpError(400, 'PGN cannot be empty.');
   if (pgn.length > 50000) throw new HttpError(400, 'PGN is too large.');
 
+  const current = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.games,
+    rowId: gameId,
+  });
+  if (current.status === 'scheduled') {
+    throw new HttpError(409, 'Start this game from Procedure before saving moves.');
+  }
+
   return await tablesDB.updateRow({
     databaseId,
     tableId: tableIds.games,
@@ -1957,8 +2016,19 @@ async function submitGameResult(tablesDB, databaseId, gameId, body) {
   if (current.status === 'scheduled') {
     throw new HttpError(409, 'Start this game from Procedure before recording its result.');
   }
+  if (current.status === 'completed' || current.status === 'forfeit') {
+    throw new HttpError(409, 'This game is already finished. Attach a PGN without submitting the result again.');
+  }
 
-  if (status === 'completed') {
+  const finalStatus = status === 'completed' || status === 'forfeit';
+  if (finalStatus && result === '*') {
+    throw new HttpError(400, 'A finished game requires a result.');
+  }
+  if (!finalStatus && result !== '*') {
+    throw new HttpError(400, 'A decisive result must complete or forfeit the game.');
+  }
+
+  if (finalStatus) {
     await assertResultAllowed(tablesDB, databaseId, current, result);
   }
 
@@ -1971,12 +2041,12 @@ async function submitGameResult(tablesDB, databaseId, gameId, body) {
       result,
       pgn: body.pgn,
       startedAt: current.startedAt || body.startedAt || new Date().toISOString(),
-      finishedAt: status === 'completed' ? body.finishedAt ?? new Date().toISOString() : undefined,
+      finishedAt: finalStatus ? body.finishedAt ?? new Date().toISOString() : undefined,
     }),
   });
 
   await recalculateStandings(tablesDB, databaseId, row.tournamentId);
-  if (status === 'completed') {
+  if (finalStatus) {
     await advanceTournamentIfReady(tablesDB, databaseId, row.tournamentId, row.round);
   }
 
@@ -2564,6 +2634,20 @@ export default async ({ req, res, log, error }) => {
         total: false,
       });
 
+      const startedGame = existing.rows.find((row) => (
+        row.blackProfileId !== SYSTEM_BYE_PROFILE_ID && row.status !== 'scheduled'
+      ));
+      if (startedGame) {
+        throw new HttpError(409, 'Pairings cannot be replaced after a game has started.');
+      }
+
+      const registrations = await listConfirmedRegistrations(tablesDB, databaseId, tournamentId);
+      assertPublishedParticipantSet(
+        { ...tournament, bracketSnapshot },
+        games,
+        registrations,
+      );
+
       for (const row of existing.rows) {
         await tablesDB.deleteRow({
           databaseId,
@@ -2579,6 +2663,21 @@ export default async ({ req, res, log, error }) => {
         games,
         normalizePhysicalBoards(tournament.physicalBoards),
       );
+
+      for (const row of rows) {
+        if (row.blackProfileId !== SYSTEM_BYE_PROFILE_ID) continue;
+        await tablesDB.updateRow({
+          databaseId,
+          tableId: tableIds.games,
+          rowId: row.$id,
+          data: {
+            status: 'completed',
+            result: '1-0',
+            pgn: 'bye',
+            finishedAt: new Date().toISOString(),
+          },
+        });
+      }
 
       const roundsTotal = Math.max(...games.map((game) => Number(game.round)).filter(Number.isFinite));
       await tablesDB.updateRow({
@@ -2618,6 +2717,13 @@ export default async ({ req, res, log, error }) => {
         queries: [Query.equal('tournamentId', tournamentId), Query.limit(500)],
         total: false,
       });
+
+      const startedGame = existing.rows.find((row) => (
+        row.blackProfileId !== SYSTEM_BYE_PROFILE_ID && row.status !== 'scheduled'
+      ));
+      if (startedGame) {
+        throw new HttpError(409, 'Pairings cannot be unpublished after a game has started.');
+      }
 
       for (const row of existing.rows) {
         await tablesDB.deleteRow({
@@ -2671,6 +2777,39 @@ export default async ({ req, res, log, error }) => {
         rowId: segments[1],
       });
 
+      const nextCheckedIn = nextStatus === 'confirmed'
+        ? Boolean(body.checkedIn ?? existing.checkedIn)
+        : false;
+      const wasParticipant = existing.status === 'confirmed' || Boolean(existing.checkedIn);
+      const willBeParticipant = nextStatus === 'confirmed' || nextCheckedIn;
+      const seedChanged = body.seed !== undefined && Number(body.seed) !== Number(existing.seed);
+      if (wasParticipant !== willBeParticipant || seedChanged) {
+        const [publishedGames, tournament, tournamentRegistrations] = await Promise.all([
+          listRowsByTournament(tablesDB, databaseId, tableIds.games, existing.tournamentId),
+          tablesDB.getRow({
+            databaseId,
+            tableId: tableIds.tournaments,
+            rowId: existing.tournamentId,
+          }),
+          listRowsByTournament(tablesDB, databaseId, tableIds.registrations, existing.tournamentId),
+        ]);
+        if (publishedGames.length) {
+          throw new HttpError(
+            409,
+            'Unpublish pairings before changing the participant list or seeding.',
+          );
+        }
+        if (willBeParticipant && !wasParticipant) {
+          const confirmedCount = tournamentRegistrations.filter((row) => (
+            row.$id !== existing.$id && (row.status === 'confirmed' || row.checkedIn)
+          )).length;
+          const capacity = Number(tournament.capacity) || 0;
+          if (capacity > 0 && confirmedCount >= capacity) {
+            throw new HttpError(409, `Tournament capacity is ${capacity}. Keep this registration waitlisted or increase capacity.`);
+          }
+        }
+      }
+
       const row = await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.registrations,
@@ -2678,7 +2817,7 @@ export default async ({ req, res, log, error }) => {
         data: cleanObject({
           status: nextStatus,
           seed: body.seed,
-          checkedIn: nextStatus === 'cancelled' ? false : body.checkedIn,
+          checkedIn: nextCheckedIn,
           // Never write the code here: this table is world-readable.
           checkInCode: null,
         }),

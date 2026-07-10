@@ -48,7 +48,7 @@ const players = [
 ]
 
 const tournamentPlayerCounts = {
-  seed_tour_swiss: 20,
+  seed_tour_swiss: 6,
   seed_tour_completed: 16,
   seed_tour_double_round_robin: 18,
   seed_tour_knockout: 16,
@@ -65,7 +65,7 @@ const tournaments = [
     status: 'upcoming',
     format: 'Swiss',
     timeControl: '15+10 Rapid',
-    roundsTotal: 7,
+    roundsTotal: 4,
     currentRound: null,
     startsAt: '2026-07-20T13:00:00.000Z',
     endsAt: '2026-08-10T17:00:00.000Z',
@@ -79,7 +79,7 @@ const tournaments = [
     status: 'upcoming',
     format: 'Round robin',
     timeControl: '10+5 Rapid',
-    roundsTotal: 5,
+    roundsTotal: 15,
     currentRound: null,
     startsAt: '2026-07-22T13:00:00.000Z',
     endsAt: '2026-08-05T17:00:00.000Z',
@@ -93,7 +93,7 @@ const tournaments = [
     status: 'upcoming',
     format: 'Double round robin',
     timeControl: '25+10 Classical',
-    roundsTotal: 10,
+    roundsTotal: 34,
     currentRound: null,
     startsAt: '2026-07-24T13:00:00.000Z',
     endsAt: '2026-08-21T17:00:00.000Z',
@@ -121,7 +121,7 @@ const tournaments = [
     status: 'upcoming',
     format: 'Double elimination',
     timeControl: '5+3 Blitz',
-    roundsTotal: 6,
+    roundsTotal: 14,
     currentRound: null,
     startsAt: '2026-07-28T15:00:00.000Z',
     endsAt: '2026-08-08T18:00:00.000Z',
@@ -272,7 +272,9 @@ const client = new Client().setEndpoint(endpoint).setProject(projectId).setKey(a
 const tablesDB = new TablesDB(client)
 
 for (const tournamentId of seededTournamentIds) {
-  await deleteRowsByTournament(tableIds.games, tournamentId)
+  for (const tableId of [tableIds.registrations, tableIds.games, tableIds.standings]) {
+    await deleteRowsByTournament(tableId, tournamentId)
+  }
 }
 
 for (const [tableId, rows, uniqueField] of plan) {

@@ -552,9 +552,7 @@ class AppwriteService {
     final players = registeredPlayers.isNotEmpty
         ? registeredPlayers.length
         : cloudData.playerCountsByTournament[row.$id] ?? 0;
-    final displayedPlayers = capacity == null
-        ? players
-        : players.clamp(0, capacity).toInt();
+    final displayedPlayers = players;
     final location = data['location']?.toString() ?? 'University of Jordan';
     final startsAt = data['startsAt']?.toString();
 
@@ -645,9 +643,10 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
     final tournamentId = data['tournamentId']?.toString();
     final profileId = data['profileId']?.toString();
     final status = data['status']?.toString();
+    final checkedIn = data['checkedIn'] == true;
     if (tournamentId == null ||
         profileId == null ||
-        status == 'cancelled' ||
+        (status != 'confirmed' && !checkedIn) ||
         !profiles.containsKey(profileId)) {
       continue;
     }
@@ -683,7 +682,8 @@ Map<String, int> _groupRegistrationCounts(List<models.Row> rows) {
     final data = row.data;
     final tournamentId = data['tournamentId']?.toString();
     final status = data['status']?.toString();
-    if (tournamentId == null || status == 'cancelled') continue;
+    final checkedIn = data['checkedIn'] == true;
+    if (tournamentId == null || (status != 'confirmed' && !checkedIn)) continue;
     groups[tournamentId] = (groups[tournamentId] ?? 0) + 1;
   }
   return groups;
