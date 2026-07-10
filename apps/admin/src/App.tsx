@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Image as ImageIcon, Plus, Search, Trash2, Upload, Video, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Download, Image as ImageIcon, Plus, Search, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
 import { JuChessBoard, type JuChessBoardChange } from './components/JuChessBoard'
 import { buildChessGame, deriveResult, parseChessPgn, pgnFromMoves } from './components/JuChessRules'
@@ -63,8 +63,6 @@ import { type TournamentStatus } from './lib/juchess'
 type Screen = 'dashboard' | 'tournaments' | 'players' | 'news' | 'announcements' | 'adminAccess'
 type TournamentTab = TournamentStatus
 type TournamentDataSource = 'cloud' | 'unavailable'
-type DayPeriod = 'AM' | 'PM'
-
 type Player = {
   id: string
   profileId?: string
@@ -893,9 +891,6 @@ function TournamentsScreen({
   const [timeCategory, setTimeCategory] = useState('Rapid')
   const [timeMinutes, setTimeMinutes] = useState('15')
   const [timeIncrement, setTimeIncrement] = useState('10')
-  const [startDate, setStartDate] = useState('')
-  const [startTime, setStartTime] = useState('09:00')
-  const [startPeriod, setStartPeriod] = useState<DayPeriod>('AM')
   const [selectedTournamentKey, setSelectedTournamentKey] = useState('')
   const [registrations, setRegistrations] = useState<AdminRegistration[]>([])
   const [registrationsLoading, setRegistrationsLoading] = useState(false)
@@ -918,9 +913,7 @@ function TournamentsScreen({
   const managedTournament = tournaments.find((item) => tournamentKey(item) === manageTournamentKey) ?? null
   const mediaTournament = tournaments.find((item) => tournamentKey(item) === mediaTournamentKey) ?? null
   const createEnabled = tab === 'draft'
-  const canSaveDraft = Boolean(form.name.trim() && form.format.trim())
-    && (!startDate || Boolean(parseManualStartTime(startTime)))
-    && !submitting
+  const canSaveDraft = Boolean(form.name.trim() && form.format.trim()) && !submitting
   const isEditing = Boolean(editingTournament)
   const showRegistrationQueue = tab === 'upcoming' && !managedTournament
   const selectedTournamentRowId = showRegistrationQueue ? selectedTournament?.rowId : undefined
@@ -1017,9 +1010,6 @@ function TournamentsScreen({
     setTimeCategory('Rapid')
     setTimeMinutes('15')
     setTimeIncrement('10')
-    setStartDate('')
-    setStartTime('09:00')
-    setStartPeriod('AM')
   }
 
   function openCreatePanel() {
@@ -1038,7 +1028,6 @@ function TournamentsScreen({
     setCreateStep(0)
     setForm(tournamentToEditForm(item))
     syncTimeStateFromControl(item.timeControl)
-    syncStartStateFromValue(item.startsAt)
     setShowCreate(true)
     setMessage(null)
   }
@@ -1063,44 +1052,12 @@ function TournamentsScreen({
     setTimeCategory(match[3] || 'Rapid')
   }
 
-  function syncStartStateFromValue(value?: string) {
-    const next = startDateTimeParts(value)
-    setStartDate(next.date)
-    setStartTime(next.time)
-    setStartPeriod(next.period)
-  }
-
-  function setStartSelection(next: Partial<{ date: string; time: string; period: DayPeriod }>) {
-    const date = next.date ?? startDate
-    const time = next.time ?? startTime
-    const period = next.period ?? startPeriod
-
-    setStartDate(date)
-    setStartTime(time)
-    setStartPeriod(period)
-
-    if (!date) {
-      update('startsAt', undefined)
-      return
-    }
-
-    const startsAt = combineStartDateTime(date, time, period)
-    if (startsAt) update('startsAt', startsAt)
-  }
-
-  function stepStartTime(minutesToAdd: number) {
-    const parsed = parseManualStartTime(startTime) ?? { hours: 9, minutes: 0 }
-    const currentHours = (parsed.hours % 12) + (startPeriod === 'PM' ? 12 : 0)
-    const totalMinutes = (currentHours * 60 + parsed.minutes + minutesToAdd + 24 * 60) % (24 * 60)
-    const nextHours24 = Math.floor(totalMinutes / 60)
-    const nextMinutes = totalMinutes % 60
-    const nextPeriod: DayPeriod = nextHours24 >= 12 ? 'PM' : 'AM'
-    const nextHours = nextHours24 % 12 || 12
-
-    setStartSelection({
-      time: `${String(nextHours).padStart(2, '0')}:${String(nextMinutes).padStart(2, '0')}`,
-      period: nextPeriod,
-    })
+  function stepStartDateTime(minutesToAdd: number) {
+    if (!form.startsAt) return
+    const date = new Date(form.startsAt)
+    if (Number.isNaN(date.getTime())) return
+    date.setMinutes(date.getMinutes() + minutesToAdd)
+    update('startsAt', date.toISOString())
   }
 
   function setTimeSelection(next: Partial<{ category: string; minutes: string; increment: string }>) {
@@ -1584,42 +1541,35 @@ function TournamentsScreen({
                       placeholder="Type venue / platform..."
                     />
                   </label>
-                  <div className="start-date-time-field wide">
-                    <label>
-                      Start date
-                      <input type="date" value={startDate} onChange={(event) => setStartSelection({ date: event.target.value })} />
-                    </label>
-                    <div className="manual-time-field">
-                      <span>Start time</span>
-                      <div className="manual-time-controls">
-                        <button type="button" className="time-step-button" title="15 minutes earlier" aria-label="15 minutes earlier" onClick={() => stepStartTime(-15)}>
-                          <ChevronLeft size={17} aria-hidden="true" />
+                  <div className="create-field wide">
+                    <span>Start date / time</span>
+                    <div className="date-time-picker-control">
+                      <input
+                        type="datetime-local"
+                        step={900}
+                        value={toDateTimeLocalValue(form.startsAt)}
+                        onChange={(event) => update('startsAt', fromDateTimeLocalValue(event.target.value))}
+                      />
+                      <div className="date-time-stepper" role="group" aria-label="Adjust start time">
+                        <button
+                          type="button"
+                          title="15 minutes later"
+                          aria-label="15 minutes later"
+                          disabled={!form.startsAt}
+                          onClick={() => stepStartDateTime(15)}
+                        >
+                          <ChevronUp size={15} aria-hidden="true" />
                         </button>
-                        <input
-                          aria-invalid={startDate && !parseManualStartTime(startTime) ? 'true' : undefined}
-                          inputMode="numeric"
-                          maxLength={5}
-                          placeholder="09:30"
-                          value={startTime}
-                          onChange={(event) => setStartSelection({ time: event.target.value })}
-                        />
-                        <button type="button" className="time-step-button" title="15 minutes later" aria-label="15 minutes later" onClick={() => stepStartTime(15)}>
-                          <ChevronRight size={17} aria-hidden="true" />
+                        <button
+                          type="button"
+                          title="15 minutes earlier"
+                          aria-label="15 minutes earlier"
+                          disabled={!form.startsAt}
+                          onClick={() => stepStartDateTime(-15)}
+                        >
+                          <ChevronDown size={15} aria-hidden="true" />
                         </button>
-                        <div className="day-period-control" role="group" aria-label="Start time period">
-                          {(['AM', 'PM'] as DayPeriod[]).map((period) => (
-                            <button
-                              key={period}
-                              type="button"
-                              className={startPeriod === period ? 'active' : undefined}
-                              onClick={() => setStartSelection({ period })}
-                            >
-                              {period}
-                            </button>
-                          ))}
-                        </div>
                       </div>
-                      <small>Enter time as HH:MM, then choose AM or PM.</small>
                     </div>
                   </div>
                   <label>Registration deadline<input type="datetime-local" /></label>
@@ -5907,43 +5857,19 @@ function formatTime(value?: string) {
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(date)
 }
 
-function startDateTimeParts(value?: string): { date: string; time: string; period: DayPeriod } {
-  if (!value) return { date: '', time: '09:00', period: 'AM' }
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return { date: '', time: '09:00', period: 'AM' }
-
-  const hours24 = parsed.getHours()
-  const hours = hours24 % 12 || 12
-  return {
-    date: `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`,
-    time: `${String(hours).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`,
-    period: hours24 >= 12 ? 'PM' : 'AM',
-  }
+function toDateTimeLocalValue(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 16)
 }
 
-function parseManualStartTime(value: string) {
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/)
-  if (!match) return null
-  const hours = Number(match[1])
-  const minutes = Number(match[2])
-  if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return null
-  return { hours, minutes }
-}
-
-function combineStartDateTime(dateValue: string, timeValue: string, period: DayPeriod) {
-  const time = parseManualStartTime(timeValue)
-  const dateMatch = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!time || !dateMatch) return undefined
-
-  const hours24 = (time.hours % 12) + (period === 'PM' ? 12 : 0)
-  const date = new Date(
-    Number(dateMatch[1]),
-    Number(dateMatch[2]) - 1,
-    Number(dateMatch[3]),
-    hours24,
-    time.minutes,
-  )
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
+function fromDateTimeLocalValue(value: string) {
+  if (!value) return undefined
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toISOString()
 }
 
 export default App
