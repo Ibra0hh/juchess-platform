@@ -113,7 +113,7 @@ function ProfilePage() {
           <section className="profile-panel recent-panel">
             <div className="panel-title-row">
               <h2>Recent games</h2>
-              <Link to="/games">Review room &rarr;</Link>
+              <Link to="/tools">Review room &rarr;</Link>
             </div>
             <div className="recent-list">
               {recentGames.map((game) => {
@@ -123,7 +123,7 @@ function ProfilePage() {
                 const draw = game.result.includes('1/2')
 
                 return (
-                  <Link to={`/games?game=${game.key}`} className="recent-game-row" key={game.key}>
+                  <Link to={`/tools?game=${game.key}`} className="recent-game-row" key={game.key}>
                     <span className={draw ? 'draw' : won ? 'win' : 'loss'}>{draw ? '1/2' : won ? 'W' : 'L'}</span>
                     <span>
                       <strong>vs {opponent}</strong>

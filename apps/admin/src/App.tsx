@@ -357,8 +357,8 @@ const demoPlayers: Player[] = [
 const windowModel: Array<{ key: WindowKey; label: string; icon: string; sections: string[] }> = [
   { key: 'home', label: 'Home', icon: '⌂', sections: ['Header', 'Featured tournament', 'Quick tools', 'Club leaderboard', 'News'] },
   { key: 'tournaments', label: 'Tournaments', icon: '♞', sections: ['Tabs', 'Tournament cards', 'Detail hero', 'Registration'] },
-  { key: 'games', label: 'Games', icon: '♟', sections: ['Review games', 'Analysis board', 'PGN upload'] },
-  { key: 'tools', label: 'Tools', icon: '◫', sections: ['Chess clock', 'Saved analyses', 'Move quality'] },
+  { key: 'tools', label: 'Tools', icon: '◫', sections: ['Game review', 'Analysis board', 'PGN upload'] },
+  { key: 'games', label: 'Games', icon: '♟', sections: ['Chess board', 'Online tournaments', 'Live games'] },
   { key: 'profile', label: 'Profile', icon: '◍', sections: ['Stats', 'Recent games', 'Account details'] },
   { key: 'auth', label: 'Auth', icon: '◇', sections: ['Sign in', 'Sign up', 'Forgot password', 'Guest browsing'] },
 ]
@@ -2275,7 +2275,7 @@ function TournamentManageView({
         ))}
       </div>
 
-      <section className={`manage-panel ${stage === 'bracket' ? 'website-bracket-host' : ''}`}>
+      <section className={`manage-panel ${stage === 'bracket' ? 'website-bracket-host' : ''} ${stage === 'procedure' ? 'procedure-workspace-host' : ''}`}>
         {stage === 'participants' ? (
           <>
             <div className="manage-panel-head participant-panel-head">
@@ -2434,36 +2434,40 @@ function TournamentManageView({
           </>
         ) : null}
         {stage === 'procedure' ? (
-          <>
-            <ProcedurePlanner
-              active={tournament.status === 'active'}
-              advanceDisabled={disabled}
-              configuredTables={tournament.physicalBoards || 3}
-              disabled={disabled}
-              onAdvanceRound={() => void onAdvanceRound(tournament)}
-              onConfigure={() => void onProcedureConfigure(tournament, physicalBoards)}
-              onMatchSelect={tournament.status === 'active' || tournament.status === 'completed' ? selectLiveBoard : undefined}
-              onStartMatch={(match, physicalBoard) => void startProcedureMatch(match, physicalBoard)}
-              onTablesChange={setPhysicalBoards}
-              planMissing={procedurePlanMissing}
-              queue={procedureQueue}
-              roundLabel={procedureMatches[0]?.roundLabel ?? `Round ${currentRoundNumber(tournament)}`}
-              selectedBoardKey={selectedBoardKey}
-              tables={physicalBoards}
-              totalMatches={procedureMatches.length}
-            />
+          <div className={`procedure-workspace ${liveBoardOptions.length ? 'with-board' : ''}`}>
             {(tournament.status === 'active' || tournament.status === 'completed') && liveBoardOptions.length ? (
-              <LiveTournamentBoard
-                boards={liveBoardOptions}
-                onBoardSelect={selectLiveBoard}
-                onMessage={onMessage}
-                onSyncMoves={syncLiveBoardMoves}
-                onSaveGame={saveLiveBoardResult}
-                panelRef={liveBoardRef}
-                selectedBoardKey={selectedBoardKey}
-              />
+              <div className="procedure-board-column">
+                <LiveTournamentBoard
+                  boards={liveBoardOptions}
+                  onBoardSelect={selectLiveBoard}
+                  onMessage={onMessage}
+                  onSyncMoves={syncLiveBoardMoves}
+                  onSaveGame={saveLiveBoardResult}
+                  panelRef={liveBoardRef}
+                  selectedBoardKey={selectedBoardKey}
+                />
+              </div>
             ) : null}
-          </>
+            <div className="procedure-plan-column">
+              <ProcedurePlanner
+                active={tournament.status === 'active'}
+                advanceDisabled={disabled}
+                configuredTables={tournament.physicalBoards || 3}
+                disabled={disabled}
+                onAdvanceRound={() => void onAdvanceRound(tournament)}
+                onConfigure={() => void onProcedureConfigure(tournament, physicalBoards)}
+                onMatchSelect={tournament.status === 'active' || tournament.status === 'completed' ? selectLiveBoard : undefined}
+                onStartMatch={(match, physicalBoard) => void startProcedureMatch(match, physicalBoard)}
+                onTablesChange={setPhysicalBoards}
+                planMissing={procedurePlanMissing}
+                queue={procedureQueue}
+                roundLabel={procedureMatches[0]?.roundLabel ?? `Round ${currentRoundNumber(tournament)}`}
+                selectedBoardKey={selectedBoardKey}
+                tables={physicalBoards}
+                totalMatches={procedureMatches.length}
+              />
+            </div>
+          </div>
         ) : null}
         {stage === 'standings' ? (
           <>

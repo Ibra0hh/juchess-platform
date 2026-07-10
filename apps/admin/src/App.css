@@ -1770,6 +1770,57 @@ button {
   background: #fff;
 }
 
+.manage-panel.procedure-workspace-host {
+  max-width: 1440px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.procedure-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.procedure-workspace.with-board {
+  grid-template-columns: minmax(430px, 540px) minmax(520px, 1fr);
+  align-items: start;
+}
+
+.procedure-board-column,
+.procedure-plan-column {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e6dfd3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.procedure-board-column {
+  position: sticky;
+  top: 18px;
+}
+
+.procedure-board-column .live-board-panel {
+  border-top: 0;
+}
+
+.procedure-board-column .live-board-layout {
+  grid-template-columns: 1fr;
+  padding: 16px;
+}
+
+.procedure-board-column .live-board-area > .board-player-bar,
+.procedure-board-column .live-board-area > .ju-chess-board-shell,
+.procedure-board-column .live-replay-controls {
+  width: 100%;
+}
+
+.procedure-board-column .live-game-side {
+  border-top: 1px solid #e6dfd3;
+  padding-top: 16px;
+}
+
 .procedure-head label {
   display: flex;
   align-items: center;
@@ -3695,6 +3746,22 @@ button {
 
   .web-preview-layout .window-control {
     grid-area: control;
+  }
+}
+
+@media (max-width: 1180px) {
+  .procedure-workspace.with-board {
+    grid-template-columns: 1fr;
+  }
+
+  .procedure-board-column {
+    position: static;
+  }
+
+  .procedure-board-column .live-board-area > .board-player-bar,
+  .procedure-board-column .live-board-area > .ju-chess-board-shell,
+  .procedure-board-column .live-replay-controls {
+    width: min(100%, 560px);
   }
 }
 

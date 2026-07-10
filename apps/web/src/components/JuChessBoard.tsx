@@ -126,6 +126,7 @@ export function JuChessBoard({
           return (
             <button
               type="button"
+              aria-label={`Square ${square.key}`}
               className={[
                 'ju-chess-square',
                 square.dark ? 'dark' : 'light',
@@ -135,6 +136,7 @@ export function JuChessBoard({
                 check ? 'check' : '',
               ].filter(Boolean).join(' ')}
               disabled={!interactive}
+              data-square={square.key}
               onClick={() => handleSquareClick(square.key)}
               key={square.key}
             >

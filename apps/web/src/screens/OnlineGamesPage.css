@@ -1,0 +1,423 @@
+.online-games-screen {
+  min-height: 100vh;
+  background: #f5efe3;
+}
+
+.online-games-main {
+  width: min(100% - 40px, 1240px);
+  margin: 0 auto;
+  padding: 34px 0 52px;
+}
+
+.online-games-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.online-games-heading > div:first-child > span {
+  color: #7a2431;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.online-games-heading h1 {
+  margin: 3px 0 4px;
+  color: #1e2b45;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 42px;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.online-games-heading p {
+  max-width: 650px;
+  margin: 0;
+  color: rgba(30, 43, 69, 0.68);
+  font-size: 14px;
+}
+
+.online-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  border: 1px solid rgba(30, 43, 69, 0.2);
+  border-radius: 7px;
+  background: #fffdf8;
+  color: #1e2b45;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.online-status.live {
+  border-color: rgba(122, 36, 49, 0.34);
+  color: #7a2431;
+}
+
+.online-games-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 620px) minmax(320px, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.online-board-station,
+.online-tournament-panel {
+  overflow: hidden;
+  border: 1px solid rgba(30, 43, 69, 0.16);
+  border-radius: 8px;
+  background: #fffdf8;
+  box-shadow: 0 12px 34px rgba(30, 43, 69, 0.08);
+}
+
+.online-board-station {
+  padding: 18px;
+}
+
+.online-board-head,
+.online-event-head,
+.online-board-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.online-board-head {
+  margin-bottom: 14px;
+}
+
+.online-board-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.online-board-head strong {
+  color: #1e2b45;
+  font-size: 15px;
+}
+
+.online-board-head span {
+  color: rgba(30, 43, 69, 0.58);
+  font-size: 11.5px;
+}
+
+.online-board-head button,
+.online-board-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid rgba(30, 43, 69, 0.22);
+  border-radius: 7px;
+  background: #fff;
+  color: #1e2b45;
+  padding: 0 11px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.online-board-head button:hover,
+.online-board-controls button:hover:not(:disabled) {
+  border-color: #7a2431;
+  color: #7a2431;
+}
+
+.online-player-strip {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  width: min(100%, 580px);
+  min-height: 42px;
+  margin: 0 auto;
+  border: 1px solid rgba(30, 43, 69, 0.16);
+  padding: 0 11px;
+}
+
+.online-player-strip.black {
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+  background: #e7e2d8;
+}
+
+.online-player-strip.white {
+  border-top: 0;
+  border-radius: 0 0 7px 7px;
+  background: #fff;
+}
+
+.online-player-strip > span {
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border: 1px solid #1e2b45;
+  border-radius: 4px;
+  color: #1e2b45;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.online-player-strip.black > span {
+  background: #1e2b45;
+  color: #fff;
+}
+
+.online-player-strip strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #1e2b45;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.online-player-strip small {
+  color: rgba(30, 43, 69, 0.58);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+}
+
+.online-ju-board {
+  width: min(100%, 580px);
+  margin: 0 auto;
+}
+
+.online-ju-board .ju-chess-board {
+  border-radius: 0;
+}
+
+.online-board-controls {
+  width: min(100%, 580px);
+  margin: 13px auto 0;
+}
+
+.online-board-controls span {
+  color: rgba(30, 43, 69, 0.62);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-align: center;
+}
+
+.online-board-controls button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.online-tournament-panel {
+  padding-bottom: 16px;
+}
+
+.online-panel-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid rgba(30, 43, 69, 0.12);
+  padding: 18px;
+}
+
+.online-panel-title > span {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: #7a2431;
+  color: #fff;
+}
+
+.online-panel-title h2 {
+  margin: 0;
+  color: #1e2b45;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.online-panel-title p {
+  margin: 3px 0 0;
+  color: rgba(30, 43, 69, 0.62);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.online-primary-action {
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  margin: 16px 16px 0;
+  border-radius: 7px;
+  background: #1e2b45;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.online-primary-action:hover {
+  background: #7a2431;
+}
+
+.online-event-list {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 0;
+}
+
+.online-event {
+  border: 1px solid rgba(30, 43, 69, 0.14);
+  border-radius: 7px;
+  background: #fff;
+  padding: 13px;
+}
+
+.online-event-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.online-event-head strong {
+  color: #1e2b45;
+  font-size: 13px;
+}
+
+.online-event-head span,
+.online-event-meta,
+.online-no-boards {
+  color: rgba(30, 43, 69, 0.58);
+  font-size: 10.5px;
+}
+
+.online-event-head a {
+  color: #7a2431;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.online-event-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 9px;
+}
+
+.online-event-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.online-board-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 11px;
+}
+
+.online-board-list button {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  border: 1px solid rgba(30, 43, 69, 0.1);
+  border-radius: 6px;
+  background: #fdfaf3;
+  color: #1e2b45;
+  padding: 0 9px;
+  text-align: left;
+}
+
+.online-board-list button:hover,
+.online-board-list button.active {
+  border-color: rgba(122, 36, 49, 0.38);
+  background: #fff5ee;
+}
+
+.online-board-list button > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(30, 43, 69, 0.3);
+}
+
+.online-board-list button > span.live-dot {
+  background: #b23a3a;
+}
+
+.online-board-list strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.online-board-list small {
+  color: rgba(30, 43, 69, 0.52);
+  font-size: 9.5px;
+}
+
+.online-no-boards {
+  margin: 10px 0 0;
+  line-height: 1.45;
+}
+
+.online-empty {
+  border: 1px dashed rgba(30, 43, 69, 0.2);
+  border-radius: 7px;
+  color: rgba(30, 43, 69, 0.58);
+  padding: 24px 14px;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 960px) {
+  .online-games-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .online-games-main {
+    width: min(100% - 28px, 1240px);
+    padding-top: 22px;
+  }
+
+  .online-games-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .online-games-heading h1 {
+    font-size: 34px;
+  }
+
+  .online-board-station {
+    padding: 12px;
+  }
+
+  .online-board-controls {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .online-board-controls span {
+    order: -1;
+    width: 100%;
+  }
+
+  .online-board-controls button {
+    flex: 1;
+  }
+}

@@ -259,8 +259,8 @@ function GamesPage() {
   }
 
   return (
-    <div className="club-screen games-screen" data-screen-label="Games Workspace">
-      <SiteHeader active="games" />
+    <div className="club-screen games-screen" data-screen-label="Tools Workspace">
+      <SiteHeader active="tools" />
       <main className="games-main">
         <section className="board-column" aria-label="Board area">
           <div className="board-title-row">

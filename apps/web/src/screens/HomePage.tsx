@@ -475,6 +475,7 @@ function HomeFooter() {
         </div>
         <nav aria-label="Footer navigation">
           <Link to="/tournaments">Tournaments</Link>
+          <Link to="/tools">Tools</Link>
           <Link to="/games">Games</Link>
           <Link to="/leaderboard">Leaderboard</Link>
           <Link to="/sign-up">Join the club</Link>

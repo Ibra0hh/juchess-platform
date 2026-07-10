@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import './SiteHeader.css'
 
 type SiteHeaderProps = {
-  active: 'home' | 'tournaments' | 'games' | 'leaderboard' | 'profile'
+  active: 'home' | 'tournaments' | 'tools' | 'games' | 'leaderboard' | 'profile'
   profilePreview?: {
     displayName: string
     initials: string
@@ -41,6 +41,9 @@ function SiteHeader({ active, profilePreview }: SiteHeaderProps) {
           </Link>
           <Link to="/tournaments" className={active === 'tournaments' ? 'active' : undefined}>
             Tournaments
+          </Link>
+          <Link to="/tools" className={active === 'tools' ? 'active' : undefined}>
+            Tools
           </Link>
           <Link to="/games" className={active === 'games' ? 'active' : undefined}>
             Games

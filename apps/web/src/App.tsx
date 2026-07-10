@@ -6,6 +6,7 @@ import ForgotPasswordPage from './screens/ForgotPasswordPage'
 import GamesPage from './screens/GamesPage'
 import HomePage from './screens/HomePage'
 import LeaderboardPage from './screens/LeaderboardPage'
+import OnlineGamesPage from './screens/OnlineGamesPage'
 import ProfilePage from './screens/ProfilePage'
 import TournamentDetailPage from './screens/TournamentDetailPage'
 import TournamentsPage from './screens/TournamentsPage'
@@ -33,8 +34,8 @@ function App() {
         <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
         <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/games" element={<GamesPage />} />
-        <Route path="/tools" element={<Navigate to="/games" replace />} />
+        <Route path="/games" element={<OnlineGamesPage />} />
+        <Route path="/tools" element={<GamesPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="*" element={<NotFound />} />
