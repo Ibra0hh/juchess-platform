@@ -39,6 +39,40 @@
     ]
   },
   {
+    "$id": "player-actions",
+    "name": "JuChess Player Actions",
+    "runtime": "node-22",
+    "path": "functions/player-actions",
+    "entrypoint": "src/main.js",
+    "commands": "npm install",
+    "execute": [
+      "users"
+    ],
+    "events": [],
+    "schedule": "",
+    "timeout": 15,
+    "enabled": true,
+    "logging": true,
+    "ignore": [
+      "node_modules",
+      ".git"
+    ],
+    "scopes": [
+      "databases.read",
+      "databases.write",
+      "rows.read",
+      "rows.write",
+      "documents.read",
+      "documents.write"
+    ],
+    "vars": [
+      {
+        "key": "JUCHESS_DATABASE_ID",
+        "value": "juchess"
+      }
+    ]
+  },
+  {
     "$id": "access-guards",
     "name": "JuChess Access Guards",
     "runtime": "node-22",

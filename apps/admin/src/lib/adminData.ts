@@ -67,7 +67,10 @@ type AppwriteProfileRow = Models.Row & {
   displayName?: string
   email?: string
   universityId?: string
+  phone?: string
   rating?: number
+  role?: string
+  status?: string
 }
 
 const tournamentFormatOrder = [
@@ -415,6 +418,110 @@ export async function submitTournamentGameResult(input: {
   })
 
   return response.row
+}
+
+/** The bye sentinel is a scheduling placeholder, never a club member. */
+export const SYSTEM_BYE_PROFILE_ID = 'system_bye'
+
+export type ClubPlayer = {
+  id: string
+  name: string
+  universityId: string
+  rating: number
+  email: string
+  phone: string
+  role: string
+  status: string
+}
+
+export type ClubPlayersResult = {
+  players: ClubPlayer[]
+  error?: string
+}
+
+export async function loadClubPlayers(): Promise<ClubPlayersResult> {
+  if (!appwriteReady) return { players: [] }
+
+  try {
+    const response = await tablesDB.listRows<AppwriteProfileRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.profiles,
+      queries: [Query.limit(1000)],
+      total: false,
+    })
+
+    const players = response.rows
+      .filter((row) => row.$id !== SYSTEM_BYE_PROFILE_ID)
+      .map((row) => ({
+        id: row.$id,
+        name: row.displayName || row.email || row.$id,
+        universityId: row.universityId || '-',
+        rating: row.rating ?? 1200,
+        email: row.email ?? '',
+        phone: row.phone ?? '',
+        role: row.role ?? 'member',
+        status: row.status ?? 'active',
+      }))
+      .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))
+
+    return { players }
+  } catch (error) {
+    console.warn('JuChess club players could not be loaded.', error)
+    return { players: [], error: formatAdminError(error) }
+  }
+}
+
+export async function countPendingRegistrations(): Promise<number> {
+  if (!appwriteReady) return 0
+
+  try {
+    const response = await tablesDB.listRows({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.registrations,
+      queries: [Query.equal('status', 'pending'), Query.limit(1000)],
+      total: false,
+    })
+    return response.rows.length
+  } catch {
+    return 0
+  }
+}
+
+export type AdminCheckIn = {
+  rowId: string
+  tournamentId: string
+  profileId: string
+  registrationId: string
+  code: string
+  checkedIn: boolean
+}
+
+/**
+ * Check-in codes are not readable from the client: the `check_ins` table has no
+ * public read. Staff fetch them through the admin function, which uses its
+ * server-side key.
+ */
+export async function loadTournamentCheckIns(tournamentRowId: string): Promise<AdminCheckIn[]> {
+  if (!appwriteReady || !tournamentRowId) return []
+
+  try {
+    const response = await runAdminAction<{ checkIns: Array<Record<string, unknown>> }>({
+      method: ExecutionMethod.GET,
+      path: `/tournaments/${tournamentRowId}/check-ins`,
+    })
+
+    return (response.checkIns ?? []).map((row) => ({
+      rowId: String(row.$id ?? ''),
+      tournamentId: String(row.tournamentId ?? ''),
+      profileId: String(row.profileId ?? ''),
+      registrationId: String(row.registrationId ?? ''),
+      code: String(row.code ?? ''),
+      checkedIn: row.checkedIn === true,
+    }))
+  } catch (error) {
+    console.warn('JuChess check-in codes could not be loaded.', error)
+    return []
+  }
 }
 
 export type AdvanceRoundResult = {
@@ -806,11 +913,11 @@ function tournamentFormatRank(format: string) {
 async function runAdminAction<T>({
   method,
   path,
-  body,
+  body = {},
 }: {
   method: ExecutionMethod
   path: string
-  body: Record<string, unknown>
+  body?: Record<string, unknown>
 }): Promise<T> {
   requireAppwriteReady()
   const adminJwt = await account.createJWT({ duration: 900 })

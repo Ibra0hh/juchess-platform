@@ -18,6 +18,8 @@
     "lint:web": "npm --workspace apps/web run lint",
     "lint:admin": "npm --workspace apps/admin run lint",
     "mobile:analyze": "cd apps/mobile && flutter analyze",
-    "mobile:test": "cd apps/mobile && flutter test"
+    "mobile:test": "cd apps/mobile && flutter test",
+    "test:engine": "cd appwrite/functions/admin-actions && node --test test/engine.test.mjs",
+    "check:functions": "node --check appwrite/functions/admin-actions/src/main.js && node --check appwrite/functions/player-actions/src/main.js && node --check appwrite/functions/access-guards/src/main.js"
   }
 }

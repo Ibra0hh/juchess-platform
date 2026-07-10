@@ -1,5 +1,5 @@
-import { ID, Permission, Query, Role, type Models } from 'appwrite'
-import { appwriteConfig, appwriteReady, tablesDB } from './appwrite'
+import { ExecutionMethod, Query, type Models } from 'appwrite'
+import { appwriteConfig, appwriteReady, functions, tablesDB } from './appwrite'
 import { tableIds } from './juchess'
 
 export type RegistrationStatus = 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
@@ -9,8 +9,47 @@ export type MyRegistration = Models.Row & {
   profileId: string
   status: RegistrationStatus
   seed?: number
-  checkInCode?: string
   checkedIn?: boolean
+}
+
+export type MyCheckIn = Models.Row & {
+  tournamentId: string
+  profileId: string
+  registrationId: string
+  code: string
+  checkedIn?: boolean
+}
+
+/**
+ * Registration writes go through the player-actions function. The client is not
+ * allowed to create these rows directly: the server derives the profile from the
+ * session and always starts a registration as `pending`, so a player cannot
+ * approve themselves or register on someone else's behalf.
+ */
+async function runPlayerAction<T>(path: string, body: Record<string, unknown> = {}): Promise<T> {
+  requireReady()
+
+  const execution = await functions.createExecution({
+    functionId: appwriteConfig.playerFunctionId,
+    body: JSON.stringify(body),
+    async: false,
+    xpath: path,
+    method: ExecutionMethod.POST,
+    headers: { 'content-type': 'application/json' },
+  })
+
+  let payload: { ok?: boolean; error?: string } & Record<string, unknown>
+  try {
+    payload = JSON.parse(execution.responseBody)
+  } catch {
+    throw new Error('The club server returned an unreadable response.')
+  }
+
+  if (execution.responseStatusCode >= 400 || payload.ok === false) {
+    throw new Error(payload.error || 'Could not update your registration.')
+  }
+
+  return payload as T
 }
 
 export async function loadMyRegistration(
@@ -34,55 +73,49 @@ export async function loadMyRegistration(
   return active ?? response.rows[0] ?? null
 }
 
-export async function registerForTournament(
+/**
+ * Check-in codes live in a table with no public read. Row permissions let a
+ * player read only their own pass, so this returns null for everyone else.
+ */
+export async function loadMyCheckIn(
   tournamentRowId: string,
   profileId: string,
-  accountId: string,
-): Promise<MyRegistration> {
-  requireReady()
+): Promise<MyCheckIn | null> {
+  if (!appwriteReady || !tournamentRowId || !profileId) return null
 
-  const existing = await loadMyRegistration(tournamentRowId, profileId)
-  if (existing && existing.status !== 'cancelled') return existing
-
-  if (existing) {
-    return await tablesDB.updateRow<MyRegistration>({
+  try {
+    const response = await tablesDB.listRows<MyCheckIn>({
       databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.registrations,
-      rowId: existing.$id,
-      data: { status: 'pending', checkedIn: false },
+      tableId: tableIds.checkIns,
+      queries: [
+        Query.equal('tournamentId', tournamentRowId),
+        Query.equal('profileId', profileId),
+        Query.limit(1),
+      ],
+      total: false,
     })
+    return response.rows[0] ?? null
+  } catch {
+    return null
   }
+}
 
-  return await tablesDB.createRow<MyRegistration>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.registrations,
-    rowId: ID.unique(),
-    data: {
-      tournamentId: tournamentRowId,
-      profileId,
-      status: 'pending',
-      checkedIn: false,
-    },
-    permissions: [
-      Permission.read(Role.user(accountId)),
-      Permission.update(Role.user(accountId)),
-    ],
+export async function registerForTournament(tournamentRowId: string): Promise<MyRegistration> {
+  const payload = await runPlayerAction<{ row: MyRegistration }>('/registrations', {
+    tournamentId: tournamentRowId,
   })
+  return payload.row
 }
 
 export async function cancelMyRegistration(registrationRowId: string): Promise<MyRegistration> {
-  requireReady()
-
-  return await tablesDB.updateRow<MyRegistration>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.registrations,
-    rowId: registrationRowId,
-    data: { status: 'cancelled', checkedIn: false },
-  })
+  const payload = await runPlayerAction<{ row: MyRegistration }>(
+    `/registrations/${registrationRowId}/cancel`,
+  )
+  return payload.row
 }
 
-export function checkInQrPayload(registration: MyRegistration) {
-  return `JUCHESS-CHECKIN:${registration.$id}:${registration.checkInCode ?? ''}`
+export function checkInQrPayload(checkIn: MyCheckIn) {
+  return `JUCHESS-CHECKIN:${checkIn.registrationId}:${checkIn.code}`
 }
 
 function requireReady() {

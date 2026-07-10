@@ -23,8 +23,10 @@ import {
 import {
   cancelMyRegistration,
   checkInQrPayload,
+  loadMyCheckIn,
   loadMyRegistration,
   registerForTournament,
+  type MyCheckIn,
   type MyRegistration,
 } from '../lib/registrations'
 import './TournamentDetailPage.css'
@@ -383,6 +385,7 @@ function RegistrationTab({
 function RegistrationActions({ tournament }: { tournament: Tournament }) {
   const { loading: authLoading, profile, refresh, user } = useAuth()
   const [registration, setRegistration] = useState<MyRegistration | null>(null)
+  const [checkIn, setCheckIn] = useState<MyCheckIn | null>(null)
   const [registrationLoading, setRegistrationLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -393,14 +396,21 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   const refreshRegistration = useCallback(async () => {
     if (!tournamentRowId || !profileId) {
       setRegistration(null)
+      setCheckIn(null)
       return
     }
 
     setRegistrationLoading(true)
     try {
-      setRegistration(await loadMyRegistration(tournamentRowId, profileId))
+      const [nextRegistration, nextCheckIn] = await Promise.all([
+        loadMyRegistration(tournamentRowId, profileId),
+        loadMyCheckIn(tournamentRowId, profileId),
+      ])
+      setRegistration(nextRegistration)
+      setCheckIn(nextCheckIn)
     } catch {
       setRegistration(null)
+      setCheckIn(null)
     } finally {
       setRegistrationLoading(false)
     }
@@ -456,10 +466,12 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
         throw new Error('Player profile is not ready yet.')
       }
 
-      setRegistration(await registerForTournament(tournamentRowId, resolvedProfileId, user.$id))
+      setRegistration(await registerForTournament(tournamentRowId))
       setMessage('Registration received. The organizers will review your spot.')
-    } catch {
-      setMessage('Could not prepare your player profile. Please sign out and sign in again, then try registering.')
+    } catch (error) {
+      setMessage(error instanceof Error && error.message
+        ? error.message
+        : 'Could not register right now. Please try again.')
     } finally {
       setBusy(false)
     }
@@ -471,6 +483,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
     setMessage(null)
     try {
       setRegistration(await cancelMyRegistration(registration.$id))
+      setCheckIn(null)
       setMessage('Your registration was cancelled.')
     } catch {
       setMessage('Could not cancel right now. Ask an organizer for help at the venue.')
@@ -509,7 +522,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
           <>
             <h2>You are in!</h2>
             <p>Show this code at the venue to check in for {tournament.name}.</p>
-            <CheckInPass registration={registration as MyRegistration} />
+            <CheckInPass checkIn={checkIn} />
           </>
         )}
         {message ? <p className="register-message" role="status">{message}</p> : null}
@@ -519,7 +532,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
           <button type="button" className="primary-action" disabled={busy} onClick={handleRegister}>
             {busy ? 'Registering...' : 'Register'}
           </button>
-        ) : registration?.checkedIn ? (
+        ) : checkIn?.checkedIn || registration?.checkedIn ? (
           <span className="checkin-done">Checked in</span>
         ) : (
           <button type="button" className="secondary-action" disabled={busy} onClick={handleCancel}>
@@ -531,21 +544,21 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   )
 }
 
-function CheckInPass({ registration }: { registration: MyRegistration }) {
+function CheckInPass({ checkIn }: { checkIn: MyCheckIn | null }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !registration.checkInCode) return
+    if (!canvas || !checkIn) return
 
-    QRCode.toCanvas(canvas, checkInQrPayload(registration), {
+    QRCode.toCanvas(canvas, checkInQrPayload(checkIn), {
       width: 148,
       margin: 1,
       color: { dark: '#1E2B45', light: '#FDF8EC' },
     }).catch(() => undefined)
-  }, [registration])
+  }, [checkIn])
 
-  if (!registration.checkInCode) {
+  if (!checkIn) {
     return <p className="checkin-note">Your check-in code is on its way. Check back before the event.</p>
   }
 
@@ -554,8 +567,8 @@ function CheckInPass({ registration }: { registration: MyRegistration }) {
       <canvas ref={canvasRef} aria-label="Check-in QR code" />
       <div>
         <span>Check-in code</span>
-        <strong>{registration.checkInCode}</strong>
-        <small>{registration.checkedIn ? 'Checked in at the venue' : 'Keep this ready at the venue'}</small>
+        <strong>{checkIn.code}</strong>
+        <small>{checkIn.checkedIn ? 'Checked in at the venue' : 'Keep this ready at the venue'}</small>
       </div>
     </div>
   )

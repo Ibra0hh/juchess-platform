@@ -91,6 +91,10 @@ class AppConfig {
     'APPWRITE_REGISTRATIONS_TABLE_ID',
     defaultValue: 'registrations',
   );
+  static const checkInsTableId = String.fromEnvironment(
+    'APPWRITE_CHECK_INS_TABLE_ID',
+    defaultValue: 'check_ins',
+  );
   static const gamesTableId = String.fromEnvironment(
     'APPWRITE_GAMES_TABLE_ID',
     defaultValue: 'games',
@@ -98,6 +102,10 @@ class AppConfig {
   static const accessGuardFunctionId = String.fromEnvironment(
     'APPWRITE_ACCESS_GUARD_FUNCTION_ID',
     defaultValue: 'access-guards',
+  );
+  static const playerFunctionId = String.fromEnvironment(
+    'APPWRITE_PLAYER_FUNCTION_ID',
+    defaultValue: 'player-actions',
   );
   static const recoveryUrl = String.fromEnvironment(
     'APPWRITE_RECOVERY_URL',
@@ -265,57 +273,41 @@ class AppwriteService {
     await account.createRecovery(email: email, url: AppConfig.recoveryUrl);
   }
 
+  /// Registration writes go through the player-actions function. Clients cannot
+  /// insert these rows: the server owns `profileId` and forces `pending`, so a
+  /// player can neither approve themselves nor register for someone else.
+  Future<Map<String, dynamic>> _runPlayerAction(
+    String path, {
+    Map<String, dynamic> body = const {},
+  }) async {
+    final execution = await functions.createExecution(
+      functionId: AppConfig.playerFunctionId,
+      body: jsonEncode(body),
+      xasync: false,
+      path: path,
+      method: enums.ExecutionMethod.pOST,
+      headers: {'content-type': 'application/json'},
+    );
+
+    final payload = jsonDecode(execution.responseBody);
+    if (payload is! Map<String, dynamic>) {
+      throw AppwriteException('The club server returned an unreadable response.');
+    }
+    if (execution.responseStatusCode >= 400 || payload['ok'] == false) {
+      throw AppwriteException(
+        payload['error']?.toString() ?? 'Could not update your registration.',
+      );
+    }
+    return payload;
+  }
+
   Future<void> registerForTournament({
     required String tournamentRowId,
     required String profileId,
   }) async {
-    final existing = await tablesDB.listRows(
-      databaseId: AppConfig.databaseId,
-      tableId: AppConfig.registrationsTableId,
-      queries: [
-        Query.equal('tournamentId', tournamentRowId),
-        Query.equal('profileId', profileId),
-        Query.limit(100),
-      ],
-      total: false,
-      ttl: 0,
-    );
-
-    if (existing.rows.isNotEmpty) {
-      final activeRows = existing.rows.where(
-        (row) => row.data['status'] != 'cancelled',
-      );
-      if (activeRows.isNotEmpty) return;
-
-      for (final row in existing.rows) {
-        await tablesDB.updateRow(
-          databaseId: AppConfig.databaseId,
-          tableId: AppConfig.registrationsTableId,
-          rowId: row.$id,
-          data: {'status': 'pending', 'checkedIn': false},
-        );
-        break;
-      }
-      return;
-    }
-
-    // New spots stay pending until an organizer approves them; the admin
-    // function assigns the check-in code on approval.
-    final user = await account.get();
-    await tablesDB.createRow(
-      databaseId: AppConfig.databaseId,
-      tableId: AppConfig.registrationsTableId,
-      rowId: ID.unique(),
-      data: {
-        'tournamentId': tournamentRowId,
-        'profileId': profileId,
-        'status': 'pending',
-        'checkedIn': false,
-      },
-      permissions: [
-        Permission.read(Role.user(user.$id)),
-        Permission.update(Role.user(user.$id)),
-      ],
+    await _runPlayerAction(
+      '/registrations',
+      body: {'tournamentId': tournamentRowId},
     );
   }
 
@@ -336,12 +328,8 @@ class AppwriteService {
     );
 
     for (final row in existing.rows) {
-      await tablesDB.updateRow(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.registrationsTableId,
-        rowId: row.$id,
-        data: {'status': 'cancelled', 'checkedIn': false},
-      );
+      if (row.data['status'] == 'cancelled') continue;
+      await _runPlayerAction('/registrations/${row.$id}/cancel');
     }
   }
 
@@ -360,15 +348,35 @@ class AppwriteService {
       ttl: 0,
     );
 
+    // Check-in codes live in a table with no public read; row permissions mean
+    // this query returns only the signed-in player's own passes.
+    final passes = <String, Map<String, dynamic>>{};
+    try {
+      final checkIns = await tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.checkInsTableId,
+        queries: [Query.equal('profileId', profileId), Query.limit(500)],
+        total: false,
+        ttl: 0,
+      );
+      for (final row in checkIns.rows) {
+        final tournamentId = row.data['tournamentId']?.toString();
+        if (tournamentId != null) passes[tournamentId] = row.data;
+      }
+    } catch (_) {
+      // A player without any issued pass simply sees no code yet.
+    }
+
     final registrations = <String, MyRegistrationInfo>{};
     for (final row in response.rows) {
       final tournamentId = row.data['tournamentId']?.toString();
       if (tournamentId == null) continue;
+      final pass = passes[tournamentId];
       registrations[tournamentId] = MyRegistrationInfo(
         rowId: row.$id,
         status: row.data['status']?.toString() ?? 'pending',
-        checkInCode: row.data['checkInCode']?.toString(),
-        checkedIn: row.data['checkedIn'] == true,
+        checkInCode: pass?['code']?.toString(),
+        checkedIn: (pass?['checkedIn'] ?? row.data['checkedIn']) == true,
       );
     }
     return registrations;

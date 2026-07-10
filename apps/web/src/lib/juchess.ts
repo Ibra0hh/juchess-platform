@@ -175,6 +175,7 @@ export const tableIds = {
   profiles: 'profiles',
   tournaments: 'tournaments',
   registrations: 'registrations',
+  checkIns: 'check_ins',
   games: 'games',
   standings: 'standings',
   announcements: 'announcements',

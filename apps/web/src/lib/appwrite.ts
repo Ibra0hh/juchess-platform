@@ -5,6 +5,7 @@ export const appwriteConfig = {
   projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID ?? '',
   databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID ?? '',
   accessGuardFunctionId: import.meta.env.VITE_APPWRITE_ACCESS_GUARD_FUNCTION_ID ?? 'access-guards',
+  playerFunctionId: import.meta.env.VITE_APPWRITE_PLAYER_FUNCTION_ID ?? 'player-actions',
 }
 
 export const appwriteReady = Boolean(

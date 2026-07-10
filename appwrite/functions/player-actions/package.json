@@ -1,11 +1,8 @@
 {
-  "name": "juchess-admin-actions",
+  "name": "juchess-player-actions",
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "scripts": {
-    "test": "node --test test/engine.test.mjs"
-  },
   "dependencies": {
     "node-appwrite": "^26.2.0"
   }

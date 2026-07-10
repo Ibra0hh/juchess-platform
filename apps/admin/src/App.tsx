@@ -12,6 +12,9 @@ import {
   formatAdminError,
   getAdminSession,
   loadAdminProfiles,
+  countPendingRegistrations,
+  loadClubPlayers,
+  loadTournamentCheckIns,
   loadTournamentRegistrations,
   loadBlockLists,
   loadAdminTournaments,
@@ -41,7 +44,7 @@ import {
   type PairingPublishInput,
   type TournamentInput,
 } from './lib/adminData'
-import { adminQueues, type TournamentStatus } from './lib/juchess'
+import { type TournamentStatus } from './lib/juchess'
 
 type Screen = 'dashboard' | 'windows' | 'tournaments' | 'players' | 'news' | 'announcements' | 'adminAccess'
 type TournamentTab = TournamentStatus
@@ -62,6 +65,24 @@ type Player = {
   avatarColor: string
   tournaments: number
   blocked?: boolean
+}
+
+const avatarPalette = ['#7d2434', '#21304e', '#2E7D5B', '#8a6f28', '#5f1b26', '#3d5a80']
+
+function playerInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '??'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+}
+
+/** Stable per-profile colour so a player keeps the same avatar between loads. */
+function avatarColorFor(profileId: string) {
+  let hash = 0
+  for (let index = 0; index < profileId.length; index += 1) {
+    hash = (hash * 31 + profileId.charCodeAt(index)) >>> 0
+  }
+  return avatarPalette[hash % avatarPalette.length]
 }
 
 type AdminBracketSide = 'white' | 'black'
@@ -697,26 +718,44 @@ function DashboardScreen({
   const activeBlocks = blocks.identityBlocks.filter((item) => item.status === 'active').length
     + blocks.ipBlocks.filter((item) => item.status === 'active').length
 
+  const [playerCount, setPlayerCount] = useState<number | null>(null)
+  const [pendingCount, setPendingCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const [{ players }, pending] = await Promise.all([
+        loadClubPlayers(),
+        countPendingRegistrations(),
+      ])
+      if (!alive) return
+      setPlayerCount(players.length)
+      setPendingCount(pending)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
   const statCards = [
-    { label: 'Total players', value: '248', icon: '◍', tint: '#F3E4E6', delta: '+12 this month', color: '#2E7D5B' },
+    { label: 'Total players', value: playerCount === null ? '-' : String(playerCount), icon: '◍', tint: '#F3E4E6', delta: 'Registered club profiles', color: '#8B8577' },
     { label: 'Active tournaments', value: String(activeCount), icon: '♞', tint: '#EAF0FA', delta: `${activeCount} live now`, color: '#8B8577' },
     { label: 'Upcoming tournaments', value: String(upcomingCount), icon: '⚔', tint: '#EAF6F0', delta: `${tournaments.length} total events`, color: '#8B8577' },
-    { label: 'Pending registrations', value: String(adminQueues.pendingRegistrations), icon: '⏳', tint: '#FBF1E2', delta: 'Needs review', color: '#C77D0A' },
+    { label: 'Pending registrations', value: pendingCount === null ? '-' : String(pendingCount), icon: '⏳', tint: '#FBF1E2', delta: pendingCount ? 'Needs review' : 'All reviewed', color: pendingCount ? '#C77D0A' : '#8B8577' },
   ]
 
-  const recentActivity = [
-    { icon: '♞', tint: '#F3E4E6', title: 'Swiss - Round 3 pairings generated', meta: 'By Amina Osei · Swiss', time: '12m ago' },
-    { icon: '✓', tint: '#EAF6F0', title: 'Multi-stage published to public site', meta: 'Visibility: Public', time: '1h ago' },
-    { icon: '⚑', tint: '#FBEAEA', title: 'Result disputed on Board 4', meta: 'Single elimination', time: '2h ago' },
-    { icon: '+', tint: '#EAF0FA', title: '6 new registrations approved', meta: 'Swiss', time: '4h ago' },
-    { icon: '▦', tint: '#FBF1E2', title: 'Winner photos uploaded', meta: 'Single elimination', time: 'Yesterday' },
-  ]
-
-  const disputes = [
-    { match: 'Board 4 · Rahimi vs Carter', event: 'Single elimination', reason: 'Illegal move claim', severity: 'HIGH', tint: '#FBEAEA', color: '#B23A3A' },
-    { match: 'Board 2 · Tan vs Nair', event: 'Swiss', reason: 'Clock dispute', severity: 'MED', tint: '#FBF1E2', color: '#C77D0A' },
-    { match: 'Board 7 · Rossi vs Bianchi', event: 'Arena', reason: 'Score mismatch', severity: 'LOW', tint: '#F0EBE1', color: '#8B8577' },
-  ]
+  // Derived from real tournament rows. Nothing here is invented: an empty club
+  // shows an empty feed rather than a plausible-looking fiction.
+  const recentActivity = tournaments
+    .toSorted((a, b) => String(b.startsAt ?? '').localeCompare(String(a.startsAt ?? '')))
+    .slice(0, 5)
+    .map((item) => ({
+      icon: item.status === 'active' ? '♞' : item.status === 'completed' ? '✓' : '⚔',
+      tint: item.status === 'active' ? '#F3E4E6' : item.status === 'completed' ? '#EAF6F0' : '#EAF0FA',
+      title: item.name,
+      meta: `${item.format} · ${item.status}${item.currentRound ? ` · round ${item.currentRound}` : ''}`,
+      time: item.startsAt ? new Date(item.startsAt).toLocaleDateString() : 'Date not set',
+    }))
 
   return (
     <div className="dashboard-screen">
@@ -753,18 +792,22 @@ function DashboardScreen({
 
         <section className="panel-card dispute-card">
           <div className="panel-head">
-            <strong>Disputed results</strong>
-            <span className="pill danger">3 open</span>
+            <strong>Registrations awaiting review</strong>
+            {pendingCount ? <span className="pill danger">{pendingCount} open</span> : null}
           </div>
-          {disputes.map((item) => (
-            <div className="dispute-row" key={item.match}>
+          {pendingCount === null ? (
+            <div className="empty-row">Loading registrations...</div>
+          ) : pendingCount === 0 ? (
+            <div className="empty-row">Every registration has been reviewed.</div>
+          ) : (
+            <div className="dispute-row">
               <div>
-                <strong>{item.match}</strong>
-                <small>{item.event} · {item.reason}</small>
+                <strong>{pendingCount} player{pendingCount === 1 ? '' : 's'} waiting for approval</strong>
+                <small>Approve them in a tournament&apos;s registration queue to issue check-in codes.</small>
               </div>
-              <span style={{ color: item.color, background: item.tint }}>{item.severity}</span>
+              <button type="button" className="mini-button" onClick={goTournaments}>Review</button>
             </div>
-          ))}
+          )}
         </section>
       </div>
 
@@ -775,7 +818,7 @@ function DashboardScreen({
         </section>
         <section className="panel-card">
           <div className="panel-title">Operational queues</div>
-          <QueueRow icon="⏳" tint="#FBF1E2" label="Pending registrations" count={adminQueues.pendingRegistrations} action="Review" onClick={goTournaments} />
+          <QueueRow icon="⏳" tint="#FBF1E2" label="Pending registrations" count={pendingCount ?? 0} action="Review" onClick={goTournaments} />
           <QueueRow icon="⚑" tint="#FBEAEA" label="Disputed results" count={3} action="Resolve" onClick={goTournaments} />
           <QueueRow icon="✉" tint="#EAF0FA" label="Message drafts" count={5} action="Open" onClick={goNews} />
           <QueueRow icon="⛔" tint="#FBEAEA" label="Active blocks" count={activeBlocks} action="Open" onClick={goPlayers} />
@@ -1017,9 +1060,20 @@ function TournamentsScreen({
       }
 
       setManagedRegistrationsLoading(true)
-      const result = await loadTournamentRegistrations(managedTournament.rowId)
+      const [result, checkIns] = await Promise.all([
+        loadTournamentRegistrations(managedTournament.rowId),
+        loadTournamentCheckIns(managedTournament.rowId),
+      ])
       if (!alive) return
-      setManagedRegistrations(result.registrations.filter((item) => item.status !== 'cancelled'))
+
+      // Codes are stored outside the registration row, so join them back on.
+      const codeByProfile = new Map(checkIns.map((entry) => [entry.profileId, entry]))
+      setManagedRegistrations(result.registrations
+        .filter((item) => item.status !== 'cancelled')
+        .map((item) => {
+          const entry = codeByProfile.get(item.profileId)
+          return entry ? { ...item, checkInCode: entry.code, checkedIn: entry.checkedIn } : item
+        }))
       if (result.error) setMessage('Tournament participants are unavailable right now.')
       setManagedRegistrationsLoading(false)
     }
@@ -2911,10 +2965,39 @@ function PlayersScreen({
   onBlocksChanged: () => Promise<void>
   session: AdminSession
 }) {
-  const [players, setPlayers] = useState<Player[]>(demoPlayers)
+  const [players, setPlayers] = useState<Player[]>([])
+  const [playersLoading, setPlayersLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [editPlayer, setEditPlayer] = useState<Player | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const { players: clubPlayers } = await loadClubPlayers()
+      if (!alive) return
+      setPlayers(clubPlayers.map((player) => ({
+        id: player.id,
+        profileId: player.id,
+        name: player.name,
+        initials: playerInitials(player.name),
+        universityId: player.universityId,
+        email: player.email,
+        phone: player.phone || 'Not set',
+        rating: player.rating,
+        // Per-player win/loss records are not computed yet; show nothing
+        // rather than a fabricated record.
+        record: '-',
+        avatarColor: avatarColorFor(player.id),
+        tournaments: 0,
+        blocked: player.status === 'suspended',
+      })))
+      setPlayersLoading(false)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
   const visiblePlayers = players.filter((player) => {
     const needle = search.trim().toLowerCase()
     return !needle || player.name.toLowerCase().includes(needle) || player.universityId.toLowerCase().includes(needle)
@@ -2931,7 +3014,11 @@ function PlayersScreen({
         <div className="filter-row">
           <label className="inline-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filter by name or ID..." /></label>
           <select><option>All players</option><option>Swiss</option><option>Single elimination</option></select>
-          <span>{visiblePlayers.length} of 248 players</span>
+          <span>
+            {playersLoading
+              ? 'Loading players...'
+              : `${visiblePlayers.length} of ${players.length} player${players.length === 1 ? '' : 's'}`}
+          </span>
         </div>
         <button type="button" className="primary-button"><span>+</span> Add player</button>
       </div>

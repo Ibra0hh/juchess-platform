@@ -5,6 +5,7 @@ const tableIds = {
   profiles: 'profiles',
   tournaments: 'tournaments',
   registrations: 'registrations',
+  checkIns: 'check_ins',
   games: 'games',
   standings: 'standings',
   announcements: 'announcements',
@@ -120,6 +121,60 @@ function generateCheckInCode() {
     code += alphabet[Math.floor(Math.random() * alphabet.length)];
   }
   return `JU-${code}`;
+}
+
+async function findCheckIn(tablesDB, databaseId, tournamentId, profileId) {
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.checkIns,
+    queries: [
+      Query.equal('tournamentId', tournamentId),
+      Query.equal('profileId', profileId),
+      Query.limit(1),
+    ],
+    total: false,
+  });
+  return response.rows[0] ?? null;
+}
+
+// Check-in codes live in `check_ins`, which has no public read. The row grants
+// read only to the player's own account, so a confirmed student sees their pass
+// and nobody else's. Staff read them back through this function's API key.
+async function issueCheckInCode(tablesDB, databaseId, registration) {
+  const existing = await findCheckIn(tablesDB, databaseId, registration.tournamentId, registration.profileId);
+  if (existing) return existing;
+
+  let accountId = null;
+  try {
+    const profile = await tablesDB.getRow({
+      databaseId,
+      tableId: tableIds.profiles,
+      rowId: registration.profileId,
+    });
+    accountId = profile.accountId || null;
+  } catch {
+    // A missing profile should not block the organizer's approval.
+  }
+
+  return await tablesDB.createRow({
+    databaseId,
+    tableId: tableIds.checkIns,
+    rowId: ID.unique(),
+    data: {
+      tournamentId: registration.tournamentId,
+      profileId: registration.profileId,
+      registrationId: registration.$id,
+      code: generateCheckInCode(),
+      checkedIn: false,
+    },
+    permissions: accountId ? [Permission.read(Role.user(accountId))] : [],
+  });
+}
+
+async function revokeCheckInCode(tablesDB, databaseId, registration) {
+  const existing = await findCheckIn(tablesDB, databaseId, registration.tournamentId, registration.profileId);
+  if (!existing) return;
+  await tablesDB.deleteRow({ databaseId, tableId: tableIds.checkIns, rowId: existing.$id });
 }
 
 function normalizeResult(value) {
@@ -1561,6 +1616,7 @@ export default async ({ req, res, log, error }) => {
         'POST /blocks/ip/:id/unblock',
         'POST /registrations/:id/confirm',
         'POST /registrations/:id/status',
+        'GET /tournaments/:id/check-ins',
         'POST /games/:id/result',
         'POST /profiles/:id/role',
         'POST /profiles/:id/status',
@@ -2078,9 +2134,7 @@ export default async ({ req, res, log, error }) => {
         tableId: tableIds.registrations,
         rowId: segments[1],
       });
-      const checkInCode = nextStatus === 'confirmed' && !existing.checkInCode
-        ? generateCheckInCode()
-        : undefined;
+
       const row = await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.registrations,
@@ -2089,9 +2143,28 @@ export default async ({ req, res, log, error }) => {
           status: nextStatus,
           seed: body.seed,
           checkedIn: nextStatus === 'cancelled' ? false : body.checkedIn,
-          checkInCode,
+          // Never write the code here: this table is world-readable.
+          checkInCode: null,
         }),
       });
+
+      let checkIn = null;
+      if (nextStatus === 'confirmed') {
+        checkIn = await issueCheckInCode(tablesDB, databaseId, row);
+        if (body.checkedIn !== undefined) {
+          checkIn = await tablesDB.updateRow({
+            databaseId,
+            tableId: tableIds.checkIns,
+            rowId: checkIn.$id,
+            data: cleanObject({
+              checkedIn: Boolean(body.checkedIn),
+              checkedInAt: body.checkedIn ? new Date().toISOString() : undefined,
+            }),
+          });
+        }
+      } else {
+        await revokeCheckInCode(tablesDB, databaseId, existing);
+      }
 
       await writeAudit(tablesDB, databaseId, {
         actorProfileId: actor.$id,
@@ -2101,7 +2174,18 @@ export default async ({ req, res, log, error }) => {
         payload: { status: nextStatus, seed: body.seed, checkedIn: nextStatus === 'cancelled' ? false : body.checkedIn },
       });
 
-      return res.json({ ok: true, action: 'updateRegistration', row });
+      return res.json({ ok: true, action: 'updateRegistration', row, checkIn });
+    }
+
+    if (method === 'GET' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'check-ins') {
+      const response = await tablesDB.listRows({
+        databaseId,
+        tableId: tableIds.checkIns,
+        queries: [Query.equal('tournamentId', segments[1]), Query.limit(500)],
+        total: false,
+      });
+
+      return res.json({ ok: true, action: 'listCheckIns', checkIns: response.rows });
     }
 
     if (method === 'POST' && segments[0] === 'games' && segments[1] && segments[2] === 'result') {
