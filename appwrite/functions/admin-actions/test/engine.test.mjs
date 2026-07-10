@@ -30,6 +30,12 @@ const EXPORTED = [
   'decisiveWinnerProfileId',
   'knockoutRoundForGame',
   'assertResultAllowed',
+  'normalizePhysicalBoards',
+  'buildProcedureAssignments',
+  'createTournamentGames',
+  'configureTournamentProcedure',
+  'startProcedureGame',
+  'submitGameResult',
 ]
 
 const SDK_STUB = `
@@ -38,7 +44,7 @@ const Account = stub, Client = stub, TablesDB = stub, Teams = stub, Users = stub
 const ID = { unique: () => 'stub' };
 const Permission = { read: () => 'stub' };
 const Role = { any: () => 'stub', user: () => 'stub' };
-const Query = { equal: stub, limit: stub, notEqual: stub };
+const Query = { equal: () => 'query', limit: () => 'query', notEqual: () => 'query' };
 `
 
 function loadEngine() {
@@ -283,6 +289,141 @@ test('assertResultAllowed rejects a knockout draw and permits a Swiss draw', asy
   await assert.doesNotReject(
     () => engine.assertResultAllowed(stubDb({ format: 'Single elimination' }), 'juchess', drawnGame, '1-0'),
     'decisive knockout results pass through',
+  )
+})
+
+test('procedure: eight games use three physical boards over three waves', () => {
+  const games = Array.from({ length: 8 }, (_, index) => ({
+    round: 1,
+    board: index + 1,
+    whiteProfileId: `w${index + 1}`,
+    blackProfileId: `b${index + 1}`,
+  }))
+  const planned = engine.buildProcedureAssignments(games, 3)
+
+  assert.deepEqual(planned.map((game) => game.procedureWave), [1, 1, 1, 2, 2, 2, 3, 3])
+  assert.deepEqual(planned.map((game) => game.physicalBoard), [1, 2, 3, 1, 2, 3, 1, 2])
+  assert.deepEqual(planned.map((game) => game.queuePosition), [1, 2, 3, 4, 5, 6, 7, 8])
+})
+
+test('procedure: each round receives an independent board plan and byes use no board', () => {
+  const games = [
+    { round: 1, board: 8, whiteProfileId: 'a', blackProfileId: 'b' },
+    { round: 1, board: 12, whiteProfileId: 'c', blackProfileId: 'd' },
+    { round: 1, board: 13, whiteProfileId: 'e', blackProfileId: 'system_bye' },
+    { round: 2, board: 20, whiteProfileId: 'a', blackProfileId: 'c' },
+  ]
+  const planned = engine.buildProcedureAssignments(games, 1)
+
+  assert.deepEqual(
+    planned.map(({ procedureWave, physicalBoard, queuePosition }) => ({ procedureWave, physicalBoard, queuePosition })),
+    [
+      { procedureWave: 1, physicalBoard: 1, queuePosition: 1 },
+      { procedureWave: 2, physicalBoard: 1, queuePosition: 2 },
+      { procedureWave: undefined, physicalBoard: undefined, queuePosition: undefined },
+      { procedureWave: 1, physicalBoard: 1, queuePosition: 1 },
+    ],
+  )
+})
+
+test('procedure: created games stay scheduled until the manager starts them', async () => {
+  const writes = []
+  const tablesDB = {
+    createRow: async ({ data }) => {
+      writes.push(data)
+      return { $id: `g${writes.length}`, ...data }
+    },
+  }
+  const games = Array.from({ length: 4 }, (_, index) => ({
+    round: 1,
+    board: index + 1,
+    whiteProfileId: `w${index + 1}`,
+    blackProfileId: `b${index + 1}`,
+  }))
+
+  await engine.createTournamentGames(tablesDB, 'juchess', 't1', games, 2)
+  assert.ok(writes.every((game) => game.status === 'scheduled'))
+  assert.ok(writes.every((game) => game.startedAt === undefined))
+  assert.deepEqual(writes.map((game) => game.physicalBoard), [1, 2, 1, 2])
+})
+
+test('procedure: configuring legacy live games requeues matches beyond board capacity', async () => {
+  const games = Array.from({ length: 4 }, (_, index) => ({
+    $id: `g${index + 1}`,
+    tournamentId: 't1',
+    round: 1,
+    board: index + 1,
+    whiteProfileId: `w${index + 1}`,
+    blackProfileId: `b${index + 1}`,
+    status: 'live',
+  }))
+  const updates = new Map()
+  const tablesDB = {
+    getRow: async () => ({ $id: 't1', currentRound: 1, physicalBoards: 2 }),
+    listRows: async () => ({ rows: games }),
+    updateRow: async ({ tableId, rowId, data }) => {
+      if (tableId === 'games') updates.set(rowId, data)
+      return { $id: rowId, ...data }
+    },
+  }
+
+  await engine.configureTournamentProcedure(tablesDB, 'juchess', 't1', 2)
+  assert.equal(updates.get('g1').status, undefined)
+  assert.equal(updates.get('g2').status, undefined)
+  assert.equal(updates.get('g3').status, 'scheduled')
+  assert.equal(updates.get('g4').status, 'scheduled')
+})
+
+test('procedure: start changes one assigned game to live and rejects an occupied board', async () => {
+  const game = {
+    $id: 'g1',
+    tournamentId: 't1',
+    round: 1,
+    queuePosition: 1,
+    physicalBoard: 1,
+    status: 'scheduled',
+    whiteProfileId: 'w1',
+    blackProfileId: 'b1',
+  }
+  const tournament = { $id: 't1', status: 'active', physicalBoards: 2 }
+  const updates = []
+  const tablesDB = {
+    getRow: async ({ tableId }) => tableId === 'games' ? game : tournament,
+    listRows: async () => ({ rows: [game] }),
+    updateRow: async ({ data }) => {
+      updates.push(data)
+      return { ...game, ...data }
+    },
+  }
+
+  const started = await engine.startProcedureGame(tablesDB, 'juchess', 'g1', 1)
+  assert.equal(started.status, 'live')
+  assert.equal(started.physicalBoard, 1)
+  assert.ok(started.startedAt)
+
+  tablesDB.listRows = async () => ({
+    rows: [game, { $id: 'g2', tournamentId: 't1', status: 'live', physicalBoard: 1 }],
+  })
+  await assert.rejects(
+    () => engine.startProcedureGame(tablesDB, 'juchess', 'g1', 1),
+    (error) => error.statusCode === 409 && /already in use/i.test(error.message),
+  )
+})
+
+test('procedure: a queued game cannot receive a result before Start', async () => {
+  const tablesDB = {
+    getRow: async () => ({
+      $id: 'g1',
+      tournamentId: 't1',
+      round: 1,
+      status: 'scheduled',
+      result: '*',
+    }),
+  }
+
+  await assert.rejects(
+    () => engine.submitGameResult(tablesDB, 'juchess', 'g1', { result: '1-0' }),
+    (error) => error.statusCode === 409 && /start this game/i.test(error.message),
   )
 })
 

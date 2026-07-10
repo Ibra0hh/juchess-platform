@@ -201,12 +201,37 @@ Round progression engine (added Jul 9, 2026 — server-side in admin-actions):
   including one-sided (bye/withdrawal) games.
 - Engine dry-run harness: scratchpad `engine-dryrun.mjs` pattern — extracts the
   pure functions and simulates SE6/SE8/DE8/DE20/Swiss5; all checks pass.
-- Admin Procedure tab now uses a stable table queue (live games anchor to
-  tables by board number, free tables pull the ready queue), shows byes,
-  finished games, an Up next queue, round progress, and an Advance round
-  button. Physical table count persists per tournament in localStorage.
-- IMPORTANT: the function must be redeployed for any of this to take effect:
-  `appwrite push functions --function-id admin-actions`.
+- Admin Procedure is now an authoritative venue scheduler. The board count is
+  persisted on the tournament, every game receives a wave, physical board and
+  queue position, and new games remain `scheduled` until the manager presses
+  Start. A physical board cannot start a later lane game while an earlier one
+  is unresolved, and two live games cannot occupy the same venue board.
+- Procedure shows physical-board lanes, a round/wave schedule, byes, progress,
+  and completed games. Only live games open for result entry; completed games
+  remain selectable so the manager can add or replace PGN later without
+  changing the result or advancing the tournament again.
+- Result entry does not require PGN. The manager may start a game, choose a
+  result and save with zero moves, then return later to replay moves on the
+  digital board or paste/import PGN. New routes:
+  `POST /tournaments/:id/procedure/configure`, `POST /games/:id/start`, and
+  `POST /games/:id/pgn`.
+- Live migration is additive and repeatable:
+  `npm run migrate:procedure`, followed by an `admin-actions` deployment. The
+  migration adds `tournaments.physicalBoards` and the `games.procedureWave`,
+  `games.physicalBoard`, and `games.queuePosition` columns. It accepts an
+  existing Appwrite large-text `games.pgn` column or expands a short string
+  column to 50,000 characters.
+- DEPLOYED (Jul 10, 2026): the Procedure migration is live in project
+  `juchess-platform`; all four new columns report `available`. Deployment
+  `6a50eab0838704ae6b4b` is active and `ready`. Its live health execution
+  returned the new configure, start, and deferred-PGN routes. Local verification
+  passes 20 engine/workflow tests, function syntax checks, admin lint with only
+  three pre-existing prototype warnings, and the full GitHub Pages build.
+- LIVE PROCEDURE TEST (Jul 10, 2026): configured the seeded Swiss tournament for
+  3 physical boards. Its 10 games persisted as four waves with the expected
+  board pattern. Starting a later Board 1 game first returned `409`; the first
+  game then started, accepted `1-0` with no PGN, retained that result when PGN
+  was attached later, and allowed the next Board 1 queue entry to start.
 - VERIFIED LIVE (Jul 9, 2026): deployed and smoke-tested against production.
   Activating the seeded Swiss generated 10 round-1 games; saving the last
   result via the admin digital board auto-paired round 2 with correct score

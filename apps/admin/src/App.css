@@ -1617,6 +1617,17 @@ button {
   text-transform: uppercase;
 }
 
+.procedure-head > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.procedure-configure {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .procedure-head input {
   width: 76px;
   min-height: 34px;
@@ -1628,16 +1639,14 @@ button {
   text-align: center;
 }
 
-.procedure-summary,
-.procedure-rules {
+.procedure-summary {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   padding: 14px 18px 0;
 }
 
-.procedure-summary span,
-.procedure-rules span {
+.procedure-summary span {
   border: 1px solid #eee4d5;
   border-radius: 999px;
   background: #fdfaf1;
@@ -1647,13 +1656,15 @@ button {
   font-weight: 900;
 }
 
-.procedure-rules {
-  padding-top: 10px;
-}
-
-.procedure-rules span {
-  color: #7d2434;
-  background: #fff7ee;
+.procedure-status-note {
+  margin: 12px 18px 0;
+  border-left: 3px solid #a98a3f;
+  background: #fffaf0;
+  color: #6a6350;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .procedure-wave-block {
@@ -1681,12 +1692,24 @@ button {
 }
 
 .procedure-wave-row {
+  grid-template-columns: 44px minmax(0, 1fr) 48px minmax(0, 1fr) auto;
   width: 100%;
   border-inline: 0;
   border-top: 0;
   background: #fff;
   font: inherit;
   text-align: initial;
+}
+
+.procedure-wave-row .procedure-row-action {
+  justify-self: end;
+  min-width: 72px;
+}
+
+.procedure-wave-row > .status-pill.procedure-row-action {
+  color: #7d2434;
+  font-family: inherit;
+  font-size: 11px;
 }
 
 .procedure-wave-row > span {
@@ -1728,6 +1751,26 @@ button {
 
 .procedure-wave-row.queued {
   background: rgba(253, 250, 241, 0.85);
+}
+
+.procedure-schedule-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 24px 22px 2px;
+}
+
+.procedure-schedule-head strong {
+  color: #14213d;
+  font-family: "Source Serif 4", Georgia, serif;
+  font-size: 17px;
+}
+
+.procedure-schedule-head span {
+  color: #8b8577;
+  font-size: 11.5px;
+  font-weight: 800;
 }
 
 .procedure-byes {
@@ -2485,11 +2528,35 @@ button {
 
 .live-match-card,
 .result-control,
-.move-list-card {
+.move-list-card,
+.pgn-entry-card {
   border: 1px solid #f0eadf;
   border-radius: 10px;
   background: #fdfaf1;
   padding: 14px;
+}
+
+.pgn-entry-card {
+  display: grid;
+  gap: 9px;
+}
+
+.pgn-entry-card textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border: 1px solid #e6dfd3;
+  border-radius: 8px;
+  background: #fff;
+  color: #14213d;
+  padding: 10px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.pgn-entry-card button {
+  justify-self: start;
 }
 
 .live-match-card {
@@ -3301,6 +3368,23 @@ button {
     width: 100%;
   }
 
+  .procedure-head,
+  .procedure-configure,
+  .procedure-schedule-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .procedure-configure label,
+  .procedure-configure button {
+    width: 100%;
+  }
+
+  .procedure-head input {
+    flex: 1;
+    width: auto;
+  }
+
   .live-board-layout {
     grid-template-columns: 1fr;
     padding: 14px;
@@ -3339,6 +3423,16 @@ button {
   .pairing-row {
     grid-template-columns: 34px 1fr 38px 1fr;
     padding-inline: 12px;
+  }
+
+  .procedure-wave-row {
+    grid-template-columns: 34px minmax(0, 1fr) 32px minmax(0, 1fr);
+  }
+
+  .procedure-wave-row .procedure-row-action {
+    grid-column: 2 / -1;
+    justify-self: stretch;
+    width: 100%;
   }
 
   .bracket-manage-row {

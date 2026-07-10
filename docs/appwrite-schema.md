@@ -87,6 +87,7 @@ Fields:
 - `capacity` integer, optional.
 - `description` string, optional.
 - `bracketSnapshot` longtext, optional. JSON snapshot of the published knockout bracket; web and mobile use this as the canonical bracket after publish.
+- `physicalBoards` integer, default `3`, between `1` and `64`. Shared venue board count used by the admin Procedure scheduler.
 - `createdByProfileId` string, required.
 
 Permissions:
@@ -122,7 +123,10 @@ Fields:
 - `blackProfileId` string, required.
 - `status` enum: `scheduled`, `live`, `completed`, `forfeit`.
 - `result` enum: `1-0`, `0-1`, `1/2-1/2`, `*`.
-- `pgn` string, optional.
+- `pgn` text, optional. The admin function enforces a 50,000-character limit.
+- `procedureWave` integer, optional. Planned batch within the round.
+- `physicalBoard` integer, optional. Venue board assigned by the Procedure scheduler.
+- `queuePosition` integer, optional. Stable per-round procedure order.
 - `startedAt` datetime, optional.
 - `finishedAt` datetime, optional.
 

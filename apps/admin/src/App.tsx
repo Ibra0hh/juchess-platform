@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import './App.css'
 import { JuChessBoard, type JuChessBoardChange } from './components/JuChessBoard'
-import { buildChessGame, deriveResult } from './components/JuChessRules'
+import { buildChessGame, deriveResult, parseChessPgn, pgnFromMoves } from './components/JuChessRules'
 import { appwriteReady } from './lib/appwrite'
 import {
   advanceTournamentRound,
@@ -13,6 +13,7 @@ import {
   getAdminSession,
   loadAdminProfiles,
   countPendingRegistrations,
+  configureTournamentProcedure,
   loadClubPlayers,
   loadTournamentCheckIns,
   loadTournamentRegistrations,
@@ -22,11 +23,13 @@ import {
   signInAdmin,
   signOutAdmin,
   submitTournamentGameResult,
+  startTournamentGame,
   unblockIdentity,
   unblockIp,
   updateAdminStatus,
   updateRegistrationStatus,
   updateTournament,
+  updateTournamentGamePgn,
   unpublishTournamentPairings,
   type AdminRegistration,
   type AdminRegistrationStatus,
@@ -107,6 +110,9 @@ type LiveBoardOption = {
   black: string
   board?: number
   gameId?: string
+  completed?: boolean
+  pgn?: string
+  result?: string
   round?: number
   status?: string
   white: string
@@ -116,6 +122,8 @@ type PlayableBoard = Pairing & {
   boardKey: string
   boardLabel: string
   gameId?: string
+  pgn?: string
+  result?: string
   status?: string
 }
 
@@ -170,6 +178,11 @@ type ProcedureMatch = {
   live?: boolean
   matchNumber: number
   playable: boolean
+  pgn?: string
+  physicalBoard?: number
+  procedureWave?: number
+  queuePosition?: number
+  result?: string
   round?: number
   roundLabel: string
   status: string
@@ -187,6 +200,9 @@ type ProcedureQueue = {
   waiting: ProcedureMatch[]
   finished: ProcedureMatch[]
   byes: ProcedureMatch[]
+  currentRoundFinished: number
+  currentRoundTotal: number
+  waves: Array<{ number: number; round: number; roundLabel: string; matches: ProcedureMatch[] }>
 }
 
 type BracketEntrant = {
@@ -1383,6 +1399,55 @@ function TournamentsScreen({
     }
   }
 
+  async function handleProcedureConfigure(item: AdminTournament, physicalBoards: number) {
+    if (!item.rowId) {
+      setMessage('Only cloud tournaments can save a procedure plan.')
+      return
+    }
+
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      const outcome = await configureTournamentProcedure(item.rowId, physicalBoards)
+      setMessage(`${outcome.physicalBoards} physical boards saved. ${outcome.updatedGames} game assignments updated.`)
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleGameStart(gameId: string, physicalBoard: number) {
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      await startTournamentGame(gameId, physicalBoard)
+      setMessage(`Game started on physical board ${physicalBoard}.`)
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+      throw error
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleGamePgn(gameId: string, pgn: string) {
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      await updateTournamentGamePgn(gameId, pgn)
+      setMessage('PGN saved. The recorded result was not changed.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+      throw error
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   async function handleAdvanceRound(item: AdminTournament) {
     if (!item.rowId) {
       setMessage('Only cloud tournaments can advance rounds.')
@@ -1423,7 +1488,10 @@ function TournamentsScreen({
           }}
           onMessage={setMessage}
           onGameResult={handleGameResult}
+          onGamePgn={handleGamePgn}
+          onGameStart={handleGameStart}
           onPublish={handlePublishPairings}
+          onProcedureConfigure={handleProcedureConfigure}
           onShuffle={handleShufflePairings}
           onUnpublish={handleUnpublishPairings}
           participants={managedRegistrations}
@@ -1721,6 +1789,7 @@ function TournamentActionButtons({
   if (item.status === 'completed') {
     return (
       <>
+        <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onManage(item)}>Manage</button>
         <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onEdit(item)}>Edit</button>
         <button type="button" className="mini-button" disabled={disabled} onClick={() => onPhotos(item)}>Photos</button>
         <button type="button" className="mini-button warn" disabled={disabled} onClick={() => void onStatusChange(item, 'archived')}>Archive</button>
@@ -1740,9 +1809,12 @@ function TournamentManageView({
   onAdvanceRound,
   onBack,
   onComplete,
+  onGamePgn,
   onGameResult,
+  onGameStart,
   onMessage,
   onPublish,
+  onProcedureConfigure,
   onShuffle,
   onUnpublish,
   participants,
@@ -1755,6 +1827,7 @@ function TournamentManageView({
   onAdvanceRound: (item: AdminTournament) => Promise<void>
   onBack: () => void
   onComplete: (item: AdminTournament) => void
+  onGamePgn: (gameId: string, pgn: string) => Promise<void>
   onGameResult: (input: {
     gameId?: string
     tournamentId?: string
@@ -1764,8 +1837,10 @@ function TournamentManageView({
     status?: 'live' | 'completed'
     pgn?: string
   }) => Promise<void>
+  onGameStart: (gameId: string, physicalBoard: number) => Promise<void>
   onMessage: (message: string) => void
   onPublish: (item: AdminTournament, games: PairingPublishInput[], bracketSnapshot?: string) => void
+  onProcedureConfigure: (item: AdminTournament, physicalBoards: number) => Promise<void>
   onShuffle: (item: AdminTournament) => void
   onUnpublish: (item: AdminTournament) => void
   participants: AdminRegistration[]
@@ -1802,19 +1877,7 @@ function TournamentManageView({
   const [stage, setStage] = useState(playStage)
   const [bracketView, setBracketView] = useState<AdminBracketView>('winners')
   const [selectedBoardKey, setSelectedBoardKey] = useState('')
-  const tablesStorageKey = `juchess-admin-tables:${tournament.rowId ?? tournament.id}`
-  const [physicalBoards, setPhysicalBoardsState] = useState(() => {
-    const saved = Number(window.localStorage.getItem(tablesStorageKey))
-    return Number.isFinite(saved) && saved >= 1 ? Math.min(64, Math.floor(saved)) : 3
-  })
-  const setPhysicalBoards = (count: number) => {
-    setPhysicalBoardsState(count)
-    try {
-      window.localStorage.setItem(tablesStorageKey, String(count))
-    } catch {
-      // Persisting the table count is a convenience; ignore storage failures.
-    }
-  }
+  const [physicalBoards, setPhysicalBoards] = useState(tournament.physicalBoards || 3)
   const liveBoardRef = useRef<HTMLElement | null>(null)
   const bracketPhase = getBracketPhase(tournament)
   const tournamentPlayers = useMemo(() => buildTournamentPlayers(tournament, shuffleSeed, participants), [participants, shuffleSeed, tournament])
@@ -1840,22 +1903,23 @@ function TournamentManageView({
   ), [bracketConfig])
   const liveBoardRounds = tournament.status === 'active' ? allBracketRounds : EMPTY_ADMIN_BRACKET_ROUNDS
   const cloudGameBoards = useMemo(
-    () => buildPlayableBoardsFromAdminGames(tournament, tournament.publishedGameRows),
+    () => buildPlayableBoardsFromAdminGames(tournament.publishedGameRows),
     [tournament],
   )
+  const hasPublishedGames = tournament.publishedGameRows.length > 0
   const playableBoards = useMemo(() => (knockout || (multiStage && stage === 'bracket')
-    ? cloudGameBoards.length
+    ? hasPublishedGames
       ? cloudGameBoards
       : buildPlayableBracketBoards(liveBoardRounds)
-    : cloudGameBoards.length
+    : hasPublishedGames
       ? cloudGameBoards
       : buildPlayableBoardsFromPairings(currentRoundPairings)
-  ), [cloudGameBoards, currentRoundPairings, liveBoardRounds, knockout, multiStage, stage])
+  ), [cloudGameBoards, currentRoundPairings, hasPublishedGames, liveBoardRounds, knockout, multiStage, stage])
   const procedureMatches = useMemo(() => (
     stage !== 'procedure'
       ? []
       : tournament.publishedGameRows.length
-      ? buildProcedureMatchesFromAdminGames(tournament, tournament.publishedGameRows)
+      ? buildProcedureMatchesFromAdminGames(tournament, tournament.publishedGameRows, roundRobin || tournament.status === 'completed')
       : knockout || (multiStage && isMultiStagePhaseTwo(tournament))
       ? buildProcedureMatchesFromBracket(allBracketRounds)
       : buildProcedureMatchesFromPairings(
@@ -1866,8 +1930,11 @@ function TournamentManageView({
   const procedureQueue = useMemo(() => (
     stage === 'procedure'
       ? buildProcedureQueue(procedureMatches, physicalBoards)
-      : { tables: [], waiting: [], finished: [], byes: [] }
+      : { tables: [], waiting: [], finished: [], byes: [], currentRoundFinished: 0, currentRoundTotal: 0, waves: [] }
   ), [physicalBoards, procedureMatches, stage])
+  const procedurePlanMissing = tournament.publishedGameRows.some((game) => (
+    game.blackProfileId !== 'system_bye' && (!game.procedureWave || !game.physicalBoard || !game.queuePosition)
+  ))
   const liveBoardOptions: LiveBoardOption[] = useMemo(() => (
     stage === 'procedure'
       ? buildPlayableBoardsFromProcedureMatches(procedureMatches)
@@ -1875,8 +1942,8 @@ function TournamentManageView({
   ), [playableBoards, procedureMatches, stage])
   const publishableGames = useMemo(() => buildPublishableGames(
     knockout ? firstBracketRoundPairings(allBracketRounds) : pairings,
-    tournament.status === 'active' && swissFlow ? 'live' : 'scheduled',
-  ), [allBracketRounds, knockout, pairings, swissFlow, tournament.status])
+    'scheduled',
+  ), [allBracketRounds, knockout, pairings])
   const hasStartedGames = allBracketRounds.some((round) => (
     round.matches.some((match) => match.live || match.winner)
   ))
@@ -1895,7 +1962,8 @@ function TournamentManageView({
   useEffect(() => {
     setStage(playStage)
     setBracketView('winners')
-  }, [playStage, tournament.rowId, tournament.id])
+    setPhysicalBoards(tournament.physicalBoards || 3)
+  }, [playStage, tournament.physicalBoards, tournament.rowId, tournament.id])
 
   useEffect(() => {
     if (!liveBoardOptions.length) {
@@ -1921,6 +1989,17 @@ function TournamentManageView({
 
   async function saveLiveBoardResult(board: LiveBoardOption, state: LiveBoardState) {
     const result = normalizeAdminBoardResult(state.result)
+    const pgn = state.moves.length ? pgnFromMoves(state.moves) : undefined
+
+    if (board.completed) {
+      if (!board.gameId || !pgn) {
+        onMessage('Enter or import moves before saving PGN for this finished game.')
+        return
+      }
+      await onGamePgn(board.gameId, pgn)
+      return
+    }
+
     if (!board.gameId && (!tournament.rowId || !board.round || !board.board)) {
       onMessage('This board is not published as a game yet.')
       return
@@ -1933,11 +2012,31 @@ function TournamentManageView({
       board: board.board,
       result,
       status: result === '*' ? 'live' : 'completed',
-      pgn: state.moves.join(' '),
+      pgn,
     })
   }
 
-  const manageMode = tournament.status === 'upcoming' ? 'Prepare Tournament' : 'Live Tournament'
+  async function startProcedureMatch(match: ProcedureMatch, physicalBoard: number) {
+    if (!match.gameId) {
+      onMessage('Save the procedure plan before starting this game.')
+      return
+    }
+    try {
+      await onGameStart(match.gameId, physicalBoard)
+      setSelectedBoardKey(match.boardKey)
+      window.setTimeout(() => {
+        liveBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 0)
+    } catch {
+      // The parent already surfaces the server error in the management notice.
+    }
+  }
+
+  const manageMode = tournament.status === 'upcoming'
+    ? 'Prepare Tournament'
+    : tournament.status === 'completed'
+    ? 'Review Tournament'
+    : 'Live Tournament'
   const publishState = published
     ? 'Published - shuffle locked'
     : swissFlow && tournament.status === 'upcoming'
@@ -2080,16 +2179,21 @@ function TournamentManageView({
             <ProcedurePlanner
               active={tournament.status === 'active'}
               advanceDisabled={disabled}
+              configuredTables={tournament.physicalBoards || 3}
+              disabled={disabled}
               onAdvanceRound={() => void onAdvanceRound(tournament)}
-              onMatchSelect={tournament.status === 'active' ? selectLiveBoard : undefined}
+              onConfigure={() => void onProcedureConfigure(tournament, physicalBoards)}
+              onMatchSelect={tournament.status === 'active' || tournament.status === 'completed' ? selectLiveBoard : undefined}
+              onStartMatch={(match, physicalBoard) => void startProcedureMatch(match, physicalBoard)}
               onTablesChange={setPhysicalBoards}
+              planMissing={procedurePlanMissing}
               queue={procedureQueue}
               roundLabel={procedureMatches[0]?.roundLabel ?? `Round ${currentRoundNumber(tournament)}`}
               selectedBoardKey={selectedBoardKey}
               tables={physicalBoards}
               totalMatches={procedureMatches.length}
             />
-            {tournament.status === 'active' && liveBoardOptions.length ? (
+            {(tournament.status === 'active' || tournament.status === 'completed') && liveBoardOptions.length ? (
               <LiveTournamentBoard
                 boards={liveBoardOptions}
                 onBoardSelect={selectLiveBoard}
@@ -2125,9 +2229,14 @@ function TournamentManageView({
 function ProcedurePlanner({
   active,
   advanceDisabled,
+  configuredTables,
+  disabled,
   onAdvanceRound,
+  onConfigure,
   onMatchSelect,
+  onStartMatch,
   onTablesChange,
+  planMissing,
   queue,
   roundLabel,
   selectedBoardKey,
@@ -2136,9 +2245,14 @@ function ProcedurePlanner({
 }: {
   active: boolean
   advanceDisabled: boolean
+  configuredTables: number
+  disabled: boolean
   onAdvanceRound: () => void
+  onConfigure: () => void
   onMatchSelect?: (boardKey: string) => void
+  onStartMatch: (match: ProcedureMatch, physicalBoard: number) => void
   onTablesChange: (tables: number) => void
+  planMissing: boolean
   queue: ProcedureQueue
   roundLabel: string
   selectedBoardKey: string
@@ -2146,72 +2260,91 @@ function ProcedurePlanner({
   totalMatches: number
 }) {
   const tableCount = Math.max(1, Math.min(64, Math.floor(tables) || 1))
-  const finishedCount = queue.finished.length + queue.byes.length
-  const roundDone = totalMatches > 0 && finishedCount >= totalMatches
+  const currentRoundTotal = queue.currentRoundTotal || totalMatches
+  const finishedCount = queue.currentRoundFinished
+  const roundDone = currentRoundTotal > 0 && finishedCount >= currentRoundTotal
+  const planDirty = tableCount !== configuredTables || planMissing
 
   return (
     <div className="procedure-planner">
       <div className="manage-panel-head procedure-head">
-        <strong>Tournament procedure</strong>
-        <label>
-          Physical tables
-          <input
-            type="number"
-            min={1}
-            max={64}
-            value={tableCount}
-            onChange={(event) => onTablesChange(Math.max(1, Math.min(64, Math.floor(Number(event.target.value) || 1))))}
-          />
-        </label>
+        <div>
+          <strong>Tournament procedure</strong>
+          <span>Venue board control and game queue</span>
+        </div>
+        <div className="procedure-configure">
+          <label>
+            Physical boards
+            <input
+              type="number"
+              min={1}
+              max={64}
+              value={tableCount}
+              onChange={(event) => onTablesChange(Math.max(1, Math.min(64, Math.floor(Number(event.target.value) || 1))))}
+            />
+          </label>
+          <button type="button" className="mini-button dark" disabled={disabled || !planDirty} onClick={onConfigure}>
+            {planDirty ? 'Save board plan' : 'Plan saved'}
+          </button>
+        </div>
       </div>
       <div className="procedure-summary">
         <span>{roundLabel}</span>
-        <span>{finishedCount} of {totalMatches} games finished</span>
-        <span>{queue.waiting.length} waiting for a table</span>
+        <span>{tableCount} physical boards</span>
+        <span>{queue.waves.length} wave{queue.waves.length === 1 ? '' : 's'}</span>
+        <span>{finishedCount} of {currentRoundTotal} current games finished</span>
+        <span>{queue.waiting.length} queued</span>
       </div>
-      <div className="procedure-rules">
-        <span>Each table shows its current game; free tables pull the next waiting game.</span>
-        <span>Record results on the digital board — the next round is paired automatically when every game finishes.</span>
+      <div className="procedure-status-note">
+        {active
+          ? 'Start only the game shown on each free board. Saving the final result automatically prepares the next round.'
+          : 'This is the planned venue order. Games become startable when the tournament is active.'}
       </div>
 
       <section className="pairing-round-block procedure-wave-block">
         <div className="pairing-round-title procedure-wave-title">
-          Tables
-          <span>{queue.tables.filter((table) => table.match).length} in use</span>
+          Physical boards
+          <span>{queue.tables.filter((table) => table.match?.live).length} live</span>
         </div>
         {queue.tables.map((table) => (
           <ProcedureTableRow
             active={active}
+            disabled={disabled}
             key={`table-${table.tableNumber}`}
             onMatchSelect={onMatchSelect}
+            onStartMatch={onStartMatch}
             selectedBoardKey={selectedBoardKey}
             table={table}
           />
         ))}
       </section>
 
-      {queue.waiting.length ? (
-        <section className="pairing-round-block procedure-wave-block">
+      <div className="procedure-schedule-head">
+        <strong>Round schedule</strong>
+        <span>Grouped by wave and assigned venue board</span>
+      </div>
+      {queue.waves.map((wave) => (
+        <section className="pairing-round-block procedure-wave-block" key={`${wave.round}-${wave.number}`}>
           <div className="pairing-round-title procedure-wave-title">
-            Up next
-            <span>{queue.waiting.length} queued</span>
+            {wave.roundLabel} · Wave {wave.number}
+            <span>{wave.matches.length} game{wave.matches.length === 1 ? '' : 's'}</span>
           </div>
-          {queue.waiting.map((match, index) => (
-            <div className="pairing-row procedure-wave-row queued" key={match.boardKey}>
-              <span>#{index + 1}</span>
+          {wave.matches.map((match) => (
+            <div className={`pairing-row procedure-wave-row ${match.live ? 'live' : match.completed ? 'done' : 'queued'}`} key={match.boardKey}>
+              <span>B{match.physicalBoard}</span>
               <strong>
                 {match.white}
-                <small>{match.roundLabel} · Board {match.matchNumber}</small>
+                <small>{match.roundLabel} · Match {match.matchNumber}</small>
               </strong>
               <em>vs</em>
               <strong>
                 {match.black}
-                <small>Starts when a table is free</small>
+                <small>{match.status}</small>
               </strong>
             </div>
           ))}
         </section>
-      ) : null}
+      ))}
 
       {queue.byes.length ? (
         <div className="procedure-byes">
@@ -2224,22 +2357,22 @@ function ProcedurePlanner({
       {queue.finished.length ? (
         <section className="pairing-round-block procedure-wave-block finished">
           <div className="pairing-round-title procedure-wave-title">
-            Finished
-            <span>{queue.finished.length} games</span>
+            Completed games and PGN
+            <span>Select a game to add moves later</span>
           </div>
           {queue.finished.map((match) => (
-            <div className="pairing-row procedure-wave-row done" key={match.boardKey}>
+            <button
+              type="button"
+              className={`pairing-row procedure-wave-row done ${selectedBoardKey === match.boardKey ? 'selected-board' : ''}`}
+              disabled={!match.gameId || !onMatchSelect}
+              onClick={() => onMatchSelect?.(match.boardKey)}
+              key={match.boardKey}
+            >
               <span>✓</span>
-              <strong>
-                {match.white}
-                <small>{match.roundLabel} · Board {match.matchNumber}</small>
-              </strong>
+              <strong>{match.white}<small>{match.roundLabel} · Match {match.matchNumber}</small></strong>
               <em>vs</em>
-              <strong>
-                {match.black}
-                <small>{match.status}</small>
-              </strong>
-            </div>
+              <strong>{match.black}<small>{match.pgn ? 'PGN saved · open to edit' : 'Add PGN later'}</small></strong>
+            </button>
           ))}
         </section>
       ) : null}
@@ -2251,7 +2384,7 @@ function ProcedurePlanner({
               ? 'All games are finished. The next round should appear automatically — use this if it has not.'
               : 'Rounds advance automatically when the last result is saved.'}
           </span>
-          <button type="button" className="mini-button dark" disabled={advanceDisabled} onClick={onAdvanceRound}>
+          <button type="button" className="mini-button dark" disabled={advanceDisabled || !roundDone} onClick={onAdvanceRound}>
             Advance round
           </button>
         </div>
@@ -2262,17 +2395,22 @@ function ProcedurePlanner({
 
 function ProcedureTableRow({
   active,
+  disabled,
   onMatchSelect,
+  onStartMatch,
   selectedBoardKey,
   table,
 }: {
   active: boolean
+  disabled: boolean
   onMatchSelect?: (boardKey: string) => void
+  onStartMatch: (match: ProcedureMatch, physicalBoard: number) => void
   selectedBoardKey: string
   table: ProcedureTable
 }) {
   const match = table.match
-  const selectable = Boolean(active && match && onMatchSelect && isProcedureMatchPlayable(match))
+  const selectable = Boolean(active && match?.live && onMatchSelect)
+  const canStart = Boolean(active && match && table.startNow && match.gameId)
   const selected = Boolean(match && selectedBoardKey === match.boardKey)
   const className = [
     'pairing-row',
@@ -2284,22 +2422,27 @@ function ProcedureTableRow({
   ].filter(Boolean).join(' ')
   const content = match ? (
     <>
-      <span>T{table.tableNumber}</span>
+      <span>B{table.tableNumber}</span>
       <strong>
         {match.white}
-        <small>{match.roundLabel} · Board {match.matchNumber}</small>
+        <small>Wave {match.procedureWave} · Match {match.matchNumber}</small>
       </strong>
       <em>vs</em>
       <strong>
         {match.black}
-        <small>{table.startNow ? 'Start now on this table' : match.status}</small>
+        <small>{match.live ? 'Live now' : active ? 'Ready to start' : 'Planned'}</small>
       </strong>
+      {canStart ? (
+        <button type="button" className="mini-button dark procedure-row-action" disabled={disabled} onClick={() => onStartMatch(match, table.tableNumber)}>
+          Start
+        </button>
+      ) : match?.live ? <span className="status-pill active procedure-row-action">Live</span> : null}
     </>
   ) : (
     <>
-      <span>T{table.tableNumber}</span>
+      <span>B{table.tableNumber}</span>
       <strong>
-        Table free
+        Board free
         <small>No game assigned</small>
       </strong>
       <em>-</em>
@@ -2310,7 +2453,7 @@ function ProcedureTableRow({
     </>
   )
 
-  if (selectable && match) {
+  if (selectable && match && !canStart) {
     return (
       <button type="button" className={className} onClick={() => onMatchSelect?.(match.boardKey)}>
         {content}
@@ -2692,9 +2835,11 @@ function LiveTournamentBoard({
   selectedBoardKey: string
 }) {
   const [boardStates, setBoardStates] = useState<Record<string, LiveBoardState>>({})
+  const [pgnDrafts, setPgnDrafts] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const pairing = boards.find((board) => board.boardKey === selectedBoardKey) ?? boards[0]
-  const boardState = pairing ? boardStates[pairing.boardKey] ?? EMPTY_LIVE_BOARD_STATE : EMPTY_LIVE_BOARD_STATE
+  const boardState = pairing ? boardStates[pairing.boardKey] ?? initialLiveBoardState(pairing) : EMPTY_LIVE_BOARD_STATE
+  const pgnDraft = pairing ? pgnDrafts[pairing.boardKey] ?? pairing.pgn ?? '' : ''
   const movePairs = buildMovePairs(boardState.moves)
 
   function updateCurrentBoard(nextState: LiveBoardState) {
@@ -2708,8 +2853,11 @@ function LiveTournamentBoard({
   function handleBoardChange(state: JuChessBoardChange) {
     updateCurrentBoard({
       moves: state.moves,
-      result: state.result,
+      result: pairing?.completed ? pairing.result ?? state.result : state.result,
     })
+    if (pairing) {
+      setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: state.pgn }))
+    }
   }
 
   function undoMove() {
@@ -2723,11 +2871,12 @@ function LiveTournamentBoard({
   }
 
   function resetGame() {
-    updateCurrentBoard(EMPTY_LIVE_BOARD_STATE)
+    updateCurrentBoard({ moves: [], result: pairing?.completed ? pairing.result ?? 'Live' : 'Live' })
+    if (pairing) setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: '' }))
   }
 
   function recordResult(value: string) {
-    if (!pairing) return
+    if (!pairing || pairing.completed) return
     updateCurrentBoard({
       moves: boardState.moves,
       result: value,
@@ -2740,8 +2889,29 @@ function LiveTournamentBoard({
     setSaving(true)
     try {
       await onSaveGame(pairing, boardState)
+    } catch {
+      // The parent already surfaces the server error in the management notice.
     } finally {
       setSaving(false)
+    }
+  }
+
+  function updatePgnDraft(value: string) {
+    if (!pairing) return
+    setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: value }))
+  }
+
+  function importPgn() {
+    if (!pairing) return
+    try {
+      const parsed = parseChessPgn(pgnDraft)
+      updateCurrentBoard({
+        moves: parsed.moves,
+        result: pairing.completed ? pairing.result ?? parsed.result : parsed.result,
+      })
+      onMessage(`${pairing.boardLabel} PGN imported. Review the moves, then save.`)
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'The PGN could not be imported.')
     }
   }
 
@@ -2764,7 +2934,7 @@ function LiveTournamentBoard({
                 ))}
               </select>
             </label>
-            <span className="live-turn">{boardState.moves.length % 2 === 0 ? 'White to move' : 'Black to move'}</span>
+            <span className="live-turn">{pairing?.completed ? `Recorded ${pairing.result}` : boardState.moves.length % 2 === 0 ? 'White to move' : 'Black to move'}</span>
           </div>
           <JuChessBoard moves={boardState.moves} onChange={handleBoardChange} />
         </div>
@@ -2782,7 +2952,7 @@ function LiveTournamentBoard({
                 <button
                   type="button"
                   className={boardState.result === value ? 'active' : undefined}
-                  disabled={!pairing}
+                  disabled={!pairing || pairing.completed}
                   onClick={() => recordResult(value)}
                   key={value}
                 >
@@ -2806,17 +2976,40 @@ function LiveTournamentBoard({
               )) : <div className="empty-row">Play on the board to record moves.</div>}
             </div>
           </div>
+          <div className="pgn-entry-card">
+            <div className="move-list-head">
+              <strong>PGN</strong>
+              <span>Optional now · editable later</span>
+            </div>
+            <textarea
+              aria-label="PGN moves"
+              placeholder="Paste PGN here, or enter moves on the board"
+              value={pgnDraft}
+              onChange={(event) => updatePgnDraft(event.target.value)}
+            />
+            <button type="button" className="mini-button ghost" disabled={!pairing || !pgnDraft.trim()} onClick={importPgn}>Import PGN</button>
+          </div>
           <div className="live-board-actions">
             <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!boardState.moves.length}>Undo</button>
             <button type="button" className="mini-button ghost" onClick={resetGame} disabled={!pairing}>Reset</button>
             <button type="button" className="mini-button dark" disabled={!pairing || saving} onClick={saveBoard}>
-              {saving ? 'Saving...' : 'Save board'}
+              {saving ? 'Saving...' : pairing?.completed ? 'Save PGN' : boardState.moves.length ? 'Save result + PGN' : 'Save result without PGN'}
             </button>
           </div>
         </aside>
       </div>
     </section>
   )
+}
+
+function initialLiveBoardState(board: LiveBoardOption): LiveBoardState {
+  const result = board.completed ? board.result ?? 'Live' : board.result && board.result !== '*' ? board.result : 'Live'
+  if (!board.pgn || board.pgn === 'bye') return { moves: [], result }
+  try {
+    return { moves: parseChessPgn(board.pgn).moves, result }
+  } catch {
+    return { moves: [], result }
+  }
 }
 
 function RegistrationQueue({
@@ -3905,15 +4098,9 @@ function buildPlayableBoardsFromPairings(pairings: Pairing[]): PlayableBoard[] {
     }))
 }
 
-function buildPlayableBoardsFromAdminGames(tournament: AdminTournament, games: AdminGame[]): PlayableBoard[] {
-  const currentRound = currentRoundNumber(tournament)
-  const activeGames = games.filter((game) => (
-    game.status === 'live' ||
-    (game.status !== 'completed' && game.round === currentRound)
-  ))
-  const source = activeGames.length ? activeGames : games.filter((game) => game.status !== 'completed')
-
-  return source
+function buildPlayableBoardsFromAdminGames(games: AdminGame[]): PlayableBoard[] {
+  return games
+    .filter((game) => game.status === 'live')
     .sort((a, b) => a.round - b.round || a.board - b.board)
     .map((game) => ({
       board: game.board,
@@ -3923,6 +4110,8 @@ function buildPlayableBoardsFromAdminGames(tournament: AdminTournament, games: A
       boardKey: `game:${game.id}`,
       boardLabel: game.round > 1 ? `Round ${game.round} Board ${game.board}` : `Board ${game.board}`,
       gameId: game.id,
+      pgn: game.pgn,
+      result: game.result,
       round: game.round,
       status: game.status,
       white: game.whiteName,
@@ -3933,14 +4122,18 @@ function buildPlayableBoardsFromAdminGames(tournament: AdminTournament, games: A
 
 function buildPlayableBoardsFromProcedureMatches(matches: ProcedureMatch[]): LiveBoardOption[] {
   return matches
-    .filter(isProcedureMatchPlayable)
+    .filter((match) => Boolean(match.gameId && (match.live || match.completed)))
     .map((match) => ({
       board: match.board,
       boardKey: match.boardKey,
       boardLabel: match.boardLabel,
       black: match.black,
+      completed: match.completed,
       gameId: match.gameId,
+      pgn: match.pgn,
+      result: match.result,
       round: match.round,
+      status: match.completed ? 'completed' : match.live ? 'live' : match.status,
       white: match.white,
     }))
 }
@@ -3963,19 +4156,22 @@ function buildPlayableBracketBoards(rounds: AdminBracketRound[]): PlayableBoard[
 function buildProcedureMatchesFromPairings(pairings: Pairing[], tournament: AdminTournament): ProcedureMatch[] {
   return pairings.map((pairing) => {
     const playable = hasKnownPlayers(pairing)
+    const bye = pairing.black === 'Bye'
     return {
       black: pairing.black,
       board: pairing.board,
       boardLabel: `${pairingRoundLabel(tournament, pairing.round ?? 1)} Board ${pairing.board}`,
       boardKey: pairingBoardKey(pairing.round ?? 1, pairing.board),
+      bye,
+      completed: bye,
       matchNumber: pairing.board,
       playable,
       round: pairing.round ?? 1,
       roundLabel: pairingRoundLabel(tournament, pairing.round ?? 1),
-      status: playable ? 'Ready' : 'Waiting for player',
+      status: bye ? 'Full-point bye' : playable ? 'Ready' : 'Waiting for player',
       white: pairing.white,
     }
-  }).filter(isProcedureMatchPlayable)
+  }).filter((match) => match.playable || match.bye)
 }
 
 function buildProcedureMatchesFromBracket(rounds: AdminBracketRound[]): ProcedureMatch[] {
@@ -4005,9 +4201,9 @@ function buildProcedureMatchesFromBracket(rounds: AdminBracketRound[]): Procedur
   }).filter(isProcedureMatchPlayable)
 }
 
-function buildProcedureMatchesFromAdminGames(tournament: AdminTournament, games: AdminGame[]): ProcedureMatch[] {
+function buildProcedureMatchesFromAdminGames(tournament: AdminTournament, games: AdminGame[], includeAllRounds = false): ProcedureMatch[] {
   const currentRound = currentRoundNumber(tournament)
-  const source = games.filter((game) => (
+  const source = includeAllRounds ? games : games.filter((game) => (
     game.status === 'live' || game.round === currentRound
   ))
 
@@ -4027,6 +4223,11 @@ function buildProcedureMatchesFromAdminGames(tournament: AdminTournament, games:
         live: game.status === 'live',
         matchNumber: game.board,
         playable: !completed && !bye,
+        pgn: game.pgn,
+        physicalBoard: game.physicalBoard,
+        procedureWave: game.procedureWave,
+        queuePosition: game.queuePosition,
+        result: game.result,
         round: game.round,
         roundLabel: pairingRoundLabel(tournament, game.round),
         status: bye ? 'Full-point bye' : completed ? `Finished ${game.result}` : game.status === 'live' ? 'Live now' : 'Ready',
@@ -4049,53 +4250,77 @@ function normalizeAdminBoardResult(value: string): '1-0' | '0-1' | '1/2-1/2' | '
 
 function buildProcedureQueue(matches: ProcedureMatch[], tableCount: number): ProcedureQueue {
   const tables = Math.max(1, Math.min(64, Math.floor(tableCount) || 1))
-  const byes = matches.filter((match) => match.bye)
-  const finished = matches.filter((match) => match.completed && !match.bye)
-  const live = matches.filter((match) => match.live && !match.completed)
-  const ready = matches.filter((match) => match.playable && !match.live)
-
-  // Live games anchor to a table derived from their own board number, so a
-  // result landing on another table never moves a game that is being played.
-  const byTable = new Map<number, ProcedureMatch>()
-  const overflow: ProcedureMatch[] = []
-  for (const match of live) {
-    const preferred = ((match.board ?? match.matchNumber) - 1) % tables + 1
-    let slot = preferred
-    let placed = false
-    for (let step = 0; step < tables; step += 1) {
-      if (!byTable.has(slot)) {
-        byTable.set(slot, match)
-        placed = true
-        break
-      }
-      slot = (slot % tables) + 1
-    }
-    if (!placed) overflow.push(match)
+  const normalized = matches.map((match) => ({ ...match }))
+  const roundGroups = new Map<number, ProcedureMatch[]>()
+  normalized.filter((match) => !match.bye).forEach((match) => {
+    const round = match.round ?? 1
+    const group = roundGroups.get(round) ?? []
+    group.push(match)
+    roundGroups.set(round, group)
+  })
+  for (const group of roundGroups.values()) {
+    group.sort((a, b) => (a.queuePosition ?? a.matchNumber) - (b.queuePosition ?? b.matchNumber))
+    group.forEach((match, index) => {
+      match.queuePosition ??= index + 1
+      match.procedureWave ??= Math.floor(index / tables) + 1
+      match.physicalBoard ??= (index % tables) + 1
+    })
   }
 
-  // Free tables pull the next waiting match from the ready queue.
-  let readyCursor = 0
+  const byes = normalized.filter((match) => match.bye)
+  const finished = normalized.filter((match) => match.completed && !match.bye)
+  const live = normalized.filter((match) => match.live && !match.completed)
+  const ready = normalized.filter((match) => match.playable && !match.live)
+  const operationalRound = live[0]?.round
+    ?? ready.map((match) => match.round ?? 1).sort((a, b) => a - b)[0]
+    ?? Math.max(1, ...normalized.map((match) => match.round ?? 1))
+  const operationalReady = ready.filter((match) => (match.round ?? 1) === operationalRound)
   const assigned: ProcedureTable[] = []
+  const visibleKeys = new Set<string>()
   for (let tableNumber = 1; tableNumber <= tables; tableNumber += 1) {
-    const liveMatch = byTable.get(tableNumber)
+    const liveMatch = live.find((match) => match.physicalBoard === tableNumber)
     if (liveMatch) {
       assigned.push({ tableNumber, match: liveMatch, startNow: false })
+      visibleKeys.add(liveMatch.boardKey)
       continue
     }
-    const nextReady = ready[readyCursor]
+    const nextReady = operationalReady
+      .filter((match) => match.physicalBoard === tableNumber)
+      .sort((a, b) => (a.queuePosition ?? a.matchNumber) - (b.queuePosition ?? b.matchNumber))[0]
     if (nextReady) {
-      readyCursor += 1
       assigned.push({ tableNumber, match: nextReady, startNow: true })
+      visibleKeys.add(nextReady.boardKey)
       continue
     }
     assigned.push({ tableNumber, startNow: false })
   }
 
+  const waves = Array.from(roundGroups.entries()).flatMap(([round, group]) => {
+    const waveGroups = new Map<number, ProcedureMatch[]>()
+    group.forEach((match) => {
+      const wave = match.procedureWave ?? 1
+      const waveMatches = waveGroups.get(wave) ?? []
+      waveMatches.push(match)
+      waveGroups.set(wave, waveMatches)
+    })
+    return Array.from(waveGroups.entries()).map(([number, waveMatches]) => ({
+      number,
+      round,
+      roundLabel: waveMatches[0]?.roundLabel ?? `Round ${round}`,
+      matches: waveMatches,
+    }))
+  }).sort((a, b) => a.round - b.round || a.number - b.number)
+
   return {
     tables: assigned,
-    waiting: [...overflow, ...ready.slice(readyCursor)],
+    waiting: operationalReady.filter((match) => !visibleKeys.has(match.boardKey)),
     finished,
     byes,
+    currentRoundFinished: normalized.filter((match) => (
+      (match.round ?? 1) === operationalRound && (match.completed || match.bye)
+    )).length,
+    currentRoundTotal: normalized.filter((match) => (match.round ?? 1) === operationalRound).length,
+    waves,
   }
 }
 

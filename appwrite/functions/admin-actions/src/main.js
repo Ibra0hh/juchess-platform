@@ -211,7 +211,7 @@ function isDoubleRoundRobinTournament(tournament) {
 }
 
 function isGameDecided(game) {
-  return game.status === 'completed' && ['1-0', '0-1', '1/2-1/2'].includes(game.result);
+  return ['completed', 'forfeit'].includes(game.status) && ['1-0', '0-1', '1/2-1/2'].includes(game.result);
 }
 
 function decisiveWinnerProfileId(game) {
@@ -297,6 +297,36 @@ function isArenaTournament(tournament) {
 }
 
 const SYSTEM_BYE_PROFILE_ID = 'system_bye';
+
+function normalizePhysicalBoards(value) {
+  const count = Math.floor(Number(value) || 3);
+  return Math.max(1, Math.min(64, count));
+}
+
+function buildProcedureAssignments(games, physicalBoards) {
+  const boardCount = normalizePhysicalBoards(physicalBoards);
+  const planned = games.map((game) => ({ ...game }));
+  const rounds = new Map();
+
+  for (const game of planned) {
+    if (game.blackProfileId === SYSTEM_BYE_PROFILE_ID) continue;
+    const round = Number(game.round) || 1;
+    const roundGames = rounds.get(round) ?? [];
+    roundGames.push(game);
+    rounds.set(round, roundGames);
+  }
+
+  for (const roundGames of rounds.values()) {
+    roundGames.sort((a, b) => Number(a.board) - Number(b.board));
+    roundGames.forEach((game, index) => {
+      game.queuePosition = index + 1;
+      game.procedureWave = Math.floor(index / boardCount) + 1;
+      game.physicalBoard = (index % boardCount) + 1;
+    });
+  }
+
+  return planned;
+}
 
 async function ensureSystemByeProfile(tablesDB, databaseId) {
   try {
@@ -759,7 +789,16 @@ function buildSwissPairings(playerIds, games, seedByProfile, byeProfileId) {
   return { pairings, byePlayerId };
 }
 
-async function writeSwissRound(tablesDB, databaseId, tournamentId, round, pairings, byePlayerId, byeProfileId) {
+async function writeSwissRound(
+  tablesDB,
+  databaseId,
+  tournamentId,
+  round,
+  pairings,
+  byePlayerId,
+  byeProfileId,
+  physicalBoards = 3,
+) {
   const games = pairings.map((pairing) => ({ ...pairing, round }));
   if (byePlayerId) {
     // The sentinel row only exists for clubs that actually need a bye; creating
@@ -773,7 +812,7 @@ async function writeSwissRound(tablesDB, databaseId, tournamentId, round, pairin
     });
   }
 
-  const created = await createTournamentGames(tablesDB, databaseId, tournamentId, games, round);
+  const created = await createTournamentGames(tablesDB, databaseId, tournamentId, games, physicalBoards);
   // Score the bye immediately: a full-point bye is a finished "game".
   for (const row of created) {
     if (row.blackProfileId !== byeProfileId) continue;
@@ -863,18 +902,6 @@ async function setCurrentRound(tablesDB, databaseId, tournamentId, nextRound, ro
       roundsTotal,
     }),
   });
-}
-
-async function markRoundLive(tablesDB, databaseId, games, round) {
-  for (const game of games) {
-    if (Number(game.round) !== Number(round) || game.status !== 'scheduled') continue;
-    await tablesDB.updateRow({
-      databaseId,
-      tableId: tableIds.games,
-      rowId: game.$id,
-      data: { status: 'live', startedAt: game.startedAt || new Date().toISOString() },
-    });
-  }
 }
 
 function roundIsComplete(games, round) {
@@ -972,7 +999,13 @@ async function advanceKnockout(tablesDB, databaseId, tournament, games, options 
     }
 
     if (!creatable.length) continue;
-    await createTournamentGames(tablesDB, databaseId, tournament.$id, creatable, gameRound + roundOffset);
+    await createTournamentGames(
+      tablesDB,
+      databaseId,
+      tournament.$id,
+      creatable,
+      normalizePhysicalBoards(tournament.physicalBoards),
+    );
     await setCurrentRound(
       tablesDB,
       databaseId,
@@ -1002,7 +1035,7 @@ async function advanceKnockout(tablesDB, databaseId, tournament, games, options 
           board: 1,
           whiteProfileId: winner,
           blackProfileId: winnersFinalist,
-        }], resetRound + roundOffset);
+        }], normalizePhysicalBoards(tournament.physicalBoards));
         await setCurrentRound(
           tablesDB,
           databaseId,
@@ -1038,7 +1071,6 @@ async function advanceRoundRobin(tablesDB, databaseId, tournament, games, comple
   }
 
   const nextRound = Number(completedRound) + 1;
-  await markRoundLive(tablesDB, databaseId, games, nextRound);
   await setCurrentRound(tablesDB, databaseId, tournament.$id, nextRound, undefined);
   return { advanced: true, currentRound: nextRound };
 }
@@ -1069,7 +1101,16 @@ async function advanceSwiss(tablesDB, databaseId, tournament, games, completedRo
   }
 
   const nextRound = Number(completedRound) + 1;
-  await writeSwissRound(tablesDB, databaseId, tournament.$id, nextRound, pairings, byePlayerId, byeProfileId);
+  await writeSwissRound(
+    tablesDB,
+    databaseId,
+    tournament.$id,
+    nextRound,
+    pairings,
+    byePlayerId,
+    byeProfileId,
+    normalizePhysicalBoards(tournament.physicalBoards),
+  );
 
   await setCurrentRound(
     tablesDB,
@@ -1134,7 +1175,13 @@ async function advanceMultiStage(tablesDB, databaseId, tournament, games, comple
       blackProfileId: qualifiers[match.b.e],
     }));
 
-  await createTournamentGames(tablesDB, databaseId, tournament.$id, stageTwoGames, stageTwoFromRound);
+  await createTournamentGames(
+    tablesDB,
+    databaseId,
+    tournament.$id,
+    stageTwoGames,
+    normalizePhysicalBoards(tournament.physicalBoards),
+  );
   const names = await loadProfileNames(tablesDB, databaseId, qualifiers);
   const snapshotJson = buildKnockoutSnapshot(structure, qualifiers, [], names, tournament, {
     stageTwoFromRound,
@@ -1208,9 +1255,10 @@ async function listConfirmedRegistrations(tablesDB, databaseId, tournamentId) {
     .toSorted(compareRegistrationSeeds);
 }
 
-async function createTournamentGames(tablesDB, databaseId, tournamentId, games, liveRound = 1) {
+async function createTournamentGames(tablesDB, databaseId, tournamentId, games, physicalBoards = 3) {
   const rows = [];
-  for (const game of games) {
+  const plannedGames = buildProcedureAssignments(games, physicalBoards);
+  for (const game of plannedGames) {
     const row = await tablesDB.createRow({
       databaseId,
       tableId: tableIds.games,
@@ -1221,9 +1269,11 @@ async function createTournamentGames(tablesDB, databaseId, tournamentId, games, 
         board: Number(game.board),
         whiteProfileId: String(game.whiteProfileId),
         blackProfileId: String(game.blackProfileId),
-        status: Number(game.round) === liveRound ? 'live' : 'scheduled',
+        status: 'scheduled',
         result: '*',
-        startedAt: Number(game.round) === liveRound ? new Date().toISOString() : undefined,
+        procedureWave: game.procedureWave,
+        physicalBoard: game.physicalBoard,
+        queuePosition: game.queuePosition,
       }),
       permissions: [Permission.read(Role.any())],
     });
@@ -1240,6 +1290,7 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
     rowId: tournamentId,
   });
   const nextTournament = { ...tournament, ...nextData };
+  const physicalBoards = normalizePhysicalBoards(nextTournament.physicalBoards);
 
   const existingGames = await listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId);
   if (existingGames.length > 0) {
@@ -1273,7 +1324,7 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
       throw new HttpError(400, 'Could not build first-round games for this tournament.');
     }
 
-    const createdGames = await createTournamentGames(tablesDB, databaseId, tournamentId, schedule, 1);
+    const createdGames = await createTournamentGames(tablesDB, databaseId, tournamentId, schedule, physicalBoards);
     const names = await loadProfileNames(tablesDB, databaseId, entrants);
     const snapshotJson = buildKnockoutSnapshot(structure, entrants, [], names, nextTournament);
     return {
@@ -1291,7 +1342,16 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
       throw new HttpError(400, 'Could not build first-round games for this tournament.');
     }
 
-    const createdGames = await writeSwissRound(tablesDB, databaseId, tournamentId, 1, pairings, byePlayerId, byeProfileId);
+    const createdGames = await writeSwissRound(
+      tablesDB,
+      databaseId,
+      tournamentId,
+      1,
+      pairings,
+      byePlayerId,
+      byeProfileId,
+      physicalBoards,
+    );
     const roundsTotal = isMultiStageTournament(nextTournament)
       ? Number(nextTournament.roundsTotal) || 0
       : swissRoundsTotal(nextTournament, profileIds.length);
@@ -1310,7 +1370,7 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
     ...schedule.map((game) => Number(game.round)).filter(Number.isFinite),
     Number(nextTournament.roundsTotal) || 0,
   );
-  const createdGames = await createTournamentGames(tablesDB, databaseId, tournamentId, schedule, 1);
+  const createdGames = await createTournamentGames(tablesDB, databaseId, tournamentId, schedule, physicalBoards);
   return { createdGames, roundsTotal };
 }
 
@@ -1458,6 +1518,148 @@ async function assertResultAllowed(tablesDB, databaseId, game, result) {
   }
 }
 
+async function configureTournamentProcedure(tablesDB, databaseId, tournamentId, requestedBoards) {
+  const tournament = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.tournaments,
+    rowId: tournamentId,
+  });
+  const physicalBoards = normalizePhysicalBoards(requestedBoards);
+  const previousBoards = normalizePhysicalBoards(tournament.physicalBoards);
+  const games = await listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId);
+  const currentRound = Number(tournament.currentRound) || 1;
+  const currentRoundStarted = games.some((game) => (
+    Number(game.round) === currentRound &&
+    game.blackProfileId !== SYSTEM_BYE_PROFILE_ID &&
+    game.status !== 'scheduled'
+  ));
+
+  if (physicalBoards !== previousBoards && currentRoundStarted) {
+    throw new HttpError(409, 'Physical boards cannot change after the current round has started.');
+  }
+
+  const planned = buildProcedureAssignments(games, physicalBoards);
+  let updatedGames = 0;
+  for (const game of planned) {
+    if (game.blackProfileId === SYSTEM_BYE_PROFILE_ID) continue;
+    const current = games.find((row) => row.$id === game.$id);
+    if (!current) continue;
+    if (
+      current.status !== 'scheduled' &&
+      current.procedureWave &&
+      current.physicalBoard &&
+      current.queuePosition &&
+      !(current.status === 'live' && Number(game.procedureWave) > 1)
+    ) {
+      continue;
+    }
+    if (
+      Number(current.procedureWave) === Number(game.procedureWave) &&
+      Number(current.physicalBoard) === Number(game.physicalBoard) &&
+      Number(current.queuePosition) === Number(game.queuePosition) &&
+      !(current.status === 'live' && Number(game.procedureWave) > 1)
+    ) continue;
+
+    const requeueLegacyLiveGame = current.status === 'live' && Number(game.procedureWave) > 1;
+    await tablesDB.updateRow({
+      databaseId,
+      tableId: tableIds.games,
+      rowId: game.$id,
+      data: cleanObject({
+        procedureWave: game.procedureWave,
+        physicalBoard: game.physicalBoard,
+        queuePosition: game.queuePosition,
+        status: requeueLegacyLiveGame ? 'scheduled' : undefined,
+        startedAt: requeueLegacyLiveGame ? null : undefined,
+      }),
+    });
+    updatedGames += 1;
+  }
+
+  await tablesDB.updateRow({
+    databaseId,
+    tableId: tableIds.tournaments,
+    rowId: tournamentId,
+    data: { physicalBoards },
+  });
+
+  return { physicalBoards, updatedGames };
+}
+
+async function startProcedureGame(tablesDB, databaseId, gameId, requestedBoard) {
+  const game = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.games,
+    rowId: gameId,
+  });
+  const tournament = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.tournaments,
+    rowId: game.tournamentId,
+  });
+  if (tournament.status !== 'active') {
+    throw new HttpError(409, 'The tournament must be active before a game can start.');
+  }
+  if (game.status === 'completed' || game.status === 'forfeit') {
+    throw new HttpError(409, 'This game is already finished.');
+  }
+  if (game.blackProfileId === SYSTEM_BYE_PROFILE_ID) {
+    throw new HttpError(409, 'A bye does not use a physical board.');
+  }
+
+  const physicalBoards = normalizePhysicalBoards(tournament.physicalBoards);
+  const physicalBoard = Math.floor(Number(requestedBoard ?? game.physicalBoard));
+  if (!Number.isInteger(physicalBoard) || physicalBoard < 1 || physicalBoard > physicalBoards) {
+    throw new HttpError(400, `Physical board must be between 1 and ${physicalBoards}.`);
+  }
+
+  const games = await listRowsByTournament(tablesDB, databaseId, tableIds.games, game.tournamentId);
+  const occupied = games.find((row) => (
+    row.$id !== game.$id &&
+    row.status === 'live' &&
+    Number(row.physicalBoard) === physicalBoard
+  ));
+  if (occupied) {
+    throw new HttpError(409, `Physical board ${physicalBoard} is already in use.`);
+  }
+
+  const earlierLaneGame = games.find((row) => (
+    row.$id !== game.$id &&
+    Number(row.round) === Number(game.round) &&
+    Number(row.physicalBoard) === physicalBoard &&
+    Number(row.queuePosition) < Number(game.queuePosition) &&
+    !isGameDecided(row)
+  ));
+  if (earlierLaneGame) {
+    throw new HttpError(409, `Finish the earlier game on physical board ${physicalBoard} first.`);
+  }
+
+  if (game.status === 'live') return game;
+  return await tablesDB.updateRow({
+    databaseId,
+    tableId: tableIds.games,
+    rowId: game.$id,
+    data: {
+      status: 'live',
+      physicalBoard,
+      startedAt: game.startedAt || new Date().toISOString(),
+    },
+  });
+}
+
+async function updateGamePgn(tablesDB, databaseId, gameId, value) {
+  const pgn = String(value ?? '').trim();
+  if (!pgn) throw new HttpError(400, 'PGN cannot be empty.');
+  if (pgn.length > 50000) throw new HttpError(400, 'PGN is too large.');
+
+  return await tablesDB.updateRow({
+    databaseId,
+    tableId: tableIds.games,
+    rowId: gameId,
+    data: { pgn },
+  });
+}
+
 async function submitGameResult(tablesDB, databaseId, gameId, body) {
   const result = normalizeResult(body.result);
   if (!result) {
@@ -1469,6 +1671,10 @@ async function submitGameResult(tablesDB, databaseId, gameId, body) {
     tableId: tableIds.games,
     rowId: gameId,
   });
+
+  if (current.status === 'scheduled') {
+    throw new HttpError(409, 'Start this game from Procedure before recording its result.');
+  }
 
   if (status === 'completed') {
     await assertResultAllowed(tablesDB, databaseId, current, result);
@@ -1659,6 +1865,7 @@ export default async ({ req, res, log, error }) => {
         'POST /tournaments/:id/pairings/unpublish',
         'POST /tournaments/:id/games/result',
         'POST /tournaments/:id/rounds/next',
+        'POST /tournaments/:id/procedure/configure',
         'POST /profiles/lookup',
         'GET /admin/session',
         'GET /admin/admins',
@@ -1673,6 +1880,8 @@ export default async ({ req, res, log, error }) => {
         'POST /registrations/:id/status',
         'GET /tournaments/:id/check-ins',
         'POST /games/:id/result',
+        'POST /games/:id/start',
+        'POST /games/:id/pgn',
         'POST /profiles/:id/role',
         'POST /profiles/:id/status',
         'POST /announcements',
@@ -1993,6 +2202,7 @@ export default async ({ req, res, log, error }) => {
           location: body.location,
           capacity: body.capacity,
           description: body.description,
+          physicalBoards: normalizePhysicalBoards(body.physicalBoards),
           createdByProfileId: body.createdByProfileId ?? actor.$id,
         }),
       });
@@ -2020,6 +2230,7 @@ export default async ({ req, res, log, error }) => {
           location: body.location,
           capacity: body.capacity,
           description: body.description,
+          physicalBoards: body.physicalBoards === undefined ? undefined : normalizePhysicalBoards(body.physicalBoards),
           roundsTotal: activation?.roundsTotal ?? body.roundsTotal,
           // Activation replaces any stale pre-publish snapshot with the freshly
           // generated bracket (knockouts) or clears it (other formats).
@@ -2058,7 +2269,7 @@ export default async ({ req, res, log, error }) => {
         return badRequest(res, 'Published pairings must include round, board, whiteProfileId and blackProfileId.');
       }
 
-      await tablesDB.getRow({
+      const tournament = await tablesDB.getRow({
         databaseId,
         tableId: tableIds.tournaments,
         rowId: tournamentId,
@@ -2079,25 +2290,13 @@ export default async ({ req, res, log, error }) => {
         });
       }
 
-      const rows = [];
-      for (const game of games) {
-        const row = await tablesDB.createRow({
-          databaseId,
-          tableId: tableIds.games,
-          rowId: ID.unique(),
-          data: cleanObject({
-            tournamentId,
-            round: Number(game.round),
-            board: Number(game.board),
-            whiteProfileId: String(game.whiteProfileId),
-            blackProfileId: String(game.blackProfileId),
-            status: game.status && ['scheduled', 'live'].includes(game.status) ? game.status : 'scheduled',
-            result: '*',
-          }),
-          permissions: [Permission.read(Role.any())],
-        });
-        rows.push(row);
-      }
+      const rows = await createTournamentGames(
+        tablesDB,
+        databaseId,
+        tournamentId,
+        games,
+        normalizePhysicalBoards(tournament.physicalBoards),
+      );
 
       const roundsTotal = Math.max(...games.map((game) => Number(game.round)).filter(Number.isFinite));
       await tablesDB.updateRow({
@@ -2241,6 +2440,42 @@ export default async ({ req, res, log, error }) => {
       });
 
       return res.json({ ok: true, action: 'listCheckIns', checkIns: response.rows });
+    }
+
+    if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'procedure' && segments[3] === 'configure') {
+      const outcome = await configureTournamentProcedure(tablesDB, databaseId, segments[1], body.physicalBoards);
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'configureTournamentProcedure',
+        targetTable: tableIds.tournaments,
+        targetRowId: segments[1],
+        payload: outcome,
+      });
+      return res.json({ ok: true, action: 'configureTournamentProcedure', ...outcome });
+    }
+
+    if (method === 'POST' && segments[0] === 'games' && segments[1] && segments[2] === 'start') {
+      const row = await startProcedureGame(tablesDB, databaseId, segments[1], body.physicalBoard);
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'startTournamentGame',
+        targetTable: tableIds.games,
+        targetRowId: row.$id,
+        payload: { physicalBoard: row.physicalBoard },
+      });
+      return res.json({ ok: true, action: 'startTournamentGame', row });
+    }
+
+    if (method === 'POST' && segments[0] === 'games' && segments[1] && segments[2] === 'pgn') {
+      const row = await updateGamePgn(tablesDB, databaseId, segments[1], body.pgn);
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'updateTournamentGamePgn',
+        targetTable: tableIds.games,
+        targetRowId: row.$id,
+        payload: { attached: true },
+      });
+      return res.json({ ok: true, action: 'updateTournamentGamePgn', row });
     }
 
     if (method === 'POST' && segments[0] === 'games' && segments[1] && segments[2] === 'result') {

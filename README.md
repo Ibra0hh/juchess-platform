@@ -122,6 +122,16 @@ appwrite functions create-deployment \
   --commands "npm install"
 ```
 
+Procedure scheduling also requires the additive table migration once per
+Appwrite project:
+
+```powershell
+npm run migrate:procedure
+```
+
+The migration uses the current Appwrite CLI login, or `APPWRITE_API_KEY` when
+running non-interactively. It never stores the key in the repository.
+
 To deploy the public access guard function:
 
 ```bash

@@ -44,6 +44,7 @@
         "capacity": "integer",
         "description": "string",
         "bracketSnapshot": "longtext",
+        "physicalBoards": "integer|default:3|min:1|max:64",
         "createdByProfileId": "string|required"
       }
     },
@@ -85,7 +86,10 @@
         "blackProfileId": "string|required",
         "status": "enum:scheduled,live,completed,forfeit",
         "result": "enum:1-0,0-1,1/2-1/2,*",
-        "pgn": "string",
+        "pgn": "string|max:50000",
+        "procedureWave": "integer",
+        "physicalBoard": "integer",
+        "queuePosition": "integer",
         "startedAt": "datetime",
         "finishedAt": "datetime"
       }

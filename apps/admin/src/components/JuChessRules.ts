@@ -37,3 +37,44 @@ export function deriveResult(game: Chess) {
   if (game.isDraw()) return '1/2-1/2'
   return 'Live'
 }
+
+export function pgnFromMoves(moves: string[]) {
+  return buildChessGame(undefined, moves).pgn()
+}
+
+export function parseChessPgn(value: string) {
+  const pgn = value.trim()
+  if (!pgn || pgn === 'bye') throw new Error('Enter PGN moves first.')
+
+  const resultToken = pgn.match(/\b(1-0|0-1|1\/2-1\/2)\s*$/)?.[1]
+  const game = new Chess()
+
+  try {
+    game.loadPgn(pgn)
+    const moves = game.history()
+    if (!moves.length) throw new Error('The PGN does not contain moves.')
+    return { moves, result: deriveResult(game) === 'Live' ? resultToken ?? 'Live' : deriveResult(game) }
+  } catch {
+    const fallback = new Chess()
+    const tokens = pgn
+      .replace(/\{[^}]*\}/g, ' ')
+      .replace(/\([^)]*\)/g, ' ')
+      .split(/\s+/)
+      .map((token) => token.replace(/^\d+\.(?:\.\.)?/, ''))
+      .filter((token) => token && !/^\d+\.*$/.test(token) && !/^\$\d+$/.test(token))
+      .filter((token) => !['1-0', '0-1', '1/2-1/2', '*'].includes(token))
+
+    for (const token of tokens) {
+      try {
+        fallback.move(token)
+      } catch {
+        throw new Error(`Invalid PGN move: ${token}`)
+      }
+    }
+
+    const moves = fallback.history()
+    if (!moves.length) throw new Error('The PGN does not contain valid moves.')
+    const derived = deriveResult(fallback)
+    return { moves, result: derived === 'Live' ? resultToken ?? 'Live' : derived }
+  }
+}

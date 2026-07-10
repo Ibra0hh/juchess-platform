@@ -39,6 +39,7 @@ type AppwriteTournamentRow = Models.Row & {
   capacity?: number
   description?: string
   bracketSnapshot?: string
+  physicalBoards?: number
 }
 
 type AppwriteGameRow = Models.Row & {
@@ -50,6 +51,9 @@ type AppwriteGameRow = Models.Row & {
   status?: 'scheduled' | 'live' | 'completed' | 'forfeit'
   result?: '1-0' | '0-1' | '1/2-1/2' | '*'
   pgn?: string
+  procedureWave?: number
+  physicalBoard?: number
+  queuePosition?: number
   startedAt?: string
   finishedAt?: string
 }
@@ -103,6 +107,7 @@ export type AdminTournament = {
   publishedGames: number
   publishedGameRows: AdminGame[]
   bracketSnapshot?: string
+  physicalBoards: number
 }
 
 export type AdminGame = {
@@ -119,6 +124,9 @@ export type AdminGame = {
   status: 'scheduled' | 'live' | 'completed' | 'forfeit'
   result: '1-0' | '0-1' | '1/2-1/2' | '*'
   pgn?: string
+  procedureWave?: number
+  physicalBoard?: number
+  queuePosition?: number
   startedAt?: string
   finishedAt?: string
 }
@@ -157,6 +165,7 @@ export type TournamentInput = {
   location?: string
   capacity?: number
   description?: string
+  physicalBoards?: number
   createdByProfileId?: string
 }
 
@@ -415,6 +424,34 @@ export async function submitTournamentGameResult(input: {
       status: input.status,
       pgn: input.pgn,
     }),
+  })
+
+  return response.row
+}
+
+export async function configureTournamentProcedure(rowId: string, physicalBoards: number) {
+  return await runAdminAction<{ physicalBoards: number; updatedGames: number }>({
+    method: ExecutionMethod.POST,
+    path: `/tournaments/${rowId}/procedure/configure`,
+    body: { physicalBoards },
+  })
+}
+
+export async function startTournamentGame(gameId: string, physicalBoard: number) {
+  const response = await runAdminAction<{ row: AppwriteGameRow }>({
+    method: ExecutionMethod.POST,
+    path: `/games/${gameId}/start`,
+    body: { physicalBoard },
+  })
+
+  return response.row
+}
+
+export async function updateTournamentGamePgn(gameId: string, pgn: string) {
+  const response = await runAdminAction<{ row: AppwriteGameRow }>({
+    method: ExecutionMethod.POST,
+    path: `/games/${gameId}/pgn`,
+    body: { pgn },
   })
 
   return response.row
@@ -746,6 +783,9 @@ async function loadPublishedGamesByTournament() {
         status: row.status ?? 'scheduled',
         result: row.result ?? '*',
         pgn: row.pgn,
+        procedureWave: row.procedureWave,
+        physicalBoard: row.physicalBoard,
+        queuePosition: row.queuePosition,
         startedAt: row.startedAt,
         finishedAt: row.finishedAt,
       })
@@ -829,6 +869,7 @@ function mapTournament(
     publishedGames: games.length,
     publishedGameRows: games,
     bracketSnapshot: row.bracketSnapshot,
+    physicalBoards: Math.max(1, Math.min(64, Math.floor(row.physicalBoards ?? 3))),
   }
 }
 
