@@ -981,7 +981,9 @@ button {
 }
 
 .format-card-grid button {
-  min-height: 112px;
+  min-height: 92px;
+  display: grid;
+  align-content: center;
   padding: 14px 10px;
   color: #4a4f5a;
   text-align: center;
@@ -991,12 +993,6 @@ button {
   border-color: #7d2434;
   background: #fcf6f3;
   color: #7d2434;
-}
-
-.format-card-grid span {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 21px;
 }
 
 .format-card-grid strong {

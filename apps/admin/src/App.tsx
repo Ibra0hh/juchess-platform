@@ -240,14 +240,14 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
 const tournamentTabs: TournamentTab[] = ['draft', 'upcoming', 'active', 'completed', 'archived']
 const createSteps = ['Basic information', 'Tournament format'] as const
 const formatOptions = [
-  { value: 'Swiss', icon: '♟', layout: 'Standings + current pairings' },
-  { value: 'Round robin', icon: '◍', layout: 'Standings + schedule' },
-  { value: 'Double round robin', icon: '◎', layout: 'Double cycle standings' },
-  { value: 'Single elimination', icon: '▲', layout: 'Bracket only' },
-  { value: 'Double elimination', icon: '⧗', layout: 'Winners / Losers / Final' },
-  { value: 'Multi-stage', icon: '⬒', layout: 'Stage tabs + finals bracket' },
-  { value: 'Team', icon: '⚑', layout: 'Team boards + match points' },
-  { value: 'Arena', icon: '⚡', layout: 'Leaderboard + streaks' },
+  { value: 'Swiss', layout: 'Standings + current pairings' },
+  { value: 'Round robin', layout: 'Standings + schedule' },
+  { value: 'Double round robin', layout: 'Double cycle standings' },
+  { value: 'Single elimination', layout: 'Bracket only' },
+  { value: 'Double elimination', layout: 'Winners / Losers / Final' },
+  { value: 'Multi-stage', layout: 'Stage tabs + finals bracket' },
+  { value: 'Team', layout: 'Team boards + match points' },
+  { value: 'Arena', layout: 'Leaderboard + streaks' },
 ] as const
 const timeOptions = [
   { label: 'Classical', minutes: '90', increment: '30' },
@@ -891,8 +891,6 @@ function TournamentsScreen({
   const [timeCategory, setTimeCategory] = useState('Rapid')
   const [timeMinutes, setTimeMinutes] = useState('15')
   const [timeIncrement, setTimeIncrement] = useState('10')
-  const [timeDelay, setTimeDelay] = useState('0')
-  const [gamesPerMatch, setGamesPerMatch] = useState('1')
   const [selectedTournamentKey, setSelectedTournamentKey] = useState('')
   const [registrations, setRegistrations] = useState<AdminRegistration[]>([])
   const [registrationsLoading, setRegistrationsLoading] = useState(false)
@@ -1012,8 +1010,6 @@ function TournamentsScreen({
     setTimeCategory('Rapid')
     setTimeMinutes('15')
     setTimeIncrement('10')
-    setTimeDelay('0')
-    setGamesPerMatch('1')
   }
 
   function openCreatePanel() {
@@ -1048,30 +1044,22 @@ function TournamentsScreen({
       setTimeCategory(value || 'Rapid')
       setTimeMinutes('15')
       setTimeIncrement('10')
-      setTimeDelay('0')
-      setGamesPerMatch('1')
       return
     }
 
     setTimeMinutes(match[1])
     setTimeIncrement(match[2])
     setTimeCategory(match[3] || 'Rapid')
-    setTimeDelay('0')
-    setGamesPerMatch('1')
   }
 
-  function setTimeSelection(next: Partial<{ category: string; minutes: string; increment: string; delay: string; games: string }>) {
+  function setTimeSelection(next: Partial<{ category: string; minutes: string; increment: string }>) {
     const category = next.category ?? timeCategory
     const minutes = next.minutes ?? timeMinutes
     const increment = next.increment ?? timeIncrement
-    const delay = next.delay ?? timeDelay
-    const games = next.games ?? gamesPerMatch
 
     setTimeCategory(category)
     setTimeMinutes(minutes)
     setTimeIncrement(increment)
-    setTimeDelay(delay)
-    setGamesPerMatch(games)
     update('timeControl', `${minutes || '0'}+${increment || '0'} ${category}`)
   }
 
@@ -1565,7 +1553,6 @@ function TournamentsScreen({
                           className={form.format === option.value ? 'active' : undefined}
                           onClick={() => update('format', option.value)}
                         >
-                          <span>{option.icon}</span>
                           <strong>{option.value}</strong>
                           <small>{option.layout}</small>
                         </button>
@@ -1592,8 +1579,6 @@ function TournamentsScreen({
                       </div>
                       <label>Initial minutes<input value={timeMinutes} onChange={(event) => setTimeSelection({ minutes: event.target.value })} placeholder="15" /></label>
                       <label>Increment (seconds)<input value={timeIncrement} onChange={(event) => setTimeSelection({ increment: event.target.value })} placeholder="10" /></label>
-                      <label>Delay (seconds)<input value={timeDelay} onChange={(event) => setTimeSelection({ delay: event.target.value })} placeholder="0" /></label>
-                      <label>Games per match<input value={gamesPerMatch} onChange={(event) => setTimeSelection({ games: event.target.value })} placeholder="1" /></label>
                     </div>
                   </div>
                 </div>
