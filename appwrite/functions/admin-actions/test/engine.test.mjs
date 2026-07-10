@@ -226,6 +226,102 @@ test('swiss: nobody receives a second bye while others have none', () => {
   assert.equal(new Set(byes).size, 3, 'three players, three rounds, three distinct byes')
 })
 
+test('swiss: the drawn initial colour follows pairing-number parity', () => {
+  const players = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
+  const seeds = new Map(players.map((player, index) => [player, index + 1]))
+  const { pairings } = engine.buildSwissPairings(players, [], seeds, 'system_bye', { initialColor: 'black' })
+
+  for (const pairing of pairings) {
+    const higher = seeds.get(pairing.whiteProfileId) < seeds.get(pairing.blackProfileId)
+      ? pairing.whiteProfileId
+      : pairing.blackProfileId
+    const expected = seeds.get(higher) % 2 === 1 ? 'black' : 'white'
+    assert.equal(
+      pairing.whiteProfileId === higher ? 'white' : 'black',
+      expected,
+      `pairing number ${seeds.get(higher)} receives its prescribed first-round colour`,
+    )
+  }
+})
+
+test('swiss: two consecutive Whites force Black and two Blacks force White', () => {
+  const players = ['a', 'b']
+  const seeds = new Map([['a', 1], ['b', 2]])
+  const games = [
+    { round: 1, board: 1, whiteProfileId: 'a', blackProfileId: 'x', status: 'completed', result: '1/2-1/2' },
+    { round: 1, board: 2, whiteProfileId: 'y', blackProfileId: 'b', status: 'completed', result: '1/2-1/2' },
+    { round: 2, board: 1, whiteProfileId: 'a', blackProfileId: 'z', status: 'completed', result: '1/2-1/2' },
+    { round: 2, board: 2, whiteProfileId: 'w', blackProfileId: 'b', status: 'completed', result: '1/2-1/2' },
+  ]
+
+  const { pairings } = engine.buildSwissPairings(players, games, seeds, 'system_bye', { initialColor: 'white' })
+  assert.equal(pairings[0].whiteProfileId, 'b')
+  assert.equal(pairings[0].blackProfileId, 'a')
+})
+
+test('swiss: equal colour preferences are granted to the higher-ranked player', () => {
+  const players = ['a', 'b']
+  const seeds = new Map([['a', 1], ['b', 2]])
+  const games = [
+    { round: 1, board: 1, whiteProfileId: 'a', blackProfileId: 'x1', status: 'completed', result: '1/2-1/2' },
+    { round: 1, board: 2, whiteProfileId: 'b', blackProfileId: 'y1', status: 'completed', result: '1/2-1/2' },
+    { round: 2, board: 1, whiteProfileId: 'x2', blackProfileId: 'a', status: 'completed', result: '1/2-1/2' },
+    { round: 2, board: 2, whiteProfileId: 'y2', blackProfileId: 'b', status: 'completed', result: '1/2-1/2' },
+    { round: 3, board: 1, whiteProfileId: 'a', blackProfileId: 'x3', status: 'completed', result: '1/2-1/2' },
+    { round: 3, board: 2, whiteProfileId: 'b', blackProfileId: 'y3', status: 'completed', result: '1/2-1/2' },
+  ]
+
+  const { pairings } = engine.buildSwissPairings(players, games, seeds, 'system_bye', { initialColor: 'white' })
+  assert.equal(pairings[0].whiteProfileId, 'b')
+  assert.equal(pairings[0].blackProfileId, 'a', 'higher-ranked a receives its shared Black preference')
+})
+
+test('swiss: equal preferences use the most recent opposite-colour history', () => {
+  const players = ['a', 'b']
+  const seeds = new Map([['a', 1], ['b', 2]])
+  const games = [
+    { round: 1, board: 1, whiteProfileId: 'a', blackProfileId: 'x1', status: 'completed', result: '1/2-1/2' },
+    { round: 1, board: 2, whiteProfileId: 'y1', blackProfileId: 'b', status: 'completed', result: '1/2-1/2' },
+    { round: 2, board: 1, whiteProfileId: 'x2', blackProfileId: 'a', status: 'completed', result: '1/2-1/2' },
+    { round: 2, board: 2, whiteProfileId: 'b', blackProfileId: 'y2', status: 'completed', result: '1/2-1/2' },
+    { round: 3, board: 1, whiteProfileId: 'a', blackProfileId: 'x3', status: 'completed', result: '1/2-1/2' },
+    { round: 3, board: 2, whiteProfileId: 'b', blackProfileId: 'y3', status: 'completed', result: '1/2-1/2' },
+  ]
+
+  const { pairings } = engine.buildSwissPairings(players, games, seeds, 'system_bye', { initialColor: 'white' })
+  assert.equal(pairings[0].whiteProfileId, 'a', 'a alternates from its most recent opposite-colour round')
+  assert.equal(pairings[0].blackProfileId, 'b')
+})
+
+test('swiss: four rounds stay colour-balanced without three identical colours in a row', () => {
+  const players = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
+  const seeds = new Map(players.map((player, index) => [player, index + 1]))
+  const games = []
+
+  for (let round = 1; round <= 4; round += 1) {
+    const { pairings } = engine.buildSwissPairings(players, games, seeds, 'system_bye', { initialColor: 'white' })
+    assert.equal(pairings.length, 3)
+    for (const pairing of pairings) {
+      games.push({ round, ...pairing, status: 'completed', result: '1/2-1/2' })
+    }
+  }
+
+  for (const player of players) {
+    const colors = games
+      .filter((game) => game.whiteProfileId === player || game.blackProfileId === player)
+      .map((game) => game.whiteProfileId === player ? 'white' : 'black')
+    const whites = colors.filter((color) => color === 'white').length
+    const blacks = colors.length - whites
+    assert.ok(Math.abs(whites - blacks) <= 2, `${player} remains within the FIDE colour-difference limit`)
+    for (let index = 2; index < colors.length; index += 1) {
+      assert.ok(
+        !(colors[index] === colors[index - 1] && colors[index] === colors[index - 2]),
+        `${player} never receives the same colour three times in succession`,
+      )
+    }
+  }
+})
+
 test('a drawn knockout game has no winner and cannot resolve the next round', () => {
   // Regression guard. A draw is "decided" for standings, but a bracket needs
   // somebody to advance; without the write-time rejection this deadlocks.

@@ -181,9 +181,13 @@ Round progression engine (added Jul 9, 2026 — server-side in admin-actions):
   `appwrite/functions/admin-actions/src/main.js`. It runs automatically after
   every completed game result, and manually via
   `POST /tournaments/:id/rounds/next` (admin "Advance round" button).
-- Swiss: real score-group pairing with rematch avoidance and color balance
-  (`buildSwissPairings`). Odd fields get a rotating full-point bye recorded as
-  a completed game against the `system_bye` profile (auto-created).
+- Swiss: real score-group pairing with rematch avoidance and FIDE-style colour
+  allocation (`buildSwissPairings`). The first round draws one initial colour
+  and applies it by pairing-number parity. Later rounds use each player's colour
+  difference and history, avoid a third consecutive same colour where possible,
+  grant stronger preferences first, then use recent opposite-colour history and
+  ranking as tie-breakers. Odd fields get a rotating full-point bye recorded as
+  a completed game against the `system_bye` profile (auto-created, no colour).
 - Round robin / double round robin: full schedule at activation; rounds go
   live one at a time as the previous round finishes; auto-completes.
 - Single + double elimination: `buildKnockoutStructure` derives the whole
@@ -223,15 +227,14 @@ Round progression engine (added Jul 9, 2026 — server-side in admin-actions):
   column to 50,000 characters.
 - DEPLOYED (Jul 10, 2026): the Procedure migration is live in project
   `juchess-platform`; all four new columns report `available`. Deployment
-  `6a50eab0838704ae6b4b` is active and `ready`. Its live health execution
+  `6a50f32e8f44a439697a` is active and `ready`. Its live health execution
   returned the new configure, start, and deferred-PGN routes. Local verification
-  passes 20 engine/workflow tests, function syntax checks, admin lint with only
+  passes 25 engine/workflow tests, function syntax checks, admin lint with only
   three pre-existing prototype warnings, and the full GitHub Pages build.
-- LIVE PROCEDURE TEST (Jul 10, 2026): configured the seeded Swiss tournament for
-  3 physical boards. Its 10 games persisted as four waves with the expected
-  board pattern. Starting a later Board 1 game first returned `409`; the first
-  game then started, accepted `1-0` with no PGN, retained that result when PGN
-  was attached later, and allowed the next Board 1 queue entry to start.
+- LIVE SWISS STATE (Jul 10, 2026): the seeded Swiss tournament has six confirmed
+  players, four rounds and three physical boards. Round 1 has three scheduled
+  games. The live initial-colour draw selected Black, so seeds 1, 3 and 5 are
+  Black while seeds 2, 4 and 6 are White. All three games are in wave 1.
 - VERIFIED LIVE (Jul 9, 2026): deployed and smoke-tested against production.
   Activating the seeded Swiss generated 10 round-1 games; saving the last
   result via the admin digital board auto-paired round 2 with correct score
