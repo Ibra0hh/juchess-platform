@@ -108,14 +108,57 @@ function GamesPage() {
     if (source !== 'tournament') return
 
     let active = true
-    loadTournamentGameArchive().then((games) => {
-      if (active) setTournamentArchive(games)
-    })
+    let refreshing = false
+
+    const refreshArchive = async () => {
+      if (refreshing) return
+      refreshing = true
+      try {
+        const games = await loadTournamentGameArchive()
+        if (active) setTournamentArchive(games)
+      } finally {
+        refreshing = false
+      }
+    }
+
+    void refreshArchive()
+    const timer = window.setInterval(() => void refreshArchive(), 5000)
 
     return () => {
       active = false
+      window.clearInterval(timer)
     }
   }, [source])
+
+  const liveCloudGameId = game?.source === 'tournament' && game.live && !findSampleGame(game.id)
+    ? game.id
+    : null
+
+  useEffect(() => {
+    if (step !== 'review' || !liveCloudGameId) return
+
+    let active = true
+    let refreshing = false
+
+    const refreshLiveGame = async () => {
+      if (refreshing) return
+      refreshing = true
+      try {
+        const cloudGame = await loadTournamentGame(liveCloudGameId)
+        if (!active || !cloudGame) return
+        setGame(cloudGame)
+        setMoveIdx(Math.max(0, cloudGame.moves.length - 1))
+      } finally {
+        refreshing = false
+      }
+    }
+
+    const timer = window.setInterval(() => void refreshLiveGame(), 3000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [liveCloudGameId, step])
 
   useEffect(() => {
     if (step !== 'review' || !game) return

@@ -449,6 +449,33 @@ class AppwriteService {
     return rows;
   }
 
+  Future<TournamentLiveGameState?> loadTournamentLiveGame(
+    String gameId,
+  ) async {
+    if (!ready || gameId.trim().isEmpty) return null;
+
+    try {
+      final row = await tablesDB.getRow(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.gamesTableId,
+        rowId: gameId,
+      );
+      final data = row.data;
+      final status = data['status']?.toString() ?? 'scheduled';
+      final storedResult = data['result']?.toString();
+      return TournamentLiveGameState(
+        pgn: data['pgn']?.toString(),
+        result: status == 'live'
+            ? 'live'
+            : storedResult == null || storedResult == '*'
+            ? '-'
+            : storedResult,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<_TournamentCloudData> _loadTournamentCloudData() async {
     final registrationsFuture = _tryListRows(AppConfig.registrationsTableId);
     final profilesFuture = _tryListRows(AppConfig.profilesTableId);
@@ -588,6 +615,13 @@ class AppwriteService {
       bracketSnapshot: bracketSnapshot,
     );
   }
+}
+
+class TournamentLiveGameState {
+  const TournamentLiveGameState({required this.result, this.pgn});
+
+  final String result;
+  final String? pgn;
 }
 
 class MyRegistrationInfo {
@@ -2846,7 +2880,45 @@ class TournamentDetailScreen extends StatefulWidget {
 }
 
 class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
+  Timer? _tournamentRefreshTimer;
+  bool _refreshingTournament = false;
   String tab = 'overview';
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.event.status == 'active') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_refreshTournament());
+      });
+      _tournamentRefreshTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => unawaited(_refreshTournament()),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _tournamentRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshTournament() async {
+    if (!mounted || _refreshingTournament) return;
+
+    _refreshingTournament = true;
+    final state = context.read<AppState>();
+    try {
+      await state.refreshTournaments();
+      if (!mounted) return;
+      if (_currentEvent(state).status != 'active') {
+        _tournamentRefreshTimer?.cancel();
+      }
+    } finally {
+      _refreshingTournament = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -5614,16 +5686,68 @@ class TournamentGameDetailScreen extends StatefulWidget {
 
 class _TournamentGameDetailScreenState
     extends State<TournamentGameDetailScreen> {
-  late final List<String> moves = _parseStoredMoves(widget.match.pgn);
+  Timer? _liveRefreshTimer;
+  bool _refreshing = false;
+  late List<String> moves;
+  late String currentResult;
   bool flipped = false;
 
   @override
+  void initState() {
+    super.initState();
+    moves = _parseStoredMoves(widget.match.pgn);
+    currentResult = widget.match.result;
+
+    if (widget.match.gameId != null && currentResult == 'live') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_refreshLiveGame());
+      });
+      _liveRefreshTimer = Timer.periodic(
+        const Duration(seconds: 3),
+        (_) => unawaited(_refreshLiveGame()),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _liveRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshLiveGame() async {
+    final gameId = widget.match.gameId;
+    if (!mounted || _refreshing || gameId == null) return;
+
+    _refreshing = true;
+    final service = context.read<AppState>().service;
+    try {
+      final liveGame = await service.loadTournamentLiveGame(gameId);
+      if (!mounted || liveGame == null) return;
+
+      final refreshedMoves = _parseStoredMoves(liveGame.pgn);
+      if (refreshedMoves.join(' ') != moves.join(' ') ||
+          liveGame.result != currentResult) {
+        setState(() {
+          moves = refreshedMoves;
+          currentResult = liveGame.result;
+        });
+      }
+      if (liveGame.result != 'live') {
+        _liveRefreshTimer?.cancel();
+      }
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final result = widget.match.result == '-'
+    final result = currentResult == '-'
         ? 'Scheduled'
-        : widget.match.result == 'live'
+        : currentResult == 'live'
         ? 'Live'
-        : widget.match.result;
+        : currentResult;
 
     return PrototypeRouteScaffold(
       title: 'Tournament Game',

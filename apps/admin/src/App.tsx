@@ -2017,6 +2017,24 @@ function TournamentManageView({
     })
   }
 
+  async function publishLiveBoardMoves(board: LiveBoardOption, state: LiveBoardState) {
+    if (!board.gameId) {
+      onMessage('Start this game from Procedure before publishing live moves.')
+      return
+    }
+    if (board.completed) {
+      onMessage('This game is finished. Use Save PGN to update its recorded moves.')
+      return
+    }
+    if (!state.moves.length) {
+      onMessage('Play or import at least one move before publishing.')
+      return
+    }
+
+    await onGamePgn(board.gameId, pgnFromMoves(state.moves))
+    onMessage(`${board.white} vs ${board.black} live moves published.`)
+  }
+
   async function startProcedureMatch(match: ProcedureMatch, physicalBoard: number) {
     if (!match.gameId) {
       onMessage('Save the procedure plan before starting this game.')
@@ -2146,6 +2164,7 @@ function TournamentManageView({
                 boards={playableBoards}
                 onBoardSelect={selectLiveBoard}
                 onMessage={onMessage}
+                onPublishMoves={publishLiveBoardMoves}
                 onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
@@ -2174,6 +2193,7 @@ function TournamentManageView({
                 boards={playableBoards}
                 onBoardSelect={selectLiveBoard}
                 onMessage={onMessage}
+                onPublishMoves={publishLiveBoardMoves}
                 onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
@@ -2205,6 +2225,7 @@ function TournamentManageView({
                 boards={liveBoardOptions}
                 onBoardSelect={selectLiveBoard}
                 onMessage={onMessage}
+                onPublishMoves={publishLiveBoardMoves}
                 onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
@@ -2831,6 +2852,7 @@ function LiveTournamentBoard({
   boards,
   onBoardSelect,
   onMessage,
+  onPublishMoves,
   onSaveGame,
   panelRef,
   selectedBoardKey,
@@ -2838,12 +2860,14 @@ function LiveTournamentBoard({
   boards: LiveBoardOption[]
   onBoardSelect: (boardKey: string) => void
   onMessage: (message: string) => void
+  onPublishMoves: (board: LiveBoardOption, state: LiveBoardState) => Promise<void>
   onSaveGame: (board: LiveBoardOption, state: LiveBoardState) => Promise<void>
   panelRef: RefObject<HTMLElement | null>
   selectedBoardKey: string
 }) {
   const [boardStates, setBoardStates] = useState<Record<string, LiveBoardState>>({})
   const [pgnDrafts, setPgnDrafts] = useState<Record<string, string>>({})
+  const [publishing, setPublishing] = useState(false)
   const [saving, setSaving] = useState(false)
   const pairing = boards.find((board) => board.boardKey === selectedBoardKey) ?? boards[0]
   const boardState = pairing ? boardStates[pairing.boardKey] ?? initialLiveBoardState(pairing) : EMPTY_LIVE_BOARD_STATE
@@ -2901,6 +2925,18 @@ function LiveTournamentBoard({
       // The parent already surfaces the server error in the management notice.
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function publishMoves() {
+    if (!pairing) return
+    setPublishing(true)
+    try {
+      await onPublishMoves(pairing, boardState)
+    } catch {
+      // The parent already surfaces the server error in the management notice.
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -3006,7 +3042,15 @@ function LiveTournamentBoard({
           <div className="live-board-actions">
             <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!boardState.moves.length}>Undo</button>
             <button type="button" className="mini-button ghost" onClick={resetGame} disabled={!pairing}>Reset</button>
-            <button type="button" className="mini-button dark" disabled={!pairing || saving} onClick={saveBoard}>
+            <button
+              type="button"
+              className="mini-button"
+              disabled={!pairing?.gameId || pairing.completed || !boardState.moves.length || publishing || saving}
+              onClick={publishMoves}
+            >
+              {publishing ? 'Publishing...' : 'Publish live moves'}
+            </button>
+            <button type="button" className="mini-button dark" disabled={!pairing || saving || publishing} onClick={saveBoard}>
               {saving ? 'Saving...' : pairing?.completed ? 'Save PGN' : boardState.moves.length ? 'Save result + PGN' : 'Save result without PGN'}
             </button>
           </div>
