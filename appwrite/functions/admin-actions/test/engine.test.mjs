@@ -26,6 +26,10 @@ const EXPORTED = [
   'seededKnockoutOrder',
   'swissRoundsTotal',
   'multiStageStageOneRounds',
+  'isGameDecided',
+  'decisiveWinnerProfileId',
+  'knockoutRoundForGame',
+  'assertResultAllowed',
 ]
 
 const SDK_STUB = `
@@ -214,6 +218,72 @@ test('swiss: nobody receives a second bye while others have none', () => {
   }
 
   assert.equal(new Set(byes).size, 3, 'three players, three rounds, three distinct byes')
+})
+
+test('a drawn knockout game has no winner and cannot resolve the next round', () => {
+  // Regression guard. A draw is "decided" for standings, but a bracket needs
+  // somebody to advance; without the write-time rejection this deadlocks.
+  const entrants = ['p1', 'p2', 'p3', 'p4']
+  const structure = engine.buildKnockoutStructure(4, false)
+  const games = [
+    { round: 1, board: 1, whiteProfileId: 'p1', blackProfileId: 'p2', status: 'completed', result: '1/2-1/2' },
+    { round: 1, board: 2, whiteProfileId: 'p3', blackProfileId: 'p4', status: 'completed', result: '1-0' },
+  ]
+
+  assert.equal(engine.isGameDecided(games[0]), true, 'a draw counts as decided')
+  assert.equal(engine.decisiveWinnerProfileId(games[0]), null, 'but yields no winner')
+
+  const resolver = engine.knockoutResolver(structure, entrants, games)
+  const final = structure.rounds[structure.winnersIndices[1]].matches[0]
+  assert.equal(resolver.resolveRef(final.a).known, false, 'the drawn half cannot resolve')
+  assert.equal(resolver.resolveRef(final.b).profileId, 'p3', 'the decisive half resolves')
+})
+
+test('knockout rounds are identified so draws can be rejected at write time', () => {
+  const knockout = { format: 'Single elimination' }
+  const double = { format: 'Double elimination' }
+  const swiss = { format: 'Swiss' }
+  const game = { round: 3 }
+
+  assert.equal(engine.knockoutRoundForGame(knockout, game), true)
+  assert.equal(engine.knockoutRoundForGame(double, game), true)
+  assert.equal(engine.knockoutRoundForGame(swiss, game), false, 'Swiss draws are legal')
+
+  // Multi-stage: draws are legal in the Swiss stage, illegal in the bracket.
+  const multiStage = {
+    format: 'Multi-stage',
+    bracketSnapshot: JSON.stringify({ type: 'single', stageTwoFromRound: 4 }),
+  }
+  assert.equal(engine.knockoutRoundForGame(multiStage, { round: 3 }), false, 'stage one allows draws')
+  assert.equal(engine.knockoutRoundForGame(multiStage, { round: 4 }), true, 'stage two does not')
+  assert.equal(engine.knockoutRoundForGame({ format: 'Multi-stage' }, { round: 1 }), false, 'no bracket yet')
+})
+
+test('assertResultAllowed rejects a knockout draw and permits a Swiss draw', async () => {
+  const stubDb = (tournament) => ({
+    getRow: async () => tournament,
+  })
+  const drawnGame = { tournamentId: 't1', round: 2 }
+
+  await assert.rejects(
+    () => engine.assertResultAllowed(stubDb({ format: 'Double elimination' }), 'juchess', drawnGame, '1/2-1/2'),
+    (error) => {
+      assert.equal(error.statusCode, 400)
+      assert.match(error.message, /tie-break/i)
+      return true
+    },
+    'a drawn knockout game must be refused',
+  )
+
+  await assert.doesNotReject(
+    () => engine.assertResultAllowed(stubDb({ format: 'Swiss' }), 'juchess', drawnGame, '1/2-1/2'),
+    'Swiss draws are legal',
+  )
+
+  await assert.doesNotReject(
+    () => engine.assertResultAllowed(stubDb({ format: 'Single elimination' }), 'juchess', drawnGame, '1-0'),
+    'decisive knockout results pass through',
+  )
 })
 
 test('round counts', () => {

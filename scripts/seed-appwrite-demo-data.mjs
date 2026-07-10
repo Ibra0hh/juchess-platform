@@ -427,7 +427,10 @@ function registrationsFor(prefix, tournamentId, profileRows, status = 'confirmed
       profileId: profileRow.rowId,
       status,
       seed: index + 1,
-      checkInCode: `${prefix.toUpperCase()}${String(index + 1).padStart(2, '0')}`,
+      // Never seed a check-in code here: `registrations` is world-readable.
+      // Codes live in the private `check_ins` table and are issued by
+      // admin-actions when an organizer confirms a registration.
+      checkInCode: null,
       checkedIn: status === 'confirmed',
     },
   }))

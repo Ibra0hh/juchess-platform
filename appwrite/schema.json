@@ -48,13 +48,32 @@
       }
     },
     "registrations": {
+      "note": "World-readable (public players list and participant counts). Rows are created ONLY by the player-actions function; clients have no create permission. Never store a secret here.",
+      "permissions": ["read(\"any\")", "update(\"team:admins\")", "delete(\"team:admins\")", "update(\"team:organizers\")"],
+      "rowSecurity": true,
       "fields": {
         "tournamentId": "string|required",
         "profileId": "string|required",
         "status": "enum:pending,confirmed,waitlisted,cancelled",
         "seed": "integer",
-        "checkInCode": "string",
+        "checkInCode": "string|deprecated:always-null-see-check_ins",
         "checkedIn": "boolean|default:false"
+      }
+    },
+    "check_ins": {
+      "note": "Private check-in passes. No table-level permissions: each row grants read only to its owner's account, and staff read them through admin-actions using the server key. Written by admin-actions on registration confirm; deleted on cancel.",
+      "permissions": [],
+      "rowSecurity": true,
+      "indexes": {
+        "tournament_profile": "key:tournamentId,profileId"
+      },
+      "fields": {
+        "tournamentId": "string|required",
+        "profileId": "string|required",
+        "registrationId": "string|required",
+        "code": "string|required",
+        "checkedIn": "boolean|default:false",
+        "checkedInAt": "string"
       }
     },
     "games": {

@@ -940,6 +940,17 @@ async function advanceKnockout(tablesDB, databaseId, tournament, games, options 
       if (!roundGames.every((game) => isGameDecided(game))) {
         return { advanced: false, reason: `Round ${gameRound + roundOffset} is still in progress.` };
       }
+      // A drawn knockout game is "decided" but produces no winner, so the next
+      // round can never be built. Name it instead of stalling silently.
+      const drawn = roundGames.filter((game) => game.result === '1/2-1/2');
+      if (drawn.length) {
+        const boards = drawn.map((game) => `board ${game.board}`).join(', ');
+        return {
+          advanced: false,
+          reason: `Round ${gameRound + roundOffset} has a drawn knockout game (${boards}). `
+            + 'Replay it as a tie-break and record a decisive result.',
+        };
+      }
       continue;
     }
 
@@ -1407,6 +1418,46 @@ async function recalculateStandings(tablesDB, databaseId, tournamentId) {
   }
 }
 
+/**
+ * A knockout match must produce somebody to advance. A drawn game is "decided"
+ * for standings but has no winner, so the next round can never be built and the
+ * bracket deadlocks. Reject the draw at the point of entry instead.
+ */
+function knockoutRoundForGame(tournament, game) {
+  if (isKnockoutTournament(tournament)) return true;
+  if (!isMultiStageTournament(tournament)) return false;
+
+  try {
+    const snapshot = tournament.bracketSnapshot ? JSON.parse(tournament.bracketSnapshot) : null;
+    const stageTwoFromRound = Number(snapshot?.stageTwoFromRound) || 0;
+    return stageTwoFromRound > 0 && Number(game.round) >= stageTwoFromRound;
+  } catch {
+    return false;
+  }
+}
+
+async function assertResultAllowed(tablesDB, databaseId, game, result) {
+  if (result !== '1/2-1/2') return;
+
+  let tournament;
+  try {
+    tournament = await tablesDB.getRow({
+      databaseId,
+      tableId: tableIds.tournaments,
+      rowId: game.tournamentId,
+    });
+  } catch {
+    return;
+  }
+
+  if (knockoutRoundForGame(tournament, game)) {
+    throw new HttpError(
+      400,
+      'A knockout game cannot end in a draw. Play a tie-break and record a decisive result.',
+    );
+  }
+}
+
 async function submitGameResult(tablesDB, databaseId, gameId, body) {
   const result = normalizeResult(body.result);
   if (!result) {
@@ -1418,6 +1469,10 @@ async function submitGameResult(tablesDB, databaseId, gameId, body) {
     tableId: tableIds.games,
     rowId: gameId,
   });
+
+  if (status === 'completed') {
+    await assertResultAllowed(tablesDB, databaseId, current, result);
+  }
 
   const row = await tablesDB.updateRow({
     databaseId,

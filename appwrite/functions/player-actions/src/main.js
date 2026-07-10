@@ -173,6 +173,25 @@ export default async ({ req, res, log, error }) => {
         return res.json({ ok: false, error: 'You can only cancel your own registration.' }, 403);
       }
 
+      // Once the event starts, pairings and brackets are frozen around this
+      // player. Withdrawing must go through an organizer, who can award the
+      // forfeits the schedule needs.
+      try {
+        const tournament = await tablesDB.getRow({
+          databaseId,
+          tableId: tableIds.tournaments,
+          rowId: registration.tournamentId,
+        });
+        if (tournament.status !== 'upcoming') {
+          return res.json({
+            ok: false,
+            error: 'This tournament has already started. Ask an organizer to withdraw you.',
+          }, 400);
+        }
+      } catch {
+        // A missing tournament row should not trap the player in a dead event.
+      }
+
       const row = await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.registrations,
