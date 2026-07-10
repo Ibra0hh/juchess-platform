@@ -39,6 +39,8 @@ dependencies:
   go_router: ^17.3.0
   chess: ^0.8.1
   qr_flutter: ^4.1.0
+  video_player: 2.11.1
+  url_launcher: 6.3.2
 
 dev_dependencies:
   flutter_test:

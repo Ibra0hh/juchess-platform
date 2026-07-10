@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -98,6 +100,10 @@ class AppConfig {
   static const gamesTableId = String.fromEnvironment(
     'APPWRITE_GAMES_TABLE_ID',
     defaultValue: 'games',
+  );
+  static const tournamentAssetsBucketId = String.fromEnvironment(
+    'APPWRITE_TOURNAMENT_ASSETS_BUCKET_ID',
+    defaultValue: 'tournament-assets',
   );
   static const accessGuardFunctionId = String.fromEnvironment(
     'APPWRITE_ACCESS_GUARD_FUNCTION_ID',
@@ -478,16 +484,32 @@ class AppwriteService {
     final registrationsFuture = _tryListRows(AppConfig.registrationsTableId);
     final profilesFuture = _tryListRows(AppConfig.profilesTableId);
     final gamesFuture = _tryListRows(AppConfig.gamesTableId);
+    final mediaFuture = _tryListTournamentMedia();
 
     final registrations = await registrationsFuture;
     final profiles = _mapProfileRows(await profilesFuture);
     final games = await gamesFuture;
+    final media = await mediaFuture;
 
     return _TournamentCloudData(
       playerCountsByTournament: _groupRegistrationCounts(registrations),
       playersByTournament: _groupRegisteredPlayers(registrations, profiles),
       roundsByTournament: _groupPublishedRounds(games, profiles),
+      mediaByTournament: _groupTournamentMedia(media),
     );
+  }
+
+  Future<List<models.File>> _tryListTournamentMedia() async {
+    try {
+      final response = await storage.listFiles(
+        bucketId: AppConfig.tournamentAssetsBucketId,
+        queries: [Query.limit(500)],
+        total: false,
+      );
+      return response.files;
+    } catch (_) {
+      return const [];
+    }
   }
 
   Future<List<models.Row>> _tryListRows(String tableId) async {
@@ -611,6 +633,7 @@ class AppwriteService {
       registeredPlayers: registeredPlayers,
       publishedRounds: publishedRounds,
       bracketSnapshot: bracketSnapshot,
+      media: cloudData.mediaByTournament[row.$id] ?? const [],
     );
   }
 }
@@ -643,11 +666,46 @@ class _TournamentCloudData {
     this.playerCountsByTournament = const {},
     this.playersByTournament = const {},
     this.roundsByTournament = const {},
+    this.mediaByTournament = const {},
   });
 
   final Map<String, int> playerCountsByTournament;
   final Map<String, List<PlayerSeed>> playersByTournament;
   final Map<String, List<RoundSeed>> roundsByTournament;
+  final Map<String, List<TournamentMediaSeed>> mediaByTournament;
+}
+
+Map<String, List<TournamentMediaSeed>> _groupTournamentMedia(
+  List<models.File> files,
+) {
+  final groups = <String, List<TournamentMediaSeed>>{};
+  for (final file in files) {
+    final parts = file.name.split('--');
+    if (parts.length < 4 || parts.first != 'ju-media' || parts[1].isEmpty) {
+      continue;
+    }
+    final item = TournamentMediaSeed(
+      id: file.$id,
+      name: parts.sublist(3).join('--').replaceAll('_', ' '),
+      mimeType: file.mimeType,
+      size: file.sizeOriginal,
+      createdAt: file.$createdAt,
+      viewUri: _tournamentMediaUri(file.$id, 'view'),
+      downloadUri: _tournamentMediaUri(file.$id, 'download'),
+    );
+    groups.putIfAbsent(parts[1], () => []).add(item);
+  }
+  for (final items in groups.values) {
+    items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+  return groups;
+}
+
+Uri _tournamentMediaUri(String fileId, String action) {
+  final endpoint = AppConfig.endpoint.replaceFirst(RegExp(r'/$'), '');
+  return Uri.parse(
+    '$endpoint/storage/buckets/${AppConfig.tournamentAssetsBucketId}/files/$fileId/$action',
+  ).replace(queryParameters: {'project': AppConfig.projectId});
 }
 
 Map<String, PlayerSeed> _mapProfileRows(List<models.Row> rows) {
@@ -3222,10 +3280,256 @@ class _TournamentOverview extends StatelessWidget {
                 : 'Register',
             onTap: registrationOpen ? onRegister : onMain,
           ),
+          if (completed) ...[
+            const SizedBox(height: 18),
+            _TournamentMediaGallery(items: event.media),
+          ],
         ],
       ),
     );
   }
+}
+
+class _TournamentMediaGallery extends StatelessWidget {
+  const _TournamentMediaGallery({required this.items});
+
+  final List<TournamentMediaSeed> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const SerifText(
+              'Tournament media',
+              size: 20,
+              weight: FontWeight.w700,
+            ),
+            Text(
+              '${items.length} ${items.length == 1 ? 'file' : 'files'}',
+              style: const TextStyle(
+                color: Color(0x9921304e),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (items.isEmpty)
+          Container(
+            height: 150,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: PrototypeColors.surface,
+              border: Border.all(color: const Color(0x2621304e)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.photo_library_outlined, color: Color(0x9921304e)),
+                SizedBox(height: 7),
+                Text(
+                  'No media published yet',
+                  style: TextStyle(
+                    color: PrototypeColors.navy,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          for (final item in items) ...[
+            _TournamentMediaCard(item: item),
+            const SizedBox(height: 12),
+          ],
+      ],
+    );
+  }
+}
+
+class _TournamentMediaCard extends StatelessWidget {
+  const _TournamentMediaCard({required this.item});
+
+  final TournamentMediaSeed item;
+
+  Future<void> _download(BuildContext context) async {
+    final opened = await launchUrl(
+      item.downloadUri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this download.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: PrototypeColors.surface,
+        border: Border.all(color: const Color(0x2621304e)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 10,
+            child: ColoredBox(
+              color: PrototypeColors.navy,
+              child: item.isVideo
+                  ? _TournamentVideo(uri: item.viewUri)
+                  : Image.network(
+                      item.viewUri.toString(),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Icon(
+                        Icons.broken_image_outlined,
+                        color: PrototypeColors.cream,
+                      ),
+                    ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
+              children: [
+                Icon(
+                  item.isVideo ? Icons.videocam_outlined : Icons.image_outlined,
+                  size: 18,
+                  color: PrototypeColors.burgundy,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: PrototypeColors.navy,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        _formatMediaSize(item.size),
+                        style: const TextStyle(
+                          color: Color(0x9921304e),
+                          fontSize: 10.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Download ${item.name}',
+                  onPressed: () => _download(context),
+                  icon: const Icon(Icons.download_outlined),
+                  color: PrototypeColors.burgundy,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TournamentVideo extends StatefulWidget {
+  const _TournamentVideo({required this.uri});
+
+  final Uri uri;
+
+  @override
+  State<_TournamentVideo> createState() => _TournamentVideoState();
+}
+
+class _TournamentVideoState extends State<_TournamentVideo> {
+  late final VideoPlayerController controller;
+  late final Future<void> initialized;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = VideoPlayerController.networkUrl(widget.uri);
+    initialized = controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: initialized,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(
+            child: CircularProgressIndicator(color: PrototypeColors.cream),
+          );
+        }
+        if (snapshot.hasError) {
+          return const Center(
+            child: Icon(
+              Icons.videocam_off_outlined,
+              color: PrototypeColors.cream,
+            ),
+          );
+        }
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            FittedBox(
+              fit: BoxFit.contain,
+              child: SizedBox(
+                width: controller.value.size.width,
+                height: controller.value.size.height,
+                child: VideoPlayer(controller),
+              ),
+            ),
+            Center(
+              child: IconButton.filled(
+                tooltip: controller.value.isPlaying
+                    ? 'Pause video'
+                    : 'Play video',
+                onPressed: () {
+                  setState(() {
+                    controller.value.isPlaying
+                        ? controller.pause()
+                        : controller.play();
+                  });
+                },
+                icon: Icon(
+                  controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+String _formatMediaSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
 class _RegistrationStatusCard extends StatelessWidget {
@@ -4898,6 +5202,16 @@ class GamesScreen extends StatelessWidget {
           subtitle: 'Set up a board and record lines',
           icon: '♝',
           onTap: () => openPrototypeRoute(context, const NewAnalysisScreen()),
+        ),
+        BigActionCard(
+          title: 'Online Tournaments',
+          subtitle: 'Open active tournaments and live boards',
+          icon: '♜',
+          onTap: () {
+            final state = context.read<AppState>();
+            state.selectTournamentFilter('active');
+            state.selectTab(1);
+          },
         ),
       ],
     );
@@ -9250,6 +9564,7 @@ class TournamentSeed {
     this.status = 'active',
     this.registeredPlayers = const [],
     this.publishedRounds = const [],
+    this.media = const [],
     this.bracketSnapshot,
   });
 
@@ -9271,6 +9586,7 @@ class TournamentSeed {
   final String status;
   final List<PlayerSeed> registeredPlayers;
   final List<RoundSeed> publishedRounds;
+  final List<TournamentMediaSeed> media;
   final PublishedBracketSnapshot? bracketSnapshot;
 
   String get playerLabel {
@@ -9285,6 +9601,28 @@ class TournamentSeed {
     if (total != null) return '$total rounds';
     return this.current;
   }
+}
+
+class TournamentMediaSeed {
+  const TournamentMediaSeed({
+    required this.id,
+    required this.name,
+    required this.mimeType,
+    required this.size,
+    required this.createdAt,
+    required this.viewUri,
+    required this.downloadUri,
+  });
+
+  final String id;
+  final String name;
+  final String mimeType;
+  final int size;
+  final String createdAt;
+  final Uri viewUri;
+  final Uri downloadUri;
+
+  bool get isVideo => mimeType.startsWith('video/');
 }
 
 class PlayerSeed {

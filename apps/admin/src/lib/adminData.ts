@@ -1,9 +1,23 @@
-import { ExecutionMethod, Query, type Models } from 'appwrite'
-import { account, appwriteConfig, appwriteReady, functions, tablesDB } from './appwrite'
+import { ExecutionMethod, ID, Query, type Models } from 'appwrite'
+import { account, appwriteConfig, appwriteReady, functions, storage, tablesDB } from './appwrite'
 import { tableIds, type TournamentStatus } from './juchess'
 
 export type AdminRole = 'superAdmin' | 'admin' | 'organizer'
 export type AdminStatus = 'active' | 'suspended'
+
+const tournamentAssetsBucketId = 'tournament-assets'
+const tournamentMediaPrefix = 'ju-media'
+
+export type TournamentMedia = {
+  id: string
+  tournamentId: string
+  name: string
+  mimeType: string
+  size: number
+  createdAt: string
+  viewUrl: string
+  downloadUrl: string
+}
 
 export type AdminProfile = Models.Row & {
   accountId: string
@@ -454,6 +468,55 @@ export async function submitTournamentGameResult(input: {
   })
 
   return response.row
+}
+
+export async function listTournamentMedia(tournamentId: string): Promise<TournamentMedia[]> {
+  const response = await storage.listFiles({
+    bucketId: tournamentAssetsBucketId,
+    queries: [Query.limit(500)],
+    total: false,
+  })
+
+  return response.files
+    .map(mapTournamentMedia)
+    .filter((item): item is TournamentMedia => item?.tournamentId === tournamentId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+export async function uploadTournamentMedia(tournamentId: string, file: File) {
+  const storedName = `${tournamentMediaPrefix}--${tournamentId}--${Date.now()}--${sanitizeMediaName(file.name)}`
+  const storedFile = new File([file], storedName, { type: file.type, lastModified: file.lastModified })
+
+  await storage.createFile({
+    bucketId: tournamentAssetsBucketId,
+    fileId: ID.unique(),
+    file: storedFile,
+  })
+}
+
+export async function deleteTournamentMedia(fileId: string) {
+  await storage.deleteFile({ bucketId: tournamentAssetsBucketId, fileId })
+}
+
+function mapTournamentMedia(file: Models.File): TournamentMedia | null {
+  const parts = file.name.split('--')
+  if (parts.length < 4 || parts[0] !== tournamentMediaPrefix || !parts[1]) return null
+
+  return {
+    id: file.$id,
+    tournamentId: parts[1],
+    name: parts.slice(3).join('--').replaceAll('_', ' '),
+    mimeType: file.mimeType,
+    size: file.sizeOriginal,
+    createdAt: file.$createdAt,
+    viewUrl: storage.getFileView({ bucketId: tournamentAssetsBucketId, fileId: file.$id }),
+    downloadUrl: storage.getFileDownload({ bucketId: tournamentAssetsBucketId, fileId: file.$id }),
+  }
+}
+
+function sanitizeMediaName(value: string) {
+  const safe = value.trim().replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^\.+/, '')
+  return (safe || 'tournament-media').slice(-120)
 }
 
 export async function configureTournamentProcedure(rowId: string, physicalBoards: number) {

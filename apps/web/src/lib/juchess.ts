@@ -1,5 +1,8 @@
 import { Query, type Models } from 'appwrite'
-import { appwriteConfig, appwriteReady, tablesDB } from './appwrite'
+import { appwriteConfig, appwriteReady, storage, tablesDB } from './appwrite'
+
+const tournamentAssetsBucketId = 'tournament-assets'
+const tournamentMediaPrefix = 'ju-media'
 
 export type TournamentStatus = 'Active' | 'Upcoming' | 'Completed'
 
@@ -21,6 +24,17 @@ export type Tournament = {
   registeredPlayers?: Member[]
   publishedGames?: TournamentGame[]
   bracketSnapshot?: PublishedBracketSnapshot
+  media?: TournamentMedia[]
+}
+
+export type TournamentMedia = {
+  id: string
+  name: string
+  mimeType: string
+  size: number
+  createdAt: string
+  viewUrl: string
+  downloadUrl: string
 }
 
 type AppwriteTournamentRow = Models.Row & {
@@ -750,19 +764,21 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
       total: false,
     })
 
-    const [registrationRows, profileRows, gameRows] = await Promise.all([
+    const [registrationRows, profileRows, gameRows, mediaFiles] = await Promise.all([
       safeListRows<AppwriteRegistrationRow>(tableIds.registrations, [Query.limit(1000)], 'registrations'),
       safeListRows<AppwriteProfileRow>(tableIds.profiles, [Query.limit(1000)], 'profiles'),
       safeListRows<AppwriteGameRow>(tableIds.games, [Query.limit(1000)], 'games'),
+      safeListTournamentMedia(),
     ])
 
     const profiles = mapProfiles(profileRows)
     const playersByTournament = groupRegisteredPlayers(registrationRows, profiles)
     const gamesByTournament = groupPublishedGames(gameRows, profiles)
     const participantCounts = groupRegistrationCounts(registrationRows)
+    const mediaByTournament = groupTournamentMedia(mediaFiles)
 
     const rows = uniqueTournamentsByFormat(response.rows
-      .map((row) => mapAppwriteTournament(row, participantCounts, playersByTournament, gamesByTournament))
+      .map((row) => mapAppwriteTournament(row, participantCounts, playersByTournament, gamesByTournament, mediaByTournament))
       .filter((tournament): tournament is Tournament => Boolean(tournament)))
       .sort(compareTournaments)
 
@@ -774,6 +790,43 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
     console.warn('JuChess cloud tournament read failed.', error)
     return { tournaments: [], source: 'unavailable', error }
   }
+}
+
+async function safeListTournamentMedia() {
+  try {
+    const response = await storage.listFiles({
+      bucketId: tournamentAssetsBucketId,
+      queries: [Query.limit(500)],
+      total: false,
+    })
+    return response.files
+  } catch (error) {
+    console.warn('Tournament media read failed.', error)
+    return []
+  }
+}
+
+function groupTournamentMedia(files: Models.File[]) {
+  const groups = new Map<string, TournamentMedia[]>()
+
+  files.forEach((file) => {
+    const parts = file.name.split('--')
+    if (parts.length < 4 || parts[0] !== tournamentMediaPrefix || !parts[1]) return
+    const list = groups.get(parts[1]) ?? []
+    list.push({
+      id: file.$id,
+      name: parts.slice(3).join('--').replaceAll('_', ' '),
+      mimeType: file.mimeType,
+      size: file.sizeOriginal,
+      createdAt: file.$createdAt,
+      viewUrl: storage.getFileView({ bucketId: tournamentAssetsBucketId, fileId: file.$id }),
+      downloadUrl: storage.getFileDownload({ bucketId: tournamentAssetsBucketId, fileId: file.$id }),
+    })
+    groups.set(parts[1], list)
+  })
+
+  groups.forEach((items) => items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+  return groups
 }
 
 export async function loadAnnouncements(): Promise<AnnouncementLoadResult> {
@@ -926,6 +979,7 @@ function mapAppwriteTournament(
   participantCounts: Map<string, number>,
   playersByTournament: Map<string, Member[]>,
   gamesByTournament: Map<string, TournamentGame[]>,
+  mediaByTournament: Map<string, TournamentMedia[]>,
 ): Tournament | null {
   if (!row.format || !row.timeControl) return null
 
@@ -953,6 +1007,7 @@ function mapAppwriteTournament(
     registeredPlayers: playersByTournament.get(row.$id) ?? [],
     publishedGames: gamesByTournament.get(row.$id) ?? [],
     bracketSnapshot: parsePublishedBracketSnapshot(row.bracketSnapshot),
+    media: mediaByTournament.get(row.$id) ?? [],
   }
 }
 

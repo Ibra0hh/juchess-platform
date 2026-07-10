@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  Download,
+  Image as ImageIcon,
   LayoutGrid,
   List,
   ShieldCheck,
@@ -19,6 +21,7 @@ import {
   type PublishedBracketSnapshot,
   type Tournament,
   type TournamentGame,
+  type TournamentMedia,
 } from '../lib/juchess'
 import {
   cancelMyRegistration,
@@ -31,7 +34,7 @@ import {
 } from '../lib/registrations'
 import './TournamentDetailPage.css'
 
-type DetailTab = 'registration' | 'players' | 'rounds' | 'games' | 'table'
+type DetailTab = 'registration' | 'players' | 'rounds' | 'games' | 'table' | 'media'
 type GameView = 'grid' | 'list'
 type BracketView = 'winners' | 'losers' | 'final'
 type StageRoundTab = 'stage-one' | 'stage-two'
@@ -280,6 +283,7 @@ function TournamentDetailPage() {
         { key: 'rounds', label: 'Rounds' },
         { key: 'table', label: 'Standings' },
       ]
+  if (tournament.status === 'Completed') tabs.push({ key: 'media', label: 'Media' })
   const activeTab = tabs.some((item) => item.key === tab) ? tab : 'registration'
 
   return (
@@ -349,9 +353,64 @@ function TournamentDetailPage() {
             standings={detail.standings}
           />
         ) : null}
+
+        {activeTab === 'media' ? (
+          <TournamentMediaTab items={tournament.media ?? []} />
+        ) : null}
       </main>
     </div>
   )
+}
+
+function TournamentMediaTab({ items }: { items: TournamentMedia[] }) {
+  return (
+    <section className="detail-tab-panel tournament-media-panel">
+      <div className="panel-heading">
+        <div>
+          <h2>Tournament media</h2>
+          <p>Photos and videos published by the organizers.</p>
+        </div>
+        <span>{items.length} {items.length === 1 ? 'file' : 'files'}</span>
+      </div>
+      {items.length ? (
+        <div className="public-media-grid">
+          {items.map((item) => (
+            <article className="public-media-card" key={item.id}>
+              <div className="public-media-preview">
+                {item.mimeType.startsWith('video/') ? (
+                  <video controls preload="metadata" src={item.viewUrl} />
+                ) : (
+                  <img src={item.viewUrl} alt={item.name} loading="lazy" />
+                )}
+              </div>
+              <div className="public-media-meta">
+                <div>
+                  <strong>{item.name}</strong>
+                  <span>{formatMediaSize(item.size)}</span>
+                </div>
+                <a href={item.downloadUrl} title={`Download ${item.name}`}>
+                  <Download size={16} aria-hidden="true" />
+                  Download
+                </a>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="public-media-empty">
+          <ImageIcon size={30} aria-hidden="true" />
+          <strong>No media published yet</strong>
+          <span>The organizer has not added photos or videos for this tournament.</span>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function formatMediaSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function RegistrationTab({

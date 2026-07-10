@@ -231,7 +231,12 @@ Profile images.
 
 ### `tournament-assets`
 
-Posters, QR codes, and downloadable event files.
+Public completed-tournament photos, videos, posters, QR codes, and downloadable event files.
+
+- Public clients have read access so web and mobile can render and download galleries.
+- `admin_super_admins`, `admin_staff`, and the legacy admin/organizer teams can create, update, and delete files.
+- Gallery files use `ju-media--<tournament-row-id>--<timestamp>--<original-name>` so every client can group Storage files by tournament without a second metadata table.
+- Maximum file size is 200 MB. Common image and video formats are allowed.
 
 ## First Server Function
 

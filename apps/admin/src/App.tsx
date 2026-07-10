@@ -1,5 +1,5 @@
-import { memo, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus, Search, X } from 'lucide-react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Image as ImageIcon, Plus, Search, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
 import { JuChessBoard, type JuChessBoardChange } from './components/JuChessBoard'
 import { buildChessGame, deriveResult, parseChessPgn, pgnFromMoves } from './components/JuChessRules'
@@ -11,6 +11,7 @@ import {
   blockIp,
   createAdminProfile,
   createTournament,
+  deleteTournamentMedia,
   deleteTournament,
   formatAdminError,
   getAdminSession,
@@ -22,6 +23,7 @@ import {
   loadTournamentRegistrations,
   loadBlockLists,
   loadAdminTournaments,
+  listTournamentMedia,
   publishTournamentPairings,
   SYSTEM_BYE_PROFILE_ID,
   signInAdmin,
@@ -35,6 +37,7 @@ import {
   updateTournament,
   updateTournamentGamePgn,
   unpublishTournamentPairings,
+  uploadTournamentMedia,
   type AdminRegistration,
   type AdminRegistrationStatus,
   type AdminGame,
@@ -52,6 +55,7 @@ import {
   type IpBlock,
   type PairingPublishInput,
   type TournamentInput,
+  type TournamentMedia,
 } from './lib/adminData'
 import { type TournamentStatus } from './lib/juchess'
 
@@ -1009,6 +1013,7 @@ function TournamentsScreen({
   const [editingTournament, setEditingTournament] = useState<AdminTournament | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AdminTournament | null>(null)
   const [manageTournamentKey, setManageTournamentKey] = useState('')
+  const [mediaTournamentKey, setMediaTournamentKey] = useState('')
   const [form, setForm] = useState<TournamentInput>(() => createInitialTournamentForm())
   const [timeCategory, setTimeCategory] = useState('Rapid')
   const [timeMinutes, setTimeMinutes] = useState('15')
@@ -1035,10 +1040,11 @@ function TournamentsScreen({
   const filtered = tournaments.filter((item) => item.status === tab)
   const selectedTournament = filtered.find((item) => tournamentKey(item) === selectedTournamentKey) ?? filtered[0] ?? null
   const managedTournament = tournaments.find((item) => tournamentKey(item) === manageTournamentKey) ?? null
+  const mediaTournament = tournaments.find((item) => tournamentKey(item) === mediaTournamentKey) ?? null
   const createEnabled = tab === 'draft'
   const canSaveDraft = Boolean(form.name.trim() && form.format.trim()) && !submitting
   const isEditing = Boolean(editingTournament)
-  const showRegistrationQueue = tab !== 'completed' && tab !== 'archived' && !managedTournament
+  const showRegistrationQueue = tab === 'upcoming' && !managedTournament
   const selectedTournamentRowId = showRegistrationQueue ? selectedTournament?.rowId : undefined
 
   useEffect(() => {
@@ -1311,7 +1317,12 @@ function TournamentsScreen({
   }
 
   function handlePhotos(item: AdminTournament) {
-    setMessage(`${item.name} media tools are not connected yet.`)
+    if (!item.rowId) {
+      setMessage('Only cloud tournaments can store media.')
+      return
+    }
+    setMediaTournamentKey(tournamentKey(item))
+    setMessage(null)
   }
 
   function handleShufflePairings(item: AdminTournament) {
@@ -1550,6 +1561,19 @@ function TournamentsScreen({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (mediaTournament?.rowId) {
+    return (
+      <div className="tournament-screen">
+        <TournamentMediaManager
+          tournament={mediaTournament}
+          onBack={() => setMediaTournamentKey('')}
+          onMessage={setMessage}
+        />
+        {message ? <div className="prototype-note" role="status">{message}</div> : null}
+      </div>
+    )
   }
 
   if (managedTournament) {
@@ -1923,6 +1947,158 @@ function TournamentActionButtons({
       <button type="button" className="mini-button ghost danger" disabled={disabled} onClick={() => onDelete(item)}>Delete</button>
     </>
   )
+}
+
+function TournamentMediaManager({
+  tournament,
+  onBack,
+  onMessage,
+}: {
+  tournament: AdminTournament
+  onBack: () => void
+  onMessage: (message: string | null) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [items, setItems] = useState<TournamentMedia[]>([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [deletingId, setDeletingId] = useState('')
+  const rowId = tournament.rowId ?? ''
+
+  const refreshMedia = useCallback(async () => {
+    setLoading(true)
+    try {
+      setItems(await listTournamentMedia(rowId))
+    } catch (error) {
+      onMessage(formatAdminError(error))
+    } finally {
+      setLoading(false)
+    }
+  }, [onMessage, rowId])
+
+  useEffect(() => {
+    void refreshMedia()
+  }, [refreshMedia])
+
+  async function handleFiles(files: FileList | null) {
+    const selected = Array.from(files ?? [])
+    if (!selected.length) return
+
+    const invalid = selected.find((file) => !file.type.startsWith('image/') && !file.type.startsWith('video/'))
+    if (invalid) {
+      onMessage(`${invalid.name} is not an image or video.`)
+      return
+    }
+
+    setUploading(true)
+    onMessage(null)
+    try {
+      for (const file of selected) {
+        await uploadTournamentMedia(rowId, file)
+      }
+      onMessage(`${selected.length} media ${selected.length === 1 ? 'file' : 'files'} uploaded.`)
+      await refreshMedia()
+    } catch (error) {
+      onMessage(formatAdminError(error))
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  async function handleDelete(item: TournamentMedia) {
+    if (!window.confirm(`Delete ${item.name} permanently?`)) return
+
+    setDeletingId(item.id)
+    onMessage(null)
+    try {
+      await deleteTournamentMedia(item.id)
+      setItems((current) => current.filter((media) => media.id !== item.id))
+      onMessage(`${item.name} deleted.`)
+    } catch (error) {
+      onMessage(formatAdminError(error))
+    } finally {
+      setDeletingId('')
+    }
+  }
+
+  return (
+    <section className="tournament-media-view">
+      <button className="manage-back-button" type="button" onClick={onBack}>
+        <ArrowLeft size={16} aria-hidden="true" />
+        Completed tournaments
+      </button>
+      <header className="tournament-media-header">
+        <div>
+          <span>Completed tournament</span>
+          <h2>{tournament.name} media</h2>
+          <p>Photos and videos uploaded here are immediately available in the public website and mobile app.</p>
+        </div>
+        <button className="primary-action media-upload-button" type="button" disabled={uploading} onClick={() => inputRef.current?.click()}>
+          <Upload size={17} aria-hidden="true" />
+          {uploading ? 'Uploading...' : 'Upload media'}
+        </button>
+        <input
+          ref={inputRef}
+          className="visually-hidden"
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          onChange={(event) => void handleFiles(event.target.files)}
+        />
+      </header>
+
+      {loading ? (
+        <div className="media-empty-state">Loading tournament media...</div>
+      ) : items.length ? (
+        <div className="tournament-media-grid">
+          {items.map((item) => {
+            const video = item.mimeType.startsWith('video/')
+            return (
+              <article className="tournament-media-card" key={item.id}>
+                <div className="tournament-media-preview">
+                  {video ? (
+                    <video controls preload="metadata" src={item.viewUrl} />
+                  ) : (
+                    <img src={item.viewUrl} alt={item.name} loading="lazy" />
+                  )}
+                </div>
+                <div className="tournament-media-meta">
+                  <div className="tournament-media-name">
+                    {video ? <Video size={16} aria-hidden="true" /> : <ImageIcon size={16} aria-hidden="true" />}
+                    <div>
+                      <strong>{item.name}</strong>
+                      <span>{formatMediaSize(item.size)}</span>
+                    </div>
+                  </div>
+                  <div className="tournament-media-actions">
+                    <a href={item.downloadUrl} title={`Download ${item.name}`}>
+                      <Download size={16} aria-hidden="true" />
+                    </a>
+                    <button type="button" disabled={deletingId === item.id} title={`Delete ${item.name}`} onClick={() => void handleDelete(item)}>
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="media-empty-state">
+          <ImageIcon size={30} aria-hidden="true" />
+          <strong>No media uploaded yet</strong>
+          <span>Upload tournament photos or videos to publish the gallery.</span>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function formatMediaSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function TournamentManageView({
