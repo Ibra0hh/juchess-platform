@@ -41,6 +41,7 @@ const EXPORTED = [
   'createTournamentGames',
   'configureTournamentProcedure',
   'startProcedureGame',
+  'updateGamePgn',
   'submitGameResult',
 ]
 
@@ -413,6 +414,21 @@ test('procedure: created games stay scheduled until the manager starts them', as
   assert.ok(writes.every((game) => game.status === 'scheduled'))
   assert.ok(writes.every((game) => game.startedAt === undefined))
   assert.deepEqual(writes.map((game) => game.physicalBoard), [1, 2, 1, 2])
+})
+
+test('live moves: undoing to the initial position clears the stored PGN', async () => {
+  const updates = []
+  const tablesDB = {
+    getRow: async () => ({ $id: 'g1', status: 'live', pgn: '1. e4' }),
+    updateRow: async ({ data }) => {
+      updates.push(data)
+      return { $id: 'g1', status: 'live', ...data }
+    },
+  }
+
+  const row = await engine.updateGamePgn(tablesDB, 'juchess', 'g1', '')
+  assert.equal(row.pgn, '')
+  assert.deepEqual(updates, [{ pgn: '' }])
 })
 
 test('procedure: configuring legacy live games requeues matches beyond board capacity', async () => {

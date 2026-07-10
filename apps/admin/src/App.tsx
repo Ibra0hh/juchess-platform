@@ -1435,18 +1435,22 @@ function TournamentsScreen({
     }
   }
 
-  async function handleGamePgn(gameId: string, pgn: string) {
-    setSubmitting(true)
-    setMessage(null)
+  async function handleGamePgn(gameId: string, pgn: string, silent = false) {
+    if (!silent) {
+      setSubmitting(true)
+      setMessage(null)
+    }
     try {
       await updateTournamentGamePgn(gameId, pgn)
-      setMessage('PGN saved. The recorded result was not changed.')
-      await onChanged()
+      if (!silent) {
+        setMessage('PGN saved. The recorded result was not changed.')
+        await onChanged()
+      }
     } catch (error) {
       setMessage(formatAdminError(error))
       throw error
     } finally {
-      setSubmitting(false)
+      if (!silent) setSubmitting(false)
     }
   }
 
@@ -1829,7 +1833,7 @@ function TournamentManageView({
   onAdvanceRound: (item: AdminTournament) => Promise<void>
   onBack: () => void
   onComplete: (item: AdminTournament) => void
-  onGamePgn: (gameId: string, pgn: string) => Promise<void>
+  onGamePgn: (gameId: string, pgn: string, silent?: boolean) => Promise<void>
   onGameResult: (input: {
     gameId?: string
     tournamentId?: string
@@ -2027,22 +2031,13 @@ function TournamentManageView({
     })
   }
 
-  async function publishLiveBoardMoves(board: LiveBoardOption, state: LiveBoardState) {
+  async function syncLiveBoardMoves(board: LiveBoardOption, pgn: string) {
     if (!board.gameId) {
-      onMessage('Start this game from Procedure before publishing live moves.')
+      onMessage('Start this game from Procedure before entering live moves.')
       return
     }
-    if (board.completed) {
-      onMessage('This game is finished. Use Save PGN to update its recorded moves.')
-      return
-    }
-    if (!state.moves.length) {
-      onMessage('Play or import at least one move before publishing.')
-      return
-    }
-
-    await onGamePgn(board.gameId, pgnFromMoves(state.moves))
-    onMessage(`${board.white} vs ${board.black} live moves published.`)
+    if (board.completed) return
+    await onGamePgn(board.gameId, pgn, true)
   }
 
   async function startProcedureMatch(match: ProcedureMatch, physicalBoard: number) {
@@ -2174,7 +2169,7 @@ function TournamentManageView({
                 boards={playableBoards}
                 onBoardSelect={selectLiveBoard}
                 onMessage={onMessage}
-                onPublishMoves={publishLiveBoardMoves}
+                onSyncMoves={syncLiveBoardMoves}
                 onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
@@ -2203,7 +2198,7 @@ function TournamentManageView({
                 boards={playableBoards}
                 onBoardSelect={selectLiveBoard}
                 onMessage={onMessage}
-                onPublishMoves={publishLiveBoardMoves}
+                onSyncMoves={syncLiveBoardMoves}
                 onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
@@ -2235,7 +2230,7 @@ function TournamentManageView({
                 boards={liveBoardOptions}
                 onBoardSelect={selectLiveBoard}
                 onMessage={onMessage}
-                onPublishMoves={publishLiveBoardMoves}
+                onSyncMoves={syncLiveBoardMoves}
                 onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
@@ -2880,7 +2875,7 @@ function LiveTournamentBoard({
   boards,
   onBoardSelect,
   onMessage,
-  onPublishMoves,
+  onSyncMoves,
   onSaveGame,
   panelRef,
   selectedBoardKey,
@@ -2888,19 +2883,21 @@ function LiveTournamentBoard({
   boards: LiveBoardOption[]
   onBoardSelect: (boardKey: string) => void
   onMessage: (message: string) => void
-  onPublishMoves: (board: LiveBoardOption, state: LiveBoardState) => Promise<void>
+  onSyncMoves: (board: LiveBoardOption, pgn: string) => Promise<void>
   onSaveGame: (board: LiveBoardOption, state: LiveBoardState) => Promise<void>
   panelRef: RefObject<HTMLElement | null>
   selectedBoardKey: string
 }) {
   const [boardStates, setBoardStates] = useState<Record<string, LiveBoardState>>({})
   const [pgnDrafts, setPgnDrafts] = useState<Record<string, string>>({})
-  const [publishing, setPublishing] = useState(false)
+  const [syncingBoards, setSyncingBoards] = useState<Record<string, boolean>>({})
+  const syncQueues = useRef<Record<string, Promise<void>>>({})
   const [saving, setSaving] = useState(false)
   const pairing = boards.find((board) => board.boardKey === selectedBoardKey) ?? boards[0]
   const boardState = pairing ? boardStates[pairing.boardKey] ?? initialLiveBoardState(pairing) : EMPTY_LIVE_BOARD_STATE
   const pgnDraft = pairing ? pgnDrafts[pairing.boardKey] ?? pairing.pgn ?? '' : ''
   const movePairs = buildMovePairs(boardState.moves)
+  const syncing = pairing ? Boolean(syncingBoards[pairing.boardKey]) : false
 
   function updateCurrentBoard(nextState: LiveBoardState) {
     if (!pairing) return
@@ -2910,6 +2907,28 @@ function LiveTournamentBoard({
     }))
   }
 
+  function queueLiveMoveSync(board: LiveBoardOption, moves: string[]) {
+    if (!board.gameId || board.completed) return
+    const boardKey = board.boardKey
+    const previous = syncQueues.current[boardKey] ?? Promise.resolve()
+    const next = previous
+      .catch(() => undefined)
+      .then(() => onSyncMoves(board, pgnFromMoves(moves)))
+
+    syncQueues.current[boardKey] = next
+    setSyncingBoards((current) => ({ ...current, [boardKey]: true }))
+    void next.then(
+      () => finishLiveMoveSync(boardKey, next),
+      () => finishLiveMoveSync(boardKey, next),
+    )
+  }
+
+  function finishLiveMoveSync(boardKey: string, completed: Promise<void>) {
+    if (syncQueues.current[boardKey] !== completed) return
+    delete syncQueues.current[boardKey]
+    setSyncingBoards((current) => ({ ...current, [boardKey]: false }))
+  }
+
   function handleBoardChange(state: JuChessBoardChange) {
     updateCurrentBoard({
       moves: state.moves,
@@ -2917,6 +2936,7 @@ function LiveTournamentBoard({
     })
     if (pairing) {
       setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: state.pgn }))
+      queueLiveMoveSync(pairing, state.moves)
     }
   }
 
@@ -2928,11 +2948,16 @@ function LiveTournamentBoard({
       moves,
       result: deriveResult(next),
     })
+    setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: next.pgn() }))
+    queueLiveMoveSync(pairing, moves)
   }
 
   function resetGame() {
     updateCurrentBoard({ moves: [], result: pairing?.completed ? pairing.result ?? 'Live' : 'Live' })
-    if (pairing) setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: '' }))
+    if (pairing) {
+      setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: '' }))
+      queueLiveMoveSync(pairing, [])
+    }
   }
 
   function recordResult(value: string) {
@@ -2956,18 +2981,6 @@ function LiveTournamentBoard({
     }
   }
 
-  async function publishMoves() {
-    if (!pairing) return
-    setPublishing(true)
-    try {
-      await onPublishMoves(pairing, boardState)
-    } catch {
-      // The parent already surfaces the server error in the management notice.
-    } finally {
-      setPublishing(false)
-    }
-  }
-
   function updatePgnDraft(value: string) {
     if (!pairing) return
     setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: value }))
@@ -2981,7 +2994,10 @@ function LiveTournamentBoard({
         moves: parsed.moves,
         result: pairing.completed ? pairing.result ?? parsed.result : parsed.result,
       })
-      onMessage(`${pairing.boardLabel} PGN imported. Review the moves, then save.`)
+      const importedPgn = pgnFromMoves(parsed.moves)
+      setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: importedPgn }))
+      queueLiveMoveSync(pairing, parsed.moves)
+      onMessage(`${pairing.boardLabel} PGN imported.`)
     } catch (error) {
       onMessage(error instanceof Error ? error.message : 'The PGN could not be imported.')
     }
@@ -3042,7 +3058,7 @@ function LiveTournamentBoard({
           <div className="move-list-card">
             <div className="move-list-head">
               <strong>Live moves</strong>
-              <span>{boardState.moves.length} moves</span>
+              <span>{syncing ? 'Publishing...' : `${boardState.moves.length} moves · Live`}</span>
             </div>
             <div className="move-list-scroll">
               {movePairs.length ? movePairs.map((row) => (
@@ -3070,15 +3086,7 @@ function LiveTournamentBoard({
           <div className="live-board-actions">
             <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!boardState.moves.length}>Undo</button>
             <button type="button" className="mini-button ghost" onClick={resetGame} disabled={!pairing}>Reset</button>
-            <button
-              type="button"
-              className="mini-button"
-              disabled={!pairing?.gameId || pairing.completed || !boardState.moves.length || publishing || saving}
-              onClick={publishMoves}
-            >
-              {publishing ? 'Publishing...' : 'Publish live moves'}
-            </button>
-            <button type="button" className="mini-button dark" disabled={!pairing || saving || publishing} onClick={saveBoard}>
+            <button type="button" className="mini-button dark" disabled={!pairing || saving || syncing} onClick={saveBoard}>
               {saving ? 'Saving...' : pairing?.completed ? 'Save PGN' : boardState.moves.length ? 'Save result + PGN' : 'Save result without PGN'}
             </button>
           </div>

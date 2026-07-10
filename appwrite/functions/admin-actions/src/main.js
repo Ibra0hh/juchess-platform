@@ -1950,7 +1950,6 @@ async function startProcedureGame(tablesDB, databaseId, gameId, requestedBoard) 
 
 async function updateGamePgn(tablesDB, databaseId, gameId, value) {
   const pgn = String(value ?? '').trim();
-  if (!pgn) throw new HttpError(400, 'PGN cannot be empty.');
   if (pgn.length > 50000) throw new HttpError(400, 'PGN is too large.');
 
   const current = await tablesDB.getRow({
@@ -2863,7 +2862,7 @@ export default async ({ req, res, log, error }) => {
         action: 'updateTournamentGamePgn',
         targetTable: tableIds.games,
         targetRowId: row.$id,
-        payload: { attached: true },
+        payload: { attached: Boolean(row.pgn) },
       });
       return res.json({ ok: true, action: 'updateTournamentGamePgn', row });
     }
