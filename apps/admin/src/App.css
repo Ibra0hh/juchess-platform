@@ -2639,6 +2639,51 @@ button {
   font-weight: 900;
 }
 
+.live-replay-controls {
+  display: grid;
+  grid-template-columns: repeat(2, 36px) minmax(72px, auto) repeat(2, 36px);
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 520px);
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.live-replay-controls button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 34px;
+  border: 1px solid #ded6c8;
+  border-radius: 7px;
+  background: #fff;
+  color: #21304e;
+  cursor: pointer;
+}
+
+.live-replay-controls button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.live-replay-controls button:not(:disabled):hover {
+  border-color: #7d2434;
+  color: #7d2434;
+}
+
+.live-replay-controls button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.live-replay-controls > span {
+  color: #6e7180;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+}
+
 .digital-board {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));

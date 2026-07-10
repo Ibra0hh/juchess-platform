@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import './App.css'
 import { JuChessBoard, type JuChessBoardChange } from './components/JuChessBoard'
 import { buildChessGame, deriveResult, parseChessPgn, pgnFromMoves } from './components/JuChessRules'
@@ -2890,6 +2891,7 @@ function LiveTournamentBoard({
 }) {
   const [boardStates, setBoardStates] = useState<Record<string, LiveBoardState>>({})
   const [pgnDrafts, setPgnDrafts] = useState<Record<string, string>>({})
+  const [viewPositions, setViewPositions] = useState<Record<string, number>>({})
   const [syncingBoards, setSyncingBoards] = useState<Record<string, boolean>>({})
   const syncQueues = useRef<Record<string, Promise<void>>>({})
   const [saving, setSaving] = useState(false)
@@ -2898,6 +2900,11 @@ function LiveTournamentBoard({
   const pgnDraft = pairing ? pgnDrafts[pairing.boardKey] ?? pairing.pgn ?? '' : ''
   const movePairs = buildMovePairs(boardState.moves)
   const syncing = pairing ? Boolean(syncingBoards[pairing.boardKey]) : false
+  const viewPosition = pairing
+    ? Math.min(viewPositions[pairing.boardKey] ?? boardState.moves.length, boardState.moves.length)
+    : 0
+  const viewingHistory = viewPosition < boardState.moves.length
+  const displayedMoves = boardState.moves.slice(0, viewPosition)
 
   function updateCurrentBoard(nextState: LiveBoardState) {
     if (!pairing) return
@@ -2929,12 +2936,33 @@ function LiveTournamentBoard({
     setSyncingBoards((current) => ({ ...current, [boardKey]: false }))
   }
 
+  function setHistoryPosition(position: number) {
+    if (!pairing) return
+    const bounded = Math.max(0, Math.min(position, boardState.moves.length))
+    setViewPositions((current) => {
+      const next = { ...current }
+      if (bounded === boardState.moves.length) delete next[pairing.boardKey]
+      else next[pairing.boardKey] = bounded
+      return next
+    })
+  }
+
+  function returnToLivePosition(boardKey: string) {
+    setViewPositions((current) => {
+      if (current[boardKey] === undefined) return current
+      const next = { ...current }
+      delete next[boardKey]
+      return next
+    })
+  }
+
   function handleBoardChange(state: JuChessBoardChange) {
     updateCurrentBoard({
       moves: state.moves,
       result: pairing?.completed ? pairing.result ?? state.result : state.result,
     })
     if (pairing) {
+      returnToLivePosition(pairing.boardKey)
       setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: state.pgn }))
       queueLiveMoveSync(pairing, state.moves)
     }
@@ -2948,6 +2976,7 @@ function LiveTournamentBoard({
       moves,
       result: deriveResult(next),
     })
+    returnToLivePosition(pairing.boardKey)
     setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: next.pgn() }))
     queueLiveMoveSync(pairing, moves)
   }
@@ -2955,6 +2984,7 @@ function LiveTournamentBoard({
   function resetGame() {
     updateCurrentBoard({ moves: [], result: pairing?.completed ? pairing.result ?? 'Live' : 'Live' })
     if (pairing) {
+      returnToLivePosition(pairing.boardKey)
       setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: '' }))
       queueLiveMoveSync(pairing, [])
     }
@@ -2994,6 +3024,7 @@ function LiveTournamentBoard({
         moves: parsed.moves,
         result: pairing.completed ? pairing.result ?? parsed.result : parsed.result,
       })
+      returnToLivePosition(pairing.boardKey)
       const importedPgn = pgnFromMoves(parsed.moves)
       setPgnDrafts((current) => ({ ...current, [pairing.boardKey]: importedPgn }))
       queueLiveMoveSync(pairing, parsed.moves)
@@ -3022,11 +3053,62 @@ function LiveTournamentBoard({
                 ))}
               </select>
             </label>
-            <span className="live-turn">{pairing?.completed ? `Recorded ${pairing.result}` : boardState.moves.length % 2 === 0 ? 'White to move' : 'Black to move'}</span>
+            <span className="live-turn">
+              {viewingHistory
+                ? `Move ${viewPosition} of ${boardState.moves.length}`
+                : pairing?.completed
+                ? `Recorded ${pairing.result}`
+                : boardState.moves.length % 2 === 0
+                ? 'White to move'
+                : 'Black to move'}
+            </span>
           </div>
           <BoardPlayerBar color="black" name={pairing?.black ?? 'Black player'} />
-          <JuChessBoard moves={boardState.moves} onChange={handleBoardChange} />
+          <JuChessBoard
+            interactive={Boolean(pairing && !pairing.completed && !viewingHistory)}
+            moves={displayedMoves}
+            onChange={handleBoardChange}
+          />
           <BoardPlayerBar color="white" name={pairing?.white ?? 'White player'} />
+          <div className="live-replay-controls" role="group" aria-label="Move history navigation">
+            <button
+              type="button"
+              aria-label="Go to start"
+              title="Go to start"
+              disabled={!pairing || viewPosition === 0}
+              onClick={() => setHistoryPosition(0)}
+            >
+              <ChevronsLeft aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label="Previous move"
+              title="Previous move"
+              disabled={!pairing || viewPosition === 0}
+              onClick={() => setHistoryPosition(viewPosition - 1)}
+            >
+              <ChevronLeft aria-hidden="true" />
+            </button>
+            <span>{viewPosition} / {boardState.moves.length}</span>
+            <button
+              type="button"
+              aria-label="Next move"
+              title="Next move"
+              disabled={!pairing || viewPosition >= boardState.moves.length}
+              onClick={() => setHistoryPosition(viewPosition + 1)}
+            >
+              <ChevronRight aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label="Go to live position"
+              title="Go to live position"
+              disabled={!pairing || viewPosition >= boardState.moves.length}
+              onClick={() => setHistoryPosition(boardState.moves.length)}
+            >
+              <ChevronsRight aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <aside className="live-game-side">
           <div className="live-match-card">
@@ -3046,7 +3128,7 @@ function LiveTournamentBoard({
                 <button
                   type="button"
                   className={boardState.result === value ? 'active' : undefined}
-                  disabled={!pairing || pairing.completed}
+                  disabled={!pairing || pairing.completed || viewingHistory}
                   onClick={() => recordResult(value)}
                   key={value}
                 >
@@ -3081,12 +3163,12 @@ function LiveTournamentBoard({
               value={pgnDraft}
               onChange={(event) => updatePgnDraft(event.target.value)}
             />
-            <button type="button" className="mini-button ghost" disabled={!pairing || !pgnDraft.trim()} onClick={importPgn}>Import PGN</button>
+            <button type="button" className="mini-button ghost" disabled={!pairing || !pgnDraft.trim() || viewingHistory || syncing} onClick={importPgn}>Import PGN</button>
           </div>
           <div className="live-board-actions">
-            <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!boardState.moves.length}>Undo</button>
-            <button type="button" className="mini-button ghost" onClick={resetGame} disabled={!pairing}>Reset</button>
-            <button type="button" className="mini-button dark" disabled={!pairing || saving || syncing} onClick={saveBoard}>
+            <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!boardState.moves.length || viewingHistory}>Undo move</button>
+            <button type="button" className="mini-button ghost" onClick={resetGame} disabled={!pairing || viewingHistory}>Reset</button>
+            <button type="button" className="mini-button dark" disabled={!pairing || saving || syncing || viewingHistory} onClick={saveBoard}>
               {saving ? 'Saving...' : pairing?.completed ? 'Save PGN' : boardState.moves.length ? 'Save result + PGN' : 'Save result without PGN'}
             </button>
           </div>
