@@ -1244,12 +1244,21 @@
   }
 
   .detail-tabs {
+    gap: 0;
     justify-content: flex-start;
     overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .detail-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .detail-tabs button {
-    flex: 0 0 auto;
+    flex: 1 0 max-content;
+    padding: 10px 10px;
+    font-size: 13px;
+    white-space: nowrap;
   }
 
   .overview-grid {

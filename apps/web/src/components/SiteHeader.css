@@ -104,6 +104,11 @@
   padding: 9px 18px;
 }
 
+.auth-nav .sign-in-link,
+.auth-nav .profile-link {
+  color: #f5efe3;
+}
+
 .sign-in-link:hover {
   background: #7a2431;
 }
