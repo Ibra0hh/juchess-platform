@@ -2527,6 +2527,32 @@ button {
   padding: 4px 0;
 }
 
+.live-board-area > .board-player-bar {
+  width: min(100%, 520px);
+  border: 1px solid rgba(20, 33, 61, 0.16);
+  padding: 9px 11px;
+}
+
+.live-board-area > .board-player-bar.black {
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: #ece8df;
+}
+
+.live-board-area > .board-player-bar.white {
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: #fff;
+}
+
+.live-board-area > .ju-chess-board-shell {
+  width: min(100%, 520px);
+}
+
+.live-board-area > .ju-chess-board-shell .ju-chess-board {
+  border-radius: 0;
+}
+
 .live-board-top {
   display: flex;
   align-items: end;

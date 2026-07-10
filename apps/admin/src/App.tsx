@@ -3025,7 +3025,10 @@ function BoardPlayerBar({
   name: string
 }) {
   return (
-    <div className={`board-player-bar ${compact ? 'compact' : ''}`}>
+    <div
+      aria-label={`${color === 'white' ? 'White' : 'Black'} player: ${name}`}
+      className={`board-player-bar ${color} ${compact ? 'compact' : ''}`}
+    >
       <span className={`chess-color-chip ${color}`}>{color === 'white' ? 'W' : 'B'}</span>
       <div>
         <small>{color}</small>

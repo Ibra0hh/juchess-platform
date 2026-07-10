@@ -291,7 +291,9 @@ class AppwriteService {
 
     final payload = jsonDecode(execution.responseBody);
     if (payload is! Map<String, dynamic>) {
-      throw AppwriteException('The club server returned an unreadable response.');
+      throw AppwriteException(
+        'The club server returned an unreadable response.',
+      );
     }
     if (execution.responseStatusCode >= 400 || payload['ok'] == false) {
       throw AppwriteException(
@@ -5671,18 +5673,18 @@ class _TournamentGameDetailScreenState
             children: [
               TournamentBoardPlayerBar(
                 color: flipped ? 'white' : 'black',
+                edge: 'top',
                 name: flipped ? widget.match.white : widget.match.black,
               ),
-              const SizedBox(height: 7),
               PrototypeChessBoard(
                 flipped: flipped,
                 moves: moves,
                 readOnly: true,
                 onChanged: (_, _) {},
               ),
-              const SizedBox(height: 7),
               TournamentBoardPlayerBar(
                 color: flipped ? 'black' : 'white',
+                edge: 'bottom',
                 name: flipped ? widget.match.black : widget.match.white,
               ),
             ],
@@ -5725,46 +5727,68 @@ class _TournamentGameDetailScreenState
 class TournamentBoardPlayerBar extends StatelessWidget {
   const TournamentBoardPlayerBar({
     required this.color,
+    required this.edge,
     required this.name,
     super.key,
   });
 
   final String color;
+  final String edge;
   final String name;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        ChessColorBadge(color: color),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                color.toUpperCase(),
-                style: const TextStyle(
-                  color: Color(0xff8b8577),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: PrototypeColors.navy,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
+    final isTop = edge == 'top';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color == 'black' ? const Color(0xffece8df) : Colors.white,
+        border: Border(
+          top: const BorderSide(color: Color(0x2a21304e)),
+          left: const BorderSide(color: Color(0x2a21304e)),
+          right: const BorderSide(color: Color(0x2a21304e)),
+          bottom: isTop
+              ? BorderSide.none
+              : const BorderSide(color: Color(0x2a21304e)),
         ),
-      ],
+        borderRadius: BorderRadius.vertical(
+          top: isTop ? const Radius.circular(8) : Radius.zero,
+          bottom: isTop ? Radius.zero : const Radius.circular(8),
+        ),
+      ),
+      child: Row(
+        children: [
+          ChessColorBadge(color: color),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  color.toUpperCase(),
+                  style: const TextStyle(
+                    color: Color(0xff8b8577),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: PrototypeColors.navy,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

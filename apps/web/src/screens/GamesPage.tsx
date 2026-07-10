@@ -225,32 +225,34 @@ function GamesPage() {
             <span>{boardGame ? boardGame.round || boardGame.date : 'Standard position'}</span>
           </div>
 
-          <PlayerBar
-            color="black"
-            name={boardGame?.black || 'Black'}
-            rating={boardGame?.bRating}
-            badge={inWorkspace ? workspaceResult : boardGame ? boardGame.result : ''}
-          />
+          <div className="board-player-frame">
+            <PlayerBar
+              color="black"
+              name={boardGame?.black || 'Black'}
+              rating={boardGame?.bRating}
+              badge={inWorkspace ? workspaceResult : boardGame ? boardGame.result : ''}
+            />
 
-          <div className="board-wrap">
-            <div className="eval-bar" title="Engine evaluation">
-              <span style={{ height: `${evalPct}%` }} />
+            <div className="board-wrap">
+              <div className="eval-bar" title="Engine evaluation">
+                <span style={{ height: `${evalPct}%` }} />
+              </div>
+              <JuChessBoard
+                className="games-ju-board"
+                fen={boardMoves.length ? undefined : boardGame?.fen || startFen}
+                interactive={inWorkspace}
+                moves={boardMoves}
+                onChange={inWorkspace ? updateWorkspaceBoard : undefined}
+              />
             </div>
-            <JuChessBoard
-              className="games-ju-board"
-              fen={boardMoves.length ? undefined : boardGame?.fen || startFen}
-              interactive={inWorkspace}
-              moves={boardMoves}
-              onChange={inWorkspace ? updateWorkspaceBoard : undefined}
+
+            <PlayerBar
+              color="white"
+              name={boardGame?.white || 'White'}
+              rating={boardGame?.wRating}
+              badge={`${evalNow >= 0 ? '+' : ''}${evalNow.toFixed(1)}`}
             />
           </div>
-
-          <PlayerBar
-            color="white"
-            name={boardGame?.white || 'White'}
-            rating={boardGame?.wRating}
-            badge={`${evalNow >= 0 ? '+' : ''}${evalNow.toFixed(1)}`}
-          />
 
           {inReview && game ? (
             game.moves.length > 0 ? (
@@ -435,12 +437,15 @@ function PlayerBar({
   rating?: number
 }) {
   return (
-    <div className="player-bar">
-      <span>
+    <div className={`player-bar ${color}`} aria-label={`${color === 'white' ? 'White' : 'Black'} player: ${name}`}>
+      <div className="player-bar-person">
         <i className={color} aria-hidden="true" />
-        {name}
+        <div>
+          <small>{color}</small>
+          <b>{name}</b>
+        </div>
         {rating ? <em>{rating}</em> : null}
-      </span>
+      </div>
       <strong>{badge}</strong>
     </div>
   )

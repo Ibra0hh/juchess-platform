@@ -785,25 +785,67 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 9px 11px;
+}
+
+.board-player-frame {
+  --eval-width: 18px;
+  --board-gap: 12px;
+  display: flex;
+  align-self: center;
+  flex-direction: column;
+  width: min(100%, 590px, calc(100dvh - 220px));
+  min-width: 0;
   margin-top: 16px;
-  padding: 0 2px;
 }
 
-.player-bar + .board-wrap {
-  margin-top: 10px;
+.board-player-frame .player-bar {
+  width: calc(100% - var(--eval-width) - var(--board-gap));
+  margin-left: calc(var(--eval-width) + var(--board-gap));
+  border: 1px solid rgba(30, 43, 69, 0.16);
 }
 
-.board-wrap + .player-bar {
-  margin-top: 10px;
+.board-player-frame .player-bar.black {
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: #ece8df;
 }
 
-.player-bar span {
+.board-player-frame .player-bar.white {
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: #fff;
+}
+
+.player-bar-person {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
   font-size: 14px;
   font-weight: 600;
+}
+
+.player-bar-person > div {
+  display: grid;
+  min-width: 0;
+}
+
+.player-bar-person small {
+  color: rgba(30, 43, 69, 0.56);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.player-bar-person b {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .player-bar i {
@@ -839,8 +881,6 @@
 }
 
 .board-wrap {
-  --eval-width: 18px;
-  --board-gap: 12px;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -858,6 +898,10 @@
   width: var(--games-board-size);
   min-width: 240px;
   max-width: var(--games-board-size);
+}
+
+.board-player-frame .games-ju-board .ju-chess-board {
+  border-radius: 0;
 }
 
 .eval-bar {
