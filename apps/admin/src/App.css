@@ -1816,7 +1816,58 @@ button {
   font-weight: 900;
 }
 
-.standings-row:nth-child(-n + 4) strong {
+.standings-table {
+  overflow-x: auto;
+}
+
+.standings-table-head,
+.standings-table-row {
+  display: grid;
+  grid-template-columns: 42px minmax(180px, 1fr) repeat(4, 68px) 76px;
+  align-items: center;
+  min-width: 620px;
+  gap: 8px;
+  padding: 11px 22px;
+}
+
+.standings-table-head {
+  border-bottom: 1px solid #e5ded1;
+  background: #f8f4eb;
+  color: #7b8391;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.standings-table-row {
+  border-bottom: 1px solid #f4f0e8;
+  color: #4a4f5a;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.standings-table-row strong {
+  display: grid;
+  gap: 2px;
+  color: #14213d;
+  font-weight: 900;
+}
+
+.standings-table-row strong small {
+  color: #8a8f99;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.standings-table-row b {
+  color: #7d2434;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.standings-table-row[data-rank="1"] strong,
+.standings-table-row[data-rank="2"] strong,
+.standings-table-row[data-rank="3"] strong {
   color: #7d2434;
 }
 

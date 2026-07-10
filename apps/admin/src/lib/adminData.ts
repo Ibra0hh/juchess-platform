@@ -67,6 +67,18 @@ type AppwriteRegistrationRow = Models.Row & {
   checkedIn?: boolean
 }
 
+type AppwriteStandingRow = Models.Row & {
+  tournamentId?: string
+  profileId?: string
+  rank?: number
+  points?: number
+  tieBreak?: number
+  played?: number
+  wins?: number
+  draws?: number
+  losses?: number
+}
+
 type AppwriteProfileRow = Models.Row & {
   displayName?: string
   email?: string
@@ -106,8 +118,22 @@ export type AdminTournament = {
   description?: string
   publishedGames: number
   publishedGameRows: AdminGame[]
+  standings: AdminStanding[]
   bracketSnapshot?: string
   physicalBoards: number
+}
+
+export type AdminStanding = {
+  id: string
+  tournamentId: string
+  profileId: string
+  rank: number
+  points: number
+  tieBreak: number
+  played: number
+  wins: number
+  draws: number
+  losses: number
 }
 
 export type AdminGame = {
@@ -310,7 +336,7 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
   }
 
   try {
-    const [rows, participantCounts, gamesByTournament] = await Promise.all([
+    const [rows, participantCounts, gamesByTournament, standingsByTournament] = await Promise.all([
       tablesDB.listRows<AppwriteTournamentRow>({
         databaseId: appwriteConfig.databaseId,
         tableId: tableIds.tournaments,
@@ -319,10 +345,11 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
       }),
       loadRegistrationCounts(),
       loadPublishedGamesByTournament(),
+      loadStandingsByTournament(),
     ])
 
     const tournaments = uniqueTournamentsByFormat(rows.rows
-      .map((row) => mapTournament(row, participantCounts, gamesByTournament))
+      .map((row) => mapTournament(row, participantCounts, gamesByTournament, standingsByTournament))
       .filter((tournament): tournament is AdminTournament => Boolean(tournament)))
       .sort(compareTournaments)
 
@@ -801,6 +828,44 @@ async function loadPublishedGamesByTournament() {
   ]))
 }
 
+async function loadStandingsByTournament() {
+  const standingsByTournament = new Map<string, AdminStanding[]>()
+
+  try {
+    const response = await tablesDB.listRows<AppwriteStandingRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.standings,
+      queries: [Query.limit(1000)],
+      total: false,
+    })
+
+    response.rows.forEach((row) => {
+      if (!row.tournamentId || !row.profileId) return
+      const list = standingsByTournament.get(row.tournamentId) ?? []
+      list.push({
+        id: row.$id,
+        tournamentId: row.tournamentId,
+        profileId: row.profileId,
+        rank: row.rank ?? list.length + 1,
+        points: row.points ?? 0,
+        tieBreak: row.tieBreak ?? 0,
+        played: row.played ?? 0,
+        wins: row.wins ?? 0,
+        draws: row.draws ?? 0,
+        losses: row.losses ?? 0,
+      })
+      standingsByTournament.set(row.tournamentId, list)
+    })
+  } catch (error) {
+    console.warn('Admin standings read failed.', error)
+  }
+
+  return new Map(Array.from(standingsByTournament.entries()).map(([tournamentId, standings]) => [
+    tournamentId,
+    standings.sort((a, b) => a.rank - b.rank || b.points - a.points || a.profileId.localeCompare(b.profileId)),
+  ]))
+}
+
 async function loadProfilesById(profileIds: string[]) {
   const uniqueIds = Array.from(new Set(profileIds.filter(Boolean)))
   const profiles = new Map<string, AppwriteProfileRow>()
@@ -841,6 +906,7 @@ function mapTournament(
   row: AppwriteTournamentRow,
   participantCounts: Map<string, number>,
   gamesByTournament: Map<string, AdminGame[]>,
+  standingsByTournament: Map<string, AdminStanding[]>,
 ): AdminTournament | null {
   if (!row.format || !row.timeControl) return null
   const status = row.status === 'cancelled' ? 'archived' : row.status
@@ -868,6 +934,7 @@ function mapTournament(
     description: row.description,
     publishedGames: games.length,
     publishedGameRows: games,
+    standings: standingsByTournament.get(row.$id) ?? [],
     bracketSnapshot: row.bracketSnapshot,
     physicalBoards: Math.max(1, Math.min(64, Math.floor(row.physicalBoards ?? 3))),
   }

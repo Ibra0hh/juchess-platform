@@ -35,6 +35,7 @@ import {
   type AdminRegistration,
   type AdminRegistrationStatus,
   type AdminGame,
+  type AdminStanding,
   type AdminProfile,
   type AdminProfileLoadResult,
   type AdminRole,
@@ -1950,9 +1951,13 @@ function TournamentManageView({
     knockout ? firstBracketRoundPairings(allBracketRounds) : pairings,
     'scheduled',
   ), [allBracketRounds, knockout, pairings])
-  const hasStartedGames = allBracketRounds.some((round) => (
-    round.matches.some((match) => match.live || match.winner)
-  ))
+  const standingRows = useMemo(
+    () => buildAdminStandingRows(tournament.standings, tournamentPlayers, tournament.publishedGameRows),
+    [tournament.standings, tournamentPlayers, tournament.publishedGameRows],
+  )
+  const recordedResults = tournament.publishedGameRows.filter((game) => (
+    game.status === 'completed' || game.status === 'forfeit'
+  )).length
   const canPublishPairings = tournament.status === 'upcoming' ? !swissFlow : tournament.status === 'active' && swissFlow
   const canShufflePairings = tournament.status === 'upcoming' || (tournament.status === 'active' && swissFlow)
   const shuffleLocked = disabled || participantsLoading || published || !canShufflePairings
@@ -2242,14 +2247,32 @@ function TournamentManageView({
           <>
             <div className="manage-panel-head">
               <strong>Live standings</strong>
-              <span>{hasStartedGames ? 'Results in progress' : 'No results recorded yet'}</span>
+              <span>{recordedResults ? `${recordedResults} results recorded` : 'No results recorded yet'}</span>
             </div>
-            {tournamentPlayers.length ? tournamentPlayers.map((player, index) => (
-              <div key={player.id} className="manage-row standings-row">
-                <strong>{index + 1}. {player.name}</strong>
-                <span>0 pts</span>
+            {standingRows.length ? (
+              <div className="standings-table" role="table" aria-label="Tournament standings">
+                <div className="standings-table-head" role="row">
+                  <span>#</span>
+                  <span>Player</span>
+                  <span>Played</span>
+                  <span>Won</span>
+                  <span>Drawn</span>
+                  <span>Lost</span>
+                  <span>Points</span>
+                </div>
+                {standingRows.map((row) => (
+                  <div className="standings-table-row" data-rank={row.rank} key={row.id} role="row">
+                    <span>{row.rank}</span>
+                    <strong>{row.name}<small>{row.rating}</small></strong>
+                    <span>{row.played}</span>
+                    <span>{row.wins}</span>
+                    <span>{row.draws}</span>
+                    <span>{row.losses}</span>
+                    <b>{formatStandingPoints(row.points)}</b>
+                  </div>
+                ))}
               </div>
-            )) : (
+            ) : (
               <EmptyState title="No standings yet" body="Standings will update after real game results are saved." />
             )}
           </>
@@ -4160,6 +4183,31 @@ function groupAdminGamesByRound(games: AdminGame[]) {
     blackProfileId: game.blackProfileId,
     blackRating: game.blackRating,
   })))
+}
+
+function buildAdminStandingRows(standings: AdminStanding[], players: Player[], games: AdminGame[]) {
+  const playersByProfile = new Map(players.map((player) => [player.profileId ?? player.id, player]))
+  const gameNames = new Map<string, { name: string; rating: number }>()
+  games.forEach((game) => {
+    gameNames.set(game.whiteProfileId, { name: game.whiteName, rating: game.whiteRating })
+    gameNames.set(game.blackProfileId, { name: game.blackName, rating: game.blackRating })
+  })
+
+  return [...standings]
+    .sort((a, b) => a.rank - b.rank || b.points - a.points || a.profileId.localeCompare(b.profileId))
+    .map((standing) => {
+      const player = playersByProfile.get(standing.profileId)
+      const gamePlayer = gameNames.get(standing.profileId)
+      return {
+        ...standing,
+        name: player?.name ?? gamePlayer?.name ?? standing.profileId,
+        rating: player?.rating ?? gamePlayer?.rating ?? 1200,
+      }
+    })
+}
+
+function formatStandingPoints(points: number) {
+  return Number.isInteger(points) ? String(points) : points.toFixed(1)
 }
 
 function pairingRoundLabel(tournament: AdminTournament, round: number) {
