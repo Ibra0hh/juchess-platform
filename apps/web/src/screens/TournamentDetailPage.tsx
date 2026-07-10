@@ -632,7 +632,8 @@ function RoundsTab({
     setStageTab(initialStageTab(tournament.round))
   }, [tournament.id, tournament.round])
 
-  const visibleRounds = isMultiStage ? buildStageRoundGroups(rounds, stageTab) : rounds
+  const chronologicalRounds = isMultiStage ? buildStageRoundGroups(rounds, stageTab) : rounds
+  const visibleRounds = [...chronologicalRounds].reverse()
 
   return (
     <section className="detail-tab-panel">
