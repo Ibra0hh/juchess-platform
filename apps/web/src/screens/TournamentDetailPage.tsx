@@ -283,7 +283,7 @@ function TournamentDetailPage() {
         { key: 'rounds', label: 'Rounds' },
         { key: 'table', label: 'Standings' },
       ]
-  if (tournament.status === 'Completed') tabs.push({ key: 'media', label: 'Media' })
+  if (tournament.status === 'Completed') tabs.push({ key: 'media', label: 'Photos' })
   const activeTab = tabs.some((item) => item.key === tab) ? tab : 'registration'
 
   return (
@@ -367,8 +367,8 @@ function TournamentMediaTab({ items }: { items: TournamentMedia[] }) {
     <section className="detail-tab-panel tournament-media-panel">
       <div className="panel-heading">
         <div>
-          <h2>Tournament media</h2>
-          <p>Photos and videos published by the organizers.</p>
+          <h2>Photos and videos</h2>
+          <p>Download memories published by the tournament organizers.</p>
         </div>
         <span>{items.length} {items.length === 1 ? 'file' : 'files'}</span>
       </div>
@@ -388,7 +388,7 @@ function TournamentMediaTab({ items }: { items: TournamentMedia[] }) {
                   <strong>{item.name}</strong>
                   <span>{formatMediaSize(item.size)}</span>
                 </div>
-                <a href={item.downloadUrl} title={`Download ${item.name}`}>
+                <a href={item.downloadUrl} download={item.name} title={`Download ${item.name}`}>
                   <Download size={16} aria-hidden="true" />
                   Download
                 </a>
@@ -399,7 +399,7 @@ function TournamentMediaTab({ items }: { items: TournamentMedia[] }) {
       ) : (
         <div className="public-media-empty">
           <ImageIcon size={30} aria-hidden="true" />
-          <strong>No media published yet</strong>
+          <strong>No photos published yet</strong>
           <span>The organizer has not added photos or videos for this tournament.</span>
         </div>
       )}

@@ -3094,6 +3094,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                                 child: DetailTabPill(
                                   tabs[i].label,
                                   selected: tab == tabs[i].key,
+                                  compact: tabs.length > 4,
                                 ),
                               ),
                             ),
@@ -3140,6 +3141,11 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       _TournamentMainTab(event: event)
                     else if (tab == 'rounds')
                       _TournamentRoundsTab(event: event)
+                    else if (tab == 'photos')
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        child: _TournamentMediaGallery(items: event.media),
+                      )
                     else
                       _TournamentPlayersTab(event: event),
                   ],
@@ -3160,6 +3166,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     } else {
       items.add(const DetailTab('rounds', 'Rounds'));
       items.add(const DetailTab('main', 'Standings'));
+    }
+    if (event.status == 'completed') {
+      items.add(const DetailTab('photos', 'Photos'));
     }
     if (!items.any((item) => item.key == tab)) tab = 'overview';
     return items;
@@ -3188,18 +3197,20 @@ class DetailTabPill extends StatelessWidget {
     this.label, {
     required this.selected,
     this.live = false,
+    this.compact = false,
     super.key,
   });
 
   final String label;
   final bool selected;
   final bool live;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 8, vertical: 9),
       decoration: BoxDecoration(
         color: selected ? PrototypeColors.black : Colors.transparent,
         border: Border.all(color: const Color(0x40111111)),
@@ -3227,7 +3238,7 @@ class DetailTabPill extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: selected ? PrototypeColors.cream : PrototypeColors.black,
-                fontSize: 11.5,
+                fontSize: compact ? 9.5 : 11.5,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -3280,10 +3291,6 @@ class _TournamentOverview extends StatelessWidget {
                 : 'Register',
             onTap: registrationOpen ? onRegister : onMain,
           ),
-          if (completed) ...[
-            const SizedBox(height: 18),
-            _TournamentMediaGallery(items: event.media),
-          ],
         ],
       ),
     );
@@ -3304,7 +3311,7 @@ class _TournamentMediaGallery extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const SerifText(
-              'Tournament media',
+              'Photos and videos',
               size: 20,
               weight: FontWeight.w700,
             ),
@@ -3334,7 +3341,7 @@ class _TournamentMediaGallery extends StatelessWidget {
                 Icon(Icons.photo_library_outlined, color: Color(0x99111111)),
                 SizedBox(height: 7),
                 Text(
-                  'No media published yet',
+                  'No photos published yet',
                   style: TextStyle(
                     color: PrototypeColors.black,
                     fontWeight: FontWeight.w700,
