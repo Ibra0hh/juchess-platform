@@ -3150,6 +3150,16 @@ button {
   color: #14213d;
 }
 
+.delete-player-names {
+  display: block;
+  max-height: 88px;
+  margin-top: 12px;
+  overflow: auto;
+  color: #14213d;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
 .delete-tournament-actions {
   display: flex;
   justify-content: flex-end;
@@ -3262,6 +3272,10 @@ button {
 }
 
 .selection-bar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.14);

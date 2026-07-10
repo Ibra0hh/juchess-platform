@@ -1554,6 +1554,59 @@ async function deleteTournamentRows(tablesDB, databaseId, tableId, tournamentId)
   }
 }
 
+async function listAllRows(tablesDB, databaseId, tableId) {
+  const rows = [];
+  let cursor;
+
+  while (true) {
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId,
+      queries: [Query.limit(500), ...(cursor ? [Query.cursorAfter(cursor)] : [])],
+      total: false,
+    });
+    rows.push(...response.rows);
+    if (response.rows.length < 500) return rows;
+    cursor = response.rows[response.rows.length - 1].$id;
+  }
+}
+
+function assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles) {
+  if (profileIds.includes(SYSTEM_BYE_PROFILE_ID)) {
+    throw new HttpError(409, 'The system bye profile cannot be deleted.');
+  }
+
+  const profileById = new Map(profiles.map((profile) => [profile.$id, profile]));
+  const missingId = profileIds.find((profileId) => !profileById.has(profileId));
+  if (missingId) throw new HttpError(404, `Player ${missingId} was not found.`);
+
+  const adminAccountIds = new Set(adminProfiles.map((profile) => profile.accountId).filter(Boolean));
+  const protectedProfile = profiles.find((profile) => profile.accountId && adminAccountIds.has(profile.accountId));
+  if (protectedProfile) {
+    throw new HttpError(409, `${protectedProfile.displayName || protectedProfile.email || 'This player'} has admin access. Remove that access before deleting the player.`);
+  }
+
+  const profileIdSet = new Set(profileIds);
+  const referencedGame = games.find((game) => (
+    profileIdSet.has(game.whiteProfileId) || profileIdSet.has(game.blackProfileId)
+  ));
+  if (referencedGame) {
+    const profileId = profileIdSet.has(referencedGame.whiteProfileId)
+      ? referencedGame.whiteProfileId
+      : referencedGame.blackProfileId;
+    const profile = profileById.get(profileId);
+    throw new HttpError(409, `${profile?.displayName || profile?.email || 'This player'} has tournament game history and cannot be deleted. Suspend the player instead.`);
+  }
+}
+
+async function deleteProfileRows(tablesDB, databaseId, tableId, rows, profileIdSet) {
+  const matchingRows = rows.filter((row) => profileIdSet.has(row.profileId));
+  for (const row of matchingRows) {
+    await tablesDB.deleteRow({ databaseId, tableId, rowId: row.$id });
+  }
+  return matchingRows.length;
+}
+
 function assertParticipantCanBeAdded(tournament, games, registrations, profileId) {
   if (!['draft', 'upcoming', 'active'].includes(tournament.status)) {
     throw new HttpError(409, 'Participants cannot be added to a completed or archived tournament.');
@@ -2228,6 +2281,7 @@ export default async ({ req, res, log, error }) => {
         'POST /tournaments/:id/rounds/next',
         'POST /tournaments/:id/procedure/configure',
         'POST /profiles/lookup',
+        'DELETE /players',
         'GET /admin/session',
         'GET /admin/admins',
         'POST /admin/admins',
@@ -2252,6 +2306,65 @@ export default async ({ req, res, log, error }) => {
 
   try {
     const actor = await requireAdminActor(req, tablesDB, databaseId);
+
+    if (method === 'DELETE' && segments[0] === 'players' && segments.length === 1) {
+      const profileIds = Array.isArray(body.profileIds)
+        ? Array.from(new Set(body.profileIds.map((profileId) => String(profileId).trim()).filter(Boolean)))
+        : [];
+
+      if (!profileIds.length) throw new HttpError(400, 'Select at least one player to delete.');
+      if (profileIds.length > 50) throw new HttpError(400, 'Delete at most 50 players at a time.');
+
+      const profiles = await Promise.all(profileIds.map((profileId) => tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.profiles,
+        rowId: profileId,
+      })));
+      const [games, registrations, checkIns, standings, adminProfiles] = await Promise.all([
+        listAllRows(tablesDB, databaseId, tableIds.games),
+        listAllRows(tablesDB, databaseId, tableIds.registrations),
+        listAllRows(tablesDB, databaseId, tableIds.checkIns),
+        listAllRows(tablesDB, databaseId, tableIds.standings),
+        listAllRows(tablesDB, databaseId, tableIds.adminProfiles),
+      ]);
+
+      assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles);
+
+      const profileIdSet = new Set(profileIds);
+      const deletedRows = {
+        registrations: await deleteProfileRows(tablesDB, databaseId, tableIds.registrations, registrations, profileIdSet),
+        checkIns: await deleteProfileRows(tablesDB, databaseId, tableIds.checkIns, checkIns, profileIdSet),
+        standings: await deleteProfileRows(tablesDB, databaseId, tableIds.standings, standings, profileIdSet),
+      };
+
+      for (const profile of profiles) {
+        await tablesDB.deleteRow({ databaseId, tableId: tableIds.profiles, rowId: profile.$id });
+      }
+
+      for (const profile of profiles) {
+        if (!profile.accountId) continue;
+        try {
+          await users.delete({ userId: profile.accountId });
+        } catch (cause) {
+          if (Number(cause?.code) !== 404) throw cause;
+        }
+      }
+
+      const deleted = profiles.map((profile) => ({
+        profileId: profile.$id,
+        name: profile.displayName || profile.email || profile.$id,
+      }));
+
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'deletePlayers',
+        targetTable: tableIds.profiles,
+        targetRowId: profileIds.join(','),
+        payload: { deleted, deletedRows },
+      });
+
+      return res.json({ ok: true, action: 'deletePlayers', deleted, deletedRows });
+    }
 
     if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'session') {
       return res.json({ ok: true, allowed: true, profile: actor });

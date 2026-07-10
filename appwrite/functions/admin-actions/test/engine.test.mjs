@@ -45,6 +45,7 @@ const EXPORTED = [
   'submitGameResult',
   'isDeletableTournamentStatus',
   'deleteTournamentRows',
+  'assertPlayersCanBeDeleted',
   'assertParticipantCanBeAdded',
 ]
 
@@ -54,7 +55,7 @@ const Account = stub, Client = stub, TablesDB = stub, Teams = stub, Users = stub
 const ID = { unique: () => 'stub' };
 const Permission = { read: () => 'stub' };
 const Role = { any: () => 'stub', user: () => 'stub' };
-const Query = { equal: () => 'query', limit: () => 'query', notEqual: () => 'query' };
+const Query = { cursorAfter: () => 'query', equal: () => 'query', limit: () => 'query', notEqual: () => 'query' };
 `
 
 function loadEngine() {
@@ -138,6 +139,33 @@ test('tournament deletion removes every dependent row across repeated batches', 
   assert.equal(await engine.deleteTournamentRows(database, 'juchess', 'games', 'target'), 3)
   assert.deepEqual(deleted, ['game-1', 'game-2', 'game-3'])
   assert.deepEqual(rows, [{ $id: 'other-game', tournamentId: 'other' }])
+})
+
+test('player deletion protects tournament history and admin accounts', () => {
+  const players = [
+    { $id: 'p1', accountId: 'user-1', displayName: 'Player One' },
+    { $id: 'p2', accountId: 'user-2', displayName: 'Player Two' },
+  ]
+
+  assert.equal(engine.assertPlayersCanBeDeleted(['p1'], players, [], []), undefined)
+  assert.throws(
+    () => engine.assertPlayersCanBeDeleted(
+      ['p1'],
+      players,
+      [{ $id: 'game-1', whiteProfileId: 'p1', blackProfileId: 'p2' }],
+      [],
+    ),
+    (error) => error.statusCode === 409 && /game history/i.test(error.message),
+  )
+  assert.throws(
+    () => engine.assertPlayersCanBeDeleted(
+      ['p2'],
+      players,
+      [],
+      [{ $id: 'admin-1', accountId: 'user-2' }],
+    ),
+    (error) => error.statusCode === 409 && /admin access/i.test(error.message),
+  )
 })
 
 test('participants can be added only before pairings and within capacity', () => {

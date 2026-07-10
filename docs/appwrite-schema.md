@@ -253,6 +253,7 @@ Admin execution contract:
 
 Responsibilities:
 - Approve member accounts.
+- Permanently delete player profiles and Auth accounts only when they have no tournament game history or admin access; dependent registrations, check-ins, and standings are removed first.
 - Create/update tournaments.
 - Confirm registrations and check-ins.
 - Publish pairings/results.

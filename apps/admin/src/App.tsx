@@ -11,6 +11,7 @@ import {
   blockIp,
   createAdminProfile,
   createTournament,
+  deleteClubPlayers,
   deleteTournamentMedia,
   deleteTournament,
   formatAdminError,
@@ -3713,6 +3714,9 @@ function PlayersScreen({
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [editPlayer, setEditPlayer] = useState<Player | null>(null)
+  const [deleteTargets, setDeleteTargets] = useState<Player[]>([])
+  const [deletingPlayers, setDeletingPlayers] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -3751,6 +3755,32 @@ function PlayersScreen({
     setSelected((current) => ({ ...current, [playerId]: !current[playerId] }))
   }
 
+  function requestPlayerDelete(targets: Player[]) {
+    if (!targets.length) return
+    setDeleteTargets(targets)
+    setMessage(null)
+  }
+
+  async function handlePlayerDelete() {
+    if (!deleteTargets.length) return
+
+    setDeletingPlayers(true)
+    setMessage(null)
+    try {
+      const deleted = await deleteClubPlayers(deleteTargets.map((player) => player.id))
+      const deletedIds = new Set(deleted.map((item) => item.profileId))
+      setPlayers((current) => current.filter((player) => !deletedIds.has(player.id)))
+      setSelected({})
+      setEditPlayer((current) => current && deletedIds.has(current.id) ? null : current)
+      setDeleteTargets([])
+      setMessage(`${deleted.length} player${deleted.length === 1 ? '' : 's'} permanently deleted.`)
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setDeletingPlayers(false)
+    }
+  }
+
   return (
     <div className="players-screen">
       <div className="table-toolbar">
@@ -3770,10 +3800,18 @@ function PlayersScreen({
         <div className="selection-bar">
           <strong>{selectedCount} selected</strong>
           <button type="button">✉ Message selected</button>
-          <button type="button">🗑 Remove selected</button>
+          <button
+            type="button"
+            disabled={deletingPlayers}
+            onClick={() => requestPlayerDelete(players.filter((player) => selected[player.id]))}
+          >
+            <Trash2 size={15} aria-hidden="true" /> Remove selected
+          </button>
           <button type="button" onClick={() => setSelected({})}>Clear</button>
         </div>
       ) : null}
+
+      {message ? <div className="prototype-note" role="status">{message}</div> : null}
 
       <section className="panel-card table-card">
         <div className="table-scroll">
@@ -3811,7 +3849,12 @@ function PlayersScreen({
                   <td className="mono">{player.universityId}</td>
                   <td className="mono"><strong>{player.rating}</strong></td>
                   <td className="mono">{player.record}</td>
-                  <td className="right"><button type="button" className="mini-button ghost" onClick={() => setEditPlayer(player)}>Edit</button></td>
+                  <td className="right">
+                    <div className="tournament-action-row">
+                      <button type="button" className="mini-button ghost" onClick={() => setEditPlayer(player)}>Edit</button>
+                      <button type="button" className="mini-button ghost danger" disabled={deletingPlayers} onClick={() => requestPlayerDelete([player])}>Remove</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -3832,6 +3875,41 @@ function PlayersScreen({
             setEditPlayer((current) => current ? { ...current, blocked: !current.blocked } : current)
           }}
         />
+      ) : null}
+
+      {deleteTargets.length ? (
+        <div
+          className="create-modal-backdrop delete-tournament-backdrop"
+          onClick={() => {
+            if (!deletingPlayers) setDeleteTargets([])
+          }}
+        >
+          <section
+            aria-describedby="delete-player-description"
+            aria-labelledby="delete-player-title"
+            aria-modal="true"
+            className="delete-tournament-dialog"
+            onClick={(event) => event.stopPropagation()}
+            role="alertdialog"
+          >
+            <div className="delete-tournament-copy">
+              <span>Permanent action</span>
+              <h2 id="delete-player-title">Delete {deleteTargets.length === 1 ? 'player' : `${deleteTargets.length} players`}?</h2>
+              <p id="delete-player-description">
+                This removes the selected player accounts, registrations, check-ins, and standings. Players with tournament game history or admin access cannot be deleted.
+              </p>
+              <strong className="delete-player-names">{deleteTargets.map((player) => player.name).join(', ')}</strong>
+            </div>
+            <div className="delete-tournament-actions">
+              <button type="button" className="secondary-action" disabled={deletingPlayers} onClick={() => setDeleteTargets([])}>
+                Cancel
+              </button>
+              <button type="button" className="delete-action" disabled={deletingPlayers} onClick={() => void handlePlayerDelete()}>
+                {deletingPlayers ? 'Deleting...' : 'Delete permanently'}
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
     </div>
   )

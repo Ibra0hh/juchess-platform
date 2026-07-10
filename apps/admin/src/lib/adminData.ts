@@ -598,6 +598,16 @@ export async function loadClubPlayers(): Promise<ClubPlayersResult> {
   }
 }
 
+export async function deleteClubPlayers(profileIds: string[]) {
+  const response = await runAdminAction<{ deleted: Array<{ profileId: string; name: string }> }>({
+    method: ExecutionMethod.DELETE,
+    path: '/players',
+    body: { profileIds },
+  })
+
+  return response.deleted
+}
+
 export async function countPendingRegistrations(): Promise<number> {
   if (!appwriteReady) return 0
 
