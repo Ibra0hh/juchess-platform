@@ -1885,6 +1885,11 @@ function TournamentManageView({
   const pairings = useMemo(() => buildTournamentPairingSchedule(tournament, tournamentPlayers, shuffleSeed), [shuffleSeed, tournament, tournamentPlayers])
   const currentRoundPairings = useMemo(() => currentRoundPairingsForTournament(tournament, pairings), [pairings, tournament])
   const pairingRounds = useMemo(() => groupPairingsByRound(pairings), [pairings])
+  const publishedPairingRounds = useMemo(
+    () => groupAdminGamesByRound(tournament.publishedGameRows),
+    [tournament.publishedGameRows],
+  )
+  const displayedPairingRounds = publishedPairingRounds.length ? publishedPairingRounds : pairingRounds
   const savedBracketConfig = useMemo(() => (
     published ? parsePublishedAdminBracketSnapshot(tournament.bracketSnapshot) : null
   ), [published, tournament.bracketSnapshot])
@@ -2138,7 +2143,7 @@ function TournamentManageView({
             </div>
             {participantsLoading ? (
               <div className="empty-row">Loading pairings...</div>
-            ) : pairingRounds.length ? pairingRounds.map((round) => (
+            ) : displayedPairingRounds.length ? displayedPairingRounds.map((round) => (
               <div className="pairing-round-block" key={round.round}>
                 <div className="pairing-round-title">{pairingRoundLabel(tournament, round.round)}</div>
                 {round.pairings.map((pairing) => (
@@ -4142,6 +4147,19 @@ function groupPairingsByRound(pairings: Pairing[]) {
       round,
       pairings: roundPairings.sort((a, b) => a.board - b.board),
     }))
+}
+
+function groupAdminGamesByRound(games: AdminGame[]) {
+  return groupPairingsByRound(games.map((game) => ({
+    round: game.round,
+    board: game.board,
+    white: game.whiteName,
+    whiteProfileId: game.whiteProfileId,
+    whiteRating: game.whiteRating,
+    black: game.blackName,
+    blackProfileId: game.blackProfileId,
+    blackRating: game.blackRating,
+  })))
 }
 
 function pairingRoundLabel(tournament: AdminTournament, round: number) {
