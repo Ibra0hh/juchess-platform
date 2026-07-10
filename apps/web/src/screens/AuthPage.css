@@ -1,7 +1,7 @@
 .auth-screen {
   min-height: 100vh;
   background: #f5efe3;
-  color: #1e2b45;
+  color: #111111;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
 }
 
@@ -15,10 +15,10 @@
 .auth-panel {
   width: min(100%, 440px);
   background: #fffcf4;
-  border: 1px solid rgba(30, 43, 69, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 12px;
   padding: 28px;
-  box-shadow: 0 16px 40px rgba(30, 43, 69, 0.09);
+  box-shadow: 0 16px 40px rgba(17, 17, 17, 0.09);
 }
 
 .auth-panel.compact {
@@ -54,7 +54,7 @@
 
 .auth-panel p {
   margin: 9px 0 0;
-  color: rgba(30, 43, 69, 0.68);
+  color: rgba(17, 17, 17, 0.68);
   font-size: 14px;
   line-height: 1.55;
 }
@@ -72,7 +72,7 @@
 .auth-note {
   border: 1px solid rgba(169, 138, 63, 0.34);
   background: rgba(169, 138, 63, 0.09);
-  color: rgba(30, 43, 69, 0.74);
+  color: rgba(17, 17, 17, 0.74);
 }
 
 .auth-error {
@@ -96,7 +96,7 @@
 .auth-form label {
   display: grid;
   gap: 6px;
-  color: rgba(30, 43, 69, 0.78);
+  color: rgba(17, 17, 17, 0.78);
   font-size: 12px;
   font-weight: 700;
 }
@@ -123,10 +123,10 @@
 .auth-form input {
   width: 100%;
   height: 46px;
-  border: 1px solid rgba(30, 43, 69, 0.24);
+  border: 1px solid rgba(17, 17, 17, 0.24);
   border-radius: 8px;
   background: #fffaf0;
-  color: #1e2b45;
+  color: #111111;
   padding: 0 13px;
   font: inherit;
   outline: none;
@@ -154,13 +154,13 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: rgba(30, 43, 69, 0.62);
+  color: rgba(17, 17, 17, 0.62);
   cursor: pointer;
   transform: translateY(-50%);
 }
 
 .auth-password-toggle:hover {
-  background: rgba(30, 43, 69, 0.08);
+  background: rgba(17, 17, 17, 0.08);
   color: #7a2431;
 }
 
@@ -176,7 +176,7 @@
 
 .auth-hint {
   margin-top: -4px;
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-size: 12px;
 }
 
@@ -204,7 +204,7 @@
 .auth-switch {
   margin-top: 18px;
   text-align: center;
-  color: rgba(30, 43, 69, 0.66);
+  color: rgba(17, 17, 17, 0.66);
   font-size: 13px;
 }
 

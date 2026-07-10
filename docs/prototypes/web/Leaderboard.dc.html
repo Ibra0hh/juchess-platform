@@ -20,11 +20,11 @@
 </style>
 </helmet>
 
-<div style="min-height: 100vh; background: #F5EFE3; color: #1E2B45; font-family: 'IBM Plex Sans', sans-serif;" data-screen-label="Leaderboard">
+<div style="min-height: 100vh; background: #F5EFE3; color: #111111; font-family: 'IBM Plex Sans', sans-serif;" data-screen-label="Leaderboard">
 
-  <header style="position: sticky; top: 0; z-index: 50; background: rgba(245,239,227,.92); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(30,43,69,.14);">
+  <header style="position: sticky; top: 0; z-index: 50; background: rgba(245,239,227,.92); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(17,17,17,.14);">
     <div style="max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 66px; display: flex; align-items: center; gap: 24px;">
-      <a href="Home.dc.html" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #1E2B45;">
+      <a href="Home.dc.html" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #111111;">
         <img src="assets/crest.png" alt="Chess Club JU crest" style="width: 42px; height: 42px; object-fit: contain;">
         <span style="display: flex; flex-direction: column; line-height: 1.1;">
           <span style="font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 700; letter-spacing: .02em;">JuChess</span>
@@ -32,26 +32,26 @@
         </span>
       </a>
       <nav class="ju-nav-links" style="display: flex; align-items: center; gap: 4px; margin: 0 auto;">
-        <a href="Home.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Home</a>
-        <a href="Tournaments.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Tournaments</a>
-        <a href="Games.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Games</a>
+        <a href="Home.dc.html" style="font-size: 13.5px; font-weight: 500; color: #111111; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(17,17,17,.07);">Home</a>
+        <a href="Tournaments.dc.html" style="font-size: 13.5px; font-weight: 500; color: #111111; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(17,17,17,.07);">Tournaments</a>
+        <a href="Games.dc.html" style="font-size: 13.5px; font-weight: 500; color: #111111; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(17,17,17,.07);">Games</a>
         <a href="Leaderboard.dc.html" style="font-size: 13.5px; font-weight: 600; color: #7A2431; text-decoration: none; padding: 8px 12px; border-radius: 6px; border-bottom: 2px solid #A98A3F;">Leaderboard</a>
-        <a href="Profile.dc.html" style="font-size: 13.5px; font-weight: 500; color: #1E2B45; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(30,43,69,.07);">Profile</a>
+        <a href="Profile.dc.html" style="font-size: 13.5px; font-weight: 500; color: #111111; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(17,17,17,.07);">Profile</a>
       </nav>
-      <sc-if value="{{ signedIn }}" hint-placeholder-val="{{ false }}"><a href="Profile.dc.html" title="{{ authName }}" style="margin-left: auto; width: 38px; height: 38px; border-radius: 50%; background: #1E2B45; color: #C9AE6B; display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 700; text-decoration: none;" style-hover="background: #7A2431;">{{ authInitials }}</a></sc-if><sc-if value="{{ signedOut }}" hint-placeholder-val="{{ true }}"><a href="Sign In.dc.html" style="margin-left: auto; font-size: 13px; font-weight: 600; color: #F5EFE3; background: #1E2B45; text-decoration: none; padding: 9px 18px; border-radius: 7px; white-space: nowrap;" style-hover="background: #7A2431;">Sign in</a></sc-if>
+      <sc-if value="{{ signedIn }}" hint-placeholder-val="{{ false }}"><a href="Profile.dc.html" title="{{ authName }}" style="margin-left: auto; width: 38px; height: 38px; border-radius: 50%; background: #111111; color: #C9AE6B; display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 700; text-decoration: none;" style-hover="background: #7A2431;">{{ authInitials }}</a></sc-if><sc-if value="{{ signedOut }}" hint-placeholder-val="{{ true }}"><a href="Sign In.dc.html" style="margin-left: auto; font-size: 13px; font-weight: 600; color: #F5EFE3; background: #111111; text-decoration: none; padding: 9px 18px; border-radius: 7px; white-space: nowrap;" style-hover="background: #7A2431;">Sign in</a></sc-if>
     </div>
   </header>
 
   <main style="max-width: 880px; margin: 0 auto; padding: 44px 24px 72px;">
     <div style="text-align: center;">
       <h1 style="font-family: 'Cormorant Garamond', serif; font-size: 40px; font-weight: 600; margin: 0;">Club Leaderboard</h1>
-      <p style="font-size: 14.5px; color: rgba(30,43,69,.68); margin: 8px 0 0;">Season 2025&ndash;26 club ratings &middot; updated after every rated round</p>
+      <p style="font-size: 14.5px; color: rgba(17,17,17,.68); margin: 8px 0 0;">Season 2025&ndash;26 club ratings &middot; updated after every rated round</p>
     </div>
 
     <!-- podium -->
     <div class="ju-podium" style="display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 14px; margin-top: 36px; align-items: end;">
       <sc-for list="{{ podium }}" as="p">
-        <div style="background: {{ p.bg }}; border: 1px solid {{ p.bd }}; border-radius: 12px; padding: 22px 18px {{ p.padB }}px; text-align: center; box-shadow: 0 4px 18px rgba(30,43,69,.08); color: {{ p.txt }};">
+        <div style="background: {{ p.bg }}; border: 1px solid {{ p.bd }}; border-radius: 12px; padding: 22px 18px {{ p.padB }}px; text-align: center; box-shadow: 0 4px 18px rgba(17,17,17,.08); color: {{ p.txt }};">
           <div style="font-size: 26px; line-height: 1; color: {{ p.pieceCol }};">{{ p.piece }}</div>
           <div style="font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 700; margin-top: 10px;">{{ p.name }}</div>
           <div style="font-size: 12px; opacity: .65; font-family: 'IBM Plex Mono', monospace; margin-top: 2px;">{{ p.username }}</div>
@@ -62,21 +62,21 @@
     </div>
 
     <!-- full table -->
-    <div style="margin-top: 26px; background: #FFFCF4; border: 1px solid rgba(30,43,69,.16); border-radius: 10px; overflow: hidden; max-height: 560px; overflow-y: auto;">
+    <div style="margin-top: 26px; background: #FFFCF4; border: 1px solid rgba(17,17,17,.16); border-radius: 10px; overflow: hidden; max-height: 560px; overflow-y: auto;">
       <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
         <thead><tr>
-          <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 16px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">#</th>
-          <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 16px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Player</th>
-          <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: left; padding: 10px 12px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Username</th>
-          <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 12px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Rating</th>
-          <th style="position: sticky; top: 0; z-index: 2; background: #1E2B45; color: #F5EFE3; text-align: center; padding: 10px 16px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Trend</th>
+          <th style="position: sticky; top: 0; z-index: 2; background: #111111; color: #F5EFE3; text-align: left; padding: 10px 16px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">#</th>
+          <th style="position: sticky; top: 0; z-index: 2; background: #111111; color: #F5EFE3; text-align: left; padding: 10px 16px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Player</th>
+          <th style="position: sticky; top: 0; z-index: 2; background: #111111; color: #F5EFE3; text-align: left; padding: 10px 12px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Username</th>
+          <th style="position: sticky; top: 0; z-index: 2; background: #111111; color: #F5EFE3; text-align: center; padding: 10px 12px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Rating</th>
+          <th style="position: sticky; top: 0; z-index: 2; background: #111111; color: #F5EFE3; text-align: center; padding: 10px 16px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;">Trend</th>
         </tr></thead>
         <tbody>
           <sc-for list="{{ rows }}" as="r">
-            <tr style="border-top: 1px solid rgba(30,43,69,.09); background: {{ r.bg }};">
-              <td style="padding: 11px 16px; font-family: 'IBM Plex Mono', monospace; color: rgba(30,43,69,.6);">{{ r.rank }}</td>
+            <tr style="border-top: 1px solid rgba(17,17,17,.09); background: {{ r.bg }};">
+              <td style="padding: 11px 16px; font-family: 'IBM Plex Mono', monospace; color: rgba(17,17,17,.6);">{{ r.rank }}</td>
               <td style="padding: 11px 16px; font-weight: {{ r.wt }};">{{ r.name }}</td>
-              <td style="padding: 11px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: rgba(30,43,69,.6);">{{ r.username }}</td>
+              <td style="padding: 11px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: rgba(17,17,17,.6);">{{ r.username }}</td>
               <td style="padding: 11px 12px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: #7A2431;">{{ r.rating }}</td>
               <td style="padding: 11px 16px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: {{ r.trendCol }};">{{ r.trend }}</td>
             </tr>
@@ -96,9 +96,9 @@ class Component extends DCLogic {
     var podium = [];
     if (players.length >= 3) {
       var defs = [
-        { i: 1, place: '2nd place', piece: '\u265C', padB: 22, bg: '#FFFCF4', bd: 'rgba(30,43,69,.18)', txt: '#1E2B45', pieceCol: 'rgba(30,43,69,.55)', ratingCol: '#1E2B45' },
-        { i: 0, place: 'Club champion', piece: '\u265A', padB: 34, bg: '#1E2B45', bd: '#1E2B45', txt: '#F5EFE3', pieceCol: '#C9AE6B', ratingCol: '#C9AE6B' },
-        { i: 2, place: '3rd place', piece: '\u265E', padB: 22, bg: '#FFFCF4', bd: 'rgba(30,43,69,.18)', txt: '#1E2B45', pieceCol: '#8A6A4A', ratingCol: '#1E2B45' }
+        { i: 1, place: '2nd place', piece: '\u265C', padB: 22, bg: '#FFFCF4', bd: 'rgba(17,17,17,.18)', txt: '#111111', pieceCol: 'rgba(17,17,17,.55)', ratingCol: '#111111' },
+        { i: 0, place: 'Club champion', piece: '\u265A', padB: 34, bg: '#111111', bd: '#111111', txt: '#F5EFE3', pieceCol: '#C9AE6B', ratingCol: '#C9AE6B' },
+        { i: 2, place: '3rd place', piece: '\u265E', padB: 22, bg: '#FFFCF4', bd: 'rgba(17,17,17,.18)', txt: '#111111', pieceCol: '#8A6A4A', ratingCol: '#111111' }
       ];
       podium = defs.map(function (d) {
         var p = players[d.i];

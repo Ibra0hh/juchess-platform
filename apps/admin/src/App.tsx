@@ -80,7 +80,7 @@ type Player = {
   blocked?: boolean
 }
 
-const avatarPalette = ['#7d2434', '#21304e', '#2E7D5B', '#8a6f28', '#5f1b26', '#3d5a80']
+const avatarPalette = ['#7d2434', '#111111', '#2E7D5B', '#8a6f28', '#5f1b26', '#111111']
 
 function playerInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -302,7 +302,7 @@ const demoPlayers: Player[] = [
     phone: '0788894411',
     rating: 1740,
     record: '15-5-8',
-    avatarColor: '#21304e',
+    avatarColor: '#111111',
     tournaments: 5,
   },
   {
@@ -3174,7 +3174,7 @@ function drawBracketLines(track: HTMLDivElement) {
 
       path.setAttribute('d', `M${x1} ${y1} H${midX} V${y2} H${x2}`)
       path.setAttribute('fill', 'none')
-      path.setAttribute('stroke', decided ? '#7A2431' : live ? '#A98A3F' : 'rgba(30,43,69,.22)')
+      path.setAttribute('stroke', decided ? '#7A2431' : live ? '#A98A3F' : 'rgba(17, 17, 17,.22)')
       path.setAttribute('stroke-width', decided ? '2.25' : '1.5')
       path.setAttribute('stroke-linejoin', 'round')
       path.setAttribute('stroke-linecap', 'round')
@@ -4499,7 +4499,7 @@ function buildTournamentPlayers(seed: number, registrations: AdminRegistration[]
       phone: '',
       rating: registration.rating ?? 1200,
       record: '0-0-0',
-      avatarColor: demoPlayers[index % demoPlayers.length]?.avatarColor ?? '#21304e',
+      avatarColor: demoPlayers[index % demoPlayers.length]?.avatarColor ?? '#111111',
       tournaments: 1,
     }))
 

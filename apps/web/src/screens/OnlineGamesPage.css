@@ -27,7 +27,7 @@
 
 .online-games-heading h1 {
   margin: 3px 0 4px;
-  color: #1e2b45;
+  color: #111111;
   font-family: "Cormorant Garamond", Georgia, serif;
   font-size: 42px;
   letter-spacing: 0;
@@ -37,7 +37,7 @@
 .online-games-heading p {
   max-width: 650px;
   margin: 0;
-  color: rgba(30, 43, 69, 0.68);
+  color: rgba(17, 17, 17, 0.68);
   font-size: 14px;
 }
 
@@ -46,10 +46,10 @@
   align-items: center;
   gap: 7px;
   flex: none;
-  border: 1px solid rgba(30, 43, 69, 0.2);
+  border: 1px solid rgba(17, 17, 17, 0.2);
   border-radius: 7px;
   background: #fffdf8;
-  color: #1e2b45;
+  color: #111111;
   padding: 9px 12px;
   font-size: 12px;
   font-weight: 700;
@@ -70,10 +70,10 @@
 .online-board-station,
 .online-tournament-panel {
   overflow: hidden;
-  border: 1px solid rgba(30, 43, 69, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 8px;
   background: #fffdf8;
-  box-shadow: 0 12px 34px rgba(30, 43, 69, 0.08);
+  box-shadow: 0 12px 34px rgba(17, 17, 17, 0.08);
 }
 
 .online-board-station {
@@ -99,12 +99,12 @@
 }
 
 .online-board-head strong {
-  color: #1e2b45;
+  color: #111111;
   font-size: 15px;
 }
 
 .online-board-head span {
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-size: 11.5px;
 }
 
@@ -115,10 +115,10 @@
   justify-content: center;
   gap: 6px;
   min-height: 34px;
-  border: 1px solid rgba(30, 43, 69, 0.22);
+  border: 1px solid rgba(17, 17, 17, 0.22);
   border-radius: 7px;
   background: #fff;
-  color: #1e2b45;
+  color: #111111;
   padding: 0 11px;
   font: inherit;
   font-size: 12px;
@@ -139,7 +139,7 @@
   width: min(100%, 580px);
   min-height: 42px;
   margin: 0 auto;
-  border: 1px solid rgba(30, 43, 69, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   padding: 0 11px;
 }
 
@@ -160,29 +160,29 @@
   place-items: center;
   width: 23px;
   height: 23px;
-  border: 1px solid #1e2b45;
+  border: 1px solid #111111;
   border-radius: 4px;
-  color: #1e2b45;
+  color: #111111;
   font-size: 10px;
   font-weight: 800;
 }
 
 .online-player-strip.black > span {
-  background: #1e2b45;
+  background: #111111;
   color: #fff;
 }
 
 .online-player-strip strong {
   min-width: 0;
   overflow: hidden;
-  color: #1e2b45;
+  color: #111111;
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .online-player-strip small {
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-family: "IBM Plex Mono", monospace;
   font-size: 11px;
 }
@@ -202,7 +202,7 @@
 }
 
 .online-board-controls span {
-  color: rgba(30, 43, 69, 0.62);
+  color: rgba(17, 17, 17, 0.62);
   font-family: "IBM Plex Mono", monospace;
   font-size: 11px;
   text-align: center;
@@ -221,7 +221,7 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  border-bottom: 1px solid rgba(30, 43, 69, 0.12);
+  border-bottom: 1px solid rgba(17, 17, 17, 0.12);
   padding: 18px;
 }
 
@@ -238,7 +238,7 @@
 
 .online-panel-title h2 {
   margin: 0;
-  color: #1e2b45;
+  color: #111111;
   font-family: "Cormorant Garamond", Georgia, serif;
   font-size: 24px;
   letter-spacing: 0;
@@ -246,7 +246,7 @@
 
 .online-panel-title p {
   margin: 3px 0 0;
-  color: rgba(30, 43, 69, 0.62);
+  color: rgba(17, 17, 17, 0.62);
   font-size: 12.5px;
   line-height: 1.45;
 }
@@ -257,7 +257,7 @@
   min-height: 42px;
   margin: 16px 16px 0;
   border-radius: 7px;
-  background: #1e2b45;
+  background: #111111;
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -275,7 +275,7 @@
 }
 
 .online-event {
-  border: 1px solid rgba(30, 43, 69, 0.14);
+  border: 1px solid rgba(17, 17, 17, 0.14);
   border-radius: 7px;
   background: #fff;
   padding: 13px;
@@ -287,14 +287,14 @@
 }
 
 .online-event-head strong {
-  color: #1e2b45;
+  color: #111111;
   font-size: 13px;
 }
 
 .online-event-head span,
 .online-event-meta,
 .online-no-boards {
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-size: 10.5px;
 }
 
@@ -330,10 +330,10 @@
   align-items: center;
   gap: 7px;
   min-height: 36px;
-  border: 1px solid rgba(30, 43, 69, 0.1);
+  border: 1px solid rgba(17, 17, 17, 0.1);
   border-radius: 6px;
   background: #fdfaf3;
-  color: #1e2b45;
+  color: #111111;
   padding: 0 9px;
   text-align: left;
 }
@@ -348,7 +348,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(30, 43, 69, 0.3);
+  background: rgba(17, 17, 17, 0.3);
 }
 
 .online-board-list button > span.live-dot {
@@ -364,7 +364,7 @@
 }
 
 .online-board-list small {
-  color: rgba(30, 43, 69, 0.52);
+  color: rgba(17, 17, 17, 0.52);
   font-size: 9.5px;
 }
 
@@ -374,9 +374,9 @@
 }
 
 .online-empty {
-  border: 1px dashed rgba(30, 43, 69, 0.2);
+  border: 1px dashed rgba(17, 17, 17, 0.2);
   border-radius: 7px;
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   padding: 24px 14px;
   font-size: 12px;
   text-align: center;

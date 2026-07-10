@@ -80,12 +80,12 @@
 </style>
 </helmet>
 
-<div style="min-height: 100vh; background: #F7EFE2; color: #16213B; font-family: 'IBM Plex Sans', sans-serif; overflow-x: clip;" data-screen-label="Home">
+<div style="min-height: 100vh; background: #F7EFE2; color: #111111; font-family: 'IBM Plex Sans', sans-serif; overflow-x: clip;" data-screen-label="Home">
 
   <!-- fixed navbar -->
   <header style="position: fixed; top: 0; left: 0; right: 0; z-index: 60; background: rgba(247,239,226,.8); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(22,33,59,.1);">
     <div style="max-width: 1280px; margin: 0 auto; padding: 0 26px; height: 64px; display: flex; align-items: center; gap: 22px; position: relative;">
-      <a href="Home.dc.html" style="display: flex; align-items: center; gap: 11px; text-decoration: none; color: #16213B;">
+      <a href="Home.dc.html" style="display: flex; align-items: center; gap: 11px; text-decoration: none; color: #111111;">
         <img src="assets/crest.png" alt="Chess Club JU crest" style="width: 40px; height: 40px; object-fit: contain;">
         <span style="display: flex; flex-direction: column; line-height: 1.1;">
           <span style="font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 700; letter-spacing: .02em;">JuChess</span>
@@ -94,10 +94,10 @@
       </a>
       <nav class="ju-nav-links" style="display: flex; align-items: center; gap: 2px; margin: 0 auto;">
         <a href="#hero" style="font-size: 13.5px; font-weight: 600; color: #7A2431; text-decoration: none; padding: 8px 12px; border-radius: 6px; border-bottom: 2px solid #A98A3F;">Home</a>
-        <a href="Tournaments.dc.html" style="font-size: 13.5px; font-weight: 500; color: #16213B; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Tournaments</a>
-        <a href="Games.dc.html" style="font-size: 13.5px; font-weight: 500; color: #16213B; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Games</a>
-        <a href="Leaderboard.dc.html" style="font-size: 13.5px; font-weight: 500; color: #16213B; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Leaderboard</a>
-        <a href="Profile.dc.html" style="font-size: 13.5px; font-weight: 500; color: #16213B; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Profile</a>
+        <a href="Tournaments.dc.html" style="font-size: 13.5px; font-weight: 500; color: #111111; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Tournaments</a>
+        <a href="Games.dc.html" style="font-size: 13.5px; font-weight: 500; color: #111111; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Games</a>
+        <a href="Leaderboard.dc.html" style="font-size: 13.5px; font-weight: 500; color: #111111; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Leaderboard</a>
+        <a href="Profile.dc.html" style="font-size: 13.5px; font-weight: 500; color: #111111; text-decoration: none; padding: 8px 12px; border-radius: 6px;" style-hover="background: rgba(22,33,59,.07);">Profile</a>
       </nav>
       <sc-if value="{{ signedIn }}" hint-placeholder-val="{{ false }}"><a href="Profile.dc.html" title="{{ authName }}" style="margin-left: auto; width: 38px; height: 38px; border-radius: 50%; background: #7A2431; color: #F5EFE3; display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 700; text-decoration: none;" style-hover="background: #5F1B26;">{{ authInitials }}</a></sc-if><sc-if value="{{ signedOut }}" hint-placeholder-val="{{ true }}"><a href="Sign In.dc.html" style="margin-left: auto; font-size: 13px; font-weight: 600; color: #F8F3E7; background: #7A2431; text-decoration: none; padding: 9px 20px; border-radius: 7px; white-space: nowrap; transition: background .18s ease, transform .18s ease;" style-hover="background: #5F1B26; transform: translateY(-1px);">Sign In</a></sc-if>
     </div>
@@ -114,7 +114,7 @@
     <!-- falling pieces -->
     <div class="ju-fall-layer" style="position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none;">
       <sc-for list="{{ fallers }}" as="f" hint-placeholder-count="16">
-        <span style="position: absolute; top: 0; left: {{ f.left }}%; font-size: {{ f.size }}px; color: #16213B; --o: {{ f.op }}; opacity: 0; animation: ju-fall {{ f.dur }}s linear {{ f.delay }}s infinite; will-change: transform;">{{ f.glyph }}</span>
+        <span style="position: absolute; top: 0; left: {{ f.left }}%; font-size: {{ f.size }}px; color: #111111; --o: {{ f.op }}; opacity: 0; animation: ju-fall {{ f.dur }}s linear {{ f.delay }}s infinite; will-change: transform;">{{ f.glyph }}</span>
       </sc-for>
     </div>
 
@@ -133,16 +133,16 @@
           <span class="ju-word" style="display: inline-block; animation-delay: .2s;">Ju</span><span class="ju-word" style="display: inline-block; animation-delay: .34s; color: #7A2431;">Chess</span>
         </h1>
       </div>
-      <p class="ju-fade ju-hero-tagline" style="animation-delay: .6s; font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(20px, 3vw, 30px); color: #16213B; margin: 18px 0 0;">The University of Jordan Chess Club.</p>
+      <p class="ju-fade ju-hero-tagline" style="animation-delay: .6s; font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(20px, 3vw, 30px); color: #111111; margin: 18px 0 0;">The University of Jordan Chess Club.</p>
       <p class="ju-fade ju-hero-desc" style="animation-delay: .74s; font-size: 15px; line-height: 1.65; color: rgba(22,33,59,.72); max-width: 480px; margin: 16px 0 0; text-wrap: pretty;">A student-run club bringing chess to campus life &mdash; we organise in-person tournaments for University of Jordan students, run weekly meetups, and help every player, from first-timers to veterans, sharpen their game across the board.</p>
       <div class="ju-fade ju-hero-actions" style="animation-delay: .9s; display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px;">
         <a href="Sign Up.dc.html" style="display: inline-flex; align-items: center; gap: 10px; background: #7A2431; color: #F8F3E7; text-decoration: none; font-size: 14.5px; font-weight: 600; padding: 15px 30px; border-radius: 8px; box-shadow: 0 6px 20px rgba(122,36,49,.28); transition: transform .18s ease, background .18s ease;" style-hover="background: #5F1B26; transform: translateY(-2px);">&#9822; Join the Club</a>
-        <a href="#vision" style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255,252,244,.65); color: #16213B; text-decoration: none; font-size: 14.5px; font-weight: 600; padding: 15px 28px; border-radius: 8px; border: 1px solid rgba(22,33,59,.28); transition: border-color .18s ease, background .18s ease, transform .18s ease;" style-hover="border-color: #A98A3F; background: rgba(169,138,63,.12); transform: translateY(-2px);">Our Vision &darr;</a>
+        <a href="#vision" style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255,252,244,.65); color: #111111; text-decoration: none; font-size: 14.5px; font-weight: 600; padding: 15px 28px; border-radius: 8px; border: 1px solid rgba(22,33,59,.28); transition: border-color .18s ease, background .18s ease, transform .18s ease;" style-hover="border-color: #A98A3F; background: rgba(169,138,63,.12); transform: translateY(-2px);">Our Vision &darr;</a>
       </div>
     </div>
 
     <!-- featured tournament card -->
-    <a class="ju-fade ju-feature-card" href="{{ feat.href }}" style="animation-delay: 1s; display: flex; flex-direction: column; justify-content: center; min-height: 360px; text-decoration: none; color: #16213B; background: linear-gradient(135deg, rgba(255,252,244,.98), rgba(250,244,232,.92)); border: 1px solid rgba(122,36,49,.18); border-radius: 20px; padding: 32px; box-shadow: 0 24px 60px rgba(22,33,59,.14); backdrop-filter: blur(4px); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;" style-hover="transform: translateY(-4px); box-shadow: 0 30px 68px rgba(22,33,59,.2); border-color: #A98A3F;">
+    <a class="ju-fade ju-feature-card" href="{{ feat.href }}" style="animation-delay: 1s; display: flex; flex-direction: column; justify-content: center; min-height: 360px; text-decoration: none; color: #111111; background: linear-gradient(135deg, rgba(255,252,244,.98), rgba(250,244,232,.92)); border: 1px solid rgba(122,36,49,.18); border-radius: 20px; padding: 32px; box-shadow: 0 24px 60px rgba(22,33,59,.14); backdrop-filter: blur(4px); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;" style-hover="transform: translateY(-4px); box-shadow: 0 30px 68px rgba(22,33,59,.2); border-color: #A98A3F;">
       <div class="ju-feature-eyebrow" style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
         <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; color: #7A2431;"><span class="ju-pulse" style="width: 8px; height: 8px; border-radius: 50%; background: #7A2431;"></span>{{ feat.statusLabel }}</span>
         <span style="font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: rgba(22,33,59,.5);">Featured tournament</span>
@@ -151,9 +151,9 @@
       <div style="font-size: 14.5px; color: rgba(22,33,59,.66); margin-top: 8px;">{{ feat.format }} &middot; {{ feat.timeControl }}</div>
 
       <div style="display: flex; gap: 10px; margin: 24px 0; flex-wrap: wrap;">
-        <span style="font-size: 12.5px; font-weight: 500; color: #16213B; background: rgba(22,33,59,.05); border: 1px solid rgba(22,33,59,.12); border-radius: 999px; padding: 7px 14px;">&#128197; {{ feat.date }}</span>
-        <span style="font-size: 12.5px; font-weight: 500; color: #16213B; background: rgba(22,33,59,.05); border: 1px solid rgba(22,33,59,.12); border-radius: 999px; padding: 7px 14px;">&#128205; {{ feat.location }}</span>
-        <span style="font-size: 12.5px; font-weight: 500; color: #16213B; background: rgba(22,33,59,.05); border: 1px solid rgba(22,33,59,.12); border-radius: 999px; padding: 7px 14px;">&#128101; {{ feat.participants }} players</span>
+        <span style="font-size: 12.5px; font-weight: 500; color: #111111; background: rgba(22,33,59,.05); border: 1px solid rgba(22,33,59,.12); border-radius: 999px; padding: 7px 14px;">&#128197; {{ feat.date }}</span>
+        <span style="font-size: 12.5px; font-weight: 500; color: #111111; background: rgba(22,33,59,.05); border: 1px solid rgba(22,33,59,.12); border-radius: 999px; padding: 7px 14px;">&#128205; {{ feat.location }}</span>
+        <span style="font-size: 12.5px; font-weight: 500; color: #111111; background: rgba(22,33,59,.05); border: 1px solid rgba(22,33,59,.12); border-radius: 999px; padding: 7px 14px;">&#128101; {{ feat.participants }} players</span>
       </div>
 
       <div class="ju-feature-footer" style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(22,33,59,.1); padding-top: 18px; gap: 18px;">
@@ -161,7 +161,7 @@
           <span style="font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: rgba(22,33,59,.5); font-weight: 600;">Leading</span>
           <span style="font-size: 16.5px; font-weight: 600; color: #7A2431;">{{ feat.leader }}</span>
         </span>
-        <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; color: #F8F3E7; background: #16213B; padding: 13px 22px; border-radius: 9px;">{{ feat.cta }} &rarr;</span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; color: #F8F3E7; background: #111111; padding: 13px 22px; border-radius: 9px;">{{ feat.cta }} &rarr;</span>
       </div>
     </a>
     </div>
@@ -170,7 +170,7 @@
   </section>
 
   <!-- ============ MARQUEE STRIP ============ -->
-  <div style="position: relative; z-index: 5; background: #16213B; color: rgba(248,243,231,.9); overflow: hidden; border-top: 1px solid rgba(201,174,107,.25); border-bottom: 1px solid rgba(201,174,107,.25);">
+  <div style="position: relative; z-index: 5; background: #111111; color: rgba(248,243,231,.9); overflow: hidden; border-top: 1px solid rgba(201,174,107,.25); border-bottom: 1px solid rgba(201,174,107,.25);">
     <div style="display: flex; align-items: center; gap: 28px; padding: 13px 26px; font-family: 'Cormorant Garamond', serif; font-size: 18px; letter-spacing: .01em; white-space: nowrap; justify-content: center; flex-wrap: wrap;">
       <span style="color: #C9AE6B;">&#9812;</span><span>Swiss Opens</span>
       <span style="color: #C9AE6B;">&#9822;</span><span>Single elimination</span>
@@ -246,11 +246,11 @@
           <h2 style="font-family: 'Cormorant Garamond', serif; font-size: clamp(32px, 4.4vw, 48px); font-weight: 700; margin: 10px 0 0; line-height: 1.04;">The whole club, in your pocket.</h2>
           <p style="font-size: 14.5px; line-height: 1.65; color: rgba(248,243,231,.85); max-width: 420px; margin: 12px 0 0; text-wrap: pretty;">Follow live boards, check standings, and register for tournaments from anywhere &mdash; the JuChess app is on both stores.</p>
           <div style="display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap;">
-            <a href="#" style="display: inline-flex; align-items: center; gap: 11px; background: #16213B; color: #F5EFE3; text-decoration: none; padding: 11px 18px; border-radius: 10px; border: 1px solid rgba(248,243,231,.2); transition: transform .18s ease;" style-hover="transform: translateY(-2px);">
+            <a href="#" style="display: inline-flex; align-items: center; gap: 11px; background: #111111; color: #F5EFE3; text-decoration: none; padding: 11px 18px; border-radius: 10px; border: 1px solid rgba(248,243,231,.2); transition: transform .18s ease;" style-hover="transform: translateY(-2px);">
               <svg width="22" height="26" viewBox="0 0 170 210" fill="currentColor" aria-hidden="true"><path d="M150.4 71.6c-1 .8-19.7 11.3-19.7 34.7 0 27 23.7 36.6 24.4 36.8-.1.6-3.8 13-12.5 25.6-7.8 11.1-16 22.2-28.4 22.2s-15.6-7.2-29.9-7.2c-14 0-19 7.4-30.4 7.4S34.7 180.8 26 168.4C15.9 154 7.7 131.7 7.7 110.5c0-34 22.1-52 43.8-52 11.6 0 21.2 7.6 28.5 7.6 6.9 0 17.7-8.1 30.9-8.1 5 .1 23 .5 34.9 17.2l4.6-3.6zM108.7 33.2c5.7-6.7 9.7-16.1 9.7-25.5 0-1.3-.1-2.6-.3-3.7-9.2.3-20.2 6.1-26.8 13.8-5.2 5.9-10 15.3-10 24.8 0 1.4.2 2.9.3 3.3.6.1 1.5.2 2.5.2 8.3.1 18.7-5.4 24.6-12.9z"/></svg>
               <span style="display: flex; flex-direction: column; line-height: 1.15; text-align: left;"><span style="font-size: 10px; opacity: .75;">Download on the</span><span style="font-size: 15px; font-weight: 600;">App Store</span></span>
             </a>
-            <a href="#" style="display: inline-flex; align-items: center; gap: 11px; background: #16213B; color: #F5EFE3; text-decoration: none; padding: 11px 18px; border-radius: 10px; border: 1px solid rgba(248,243,231,.2); transition: transform .18s ease;" style-hover="transform: translateY(-2px);">
+            <a href="#" style="display: inline-flex; align-items: center; gap: 11px; background: #111111; color: #F5EFE3; text-decoration: none; padding: 11px 18px; border-radius: 10px; border: 1px solid rgba(248,243,231,.2); transition: transform .18s ease;" style-hover="transform: translateY(-2px);">
               <svg width="21" height="23" viewBox="0 0 512 512" aria-hidden="true"><path fill="#EA4335" d="M325 234 90 12c-8-8-19-13-31-12l236 234z"/><path fill="#34A853" d="M59 0C48 6 41 17 41 33v446c0 16 7 27 18 33l236-256z"/><path fill="#FBBC04" d="M325 234 89 500c9 1 19-2 30-8l178-100z"/><path fill="#4285F4" d="m420 202-73-41-49 73 62 62 60-34c18-14 18-46 0-60z"/></svg>
               <span style="display: flex; flex-direction: column; line-height: 1.15; text-align: left;"><span style="font-size: 10px; opacity: .75;">Get it on</span><span style="font-size: 15px; font-weight: 600;">Google Play</span></span>
             </a>
@@ -277,7 +277,7 @@
   </section>
 
   <!-- ============ FOOTER ============ -->
-  <footer style="position: relative; z-index: 4; background: #16213B; color: rgba(245,239,227,.82);">
+  <footer style="position: relative; z-index: 4; background: #111111; color: rgba(245,239,227,.82);">
     <div style="max-width: 1180px; margin: 0 auto; padding: 44px 26px 32px; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px;">
       <div style="display: flex; align-items: center; gap: 13px;">
         <img src="assets/crest.png" alt="" style="width: 46px; height: 46px; object-fit: contain;">
@@ -344,14 +344,14 @@ class Component extends DCLogic {
       });
     }
 
-    var navy = { bg: '#1E2B45', fg: '#C9AE6B', bd: 'rgba(201,174,107,.5)' };
+    var black = { bg: '#111111', fg: '#C9AE6B', bd: 'rgba(201,174,107,.5)' };
     var cream = { bg: 'rgba(122,36,49,.08)', fg: '#7A2431', bd: 'rgba(122,36,49,.3)' };
     var team = [
-      { initials: 'IA', name: 'Ibrahim Ahmad', role: 'Chair', note: 'Leads the club and its tournament program.', bg: navy.bg, fg: navy.fg, bd: navy.bd },
+      { initials: 'IA', name: 'Ibrahim Ahmad', role: 'Chair', note: 'Leads the club and its tournament program.', bg: black.bg, fg: black.fg, bd: black.bd },
       { initials: 'LH', name: 'Leen Haddad', role: 'Vice Chair', note: 'Runs sessions and player relations.', bg: cream.bg, fg: cream.fg, bd: cream.bd },
-      { initials: 'YK', name: 'Yazan Khaled', role: 'Software Developer', note: 'Builds and maintains the JuChess platform.', bg: navy.bg, fg: navy.fg, bd: navy.bd },
+      { initials: 'YK', name: 'Yazan Khaled', role: 'Software Developer', note: 'Builds and maintains the JuChess platform.', bg: black.bg, fg: black.fg, bd: black.bd },
       { initials: 'SN', name: 'Sara Nasser', role: 'Designer', note: 'Shapes the club\u2019s visual identity.', bg: cream.bg, fg: cream.fg, bd: cream.bd },
-      { initials: 'OS', name: 'Omar Saleh', role: 'Event Manager', note: 'Plans and stages every tournament.', bg: navy.bg, fg: navy.fg, bd: navy.bd },
+      { initials: 'OS', name: 'Omar Saleh', role: 'Event Manager', note: 'Plans and stages every tournament.', bg: black.bg, fg: black.fg, bd: black.bd },
       { initials: 'MK', name: 'Mohammad Al-Khatib', role: 'Media &amp; Outreach', note: 'Grows the club across campus and online.', bg: cream.bg, fg: cream.fg, bd: cream.bd }
     ];
 

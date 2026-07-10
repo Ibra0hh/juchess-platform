@@ -16,31 +16,31 @@ html,body{margin:0;padding:0;background:#e9e1cf}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 button{font-family:inherit;cursor:pointer}
 input{font-family:inherit}
-::placeholder{color:rgba(33,48,78,.38)}
+::placeholder{color:rgba(17,17,17,.38)}
 @keyframes jcPulse{0%,100%{opacity:1}50%{opacity:.3}}
 button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d2434;outline-offset:2px}
 [data-jc-scroll]::-webkit-scrollbar{width:0;height:0;display:none}
 </style>
 </helmet>
 <template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#7d2434"/><g transform="translate(50 52)" fill="#f6f0e2"><circle cx="0" cy="-16" r="7"/><path d="M-13 20 C-13 2 -7 -6 0 -6 C7 -6 13 2 13 20 Z"/><rect x="-16" y="20" width="32" height="6" rx="2"/></g><text x="50" y="88" text-anchor="middle" font-family="Georgia,serif" font-size="12" font-weight="700" fill="#f6f0e2">JuChess</text></svg></template>
-<div style="min-height:100dvh;background:#d7cfbd;display:flex;flex-direction:column;align-items:center;padding:14px 12px 26px;font-family:-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif;color:#21304e">
-  <div ref="{{switcherRef}}" role="group" aria-label="Device preview" style="display:flex;gap:5px;margin-bottom:14px;background:#fbf7ec;border:1px solid rgba(33,48,78,.18);border-radius:999px;padding:4px;box-shadow:0 1px 3px rgba(33,48,78,.12)">
+<div style="min-height:100dvh;background:#d7cfbd;display:flex;flex-direction:column;align-items:center;padding:14px 12px 26px;font-family:-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111111">
+  <div ref="{{switcherRef}}" role="group" aria-label="Device preview" style="display:flex;gap:5px;margin-bottom:14px;background:#fbf7ec;border:1px solid rgba(17,17,17,.18);border-radius:999px;padding:4px;box-shadow:0 1px 3px rgba(17,17,17,.12)">
     <sc-for list="{{devices}}" as="dv" hint-placeholder-count="3">
       <button onClick="{{dv.on}}" aria-pressed="{{dv.on2}}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:none;border-radius:999px;background:{{dv.bg}};color:{{dv.fg}};font-size:12.5px;font-weight:600;min-height:38px" style-active="transform:scale(.97)">{{dv.label}}</button>
     </sc-for>
   </div>
   <div style="display:flex;align-items:flex-start;gap:14px">
   <div style="flex:none;width:{{fitW}}px;height:{{fitH}}px">
-  <div style="position:relative;width:{{devBoxW}}px;height:{{devBoxH}}px;background:{{devBezel}};border-radius:{{devOuterR}};padding:{{devPad}};overflow:hidden;box-shadow:0 24px 60px rgba(33,48,78,.32),0 6px 16px rgba(0,0,0,.24);transform:scale({{fit}});transform-origin:top left">
+  <div style="position:relative;width:{{devBoxW}}px;height:{{devBoxH}}px;background:{{devBezel}};border-radius:{{devOuterR}};padding:{{devPad}};overflow:hidden;box-shadow:0 24px 60px rgba(17,17,17,.32),0 6px 16px rgba(0,0,0,.24);transform:scale({{fit}});transform-origin:top left">
     <div style="position:relative;width:{{devW}};height:{{devH}};background:#f6f0e2;border-radius:{{devInnerR}};overflow:hidden;display:flex;flex-direction:column">
       <div aria-hidden="true" style="position:absolute;top:0;left:0;right:0;height:{{islandZone}};z-index:6;display:flex;align-items:center;justify-content:center;pointer-events:none">
         <span style="width:{{camW}};height:{{camH}};border-radius:999px;background:#0b0c0f"></span>
       </div>
       <div style="flex:none;height:{{statusH}};display:flex;align-items:center;justify-content:space-between;padding:0 {{statusPad}};position:relative;z-index:4">
-        <span style="font-size:{{statusFs}};font-weight:700;letter-spacing:.02em;color:#21304e">{{statusTime}}</span>
-        <span style="display:inline-flex;align-items:center;gap:6px;color:#21304e">
+        <span style="font-size:{{statusFs}};font-weight:700;letter-spacing:.02em;color:#111111">{{statusTime}}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;color:#111111">
           <svg width="17" height="12" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"></rect><rect x="5" y="5" width="3" height="7" rx="1"></rect><rect x="10" y="2.5" width="3" height="9.5" rx="1"></rect><rect x="15" y="0" width="3" height="12" rx="1" opacity=".35"></rect></svg>
-          <span style="display:inline-flex;align-items:center;gap:2px"><span style="width:22px;height:11px;border:1.5px solid #21304e;border-radius:3px;padding:1.5px;display:inline-flex"><span style="flex:1;background:#21304e;border-radius:1px"></span></span><span style="width:1.5px;height:4px;background:#21304e;border-radius:1px"></span></span>
+          <span style="display:inline-flex;align-items:center;gap:2px"><span style="width:22px;height:11px;border:1.5px solid #111111;border-radius:3px;padding:1.5px;display:inline-flex"><span style="flex:1;background:#111111;border-radius:1px"></span></span><span style="width:1.5px;height:4px;background:#111111;border-radius:1px"></span></span>
         </span>
       </div>
       <div ref="{{scrollRef}}" onScroll="{{onScroll}}" data-jc-scroll="1" style="flex:1;overflow-y:auto;overflow-x:hidden;position:relative;-webkit-overflow-scrolling:touch;scrollbar-width:none">
@@ -48,14 +48,14 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 
 <sc-if value="{{isHome}}" hint-placeholder-val="{{true}}">
 <div data-screen-label="Home" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(17,17,17,.12);background:#f2ebd9">
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:42px;height:42px;border-radius:50%;display:block;flex:none">
     <div style="flex:1;min-width:0">
       <div style="font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700;line-height:1.15">JuChess</div>
-      <div style="font-size:11px;color:rgba(33,48,78,.6)">University of Jordan Chess Club</div>
+      <div style="font-size:11px;color:rgba(17,17,17,.6)">University of Jordan Chess Club</div>
     </div>
     <sc-if value="{{isGuest}}" hint-placeholder-val="{{true}}">
-      <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.18);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">Guest Mode</span>
+      <span style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.18);font-size:11.5px;font-weight:600;color:#111111;white-space:nowrap">Guest Mode</span>
     </sc-if>
     <sc-if value="{{isMember}}" hint-placeholder-val="{{false}}">
       <button onClick="{{goProfile}}" aria-label="Open your profile" style="flex:none;width:38px;height:38px;border-radius:50%;background:rgba(169,138,63,.16);border:1.5px solid rgba(169,138,63,.55);font-family:'Source Serif 4',Georgia,serif;font-size:14px;font-weight:700;color:#79622a;display:flex;align-items:center;justify-content:center" style-active="transform:scale(.95)">{{pInit}}</button>
@@ -63,10 +63,10 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
   </div>
 
   <sc-if value="{{isGuest}}" hint-placeholder-val="{{true}}">
-    <div style="margin:14px 16px 0;padding:12px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;display:flex;align-items:center;gap:12px">
+    <div style="margin:14px 16px 0;padding:12px 14px;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;display:flex;align-items:center;gap:12px">
       <div style="flex:1;min-width:0">
         <div style="font-size:13.5px;font-weight:600">You're browsing as a guest</div>
-        <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:2px">Sign in to register and save analyses</div>
+        <div style="font-size:12px;color:rgba(17,17,17,.6);margin-top:2px">Sign in to register and save analyses</div>
       </div>
       <button onClick="{{goSignin}}" style="flex:none;padding:10px 16px;border:none;border-radius:10px;background:#7d2434;color:#f7f1e3;font-size:13px;font-weight:600">Sign in</button>
     </div>
@@ -74,24 +74,24 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
   <sc-if value="{{isMember}}" hint-placeholder-val="{{false}}">
     <div style="margin:14px 16px 0;padding:13px 16px;background:rgba(169,138,63,.13);border:1px solid rgba(169,138,63,.42);border-radius:14px">
       <div style="font-family:'Source Serif 4',Georgia,serif;font-size:16.5px;font-weight:700;line-height:1.2;color:#6d5623">Welcome back, {{userFirst}}</div>
-      <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:3px">Club rank {{pRank}} · Rating {{pRating}}</div>
+      <div style="font-size:12px;color:rgba(17,17,17,.6);margin-top:3px">Club rank {{pRank}} · Rating {{pRating}}</div>
     </div>
   </sc-if>
 
-  <div style="margin:14px 16px 0;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(33,48,78,.05)">
+  <div style="margin:14px 16px 0;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(17,17,17,.05)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <span style="font-size:11px;font-weight:600;color:rgba(33,48,78,.55);letter-spacing:.06em;text-transform:uppercase">Featured tournament</span>
+      <span style="font-size:11px;font-weight:600;color:rgba(17,17,17,.55);letter-spacing:.06em;text-transform:uppercase">Featured tournament</span>
       <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:#7d2434;color:#f7f1e3;font-size:10.5px;font-weight:700;letter-spacing:.04em"><span style="width:6px;height:6px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>LIVE</span>
     </div>
     <div style="font-family:'Source Serif 4',Georgia,serif;font-size:17.5px;font-weight:700;line-height:1.25">Swiss</div>
-    <div style="font-size:12.5px;color:rgba(33,48,78,.65);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sat, Jul 4 · 4:00 PM</div>
+    <div style="font-size:12.5px;color:rgba(17,17,17,.65);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sat, Jul 4 · 4:00 PM</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
-      <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">Main Campus · Hall B</span>
-      <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">15+10 Rapid</span>
+      <span style="padding:4px 9px;border-radius:999px;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.13);font-size:11.5px;font-weight:600;color:#111111;white-space:nowrap">Main Campus · Hall B</span>
+      <span style="padding:4px 9px;border-radius:999px;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.13);font-size:11.5px;font-weight:600;color:#111111;white-space:nowrap">15+10 Rapid</span>
       <span style="padding:4px 9px;border-radius:999px;background:rgba(169,138,63,.13);border:1px solid rgba(169,138,63,.35);font-size:11.5px;font-weight:600;color:#79622a;white-space:nowrap">12/16 players</span>
     </div>
     <div style="margin-top:10px" aria-label="12 of 16 places filled">
-      <div style="height:5px;border-radius:3px;background:rgba(33,48,78,.1);overflow:hidden"><div style="width:75%;height:100%;background:#a98a3f;border-radius:3px"></div></div>
+      <div style="height:5px;border-radius:3px;background:rgba(17,17,17,.1);overflow:hidden"><div style="width:75%;height:100%;background:#a98a3f;border-radius:3px"></div></div>
     </div>
     <button onClick="{{goFeatured}}" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:11px;background:#7d2434;color:#f7f1e3;font-size:14.5px;font-weight:600" style-active="transform:scale(.985)">View Tournament</button>
   </div>
@@ -100,17 +100,17 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
     <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:16px;font-weight:700">Quick actions</h2>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px">
-    <button onClick="{{goGameReview}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
-      <span aria-hidden="true" style="font-size:17px;color:#7d2434">♞</span><span style="font-size:13.5px;font-weight:600;color:#21304e">Game Review</span>
+    <button onClick="{{goGameReview}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="font-size:17px;color:#7d2434">♞</span><span style="font-size:13.5px;font-weight:600;color:#111111">Game Review</span>
     </button>
-    <button onClick="{{goBoardStart}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
-      <span aria-hidden="true" style="font-size:17px;color:#7d2434">♟</span><span style="font-size:13.5px;font-weight:600;color:#21304e">Analysis Board</span>
+    <button onClick="{{goBoardStart}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="font-size:17px;color:#7d2434">♟</span><span style="font-size:13.5px;font-weight:600;color:#111111">Analysis Board</span>
     </button>
-    <button onClick="{{goClock}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
-      <span aria-hidden="true" style="font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;color:#7d2434">5:00</span><span style="font-size:13.5px;font-weight:600;color:#21304e">Chess Clock</span>
+    <button onClick="{{goClock}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;color:#7d2434">5:00</span><span style="font-size:13.5px;font-weight:600;color:#111111">Chess Clock</span>
     </button>
-    <button onClick="{{goLeaderboard}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
-      <span aria-hidden="true" style="font-size:17px;color:#7d2434">♛</span><span style="font-size:13.5px;font-weight:600;color:#21304e">Leaderboard</span>
+    <button onClick="{{goLeaderboard}}" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:13px;text-align:left;min-height:64px" style-active="background:#f4ecd9">
+      <span aria-hidden="true" style="font-size:17px;color:#7d2434">♛</span><span style="font-size:13.5px;font-weight:600;color:#111111">Leaderboard</span>
     </button>
   </div>
 
@@ -118,15 +118,15 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
     <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:16px;font-weight:700">Club leaderboard</h2>
     <button onClick="{{goLeaderboard}}" style="background:none;border:none;padding:4px;font-size:12.5px;font-weight:600;color:#7d2434">View all</button>
   </div>
-  <div style="margin:0 16px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+  <div style="margin:0 16px;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
     <sc-for list="{{top4}}" as="p" hint-placeholder-count="4">
-      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(17,17,17,.08)">
         <span style="flex:none;width:24px;height:24px;border-radius:50%;background:rgba(169,138,63,.16);color:#79622a;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center">{{p.rank}}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.name}}</div>
-          <div style="font-size:11px;color:rgba(33,48,78,.55)">@{{p.cc}}</div>
+          <div style="font-size:11px;color:rgba(17,17,17,.55)">@{{p.cc}}</div>
         </div>
-        <span style="font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:700;color:#21304e">{{p.rating}}</span>
+        <span style="font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:700;color:#111111">{{p.rating}}</span>
       </div>
     </sc-for>
   </div>
@@ -135,14 +135,14 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
     <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:16px;font-weight:700">Announcements</h2>
   </div>
   <div style="margin:0 16px;display:flex;flex-direction:column;gap:10px">
-    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;padding:12px 14px">
+    <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:13px;padding:12px 14px">
       <div style="font-size:13.5px;font-weight:600">Summer training camp registration opens July 10</div>
-      <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:3px">Coached sessions every Sunday · limited to 20 members</div>
+      <div style="font-size:12px;color:rgba(17,17,17,.6);margin-top:3px">Coached sessions every Sunday · limited to 20 members</div>
       <div style="font-size:11px;color:#a98a3f;font-weight:600;margin-top:6px">Jul 1, 2026</div>
     </div>
-    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;padding:12px 14px">
+    <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:13px;padding:12px 14px">
       <div style="font-size:13.5px;font-weight:600">Club general assembly &amp; board elections</div>
-      <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:3px">Jul 20 · 5:00 PM · Main Campus, Hall C</div>
+      <div style="font-size:12px;color:rgba(17,17,17,.6);margin-top:3px">Jul 20 · 5:00 PM · Main Campus, Hall C</div>
       <div style="font-size:11px;color:#a98a3f;font-weight:600;margin-top:6px">Jun 28, 2026</div>
     </div>
   </div>
@@ -155,16 +155,16 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:56px;height:56px;border-radius:50%;display:block;flex:none">
     <div>
       <div style="font-family:'Source Serif 4',Georgia,serif;font-size:23px;font-weight:700;line-height:1.1">JuChess</div>
-      <div style="font-size:12px;color:rgba(33,48,78,.62);margin-top:2px">University of Jordan Chess Club</div>
+      <div style="font-size:12px;color:rgba(17,17,17,.62);margin-top:2px">University of Jordan Chess Club</div>
     </div>
   </div>
   <h1 style="margin:0 0 22px;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:700;line-height:1.3">Sign into your Club player account</h1>
   <label for="si-email" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Email</label>
-  <input id="si-email" type="email" placeholder="Enter email" autocomplete="email" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+  <input id="si-email" type="email" placeholder="Enter email" autocomplete="email" style="width:100%;padding:13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
   <label for="si-pw" style="display:block;font-size:12.5px;font-weight:600;margin:16px 0 6px">Password</label>
   <div style="position:relative">
-    <input id="si-pw" type="{{pwaType}}" placeholder="Enter password" autocomplete="current-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-    <button onClick="{{togglePwa}}" aria-label="Show or hide password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+    <input id="si-pw" type="{{pwaType}}" placeholder="Enter password" autocomplete="current-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <button onClick="{{togglePwa}}" aria-label="Show or hide password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(17,17,17,.6)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pwaSlash}}"></path></svg>
     </button>
   </div>
@@ -173,21 +173,21 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
   </div>
   <button onClick="{{doSignIn}}" style="width:100%;margin-top:18px;padding:14px;border:none;border-radius:12px;background:#7d2434;color:#f7f1e3;font-size:15px;font-weight:600" style-active="transform:scale(.985)">Sign in</button>
   <div style="display:flex;align-items:center;gap:12px;margin:22px 0">
-    <div style="flex:1;height:1px;background:rgba(33,48,78,.16)"></div>
-    <span style="font-size:12px;color:rgba(33,48,78,.5)">or continue with</span>
-    <div style="flex:1;height:1px;background:rgba(33,48,78,.16)"></div>
+    <div style="flex:1;height:1px;background:rgba(17,17,17,.16)"></div>
+    <span style="font-size:12px;color:rgba(17,17,17,.5)">or continue with</span>
+    <div style="flex:1;height:1px;background:rgba(17,17,17,.16)"></div>
   </div>
   <div style="display:flex;flex-direction:column;gap:10px">
-    <button onClick="{{doSignIn}}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border:1px solid rgba(33,48,78,.25);border-radius:12px;background:#fffdf6;font-size:14.5px;font-weight:600;color:#21304e" style-active="background:#f4ecd9">
+    <button onClick="{{doSignIn}}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border:1px solid rgba(17,17,17,.25);border-radius:12px;background:#fffdf6;font-size:14.5px;font-weight:600;color:#111111" style-active="background:#f4ecd9">
       <svg width="18" height="18" viewBox="0 0 384 512" aria-hidden="true"><path fill="#111111" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"></path></svg>
       Continue with Apple
     </button>
-    <button onClick="{{doSignIn}}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border:1px solid rgba(33,48,78,.25);border-radius:12px;background:#fffdf6;font-size:14.5px;font-weight:600;color:#21304e" style-active="background:#f4ecd9">
+    <button onClick="{{doSignIn}}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border:1px solid rgba(17,17,17,.25);border-radius:12px;background:#fffdf6;font-size:14.5px;font-weight:600;color:#111111" style-active="background:#f4ecd9">
       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path></svg>
       Continue with Google
     </button>
   </div>
-  <div style="text-align:center;margin-top:26px;font-size:13.5px;color:rgba(33,48,78,.65)">
+  <div style="text-align:center;margin-top:26px;font-size:13.5px;color:rgba(17,17,17,.65)">
     New to the club? <button onClick="{{goSignup}}" style="background:none;border:none;padding:4px 2px;font-size:13.5px;font-weight:700;color:#7d2434">Sign up</button>
   </div>
 </div>
@@ -196,36 +196,36 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 <sc-if value="{{isSignup}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Sign up" style="background:#f6f0e2;padding:24px 22px 40px">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
-    <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:50%;border:1px solid rgba(33,48,78,.22);background:#fffdf6;font-size:18px;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center">←</button>
+    <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:50%;border:1px solid rgba(17,17,17,.22);background:#fffdf6;font-size:18px;color:#111111;flex:none;display:flex;align-items:center;justify-content:center">←</button>
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:46px;height:46px;border-radius:50%;display:block;flex:none">
     <div>
       <div style="font-family:'Source Serif 4',Georgia,serif;font-size:20px;font-weight:700;line-height:1.1">JuChess</div>
-      <div style="font-size:11.5px;color:rgba(33,48,78,.62);margin-top:1px">University of Jordan Chess Club</div>
+      <div style="font-size:11.5px;color:rgba(17,17,17,.62);margin-top:1px">University of Jordan Chess Club</div>
     </div>
   </div>
   <h1 style="margin:0 0 20px;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700">Create your player account</h1>
   <div style="display:flex;flex-direction:column;gap:14px">
     <div><label for="su-name" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Full name</label>
-      <input id="su-name" type="text" placeholder="Enter full name" autocomplete="name" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+      <input id="su-name" type="text" placeholder="Enter full name" autocomplete="name" style="width:100%;padding:13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
     <div><label for="su-email" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Email</label>
-      <input id="su-email" type="email" placeholder="student@ju.edu.jo" autocomplete="email" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+      <input id="su-email" type="email" placeholder="student@ju.edu.jo" autocomplete="email" style="width:100%;padding:13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
     <div><label for="su-phone" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Phone number</label>
-      <input id="su-phone" type="tel" placeholder="07** *** ***" autocomplete="tel" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+      <input id="su-phone" type="tel" placeholder="07** *** ***" autocomplete="tel" style="width:100%;padding:13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
     <div><label for="su-uid" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">University ID</label>
-      <input id="su-uid" type="text" placeholder="Enter University ID" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-      <div style="font-size:11.5px;color:rgba(33,48,78,.55);margin-top:5px">Kept private — never shown on your public profile</div></div>
-    <div><label for="su-cc" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Chess.com username <span style="font-weight:400;color:rgba(33,48,78,.5)">(optional)</span></label>
-      <input id="su-cc" type="text" placeholder="Enter username" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
-    <div><label for="su-li" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Lichess username <span style="font-weight:400;color:rgba(33,48,78,.5)">(optional)</span></label>
-      <input id="su-li" type="text" placeholder="Enter username" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+      <input id="su-uid" type="text" placeholder="Enter University ID" style="width:100%;padding:13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+      <div style="font-size:11.5px;color:rgba(17,17,17,.55);margin-top:5px">Kept private — never shown on your public profile</div></div>
+    <div><label for="su-cc" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Chess.com username <span style="font-weight:400;color:rgba(17,17,17,.5)">(optional)</span></label>
+      <input id="su-cc" type="text" placeholder="Enter username" style="width:100%;padding:13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
+    <div><label for="su-li" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Lichess username <span style="font-weight:400;color:rgba(17,17,17,.5)">(optional)</span></label>
+      <input id="su-li" type="text" placeholder="Enter username" style="width:100%;padding:13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)"></div>
     <div><label for="su-pw" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Password</label>
       <div style="position:relative">
-        <input id="su-pw" type="{{pwbType}}" onInput="{{onSuPw}}" placeholder="Example: JuChess@2026" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-        <button onClick="{{togglePwb}}" aria-label="Show or hide password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+        <input id="su-pw" type="{{pwbType}}" onInput="{{onSuPw}}" placeholder="Example: JuChess@2026" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+        <button onClick="{{togglePwb}}" aria-label="Show or hide password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(17,17,17,.6)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pwbSlash}}"></path></svg>
         </button>
       </div>
-      <ol style="margin:8px 0 0;padding-left:18px;font-size:12px;color:rgba(33,48,78,.65);line-height:1.7">
+      <ol style="margin:8px 0 0;padding-left:18px;font-size:12px;color:rgba(17,17,17,.65);line-height:1.7">
         <li>At least 8 characters</li>
         <li>Use a mix of letters, numbers, and a symbol</li>
       </ol>
@@ -241,14 +241,14 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
       </sc-if></div>
     <div><label for="su-pw2" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Confirm password</label>
       <div style="position:relative">
-        <input id="su-pw2" type="{{pwcType}}" placeholder="Re-enter password" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-        <button onClick="{{togglePwc}}" aria-label="Show or hide confirm password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+        <input id="su-pw2" type="{{pwcType}}" placeholder="Re-enter password" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+        <button onClick="{{togglePwc}}" aria-label="Show or hide confirm password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(17,17,17,.6)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pwcSlash}}"></path></svg>
         </button>
       </div></div>
   </div>
   <button onClick="{{doSignUp}}" style="width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:#7d2434;color:#f7f1e3;font-size:15px;font-weight:600" style-active="transform:scale(.985)">Create account</button>
-  <div style="text-align:center;margin-top:18px;font-size:13.5px;color:rgba(33,48,78,.65)">
+  <div style="text-align:center;margin-top:18px;font-size:13.5px;color:rgba(17,17,17,.65)">
     Already a member? <button onClick="{{goSignin}}" style="background:none;border:none;padding:4px 2px;font-size:13.5px;font-weight:700;color:#7d2434">Sign in</button>
   </div>
 </div>
@@ -256,86 +256,86 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 
 <sc-if value="{{isForgot}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Forgot password" style="background:#f6f0e2;padding:24px 22px 40px">
-  <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;display:flex;align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;display:flex;align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:26px">
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:50px;height:50px;border-radius:50%;display:block;flex:none">
     <div>
       <div style="font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700;line-height:1.1">JuChess</div>
-      <div style="font-size:11.5px;color:rgba(33,48,78,.62);margin-top:1px">University of Jordan Chess Club</div>
+      <div style="font-size:11.5px;color:rgba(17,17,17,.62);margin-top:1px">University of Jordan Chess Club</div>
     </div>
   </div>
   <h1 style="margin:0 0 8px;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700">Forgot your password?</h1>
-  <p style="margin:0 0 20px;font-size:13.5px;color:rgba(33,48,78,.65);line-height:1.5">Enter your username, email, or University ID, then choose how you'd like to receive your one-time code.</p>
+  <p style="margin:0 0 20px;font-size:13.5px;color:rgba(17,17,17,.65);line-height:1.5">Enter your username, email, or University ID, then choose how you'd like to receive your one-time code.</p>
   <label for="fp-id" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">Username, email, or University ID</label>
-  <input id="fp-id" type="text" placeholder="Enter username, email, or University ID" style="width:100%;padding:13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+  <input id="fp-id" type="text" placeholder="Enter username, email, or University ID" style="width:100%;padding:13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
   <div style="font-size:12.5px;font-weight:600;margin:18px 0 8px">Send code via</div>
   <div style="display:flex;gap:10px">
-    <button onClick="{{setEmail}}" aria-pressed="{{methodEmail}}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 8px;border:1.5px solid {{emBd}};border-radius:13px;background:{{emBg}};color:#21304e;min-height:82px;transition:border-color .2s ease,background-color .2s ease" style-active="transform:scale(.98)">
+    <button onClick="{{setEmail}}" aria-pressed="{{methodEmail}}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 8px;border:1.5px solid {{emBd}};border-radius:13px;background:{{emBg}};color:#111111;min-height:82px;transition:border-color .2s ease,background-color .2s ease" style-active="transform:scale(.98)">
       <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#7d2434" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3.5 6.5L12 12.5l8.5-6"></path></svg>
       <span style="font-size:13.5px;font-weight:700">Email</span>
     </button>
-    <button onClick="{{setSms}}" aria-pressed="{{methodSms}}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 8px;border:1.5px solid {{smBd}};border-radius:13px;background:{{smBg}};color:#21304e;min-height:82px;transition:border-color .2s ease,background-color .2s ease" style-active="transform:scale(.98)">
+    <button onClick="{{setSms}}" aria-pressed="{{methodSms}}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 8px;border:1.5px solid {{smBd}};border-radius:13px;background:{{smBg}};color:#111111;min-height:82px;transition:border-color .2s ease,background-color .2s ease" style-active="transform:scale(.98)">
       <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#7d2434" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"></rect><path d="M10.5 18.5h3"></path></svg>
       <span style="font-size:13.5px;font-weight:700">SMS</span>
     </button>
   </div>
   <button onClick="{{sendOtp}}" style="width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:#7d2434;color:#f7f1e3;font-size:15px;font-weight:600" style-active="transform:scale(.985)">Continue</button>
-  <p style="margin:14px 0 0;font-size:11.5px;color:rgba(33,48,78,.5);text-align:center;line-height:1.5">If an account matches, a 6-digit code will be sent. Mock only — no code is actually sent.</p>
+  <p style="margin:14px 0 0;font-size:11.5px;color:rgba(17,17,17,.5);text-align:center;line-height:1.5">If an account matches, a 6-digit code will be sent. Mock only — no code is actually sent.</p>
 </div>
 </sc-if>
 
 <sc-if value="{{isOtp}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="OTP" style="background:#f6f0e2;padding:24px 22px 40px">
-  <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;display:flex;align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;display:flex;align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:26px">
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:50px;height:50px;border-radius:50%;display:block;flex:none">
     <div>
       <div style="font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700;line-height:1.1">JuChess</div>
-      <div style="font-size:11.5px;color:rgba(33,48,78,.62);margin-top:1px">University of Jordan Chess Club</div>
+      <div style="font-size:11.5px;color:rgba(17,17,17,.62);margin-top:1px">University of Jordan Chess Club</div>
     </div>
   </div>
   <h1 style="margin:0 0 8px;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700">Enter the code</h1>
-  <p style="margin:0 0 22px;font-size:13.5px;color:rgba(33,48,78,.65);line-height:1.5">We sent a 6-digit code to {{otpDest}}.</p>
+  <p style="margin:0 0 22px;font-size:13.5px;color:rgba(17,17,17,.65);line-height:1.5">We sent a 6-digit code to {{otpDest}}.</p>
   <div style="display:flex;gap:8px;justify-content:space-between" aria-label="One-time code">
-    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 1" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 2" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 3" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 4" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 5" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 6" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 1" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 2" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 3" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 4" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 5" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <input onInput="{{otpInput}}" inputMode="numeric" aria-label="Digit 6" style="width:100%;max-width:56px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
   </div>
   <button onClick="{{verifyOtp}}" style="width:100%;margin-top:24px;padding:14px;border:none;border-radius:12px;background:#7d2434;color:#f7f1e3;font-size:15px;font-weight:600" style-active="transform:scale(.985)">Verify code</button>
-  <div style="text-align:center;margin-top:16px;font-size:13px;color:rgba(33,48,78,.6)">Didn't get it? <button onClick="{{sendOtp}}" style="background:none;border:none;padding:4px 2px;font-size:13px;font-weight:700;color:#7d2434">Resend code</button></div>
+  <div style="text-align:center;margin-top:16px;font-size:13px;color:rgba(17,17,17,.6)">Didn't get it? <button onClick="{{sendOtp}}" style="background:none;border:none;padding:4px 2px;font-size:13px;font-weight:700;color:#7d2434">Resend code</button></div>
 </div>
 </sc-if>
 
 <sc-if value="{{isReset}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Reset password" style="background:#f6f0e2;padding:24px 22px 40px">
-  <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;display:flex;align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <button onClick="{{back}}" aria-label="Back" style="width:42px;height:42px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;display:flex;align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:26px">
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:50px;height:50px;border-radius:50%;display:block;flex:none">
     <div>
       <div style="font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700;line-height:1.1">JuChess</div>
-      <div style="font-size:11.5px;color:rgba(33,48,78,.62);margin-top:1px">University of Jordan Chess Club</div>
+      <div style="font-size:11.5px;color:rgba(17,17,17,.62);margin-top:1px">University of Jordan Chess Club</div>
     </div>
   </div>
   <h1 style="margin:0 0 8px;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700">Set a new password</h1>
-  <p style="margin:0 0 20px;font-size:13.5px;color:rgba(33,48,78,.65);line-height:1.5">Choose a new password for your club account.</p>
+  <p style="margin:0 0 20px;font-size:13.5px;color:rgba(17,17,17,.65);line-height:1.5">Choose a new password for your club account.</p>
   <label for="rp-pw" style="display:block;font-size:12.5px;font-weight:600;margin:0 0 6px">New password</label>
   <div style="position:relative">
-    <input id="rp-pw" type="{{pwdType}}" onInput="{{onRpPw}}" placeholder="Example: JuChess@2026" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-    <button onClick="{{togglePwd}}" aria-label="Show or hide new password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+    <input id="rp-pw" type="{{pwdType}}" onInput="{{onRpPw}}" placeholder="Example: JuChess@2026" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <button onClick="{{togglePwd}}" aria-label="Show or hide new password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(17,17,17,.6)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pwdSlash}}"></path></svg>
     </button>
   </div>
   <label for="rp-pw2" style="display:block;font-size:12.5px;font-weight:600;margin:16px 0 6px">Confirm new password</label>
   <div style="position:relative">
-    <input id="rp-pw2" type="{{pweType}}" placeholder="Re-enter new password" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(33,48,78,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#21304e;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
-    <button onClick="{{togglePwe}}" aria-label="Show or hide confirm password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(33,48,78,.6)">
+    <input id="rp-pw2" type="{{pweType}}" placeholder="Re-enter new password" autocomplete="new-password" style="width:100%;padding:13px 46px 13px 14px;border:1px solid rgba(17,17,17,.28);border-radius:10px;background:#fffdf6;font-size:15px;color:#111111;outline:none" style-focus="border-color:#7d2434;box-shadow:0 0 0 3px rgba(125,36,52,.12)">
+    <button onClick="{{togglePwe}}" aria-label="Show or hide confirm password" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;background:none;border:none;display:flex;align-items:center;justify-content:center;color:rgba(17,17,17,.6)">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="2.8"></circle><path d="M4 20L20 4" style="opacity:{{pweSlash}}"></path></svg>
     </button>
   </div>
-  <ol style="margin:10px 0 0;padding-left:18px;font-size:12px;color:rgba(33,48,78,.65);line-height:1.7">
+  <ol style="margin:10px 0 0;padding-left:18px;font-size:12px;color:rgba(17,17,17,.65);line-height:1.7">
     <li>At least 8 characters</li>
     <li>Use a mix of letters, numbers, and a symbol</li>
   </ol>
@@ -355,12 +355,12 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 
 <sc-if value="{{isTournaments}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Tournaments" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(17,17,17,.12);background:#f2ebd9">
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:36px;height:36px;border-radius:50%;display:block;flex:none">
     <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700">Tournaments</h1>
   </div>
-  <div role="tablist" aria-label="Tournament status" style="padding:12px 16px;position:sticky;top:0;background:#f6f0e2;z-index:5;border-bottom:1px solid rgba(33,48,78,.08)">
-    <div style="display:flex;gap:4px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.14);border-radius:999px;padding:4px">
+  <div role="tablist" aria-label="Tournament status" style="padding:12px 16px;position:sticky;top:0;background:#f6f0e2;z-index:5;border-bottom:1px solid rgba(17,17,17,.08)">
+    <div style="display:flex;gap:4px;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.14);border-radius:999px;padding:4px">
       <sc-for list="{{tTabs}}" as="tb" hint-placeholder-count="3">
         <button role="tab" onClick="{{tb.on}}" style="flex:1;padding:9px 0;border-radius:999px;border:none;background:{{tb.bg}};color:{{tb.fg}};font-size:13px;font-weight:600;min-height:40px;transition:background-color .25s ease">{{tb.label}}</button>
       </sc-for>
@@ -368,17 +368,17 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
   </div>
   <div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px 0">
     <sc-for list="{{tList}}" as="t" hint-placeholder-count="3">
-      <button onClick="{{t.on}}" style="display:block;width:100%;text-align:left;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(33,48,78,.05)" style-active="background:#f4ecd9">
+      <button onClick="{{t.on}}" style="display:block;width:100%;text-align:left;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(17,17,17,.05)" style-active="background:#f4ecd9">
         <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px">
-          <div style="flex:1;min-width:200px;font-family:'Source Serif 4',Georgia,serif;font-size:16.5px;font-weight:700;line-height:1.3;color:#21304e;overflow-wrap:break-word">{{t.name}}</div>
+          <div style="flex:1;min-width:200px;font-family:'Source Serif 4',Georgia,serif;font-size:16.5px;font-weight:700;line-height:1.3;color:#111111;overflow-wrap:break-word">{{t.name}}</div>
           <span style="flex:none;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:{{t.bBg}};color:{{t.bFg}};border:1px solid {{t.bBd}};font-size:10.5px;font-weight:700;letter-spacing:.03em">
             <sc-if value="{{t.bLive}}" hint-placeholder-val="{{false}}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;animation:jcPulse 1.4s infinite"></span></sc-if>{{t.bT}}
           </span>
         </div>
-        <div style="font-size:12.5px;color:rgba(33,48,78,.65);margin-top:4px">{{t.date}} · {{t.loc}}</div>
+        <div style="font-size:12.5px;color:rgba(17,17,17,.65);margin-top:4px">{{t.date}} · {{t.loc}}</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
-          <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">{{t.fmt}}</span>
-          <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">{{t.tc}}</span>
+          <span style="padding:4px 9px;border-radius:999px;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.13);font-size:11.5px;font-weight:600;color:#111111;white-space:nowrap">{{t.fmt}}</span>
+          <span style="padding:4px 9px;border-radius:999px;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.13);font-size:11.5px;font-weight:600;color:#111111;white-space:nowrap">{{t.tc}}</span>
           <span style="padding:4px 9px;border-radius:999px;background:rgba(169,138,63,.13);border:1px solid rgba(169,138,63,.35);font-size:11.5px;font-weight:600;color:#79622a;white-space:nowrap">{{t.cap}}</span>
         </div>
         <div style="font-size:12px;font-weight:600;color:#7d2434;margin-top:9px">{{t.cur}}</div>
@@ -390,8 +390,8 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 
 <sc-if value="{{isTournament}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Tournament detail" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
-    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(17,17,17,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:32px;height:32px;border-radius:50%;display:block;flex:none">
     <span style="flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:15px;font-weight:700">JuChess</span>
     <span style="flex:none;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:{{tdBBg}};color:{{tdBFg}};border:1px solid {{tdBBd}};font-size:10.5px;font-weight:700;letter-spacing:.03em">
@@ -402,13 +402,13 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
     <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:20px;font-weight:700;line-height:1.3;overflow-wrap:break-word">{{tdName}}</h1>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
       <sc-for list="{{tdChips}}" as="c" hint-placeholder-count="4">
-        <span style="padding:4px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:11.5px;font-weight:600;color:#33415f;white-space:nowrap">{{c.x}}</span>
+        <span style="padding:4px 9px;border-radius:999px;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.13);font-size:11.5px;font-weight:600;color:#111111;white-space:nowrap">{{c.x}}</span>
       </sc-for>
     </div>
   </div>
-  <div role="tablist" aria-label="Tournament sections" style="display:flex;gap:7px;padding:10px 16px;position:sticky;top:0;background:#f6f0e2;z-index:5;border-bottom:1px solid rgba(33,48,78,.1);overflow-x:auto;scrollbar-width:none">
+  <div role="tablist" aria-label="Tournament sections" style="display:flex;gap:7px;padding:10px 16px;position:sticky;top:0;background:#f6f0e2;z-index:5;border-bottom:1px solid rgba(17,17,17,.1);overflow-x:auto;scrollbar-width:none">
     <sc-for list="{{tdTabs}}" as="tb" hint-placeholder-count="5">
-      <button role="tab" onClick="{{tb.on}}" style="flex:none;display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:999px;border:1px solid rgba(33,48,78,.25);background:{{tb.bg}};color:{{tb.fg}};font-size:12.5px;font-weight:600;min-height:38px;white-space:nowrap">
+      <button role="tab" onClick="{{tb.on}}" style="flex:none;display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:999px;border:1px solid rgba(17,17,17,.25);background:{{tb.bg}};color:{{tb.fg}};font-size:12.5px;font-weight:600;min-height:38px;white-space:nowrap">
         <sc-if value="{{tb.live}}" hint-placeholder-val="{{false}}"><span style="width:6px;height:6px;border-radius:50%;background:#7d2434;animation:jcPulse 1.4s infinite"></span></sc-if>{{tb.label}}
       </button>
     </sc-for>
@@ -420,14 +420,14 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
         <div style="background:rgba(169,138,63,.12);border:1px solid rgba(169,138,63,.4);border-radius:13px;padding:13px 14px;margin-bottom:12px;display:flex;align-items:center;gap:11px">
           <span aria-hidden="true" style="font-size:21px;color:#a98a3f">♛</span>
           <div><div style="font-size:11px;font-weight:700;color:#79622a;letter-spacing:.06em;text-transform:uppercase">Champion</div>
-          <div style="font-size:15px;font-weight:700;color:#21304e">{{tdWinner}}</div></div>
+          <div style="font-size:15px;font-weight:700;color:#111111">{{tdWinner}}</div></div>
         </div>
       </sc-if>
       <sc-if value="{{tdShowFacts}}" hint-placeholder-val="{{false}}">
-        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+        <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
           <sc-for list="{{tdFacts}}" as="f" hint-placeholder-count="7">
-            <div style="display:flex;justify-content:space-between;gap:14px;padding:11px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
-              <span style="font-size:12.5px;color:rgba(33,48,78,.6);flex:none">{{f.k}}</span>
+            <div style="display:flex;justify-content:space-between;gap:14px;padding:11px 14px;border-bottom:1px solid rgba(17,17,17,.08)">
+              <span style="font-size:12.5px;color:rgba(17,17,17,.6);flex:none">{{f.k}}</span>
               <span style="font-size:13px;font-weight:600;text-align:right;min-width:0;overflow-wrap:break-word">{{f.x}}</span>
             </div>
           </sc-for>
@@ -436,12 +436,12 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
       <sc-if value="{{tdRegistered}}" hint-placeholder-val="{{false}}">
         <div style="background:#fdfaf1;border:1px solid rgba(169,138,63,.4);border-radius:16px;padding:18px 16px;text-align:center">
           <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;background:rgba(31,138,91,.12);border:1px solid rgba(31,138,91,.4);font-size:11px;font-weight:700;color:#1f8a5b"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>You're registered</div>
-          <div style="font-size:12.5px;color:rgba(33,48,78,.6);margin-top:8px;line-height:1.4">Show this at check-in — it stays here anytime.</div>
-          <img src="{{tdQrSrc}}" alt="Registration QR code" style="width:168px;height:168px;margin:14px auto 0;display:block;border:1px solid rgba(33,48,78,.14);border-radius:12px;padding:8px;background:#fffdf6">
-          <div style="margin-top:14px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(33,48,78,.5)">Check-in code</div>
+          <div style="font-size:12.5px;color:rgba(17,17,17,.6);margin-top:8px;line-height:1.4">Show this at check-in — it stays here anytime.</div>
+          <img src="{{tdQrSrc}}" alt="Registration QR code" style="width:168px;height:168px;margin:14px auto 0;display:block;border:1px solid rgba(17,17,17,.14);border-radius:12px;padding:8px;background:#fffdf6">
+          <div style="margin-top:14px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(17,17,17,.5)">Check-in code</div>
           <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:6px">
-            <span style="font-family:ui-monospace,Menlo,monospace;font-size:27px;font-weight:700;letter-spacing:.16em;color:#21304e">{{tdRegCodeSpaced}}</span>
-            <button onClick="{{tdCopyCode}}" aria-label="Copy check-in code" style="flex:none;width:40px;height:40px;border-radius:10px;border:1px solid rgba(33,48,78,.2);background:#fffdf6;color:#7d2434;display:flex;align-items:center;justify-content:center" style-active="background:#f4ecd9"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg></button>
+            <span style="font-family:ui-monospace,Menlo,monospace;font-size:27px;font-weight:700;letter-spacing:.16em;color:#111111">{{tdRegCodeSpaced}}</span>
+            <button onClick="{{tdCopyCode}}" aria-label="Copy check-in code" style="flex:none;width:40px;height:40px;border-radius:10px;border:1px solid rgba(17,17,17,.2);background:#fffdf6;color:#7d2434;display:flex;align-items:center;justify-content:center" style-active="background:#f4ecd9"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg></button>
           </div>
         </div>
       </sc-if>
@@ -455,15 +455,15 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
   <sc-if value="{{tdLiveTab}}" hint-placeholder-val="{{false}}">
     <div style="display:flex;flex-direction:column;gap:10px;padding:14px 16px 0">
       <sc-for list="{{tdLive}}" as="g" hint-placeholder-count="3">
-        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;padding:12px 14px">
+        <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:13px;padding:12px 14px">
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;font-weight:700;color:rgba(33,48,78,.55)">{{g.board}}</span>
-            <span style="font-size:11px;color:rgba(33,48,78,.45)">{{g.note}}</span>
+            <span style="font-size:11px;font-weight:700;color:rgba(17,17,17,.55)">{{g.board}}</span>
+            <span style="font-size:11px;color:rgba(17,17,17,.45)">{{g.note}}</span>
             <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:#7d2434;color:#f7f1e3;font-size:10px;font-weight:700"><span style="width:5px;height:5px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>LIVE</span>
           </div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:9px">
             <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600"><span aria-hidden="true" style="width:11px;height:11px;border-radius:3px;background:#fbf7ee;border:1px solid rgba(33,48,78,.4);flex:none"></span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.white}}</span></div>
+              <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600"><span aria-hidden="true" style="width:11px;height:11px;border-radius:3px;background:#fbf7ee;border:1px solid rgba(17,17,17,.4);flex:none"></span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.white}}</span></div>
               <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;margin-top:5px"><span aria-hidden="true" style="width:11px;height:11px;border-radius:3px;background:#232a36;flex:none"></span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.black}}</span></div>
             </div>
             <button onClick="{{g.watch}}" style="flex:none;padding:10px 16px;border:1.5px solid #7d2434;border-radius:10px;background:transparent;color:#7d2434;font-size:13px;font-weight:700;min-height:42px" style-active="background:rgba(125,36,52,.08)">Watch</button>
@@ -478,52 +478,52 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
       <sc-if value="{{tdShowStages}}" hint-placeholder-val="{{false}}">
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <sc-for list="{{tdStageBtns}}" as="sb" hint-placeholder-count="2">
-            <button onClick="{{sb.on}}" style="flex:1;padding:9px 6px;border-radius:11px;border:1px solid rgba(33,48,78,.25);background:{{sb.bg}};color:{{sb.fg}};font-size:11.5px;font-weight:600;min-height:44px;line-height:1.3">{{sb.label}}</button>
+            <button onClick="{{sb.on}}" style="flex:1;padding:9px 6px;border-radius:11px;border:1px solid rgba(17,17,17,.25);background:{{sb.bg}};color:{{sb.fg}};font-size:11.5px;font-weight:600;min-height:44px;line-height:1.3">{{sb.label}}</button>
           </sc-for>
         </div>
       </sc-if>
       <sc-if value="{{tdShowSeg}}" hint-placeholder-val="{{false}}">
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <sc-for list="{{tdSeg}}" as="sg" hint-placeholder-count="3">
-            <button onClick="{{sg.on}}" style="flex:1;padding:9px 0;border-radius:999px;border:1px solid rgba(33,48,78,.25);background:{{sg.bg}};color:{{sg.fg}};font-size:12.5px;font-weight:600;min-height:40px">{{sg.label}}</button>
+            <button onClick="{{sg.on}}" style="flex:1;padding:9px 0;border-radius:999px;border:1px solid rgba(17,17,17,.25);background:{{sg.bg}};color:{{sg.fg}};font-size:12.5px;font-weight:600;min-height:40px">{{sg.label}}</button>
           </sc-for>
         </div>
       </sc-if>
 
       <sc-if value="{{tdShowStand}}" hint-placeholder-val="{{false}}">
         <sc-if value="{{tdShowRoundCard}}" hint-placeholder-val="{{false}}">
-          <div style="background:#21304e;color:#f7f1e3;border-radius:13px;padding:13px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+          <div style="background:#111111;color:#f7f1e3;border-radius:13px;padding:13px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
             <div><div style="font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;opacity:.7">Now playing</div>
             <div style="font-family:'Source Serif 4',Georgia,serif;font-size:17px;font-weight:700;margin-top:2px">{{tdRoundCard}}</div></div>
             <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:#7d2434;font-size:10.5px;font-weight:700"><span style="width:6px;height:6px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>LIVE</span>
           </div>
         </sc-if>
         <sc-if value="{{tdStandEmpty}}" hint-placeholder-val="{{false}}">
-          <div style="background:#fdfaf1;border:1px dashed rgba(33,48,78,.3);border-radius:14px;padding:28px 20px;text-align:center">
-            <div aria-hidden="true" style="font-size:26px;color:rgba(33,48,78,.35)">♟</div>
+          <div style="background:#fdfaf1;border:1px dashed rgba(17,17,17,.3);border-radius:14px;padding:28px 20px;text-align:center">
+            <div aria-hidden="true" style="font-size:26px;color:rgba(17,17,17,.35)">♟</div>
             <div style="font-size:13.5px;font-weight:600;margin-top:8px">No standings yet</div>
-            <div style="font-size:12.5px;color:rgba(33,48,78,.6);margin-top:3px">{{tdStandEmptyMsg}}</div>
+            <div style="font-size:12.5px;color:rgba(17,17,17,.6);margin-top:3px">{{tdStandEmptyMsg}}</div>
           </div>
         </sc-if>
-        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
-          <div style="display:grid;grid-template-columns:34px 1fr 44px 62px;gap:6px;align-items:center;padding:9px 14px;background:rgba(33,48,78,.05);font-size:10.5px;font-weight:700;letter-spacing:.05em;color:rgba(33,48,78,.55);text-transform:uppercase">
+        <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:34px 1fr 44px 62px;gap:6px;align-items:center;padding:9px 14px;background:rgba(17,17,17,.05);font-size:10.5px;font-weight:700;letter-spacing:.05em;color:rgba(17,17,17,.55);text-transform:uppercase">
             <span>#</span><span>Player</span><span style="text-align:right">Pts</span><span style="text-align:right">W–D–L</span>
           </div>
           <sc-for list="{{tdStand}}" as="row" hint-placeholder-count="6">
-            <div style="display:grid;grid-template-columns:34px 1fr 44px 62px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.08);background:{{row.hlBg}}">
-              <span style="font-size:12.5px;font-weight:700;color:rgba(33,48,78,.6)">{{row.rank}}</span>
+            <div style="display:grid;grid-template-columns:34px 1fr 44px 62px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(17,17,17,.08);background:{{row.hlBg}}">
+              <span style="font-size:12.5px;font-weight:700;color:rgba(17,17,17,.6)">{{row.rank}}</span>
               <div style="min-width:0;display:flex;align-items:center;gap:6px">
                 <div style="min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{row.name}}</div>
-                <div style="font-size:10.5px;color:rgba(33,48,78,.5)">{{row.rating}}</div></div>
+                <div style="font-size:10.5px;color:rgba(17,17,17,.5)">{{row.rating}}</div></div>
                 <sc-if value="{{row.q}}" hint-placeholder-val="{{false}}"><span title="Qualified" style="flex:none;font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:6px;background:rgba(169,138,63,.18);color:#79622a;border:1px solid rgba(169,138,63,.4)">Q</span></sc-if>
               </div>
               <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:700">{{row.pts}}</span>
-              <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:rgba(33,48,78,.6)">{{row.rec}}</span>
+              <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:rgba(17,17,17,.6)">{{row.rec}}</span>
             </div>
           </sc-for>
         </div>
         <sc-if value="{{tdStandNote}}" hint-placeholder-val="{{false}}">
-          <div style="font-size:11.5px;color:rgba(33,48,78,.55);margin-top:8px;padding:0 2px">{{tdStandNote}}</div>
+          <div style="font-size:11.5px;color:rgba(17,17,17,.55);margin-top:8px;padding:0 2px">{{tdStandNote}}</div>
         </sc-if>
       </sc-if>
 
@@ -531,7 +531,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
         <sc-if value="{{tdShowBrNav}}" hint-placeholder-val="{{true}}">
           <div role="tablist" aria-label="Jump to round" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin:0 -16px 10px;padding:0 16px">
             <sc-for list="{{tdBrChips}}" as="bc" hint-placeholder-count="4">
-              <button onClick="{{bc.on}}" style="flex:none;padding:7px 13px;border-radius:999px;border:1px solid rgba(33,48,78,.22);background:{{bc.bg}};color:{{bc.fg}};font-size:11.5px;font-weight:600;white-space:nowrap;min-height:36px" style-active="transform:scale(.97)">{{bc.label}}</button>
+              <button onClick="{{bc.on}}" style="flex:none;padding:7px 13px;border-radius:999px;border:1px solid rgba(17,17,17,.22);background:{{bc.bg}};color:{{bc.fg}};font-size:11.5px;font-weight:600;white-space:nowrap;min-height:36px" style-active="transform:scale(.97)">{{bc.label}}</button>
             </sc-for>
           </div>
         </sc-if>
@@ -539,11 +539,11 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
           <div style="display:flex;gap:14px;align-items:stretch;min-height:200px">
             <sc-for list="{{tdBracket}}" as="col" hint-placeholder-count="3">
               <div style="flex:none;width:172px;display:flex;flex-direction:column">
-                <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:8px">{{col.label}}</div>
+                <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(17,17,17,.55);margin-bottom:8px">{{col.label}}</div>
                 <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;gap:10px">
                   <sc-for list="{{col.matches}}" as="m" hint-placeholder-count="2">
-                    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.18);border-radius:10px;overflow:hidden">
-                      <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid rgba(33,48,78,.08);opacity:{{m.op1}}">
+                    <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.18);border-radius:10px;overflow:hidden">
+                      <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid rgba(17,17,17,.08);opacity:{{m.op1}}">
                         <sc-if value="{{m.w1}}" hint-placeholder-val="{{false}}"><span aria-label="Winner" style="flex:none;color:#a98a3f;font-size:11px;font-weight:800">✓</span></sc-if>
                         <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:{{m.fw1}};font-style:{{m.it1}}">{{m.n1}}</span>
                       </div>
@@ -564,24 +564,24 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
             </sc-for>
           </div>
         </div>
-        <div style="font-size:11px;color:rgba(33,48,78,.5);margin-top:6px">Scroll sideways to follow the bracket · ✓ marks the winner</div>
+        <div style="font-size:11px;color:rgba(17,17,17,.5);margin-top:6px">Scroll sideways to follow the bracket · ✓ marks the winner</div>
       </sc-if>
 
       <sc-if value="{{tdShowArena}}" hint-placeholder-val="{{false}}">
-        <div style="background:#21304e;color:#f7f1e3;border-radius:14px;padding:16px;text-align:center;margin-bottom:12px">
+        <div style="background:#111111;color:#f7f1e3;border-radius:14px;padding:16px;text-align:center;margin-bottom:12px">
           <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.7">Arena ends in</div>
           <div style="font-family:ui-monospace,Menlo,monospace;font-size:40px;font-weight:700;letter-spacing:.02em;margin-top:2px">{{tdArenaClock}}</div>
           <div style="display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:4px 10px;border-radius:999px;background:#7d2434;font-size:10.5px;font-weight:700"><span style="width:6px;height:6px;border-radius:50%;background:#f7f1e3;animation:jcPulse 1.4s infinite"></span>ARENA LIVE</div>
         </div>
-        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
-          <div style="display:grid;grid-template-columns:34px 1fr 40px 80px;gap:6px;align-items:center;padding:9px 14px;background:rgba(33,48,78,.05);font-size:10.5px;font-weight:700;letter-spacing:.05em;color:rgba(33,48,78,.55);text-transform:uppercase">
+        <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:34px 1fr 40px 80px;gap:6px;align-items:center;padding:9px 14px;background:rgba(17,17,17,.05);font-size:10.5px;font-weight:700;letter-spacing:.05em;color:rgba(17,17,17,.55);text-transform:uppercase">
             <span>#</span><span>Player</span><span style="text-align:right">Pts</span><span style="text-align:right">Streak</span>
           </div>
           <sc-for list="{{tdArenaRows}}" as="row" hint-placeholder-count="6">
-            <div style="display:grid;grid-template-columns:34px 1fr 40px 80px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
-              <span style="font-size:12.5px;font-weight:700;color:rgba(33,48,78,.6)">{{row.rank}}</span>
+            <div style="display:grid;grid-template-columns:34px 1fr 40px 80px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(17,17,17,.08)">
+              <span style="font-size:12.5px;font-weight:700;color:rgba(17,17,17,.6)">{{row.rank}}</span>
               <div style="min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{row.name}}</div>
-              <div style="font-size:10.5px;color:rgba(33,48,78,.5)">{{row.g}}</div></div>
+              <div style="font-size:10.5px;color:rgba(17,17,17,.5)">{{row.g}}</div></div>
               <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:14px;font-weight:700">{{row.pts}}</span>
               <span style="text-align:right;font-size:11px;color:#79622a;font-weight:600">{{row.stk}}</span>
             </div>
@@ -590,24 +590,24 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
       </sc-if>
 
       <sc-if value="{{tdShowTeam}}" hint-placeholder-val="{{false}}">
-        <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden;margin-bottom:14px">
-          <div style="display:grid;grid-template-columns:34px 1fr 50px 60px;gap:6px;align-items:center;padding:9px 14px;background:rgba(33,48,78,.05);font-size:10.5px;font-weight:700;letter-spacing:.05em;color:rgba(33,48,78,.55);text-transform:uppercase">
+        <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden;margin-bottom:14px">
+          <div style="display:grid;grid-template-columns:34px 1fr 50px 60px;gap:6px;align-items:center;padding:9px 14px;background:rgba(17,17,17,.05);font-size:10.5px;font-weight:700;letter-spacing:.05em;color:rgba(17,17,17,.55);text-transform:uppercase">
             <span>#</span><span>Team</span><span style="text-align:right">Match</span><span style="text-align:right">Game</span>
           </div>
           <sc-for list="{{tdTeamStand}}" as="row" hint-placeholder-count="4">
-            <div style="display:grid;grid-template-columns:34px 1fr 50px 60px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
-              <span style="font-size:12.5px;font-weight:700;color:rgba(33,48,78,.6)">{{row.rank}}</span>
+            <div style="display:grid;grid-template-columns:34px 1fr 50px 60px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(17,17,17,.08)">
+              <span style="font-size:12.5px;font-weight:700;color:rgba(17,17,17,.6)">{{row.rank}}</span>
               <span style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{row.team}}</span>
               <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:700">{{row.mp}}</span>
-              <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:rgba(33,48,78,.6)">{{row.gp}}</span>
+              <span style="text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:rgba(17,17,17,.6)">{{row.gp}}</span>
             </div>
           </sc-for>
         </div>
-        <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:8px">{{tdTeamDayLabel}}</div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(17,17,17,.55);margin-bottom:8px">{{tdTeamDayLabel}}</div>
         <div style="display:flex;flex-direction:column;gap:12px">
           <sc-for list="{{tdTeamMatches}}" as="tm" hint-placeholder-count="2">
-            <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
-              <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:13px 14px;border-bottom:1px solid rgba(33,48,78,.1)">
+            <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:13px 14px;border-bottom:1px solid rgba(17,17,17,.1)">
                 <span style="font-size:15px;font-weight:800">{{tm.a}}</span>
                 <span style="font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;color:#7d2434">{{tm.as}} – {{tm.bs}}</span>
                 <span style="font-size:15px;font-weight:800">{{tm.b}}</span>
@@ -616,9 +616,9 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
                 </sc-if>
               </div>
               <sc-for list="{{tm.boards}}" as="g" hint-placeholder-count="4">
-                <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(33,48,78,.06)">
-                  <span style="flex:none;font-size:10.5px;font-weight:700;color:rgba(33,48,78,.5);width:44px">Board {{g.bn}}</span>
-                  <span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.white}} <span style="color:rgba(33,48,78,.45);font-weight:400">vs</span> {{g.black}}</span>
+                <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(17,17,17,.06)">
+                  <span style="flex:none;font-size:10.5px;font-weight:700;color:rgba(17,17,17,.5);width:44px">Board {{g.bn}}</span>
+                  <span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.white}} <span style="color:rgba(17,17,17,.45);font-weight:400">vs</span> {{g.black}}</span>
                   <span style="flex:none;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:{{g.cBg}};color:{{g.cFg}};font-size:10px;font-weight:700">
                     <sc-if value="{{g.live}}" hint-placeholder-val="{{false}}"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;animation:jcPulse 1.4s infinite"></span></sc-if>{{g.chip}}
                   </span>
@@ -634,21 +634,21 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
   <sc-if value="{{tdRoundsTab}}" hint-placeholder-val="{{false}}">
     <div style="padding:14px 16px 0">
       <sc-if value="{{tdRoundsEmpty}}" hint-placeholder-val="{{false}}">
-        <div style="background:#fdfaf1;border:1px dashed rgba(33,48,78,.3);border-radius:14px;padding:28px 20px;text-align:center">
-          <div aria-hidden="true" style="font-size:26px;color:rgba(33,48,78,.35)">♞</div>
+        <div style="background:#fdfaf1;border:1px dashed rgba(17,17,17,.3);border-radius:14px;padding:28px 20px;text-align:center">
+          <div aria-hidden="true" style="font-size:26px;color:rgba(17,17,17,.35)">♞</div>
           <div style="font-size:13.5px;font-weight:600;margin-top:8px">No pairings yet</div>
-          <div style="font-size:12.5px;color:rgba(33,48,78,.6);margin-top:3px">{{tdRoundsEmptyMsg}}</div>
+          <div style="font-size:12.5px;color:rgba(17,17,17,.6);margin-top:3px">{{tdRoundsEmptyMsg}}</div>
         </div>
       </sc-if>
       <div style="display:flex;flex-direction:column;gap:14px">
         <sc-for list="{{tdRoundGroups}}" as="rd" hint-placeholder-count="3">
           <div>
-            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:7px">{{rd.label}}</div>
-            <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;overflow:hidden">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(17,17,17,.55);margin-bottom:7px">{{rd.label}}</div>
+            <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:13px;overflow:hidden">
               <sc-for list="{{rd.games}}" as="g" hint-placeholder-count="4">
-                <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.07)">
-                  <span style="flex:none;width:22px;height:22px;border-radius:6px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.12);font-size:10.5px;font-weight:700;color:rgba(33,48,78,.6);display:flex;align-items:center;justify-content:center">{{g.bn}}</span>
-                  <span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.white}} <span style="color:rgba(33,48,78,.45);font-weight:400">vs</span> {{g.black}}</span>
+                <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(17,17,17,.07)">
+                  <span style="flex:none;width:22px;height:22px;border-radius:6px;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.12);font-size:10.5px;font-weight:700;color:rgba(17,17,17,.6);display:flex;align-items:center;justify-content:center">{{g.bn}}</span>
+                  <span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{g.white}} <span style="color:rgba(17,17,17,.45);font-weight:400">vs</span> {{g.black}}</span>
                   <span style="flex:none;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:{{g.cBg}};color:{{g.cFg}};font-size:10px;font-weight:700">
                     <sc-if value="{{g.live}}" hint-placeholder-val="{{false}}"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;animation:jcPulse 1.4s infinite"></span></sc-if>{{g.chip}}
                   </span>
@@ -659,7 +659,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
         </sc-for>
       </div>
       <sc-if value="{{tdShowUpNote}}" hint-placeholder-val="{{false}}">
-        <div style="margin-top:12px;padding:11px 14px;background:rgba(33,48,78,.04);border:1px dashed rgba(33,48,78,.25);border-radius:12px;font-size:12px;color:rgba(33,48,78,.6)">{{tdUpNote}}</div>
+        <div style="margin-top:12px;padding:11px 14px;background:rgba(17,17,17,.04);border:1px dashed rgba(17,17,17,.25);border-radius:12px;font-size:12px;color:rgba(17,17,17,.6)">{{tdUpNote}}</div>
       </sc-if>
     </div>
   </sc-if>
@@ -669,15 +669,15 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
       <sc-for list="{{tdPlayerGroups}}" as="pg" hint-placeholder-count="1">
         <div>
           <sc-if value="{{pg.label}}" hint-placeholder-val="{{false}}">
-            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:7px">{{pg.label}}</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(17,17,17,.55);margin-bottom:7px">{{pg.label}}</div>
           </sc-if>
-          <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:13px;overflow:hidden">
+          <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:13px;overflow:hidden">
             <sc-for list="{{pg.rows}}" as="p" hint-placeholder-count="6">
-              <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid rgba(33,48,78,.07)">
-                <span style="flex:none;width:26px;height:26px;border-radius:50%;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.13);font-size:10.5px;font-weight:700;color:rgba(33,48,78,.6);display:flex;align-items:center;justify-content:center">{{p.seed}}</span>
+              <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid rgba(17,17,17,.07)">
+                <span style="flex:none;width:26px;height:26px;border-radius:50%;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.13);font-size:10.5px;font-weight:700;color:rgba(17,17,17,.6);display:flex;align-items:center;justify-content:center">{{p.seed}}</span>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.name}}</div>
-                  <div style="font-size:10.5px;color:rgba(33,48,78,.5)">{{p.cc}}</div>
+                  <div style="font-size:10.5px;color:rgba(17,17,17,.5)">{{p.cc}}</div>
                 </div>
                 <span style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:700">{{p.rating}}</span>
               </div>
@@ -692,29 +692,29 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 
 <sc-if value="{{isLeaderboard}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Leaderboard" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
-    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(17,17,17,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Club leaderboard</h1>
   </div>
-  <div style="margin:14px 16px 0;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+  <div style="margin:14px 16px 0;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
     <sc-for list="{{clubBoard}}" as="p" hint-placeholder-count="10">
-      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(17,17,17,.08)">
         <span style="flex:none;width:26px;height:26px;border-radius:50%;background:rgba(169,138,63,.14);color:#79622a;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">{{p.rank}}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.name}}</div>
-          <div style="font-size:11px;color:rgba(33,48,78,.55)">{{p.cc}}</div>
+          <div style="font-size:11px;color:rgba(17,17,17,.55)">{{p.cc}}</div>
         </div>
         <span style="font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:700">{{p.rating}}</span>
       </div>
     </sc-for>
   </div>
-  <div style="font-size:11.5px;color:rgba(33,48,78,.5);margin:10px 18px 0">Club rapid ratings · updated after every rated event</div>
+  <div style="font-size:11.5px;color:rgba(17,17,17,.5);margin:10px 18px 0">Club rapid ratings · updated after every rated event</div>
 </div>
 </sc-if>
 
 <sc-if value="{{isGames}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Games" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(17,17,17,.12);background:#f2ebd9">
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:36px;height:36px;border-radius:50%;display:block;flex:none">
     <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700">Review games</h1>
   </div>
@@ -725,11 +725,11 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
       <span style="display:block;font-size:12.5px;opacity:.75;margin-top:2px">Review a finished game move by move</span></span>
       <span aria-hidden="true" style="font-size:18px;opacity:.7">›</span>
     </button>
-    <button onClick="{{goNewAnalysis}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:20px 18px;border:1.5px solid #21304e;border-radius:14px;background:#fdfaf1;color:#21304e;text-align:left" style-active="background:#f4ecd9">
+    <button onClick="{{goNewAnalysis}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:20px 18px;border:1.5px solid #111111;border-radius:14px;background:#fdfaf1;color:#111111;text-align:left" style-active="background:#f4ecd9">
       <span aria-hidden="true" style="font-size:24px;color:#7d2434">♝</span>
       <span style="flex:1"><span style="display:block;font-size:16px;font-weight:700">New Analysis</span>
-      <span style="display:block;font-size:12.5px;color:rgba(33,48,78,.6);margin-top:2px">Fresh analysis from any starting point</span></span>
-      <span aria-hidden="true" style="font-size:18px;color:rgba(33,48,78,.5)">›</span>
+      <span style="display:block;font-size:12.5px;color:rgba(17,17,17,.6);margin-top:2px">Fresh analysis from any starting point</span></span>
+      <span aria-hidden="true" style="font-size:18px;color:rgba(17,17,17,.5)">›</span>
     </button>
   </div>
 </div>
@@ -737,18 +737,18 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 
 <sc-if value="{{isGameReview}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Game Review" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
-    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(17,17,17,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Game Review</h1>
   </div>
   <div style="padding:16px 16px 0">
-    <p style="margin:0 0 14px;font-size:13px;color:rgba(33,48,78,.6)">Pick where the game comes from.</p>
-    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+    <p style="margin:0 0 14px;font-size:13px;color:rgba(17,17,17,.6)">Pick where the game comes from.</p>
+    <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
       <sc-for list="{{optReview}}" as="o" hint-placeholder-count="5">
-        <button onClick="{{o.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:15px 16px;background:none;border:none;border-bottom:1px solid rgba(33,48,78,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
-          <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:#21304e">{{o.t}}</span>
-          <span style="display:block;font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">{{o.sub}}</span></span>
-          <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+        <button onClick="{{o.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:15px 16px;background:none;border:none;border-bottom:1px solid rgba(17,17,17,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
+          <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:#111111">{{o.t}}</span>
+          <span style="display:block;font-size:11.5px;color:rgba(17,17,17,.55);margin-top:2px">{{o.sub}}</span></span>
+          <span aria-hidden="true" style="font-size:17px;color:rgba(17,17,17,.4)">›</span>
         </button>
       </sc-for>
     </div>
@@ -758,65 +758,65 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 
 <sc-if value="{{isNewAnalysis}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="New Analysis" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
-    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(17,17,17,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">New Analysis</h1>
   </div>
   <div style="padding:16px 16px 0">
-    <p style="margin:0 0 14px;font-size:13px;color:rgba(33,48,78,.6)">Start a fresh analysis from zero.</p>
-    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+    <p style="margin:0 0 14px;font-size:13px;color:rgba(17,17,17,.6)">Start a fresh analysis from zero.</p>
+    <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
       <sc-for list="{{optAnalysis}}" as="o" hint-placeholder-count="6">
-        <button onClick="{{o.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:15px 16px;background:none;border:none;border-bottom:1px solid rgba(33,48,78,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
-          <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:#21304e">{{o.t}}</span>
-          <span style="display:block;font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">{{o.sub}}</span></span>
-          <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+        <button onClick="{{o.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:15px 16px;background:none;border:none;border-bottom:1px solid rgba(17,17,17,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
+          <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:#111111">{{o.t}}</span>
+          <span style="display:block;font-size:11.5px;color:rgba(17,17,17,.55);margin-top:2px">{{o.sub}}</span></span>
+          <span aria-hidden="true" style="font-size:17px;color:rgba(17,17,17,.4)">›</span>
         </button>
       </sc-for>
     </div>
-    <div style="margin-top:12px;font-size:11.5px;color:rgba(33,48,78,.5)">Mock only — no engine connected in this prototype.</div>
+    <div style="margin-top:12px;font-size:11.5px;color:rgba(17,17,17,.5)">Mock only — no engine connected in this prototype.</div>
   </div>
 </div>
 </sc-if>
 
 <sc-if value="{{isPicklist}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Pick a game" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
-    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(17,17,17,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">{{pickTitle}}</h1>
   </div>
   <div style="padding:16px 16px 0">
-    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+    <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
       <sc-for list="{{pickRows}}" as="g" hint-placeholder-count="4">
-        <button onClick="{{g.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;background:none;border:none;border-bottom:1px solid rgba(33,48,78,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
-          <span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;color:#21304e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{g.t}}</span>
-          <span style="display:block;font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">{{g.sub}}</span></span>
-          <span style="flex:none;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;color:#21304e;padding:3px 8px;border-radius:8px;background:rgba(33,48,78,.07)">{{g.res}}</span>
+        <button onClick="{{g.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;background:none;border:none;border-bottom:1px solid rgba(17,17,17,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
+          <span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;color:#111111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{g.t}}</span>
+          <span style="display:block;font-size:11.5px;color:rgba(17,17,17,.55);margin-top:2px">{{g.sub}}</span></span>
+          <span style="flex:none;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;color:#111111;padding:3px 8px;border-radius:8px;background:rgba(17,17,17,.07)">{{g.res}}</span>
         </button>
       </sc-for>
     </div>
-    <div style="margin-top:12px;font-size:11.5px;color:rgba(33,48,78,.5)">Sample games (mock) — tap one to open the analysis board.</div>
+    <div style="margin-top:12px;font-size:11.5px;color:rgba(17,17,17,.5)">Sample games (mock) — tap one to open the analysis board.</div>
   </div>
 </div>
 </sc-if>
 
 <sc-if value="{{isTools}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Tools" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(17,17,17,.12);background:#f2ebd9">
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:36px;height:36px;border-radius:50%;display:block;flex:none">
     <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700">Tools</h1>
   </div>
   <div style="display:flex;flex-direction:column;gap:12px;padding:16px 16px 0">
-    <button onClick="{{goClock}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:17px 16px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;text-align:left" style-active="background:#f4ecd9">
+    <button onClick="{{goClock}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:17px 16px;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;text-align:left" style-active="background:#f4ecd9">
       <span aria-hidden="true" style="flex:none;width:44px;height:44px;border-radius:11px;background:rgba(125,36,52,.08);border:1px solid rgba(125,36,52,.2);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:700;color:#7d2434">5:00</span>
-      <span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#21304e">Chess Clock</span>
-      <span style="display:block;font-size:12px;color:rgba(33,48,78,.6);margin-top:2px">Over-the-board timer with presets</span></span>
-      <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+      <span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#111111">Chess Clock</span>
+      <span style="display:block;font-size:12px;color:rgba(17,17,17,.6);margin-top:2px">Over-the-board timer with presets</span></span>
+      <span aria-hidden="true" style="font-size:17px;color:rgba(17,17,17,.4)">›</span>
     </button>
-    <button onClick="{{goSaved}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:17px 16px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;text-align:left" style-active="background:#f4ecd9">
+    <button onClick="{{goSaved}}" style="width:100%;display:flex;align-items:center;gap:14px;padding:17px 16px;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;text-align:left" style-active="background:#f4ecd9">
       <span aria-hidden="true" style="flex:none;width:44px;height:44px;border-radius:11px;background:rgba(125,36,52,.08);border:1px solid rgba(125,36,52,.2);display:flex;align-items:center;justify-content:center;font-size:21px;color:#7d2434">♜</span>
-      <span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#21304e">Saved Analyses</span>
-      <span style="display:block;font-size:12px;color:rgba(33,48,78,.6);margin-top:2px">Your stored positions and lines</span></span>
-      <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+      <span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#111111">Saved Analyses</span>
+      <span style="display:block;font-size:12px;color:rgba(17,17,17,.6);margin-top:2px">Your stored positions and lines</span></span>
+      <span aria-hidden="true" style="font-size:17px;color:rgba(17,17,17,.4)">›</span>
     </button>
   </div>
 </div>
@@ -824,57 +824,57 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 
 <sc-if value="{{isBoard}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Analysis Board" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
-    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(17,17,17,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Analysis Board</h1>
   </div>
   <div style="padding:14px 16px 0">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <span aria-hidden="true" style="width:14px;height:14px;border-radius:50%;background:{{bStatusDot}};border:1px solid rgba(33,48,78,.35);flex:none"></span>
+      <span aria-hidden="true" style="width:14px;height:14px;border-radius:50%;background:{{bStatusDot}};border:1px solid rgba(17,17,17,.35);flex:none"></span>
       <span aria-live="polite" style="font-size:13.5px;font-weight:700;color:{{bStatusColor}}">{{bStatus}}</span>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(8,1fr);border:2px solid #21304e;border-radius:8px;overflow:hidden;aspect-ratio:1;box-shadow:0 4px 14px rgba(33,48,78,.18)" role="grid" aria-label="Chessboard">
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);border:2px solid #111111;border-radius:8px;overflow:hidden;aspect-ratio:1;box-shadow:0 4px 14px rgba(17,17,17,.18)" role="grid" aria-label="Chessboard">
       <sc-for list="{{sq}}" as="c" hint-placeholder-count="64">
         <button onClick="{{c.tap}}" role="gridcell" style="position:relative;aspect-ratio:1;border:none;padding:0;background:{{c.bg}};display:flex;align-items:center;justify-content:center;font-size:clamp(22px,7.6vw,35px);line-height:1;color:{{c.col}};text-shadow:{{c.sh}}">
-          <sc-if value="{{c.dot}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="position:absolute;width:28%;height:28%;border-radius:50%;background:rgba(33,48,78,.34)"></span></sc-if>
+          <sc-if value="{{c.dot}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="position:absolute;width:28%;height:28%;border-radius:50%;background:rgba(17,17,17,.34)"></span></sc-if>
           <sc-if value="{{c.ring}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="position:absolute;inset:7%;border:3px solid rgba(125,36,52,.5);border-radius:50%"></span></sc-if>
           <span style="position:relative;z-index:1">{{c.ch}}</span>
         </button>
       </sc-for>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button onClick="{{doFlip}}" style="flex:1;padding:11px 0;border:1px solid rgba(33,48,78,.3);border-radius:10px;background:#fdfaf1;font-size:12.5px;font-weight:600;color:#21304e;min-height:44px" style-active="background:#f4ecd9">Flip</button>
-      <button onClick="{{doUndo}}" style="flex:1;padding:11px 0;border:1px solid rgba(33,48,78,.3);border-radius:10px;background:#fdfaf1;font-size:12.5px;font-weight:600;color:#21304e;min-height:44px" style-active="background:#f4ecd9">Undo</button>
-      <button onClick="{{doResetBoard}}" style="flex:1;padding:11px 0;border:1px solid rgba(33,48,78,.3);border-radius:10px;background:#fdfaf1;font-size:12.5px;font-weight:600;color:#21304e;min-height:44px" style-active="background:#f4ecd9">Reset</button>
+      <button onClick="{{doFlip}}" style="flex:1;padding:11px 0;border:1px solid rgba(17,17,17,.3);border-radius:10px;background:#fdfaf1;font-size:12.5px;font-weight:600;color:#111111;min-height:44px" style-active="background:#f4ecd9">Flip</button>
+      <button onClick="{{doUndo}}" style="flex:1;padding:11px 0;border:1px solid rgba(17,17,17,.3);border-radius:10px;background:#fdfaf1;font-size:12.5px;font-weight:600;color:#111111;min-height:44px" style-active="background:#f4ecd9">Undo</button>
+      <button onClick="{{doResetBoard}}" style="flex:1;padding:11px 0;border:1px solid rgba(17,17,17,.3);border-radius:10px;background:#fdfaf1;font-size:12.5px;font-weight:600;color:#111111;min-height:44px" style-active="background:#f4ecd9">Reset</button>
     </div>
-    <div style="margin-top:12px;background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:12px;padding:12px 14px;min-height:60px">
-      <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(33,48,78,.55);margin-bottom:6px">Move list</div>
+    <div style="margin-top:12px;background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:12px;padding:12px 14px;min-height:60px">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(17,17,17,.55);margin-bottom:6px">Move list</div>
       <sc-if value="{{hasMoves}}" hint-placeholder-val="{{false}}">
-        <div style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.8;color:#21304e;overflow-wrap:break-word">{{movesText}}</div>
+        <div style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.8;color:#111111;overflow-wrap:break-word">{{movesText}}</div>
       </sc-if>
       <sc-if value="{{noMoves}}" hint-placeholder-val="{{true}}">
-        <div style="font-size:12.5px;color:rgba(33,48,78,.5)">Tap a piece to see its legal moves, then tap a highlighted square.</div>
+        <div style="font-size:12.5px;color:rgba(17,17,17,.5)">Tap a piece to see its legal moves, then tap a highlighted square.</div>
       </sc-if>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button onClick="{{doSave}}" style="flex:1;padding:13px 0;border:none;border-radius:11px;background:#7d2434;color:#f7f1e3;font-size:13.5px;font-weight:600;min-height:48px" style-active="transform:scale(.985)">Save Analysis</button>
-      <button onClick="{{doExport}}" style="flex:1;padding:13px 0;border:1.5px solid #21304e;border-radius:11px;background:transparent;color:#21304e;font-size:13.5px;font-weight:600;min-height:48px" style-active="background:#f4ecd9">Export PGN</button>
+      <button onClick="{{doExport}}" style="flex:1;padding:13px 0;border:1.5px solid #111111;border-radius:11px;background:transparent;color:#111111;font-size:13.5px;font-weight:600;min-height:48px" style-active="background:#f4ecd9">Export PGN</button>
     </div>
-    <div style="margin-top:10px;font-size:11.5px;color:rgba(33,48,78,.55);text-align:center">{{saveCue}}</div>
+    <div style="margin-top:10px;font-size:11.5px;color:rgba(17,17,17,.55);text-align:center">{{saveCue}}</div>
   </div>
 </div>
 </sc-if>
 
 <sc-if value="{{isClock}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Chess Clock" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
-    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(17,17,17,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Chess Clock</h1>
   </div>
   <div style="padding:14px 16px 0">
     <div role="group" aria-label="Time presets" style="display:flex;gap:7px;margin-bottom:14px">
       <sc-for list="{{presets}}" as="p" hint-placeholder-count="5">
-        <button onClick="{{p.on}}" style="flex:1;padding:10px 0;border-radius:10px;border:1px solid rgba(33,48,78,.28);background:{{p.bg}};color:{{p.fg}};font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;min-height:44px">{{p.label}}</button>
+        <button onClick="{{p.on}}" style="flex:1;padding:10px 0;border-radius:10px;border:1px solid rgba(17,17,17,.28);background:{{p.bg}};color:{{p.fg}};font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;min-height:44px">{{p.label}}</button>
       </sc-for>
     </div>
     <button onClick="{{tapB}}" aria-label="Black clock" style="width:100%;border:1px solid {{bPan.bd}};border-radius:16px;background:{{bPan.bg}};color:{{bPan.fg}};padding:26px 20px;text-align:center;animation:{{bPan.anim}}">
@@ -890,35 +890,35 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
     </button>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button onClick="{{togglePause}}" style="flex:1;padding:13px 0;border:none;border-radius:11px;background:#7d2434;color:#f7f1e3;font-size:13.5px;font-weight:600;min-height:48px" style-active="transform:scale(.985)">{{pauseLabel}}</button>
-      <button onClick="{{resetClock}}" style="flex:1;padding:13px 0;border:1.5px solid #21304e;border-radius:11px;background:transparent;color:#21304e;font-size:13.5px;font-weight:600;min-height:48px" style-active="background:#f4ecd9">Reset</button>
+      <button onClick="{{resetClock}}" style="flex:1;padding:13px 0;border:1.5px solid #111111;border-radius:11px;background:transparent;color:#111111;font-size:13.5px;font-weight:600;min-height:48px" style-active="background:#f4ecd9">Reset</button>
     </div>
-    <div style="margin-top:10px;font-size:11.5px;color:rgba(33,48,78,.55);text-align:center">Tap your own clock after moving to start your opponent's time.</div>
+    <div style="margin-top:10px;font-size:11.5px;color:rgba(17,17,17,.55);text-align:center">Tap your own clock after moving to start your opponent's time.</div>
   </div>
 </div>
 </sc-if>
 
 <sc-if value="{{isSaved}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Saved Analyses" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(33,48,78,.12)">
-    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(33,48,78,.18);background:#fffdf6;color:#21304e;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(33,48,78,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f2ebd9;border-bottom:1px solid rgba(17,17,17,.12)">
+    <button onClick="{{back}}" aria-label="Back" style="width:40px;height:40px;border-radius:12px;border:1px solid rgba(17,17,17,.18);background:#fffdf6;color:#111111;flex:none;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(17,17,17,.08)" style-active="background:#f1e9d6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700">Saved Analyses</h1>
   </div>
   <div style="padding:16px 16px 0">
     <sc-if value="{{savedEmpty}}" hint-placeholder-val="{{false}}">
-      <div style="background:#fdfaf1;border:1px dashed rgba(33,48,78,.3);border-radius:14px;padding:30px 20px;text-align:center">
-        <div aria-hidden="true" style="font-size:26px;color:rgba(33,48,78,.35)">♜</div>
+      <div style="background:#fdfaf1;border:1px dashed rgba(17,17,17,.3);border-radius:14px;padding:30px 20px;text-align:center">
+        <div aria-hidden="true" style="font-size:26px;color:rgba(17,17,17,.35)">♜</div>
         <div style="font-size:13.5px;font-weight:600;margin-top:8px">Nothing saved yet</div>
-        <div style="font-size:12.5px;color:rgba(33,48,78,.6);margin-top:3px">Sign in to keep analyses across sessions.</div>
+        <div style="font-size:12.5px;color:rgba(17,17,17,.6);margin-top:3px">Sign in to keep analyses across sessions.</div>
         <button onClick="{{goSignin}}" style="margin-top:14px;padding:11px 22px;border:none;border-radius:10px;background:#7d2434;color:#f7f1e3;font-size:13px;font-weight:600">Sign in</button>
       </div>
     </sc-if>
-    <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+    <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
       <sc-for list="{{savedRows}}" as="a" hint-placeholder-count="2">
-        <button onClick="{{a.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;background:none;border:none;border-bottom:1px solid rgba(33,48,78,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
+        <button onClick="{{a.on}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;background:none;border:none;border-bottom:1px solid rgba(17,17,17,.08);text-align:left;min-height:56px" style-active="background:#f4ecd9">
           <span aria-hidden="true" style="flex:none;width:34px;height:34px;border-radius:9px;background:rgba(125,36,52,.08);border:1px solid rgba(125,36,52,.2);display:flex;align-items:center;justify-content:center;font-size:15px;color:#7d2434">♟</span>
-          <span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;color:#21304e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{a.t}}</span>
-          <span style="display:block;font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">{{a.sub}}</span></span>
-          <span aria-hidden="true" style="font-size:17px;color:rgba(33,48,78,.4)">›</span>
+          <span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;color:#111111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{a.t}}</span>
+          <span style="display:block;font-size:11.5px;color:rgba(17,17,17,.55);margin-top:2px">{{a.sub}}</span></span>
+          <span aria-hidden="true" style="font-size:17px;color:rgba(17,17,17,.4)">›</span>
         </button>
       </sc-for>
     </div>
@@ -928,40 +928,40 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
 
 <sc-if value="{{isProfile}}" hint-placeholder-val="{{false}}">
 <div data-screen-label="Profile" style="padding:0 0 118px">
-  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(33,48,78,.12);background:#f2ebd9">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid rgba(17,17,17,.12);background:#f2ebd9">
     <img src="assets/juchess-logo.png" alt="JuChess logo" style="width:36px;height:36px;border-radius:50%;display:block;flex:none">
     <h1 style="margin:0;flex:1;font-family:'Source Serif 4',Georgia,serif;font-size:19px;font-weight:700">Profile</h1>
   </div>
 
   <sc-if value="{{isGuest}}" hint-placeholder-val="{{false}}">
     <div style="padding:26px 16px 0;text-align:center">
-      <div aria-hidden="true" style="width:76px;height:76px;border-radius:50%;background:rgba(33,48,78,.07);border:1px solid rgba(33,48,78,.2);margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:30px;color:rgba(33,48,78,.4)">♟</div>
+      <div aria-hidden="true" style="width:76px;height:76px;border-radius:50%;background:rgba(17,17,17,.07);border:1px solid rgba(17,17,17,.2);margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:30px;color:rgba(17,17,17,.4)">♟</div>
       <div style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700;margin-top:14px">You're in Guest Mode</div>
-      <div style="font-size:13px;color:rgba(33,48,78,.6);margin-top:5px;line-height:1.5">Sign in to see your club rating, rank,<br>tournament history and achievements.</div>
+      <div style="font-size:13px;color:rgba(17,17,17,.6);margin-top:5px;line-height:1.5">Sign in to see your club rating, rank,<br>tournament history and achievements.</div>
       <button onClick="{{goSignin}}" style="margin-top:18px;padding:13px 34px;border:none;border-radius:11px;background:#7d2434;color:#f7f1e3;font-size:14.5px;font-weight:600" style-active="transform:scale(.985)">Sign in</button>
-      <div style="margin-top:12px;font-size:13px;color:rgba(33,48,78,.6)">New to the club? <button onClick="{{goSignup}}" style="background:none;border:none;padding:4px 2px;font-size:13px;font-weight:700;color:#7d2434">Sign up</button></div>
+      <div style="margin-top:12px;font-size:13px;color:rgba(17,17,17,.6)">New to the club? <button onClick="{{goSignup}}" style="background:none;border:none;padding:4px 2px;font-size:13px;font-weight:700;color:#7d2434">Sign up</button></div>
     </div>
   </sc-if>
 
   <sc-if value="{{isMember}}" hint-placeholder-val="{{false}}">
     <div style="padding:16px 16px 0">
-      <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px">
+      <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px">
         <div aria-hidden="true" style="flex:none;width:62px;height:62px;border-radius:50%;background:rgba(169,138,63,.16);border:1px solid rgba(169,138,63,.4);display:flex;align-items:center;justify-content:center;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:700;color:#79622a">{{pInit}}</div>
         <div style="flex:1;min-width:0">
           <div style="font-family:'Source Serif 4',Georgia,serif;font-size:18px;font-weight:700;overflow-wrap:break-word">{{pName}}</div>
-          <div style="font-size:12px;color:rgba(33,48,78,.6);margin-top:2px">Chess.com: {{pCc}}</div>
+          <div style="font-size:12px;color:rgba(17,17,17,.6);margin-top:2px">Chess.com: {{pCc}}</div>
           <div style="display:flex;gap:6px;margin-top:8px">
             <span style="padding:3px 9px;border-radius:999px;background:rgba(169,138,63,.14);border:1px solid rgba(169,138,63,.4);font-size:11px;font-weight:700;color:#79622a">Rating {{pRating}}</span>
-            <span style="padding:3px 9px;border-radius:999px;background:rgba(33,48,78,.06);border:1px solid rgba(33,48,78,.15);font-size:11px;font-weight:700;color:#33415f">Club rank {{pRank}}</span>
+            <span style="padding:3px 9px;border-radius:999px;background:rgba(17,17,17,.06);border:1px solid rgba(17,17,17,.15);font-size:11px;font-weight:700;color:#111111">Club rank {{pRank}}</span>
           </div>
         </div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
         <sc-for list="{{pStats}}" as="st" hint-placeholder-count="3">
-          <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:12px;padding:12px 8px;text-align:center">
+          <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:12px;padding:12px 8px;text-align:center">
             <div style="font-family:ui-monospace,Menlo,monospace;font-size:20px;font-weight:700">{{st.x}}</div>
-            <div style="font-size:11px;color:rgba(33,48,78,.55);font-weight:600;margin-top:2px">{{st.k}}</div>
+            <div style="font-size:11px;color:rgba(17,17,17,.55);font-weight:600;margin-top:2px">{{st.k}}</div>
           </div>
         </sc-for>
       </div>
@@ -974,24 +974,24 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
       </div>
 
       <div style="margin:20px 0 8px;font-family:'Source Serif 4',Georgia,serif;font-size:15.5px;font-weight:700">Recent tournament games</div>
-      <div style="background:#fdfaf1;border:1px solid rgba(33,48,78,.16);border-radius:14px;overflow:hidden">
+      <div style="background:#fdfaf1;border:1px solid rgba(17,17,17,.16);border-radius:14px;overflow:hidden">
         <sc-for list="{{pGames}}" as="g" hint-placeholder-count="3">
-          <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(33,48,78,.08)">
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(17,17,17,.08)">
             <div style="flex:1;min-width:0">
               <div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{g.t}}</div>
-              <div style="font-size:11px;color:rgba(33,48,78,.55);margin-top:2px">{{g.sub}}</div>
+              <div style="font-size:11px;color:rgba(17,17,17,.55);margin-top:2px">{{g.sub}}</div>
             </div>
             <span style="flex:none;padding:4px 10px;border-radius:999px;background:{{g.cBg}};color:{{g.cFg}};font-size:11px;font-weight:700">{{g.chip}}</span>
           </div>
         </sc-for>
       </div>
 
-      <div style="margin-top:14px;padding:13px 14px;background:rgba(33,48,78,.04);border:1px solid rgba(33,48,78,.14);border-radius:13px;display:flex;align-items:center;gap:12px">
+      <div style="margin-top:14px;padding:13px 14px;background:rgba(17,17,17,.04);border:1px solid rgba(17,17,17,.14);border-radius:13px;display:flex;align-items:center;gap:12px">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600">Sync Chess.com games</div>
-          <div style="font-size:11.5px;color:rgba(33,48,78,.55);margin-top:2px">Pull your latest online games (mock)</div>
+          <div style="font-size:11.5px;color:rgba(17,17,17,.55);margin-top:2px">Pull your latest online games (mock)</div>
         </div>
-        <button onClick="{{syncCc}}" style="flex:none;padding:10px 16px;border:1.5px solid #21304e;border-radius:10px;background:transparent;color:#21304e;font-size:12.5px;font-weight:700;min-height:42px" style-active="background:#f4ecd9">Sync</button>
+        <button onClick="{{syncCc}}" style="flex:none;padding:10px 16px;border:1.5px solid #111111;border-radius:10px;background:transparent;color:#111111;font-size:12.5px;font-weight:700;min-height:42px" style-active="background:#f4ecd9">Sync</button>
       </div>
 
       <button onClick="{{signOut}}" style="width:100%;margin-top:14px;padding:13px;border:1px solid rgba(125,36,52,.4);border-radius:11px;background:transparent;color:#7d2434;font-size:13.5px;font-weight:600" style-active="background:rgba(125,36,52,.06)">Sign out</button>
@@ -1005,11 +1005,11 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
       </div>
 
 <sc-if value="{{showToast}}" hint-placeholder-val="{{false}}">
-  <div role="status" style="position:absolute;bottom:96px;left:50%;transform:translateX(-50%);background:#21304e;color:#f7f1e3;padding:10px 16px;border-radius:10px;font-size:13px;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:360px;width:max-content;text-align:center">{{toastText}}</div>
+  <div role="status" style="position:absolute;bottom:96px;left:50%;transform:translateX(-50%);background:#111111;color:#f7f1e3;padding:10px 16px;border-radius:10px;font-size:13px;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:360px;width:max-content;text-align:center">{{toastText}}</div>
 </sc-if>
 
 <sc-if value="{{showNav}}" hint-placeholder-val="{{true}}">
-<nav aria-label="Primary" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:{{contentMax}};background:#fbf7ec;border-top:1px solid rgba(33,48,78,.15);display:flex;padding:5px 4px 10px;z-index:40">
+<nav aria-label="Primary" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:{{contentMax}};background:#fbf7ec;border-top:1px solid rgba(17,17,17,.15);display:flex;padding:5px 4px 10px;z-index:40">
   <button onClick="{{goHome}}" aria-label="Home" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;padding:6px 0;min-height:48px;color:{{cHome}}">
     <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"></path><path d="M5 9.5V21h14V9.5"></path></svg>
     <span style="font-size:10px;font-weight:600">Home</span>
@@ -1037,8 +1037,8 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #7d24
   </div>
   </div>
   <sc-if value="{{sbShow}}" hint-placeholder-val="{{false}}">
-    <div ref="{{trackRef}}" aria-hidden="true" style="flex:none;position:relative;width:7px;height:{{fitH}}px;border-radius:5px;background:rgba(33,48,78,.12)">
-      <div onMouseDown="{{sbDown}}" style="position:absolute;left:0;right:0;height:{{sbThumbH}};top:{{sbThumbT}};background:rgba(33,48,78,.4);border-radius:5px;cursor:grab"></div>
+    <div ref="{{trackRef}}" aria-hidden="true" style="flex:none;position:relative;width:7px;height:{{fitH}}px;border-radius:5px;background:rgba(17,17,17,.12)">
+      <div onMouseDown="{{sbDown}}" style="position:absolute;left:0;right:0;height:{{sbThumbH}};top:{{sbThumbT}};background:rgba(17,17,17,.4);border-radius:5px;cursor:grab"></div>
     </div>
   </sc-if>
   </div>
@@ -1428,7 +1428,7 @@ class Component extends DCLogic {
   qrDataUri(code){
     const m=this.qrMatrix(code),N=m.length,cell=4,pad=2,size=(N+pad*2)*cell; let rects='';
     for(let r=0;r<N;r++)for(let c=0;c<N;c++) if(m[r][c]) rects+="<rect x='"+((c+pad)*cell)+"' y='"+((r+pad)*cell)+"' width='"+cell+"' height='"+cell+"'/>";
-    const svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 "+size+" "+size+"'><rect width='"+size+"' height='"+size+"' fill='#fffdf6'/><g fill='#21304e'>"+rects+"</g></svg>";
+    const svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 "+size+" "+size+"'><rect width='"+size+"' height='"+size+"' fill='#fffdf6'/><g fill='#111111'>"+rects+"</g></svg>";
     return 'data:image/svg+xml,'+encodeURIComponent(svg);
   }
   toggleReg(t){
@@ -1448,8 +1448,8 @@ class Component extends DCLogic {
     const nm=i=>this.P[i][0]; const live=g.res==='live';
     return {bn:g.board,white:nm(g.w),black:nm(g.b),live,
       chip:live?'LIVE':(g.res==='–'?'Upcoming':g.res),
-      cBg:live?'#7d2434':(g.res==='–'?'rgba(33,48,78,.05)':'rgba(33,48,78,.08)'),
-      cFg:live?'#f7f1e3':(g.res==='–'?'rgba(33,48,78,.5)':'#21304e')};
+      cBg:live?'#7d2434':(g.res==='–'?'rgba(17,17,17,.05)':'rgba(17,17,17,.08)'),
+      cFg:live?'#f7f1e3':(g.res==='–'?'rgba(17,17,17,.5)':'#111111')};
   }
   mapBr(rounds){
     const nm=i=>this.P[i][0];
@@ -1489,10 +1489,10 @@ class Component extends DCLogic {
     const s=this.state, t=this.D.byId[s.route.params.id], P=this.P, nm=i=>P[i][0];
     const v={};
     if(!t) return v;
-    const N='#21304e',BU='#7d2434',CREAM='#f7f1e3';
+    const N='#111111',BU='#7d2434',CREAM='#f7f1e3';
     v.tdName=t.name;
     if(t.status==='active'){ v.tdBadge='Live'; v.tdBBg=BU; v.tdBFg=CREAM; v.tdBBd=BU; v.tdBLive=true; }
-    else if(t.status==='upcoming'){ v.tdBadge='Upcoming'; v.tdBBg='rgba(33,48,78,.07)'; v.tdBFg=N; v.tdBBd='rgba(33,48,78,.28)'; v.tdBLive=false; }
+    else if(t.status==='upcoming'){ v.tdBadge='Upcoming'; v.tdBBg='rgba(17,17,17,.07)'; v.tdBFg=N; v.tdBBd='rgba(17,17,17,.28)'; v.tdBLive=false; }
     else { v.tdBadge='Finished'; v.tdBBg='rgba(169,138,63,.14)'; v.tdBFg='#79622a'; v.tdBBd='rgba(169,138,63,.4)'; v.tdBLive=false; }
     v.tdChips=[t.date,t.loc,t.tc,t.capText].map(x=>({x}));
 
@@ -1617,14 +1617,14 @@ class Component extends DCLogic {
   renderVals(){
     const s=this.state, r=s.route, P=this.P;
     const user=this.user();
-    const N='#21304e',BU='#7d2434',CREAM='#f7f1e3',MUT='rgba(33,48,78,.5)';
+    const N='#111111',BU='#7d2434',CREAM='#f7f1e3',MUT='rgba(17,17,17,.5)';
     const v={};
     const d=this.DEVS[s.device]||this.DEVS.ios;
     const nat={w:parseInt(d.w)+2*parseInt(d.pad),h:parseInt(d.h)+2*parseInt(d.pad)};
     v.fit=s.fit||1; v.fitW=Math.round(nat.w*v.fit); v.fitH=Math.round(nat.h*v.fit); v.devBoxW=nat.w; v.devBoxH=nat.h;
     v.devBezel=d.bezel; v.devOuterR=d.outerR; v.devPad=d.pad; v.devW=d.w; v.devH=d.h; v.devInnerR=d.innerR; v.contentMax=d.contentMax;
     v.statusH=d.statusH; v.statusFs=d.statusFs; v.statusPad=d.statusPad; v.islandZone=d.islandZone; v.camW=d.camW; v.camH=d.camH; v.statusTime='9:41';
-    v.devices=[['ios','iPhone'],['android','Android'],['tablet','Tablet']].map(x=>({label:x[1],on:()=>this.setState({device:x[0]},()=>this.fit()),on2:s.device===x[0],bg:s.device===x[0]?'#21304e':'transparent',fg:s.device===x[0]?'#f7f1e3':'#21304e'}));
+    v.devices=[['ios','iPhone'],['android','Android'],['tablet','Tablet']].map(x=>({label:x[1],on:()=>this.setState({device:x[0]},()=>this.fit()),on2:s.device===x[0],bg:s.device===x[0]?'#111111':'transparent',fg:s.device===x[0]?'#f7f1e3':'#111111'}));
     v.scrollRef=el=>{this.scrollEl=el;}; v.brRef=el=>{this.brScrollEl=el;}; v.trackRef=el=>{this.trackEl=el;};
     v.switcherRef=el=>{ const first=!this.switcherEl; this.switcherEl=el; if(first&&el) requestAnimationFrame(()=>this.fit()); };
     v.onScroll=()=>this.updateSb(); v.sbDown=e=>this.sbDown(e);
@@ -1632,15 +1632,15 @@ class Component extends DCLogic {
     v.sbShow=vis>0&&vis<0.995; v.sbThumbH=(vh*100).toFixed(1)+'%'; v.sbThumbT=(frac*(1-vh)*100).toFixed(1)+'%';
     const strColor=['transparent','#7d2434','#a98a3f','#1f8a5b'];
     const strLabel=['','Weak password','Fair password','Strong password'];
-    const mkSeg=n=>[0,1,2].map(i=>({bg:i<n?strColor[n]:'rgba(33,48,78,.12)'}));
+    const mkSeg=n=>[0,1,2].map(i=>({bg:i<n?strColor[n]:'rgba(17,17,17,.12)'}));
     v.onSuPw=e=>this.setState({suStr:this.strength(e.target.value)});
     v.onRpPw=e=>this.setState({rpStr:this.strength(e.target.value)});
     v.suStrShow=s.suStr>0; v.suSeg=mkSeg(s.suStr); v.suStrColor=strColor[s.suStr]; v.suStrLabel=strLabel[s.suStr];
     v.rpStrShow=s.rpStr>0; v.rpSeg=mkSeg(s.rpStr); v.rpStrColor=strColor[s.rpStr]; v.rpStrLabel=strLabel[s.rpStr];
     v.methodEmail=s.otpMethod==='email'; v.methodSms=s.otpMethod==='sms';
     v.setEmail=()=>this.setState({otpMethod:'email'}); v.setSms=()=>this.setState({otpMethod:'sms'});
-    v.emBg=s.otpMethod==='email'?'rgba(125,36,52,.07)':'#fffdf6'; v.emBd=s.otpMethod==='email'?'#7d2434':'rgba(33,48,78,.22)';
-    v.smBg=s.otpMethod==='sms'?'rgba(125,36,52,.07)':'#fffdf6'; v.smBd=s.otpMethod==='sms'?'#7d2434':'rgba(33,48,78,.22)';
+    v.emBg=s.otpMethod==='email'?'rgba(125,36,52,.07)':'#fffdf6'; v.emBd=s.otpMethod==='email'?'#7d2434':'rgba(17,17,17,.22)';
+    v.smBg=s.otpMethod==='sms'?'rgba(125,36,52,.07)':'#fffdf6'; v.smBd=s.otpMethod==='sms'?'#7d2434':'rgba(17,17,17,.22)';
     v.otpDest=s.otpMethod==='sms'?'your phone via SMS':'your registered email';
     v.isHome=r.name==='home'; v.isTournaments=r.name==='tournaments'; v.isTournament=r.name==='tournament';
     v.isGames=r.name==='games'; v.isGameReview=r.name==='gamereview'; v.isNewAnalysis=r.name==='newanalysis'; v.isPicklist=r.name==='picklist';
@@ -1676,7 +1676,7 @@ class Component extends DCLogic {
 
     v.tTabs=[['active','Active'],['upcoming','Upcoming'],['completed','Completed']].map(x=>({label:x[1],on:()=>this.setState({tTab:x[0]}),bg:s.tTab===x[0]?BU:'transparent',fg:s.tTab===x[0]?CREAM:N}));
     v.tList=this.D.list.filter(t=>t.status===s.tTab).map(t=>{
-      const b=t.status==='active'?{bT:'Live',bBg:BU,bFg:CREAM,bBd:BU,bLive:true}:(t.status==='upcoming'?{bT:'Upcoming',bBg:'rgba(33,48,78,.07)',bFg:N,bBd:'rgba(33,48,78,.28)',bLive:false}:{bT:'Finished',bBg:'rgba(169,138,63,.14)',bFg:'#79622a',bBd:'rgba(169,138,63,.4)',bLive:false});
+      const b=t.status==='active'?{bT:'Live',bBg:BU,bFg:CREAM,bBd:BU,bLive:true}:(t.status==='upcoming'?{bT:'Upcoming',bBg:'rgba(17,17,17,.07)',bFg:N,bBd:'rgba(17,17,17,.28)',bLive:false}:{bT:'Finished',bBg:'rgba(169,138,63,.14)',bFg:'#79622a',bBd:'rgba(169,138,63,.4)',bLive:false});
       return Object.assign({name:t.name,date:t.date,loc:t.loc,fmt:t.fmt,tc:t.tc,cap:t.capText,cur:t.cur,on:()=>this.go('tournament',{id:t.id})},b);
     });
 
@@ -1703,7 +1703,7 @@ class Component extends DCLogic {
       v.bStatusColor='#7d2434'; v.bStatusDot=s.bGameOver.winner?'#7d2434':'#79622a';
     } else {
       v.bStatus=(s.bTurn==='w'?'White':'Black')+' to move'+(s.bCheckIdx>=0?' · Check':'');
-      v.bStatusColor=s.bCheckIdx>=0?'#7d2434':'rgba(33,48,78,.72)'; v.bStatusDot=s.bTurn==='w'?'#f4ecd6':'#2a3140';
+      v.bStatusColor=s.bCheckIdx>=0?'#7d2434':'rgba(17,17,17,.72)'; v.bStatusDot=s.bTurn==='w'?'#f4ecd6':'#2a3140';
     }
     v.doFlip=()=>this.setState({flip:!s.flip});
     v.doUndo=()=>{ if(!s.hist.length) return; const h=[...s.hist]; const snap=h.pop(); this.setState({cells:snap.cells,bTurn:snap.bTurn,bcastle:snap.bcastle,bep:snap.bep,bLast:snap.bLast,moves:snap.moves,bGameOver:snap.bGameOver,bCheckIdx:snap.bCheckIdx,hist:h,sel:-1,legal:[]}); };
@@ -1723,7 +1723,7 @@ class Component extends DCLogic {
       return {time:this.fmtT(t),
         bg:flag?'#3a1119':(active?(low?BU:N):'#fdfaf1'),
         fg:(active||flag)?CREAM:N,
-        bd:(active||flag)?'transparent':'rgba(33,48,78,.22)',
+        bd:(active||flag)?'transparent':'rgba(17,17,17,.22)',
         anim:(active&&low)?'jcPulse 1s infinite':'none',
         sub:flag?'⚑ Flag fell — out of time':(active?'Running…':(s.running?'Waiting':'Tap to start opponent'))};
     };
@@ -1747,7 +1747,7 @@ class Component extends DCLogic {
         if((g.w===0||g.b===0)&&g.res!=='live'&&g.res!=='–'){
           const won=(g.w===0&&g.res==='1-0')||(g.b===0&&g.res==='0-1');
           const draw=g.res==='½-½';
-          rg.push({t:'vs '+nm(g.w===0?g.b:g.w),sub:'Swiss · '+rd.label,chip:draw?'Draw':(won?'Won':'Lost'),cBg:draw?'rgba(33,48,78,.08)':(won?'rgba(169,138,63,.16)':'rgba(125,36,52,.1)'),cFg:draw?N:(won?'#79622a':BU)});
+          rg.push({t:'vs '+nm(g.w===0?g.b:g.w),sub:'Swiss · '+rd.label,chip:draw?'Draw':(won?'Won':'Lost'),cBg:draw?'rgba(17,17,17,.08)':(won?'rgba(169,138,63,.16)':'rgba(125,36,52,.1)'),cFg:draw?N:(won?'#79622a':BU)});
         }
       }));
       v.pGames=rg;

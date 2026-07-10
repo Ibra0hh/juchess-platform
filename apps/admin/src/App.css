@@ -13,7 +13,7 @@ body,
 
 body {
   background: #e9e1cf;
-  color: #21304e;
+  color: #111111;
   font-family: "Public Sans", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -61,7 +61,7 @@ button {
 .prototype-login-card {
   width: min(100%, 420px);
   padding: 44px 40px 40px;
-  border: 1px solid rgba(33, 48, 78, 0.1);
+  border: 1px solid rgba(17, 17, 17, 0.1);
   border-radius: 18px;
   background: #fdfaf1;
   box-shadow: 0 40px 90px -30px rgba(60, 10, 20, 0.55);
@@ -87,7 +87,7 @@ button {
 }
 
 .login-brand strong {
-  color: #21304e;
+  color: #111111;
   font-family: "Source Serif 4", Georgia, serif;
   font-size: 22px;
   line-height: 1.15;
@@ -103,7 +103,7 @@ button {
 
 .prototype-login-card h1 {
   margin: 0 0 6px;
-  color: #21304e;
+  color: #111111;
   font-family: "Source Serif 4", Georgia, serif;
   font-size: 24px;
   line-height: 1.15;
@@ -124,7 +124,7 @@ button {
 .prototype-form label {
   display: grid;
   gap: 7px;
-  color: #21304e;
+  color: #111111;
   font-size: 12.5px;
   font-weight: 800;
 }
@@ -141,7 +141,7 @@ button {
   border: 1.5px solid #e4dac5;
   border-radius: 10px;
   background: #fff;
-  color: #14213d;
+  color: #111111;
   outline: none;
 }
 
@@ -308,7 +308,7 @@ button {
   display: inline-grid;
   place-items: center;
   border-radius: 50%;
-  background: #21304e;
+  background: #111111;
   color: #fff;
   font-size: 13px;
   font-weight: 900;
@@ -363,7 +363,7 @@ button {
 
 .prototype-topbar h1 {
   margin: 0;
-  color: #21304e;
+  color: #111111;
   font-family: "Source Serif 4", Georgia, serif;
   font-size: 19px;
   letter-spacing: -0.01em;
@@ -403,7 +403,7 @@ button {
   width: 100%;
   border: 0;
   background: transparent;
-  color: #14213d;
+  color: #111111;
   outline: none;
   font-size: 13px;
 }
@@ -494,7 +494,7 @@ button {
 .stat-card strong {
   display: block;
   margin-top: 12px;
-  color: #14213d;
+  color: #111111;
   font-family: "JetBrains Mono", monospace;
   font-size: 32px;
   line-height: 1;
@@ -530,7 +530,7 @@ button {
 
 .panel-head strong,
 .panel-title {
-  color: #14213d;
+  color: #111111;
   font-size: 14.5px;
   font-weight: 900;
 }
@@ -568,7 +568,7 @@ button {
 .post-row strong,
 .block-row strong {
   display: block;
-  color: #14213d;
+  color: #111111;
   font-size: 13.5px;
   font-weight: 900;
 }
@@ -608,13 +608,13 @@ button {
 
 .queue-row span {
   flex: 1;
-  color: #14213d;
+  color: #111111;
   font-size: 13px;
   font-weight: 800;
 }
 
 .queue-row strong {
-  color: #14213d;
+  color: #111111;
   font-family: "JetBrains Mono", monospace;
   font-size: 16px;
 }
@@ -637,7 +637,7 @@ button {
 .mini-table td {
   padding: 12px 20px;
   border-bottom: 1px solid #f4f0e8;
-  color: #14213d;
+  color: #111111;
   font-size: 13px;
   font-weight: 800;
 }
@@ -666,7 +666,7 @@ button {
 
 .status-pill.draft {
   background: #eef1f6;
-  color: #33415f;
+  color: #111111;
 }
 
 .status-pill.upcoming {
@@ -681,7 +681,7 @@ button {
 
 .status-pill.waitlisted {
   background: #eef1f6;
-  color: #33415f;
+  color: #111111;
 }
 
 .status-pill.cancelled {
@@ -799,7 +799,7 @@ button {
 }
 
 .create-modal-head strong {
-  color: #14213d;
+  color: #111111;
   font-size: 17px;
   font-weight: 900;
 }
@@ -863,7 +863,7 @@ button {
 .create-field {
   display: grid;
   gap: 7px;
-  color: #21304e;
+  color: #111111;
   font-size: 12px;
   font-weight: 900;
 }
@@ -891,7 +891,7 @@ button {
   border: 1.5px solid #e6dfd3;
   border-radius: 9px;
   background: #fff;
-  color: #14213d;
+  color: #111111;
   outline: none;
   font-size: 13px;
 }
@@ -954,7 +954,7 @@ button {
   border: 1.5px solid #e6dfd3;
   border-radius: 8px;
   background: #fff;
-  color: #21304e;
+  color: #111111;
   cursor: pointer;
   place-items: center;
 }
@@ -1112,12 +1112,12 @@ button {
 .create-modal-actions .secondary-action {
   border: 1px solid #d8d1c4;
   background: #fff;
-  color: #14213d;
+  color: #111111;
 }
 
 .create-modal-actions .dark-action {
   border: 0;
-  background: #14213d;
+  background: #111111;
   color: #fff;
 }
 
@@ -1148,7 +1148,7 @@ button {
 
 .prototype-form h3 {
   margin: 0;
-  color: #14213d;
+  color: #111111;
   font-family: "Source Serif 4", Georgia, serif;
 }
 
@@ -1180,7 +1180,7 @@ button {
   display: grid;
   gap: 6px;
   min-width: min(100%, 320px);
-  color: #21304e;
+  color: #111111;
   font-size: 12px;
   font-weight: 900;
 }
@@ -1190,7 +1190,7 @@ button {
   border: 1.5px solid #e4dac5;
   border-radius: 9px;
   background: #fff;
-  color: #14213d;
+  color: #111111;
   padding: 0 12px;
   font-weight: 800;
 }
@@ -1252,7 +1252,7 @@ button {
 
 .manage-title-row h2 {
   margin: 0;
-  color: #14213d;
+  color: #111111;
   font-size: 24px;
   font-weight: 900;
 }
@@ -1330,7 +1330,7 @@ button {
   padding: 14px 22px;
   border-bottom: 1px solid #e6dfd3;
   background: #faf7f1;
-  color: #14213d;
+  color: #111111;
   font-size: 14px;
   font-weight: 900;
 }
@@ -1352,7 +1352,7 @@ button {
   justify-content: space-between;
   gap: 24px;
   padding: 24px;
-  border: 1px solid rgba(33, 48, 78, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 8px;
   background: #fffdf8;
 }
@@ -1371,7 +1371,7 @@ button {
 
 .tournament-media-header h2 {
   margin: 4px 0 6px;
-  color: #17233d;
+  color: #111111;
   font-family: Georgia, serif;
   font-size: 28px;
 }
@@ -1379,7 +1379,7 @@ button {
 .tournament-media-header p {
   max-width: 680px;
   margin: 0;
-  color: rgba(33, 48, 78, 0.68);
+  color: rgba(17, 17, 17, 0.68);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -1401,10 +1401,10 @@ button {
 .tournament-media-card {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid rgba(33, 48, 78, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 8px;
   background: #fffdf8;
-  box-shadow: 0 4px 16px rgba(33, 48, 78, 0.06);
+  box-shadow: 0 4px 16px rgba(17, 17, 17, 0.06);
 }
 
 .tournament-media-preview {
@@ -1413,7 +1413,7 @@ button {
   aspect-ratio: 16 / 10;
   place-items: center;
   overflow: hidden;
-  background: #17233d;
+  background: #111111;
 }
 
 .tournament-media-preview img,
@@ -1447,14 +1447,14 @@ button {
 
 .tournament-media-name strong {
   overflow: hidden;
-  color: #17233d;
+  color: #111111;
   font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tournament-media-name span {
-  color: rgba(33, 48, 78, 0.55);
+  color: rgba(17, 17, 17, 0.55);
   font-size: 10.5px;
 }
 
@@ -1470,10 +1470,10 @@ button {
   width: 34px;
   height: 34px;
   padding: 0;
-  border: 1px solid rgba(33, 48, 78, 0.18);
+  border: 1px solid rgba(17, 17, 17, 0.18);
   border-radius: 6px;
   background: transparent;
-  color: #17233d;
+  color: #111111;
   cursor: pointer;
   place-items: center;
 }
@@ -1489,15 +1489,15 @@ button {
   gap: 7px;
   align-content: center;
   justify-items: center;
-  border: 1px dashed rgba(33, 48, 78, 0.24);
+  border: 1px dashed rgba(17, 17, 17, 0.24);
   border-radius: 8px;
   background: rgba(255, 253, 248, 0.6);
-  color: rgba(33, 48, 78, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   text-align: center;
 }
 
 .media-empty-state strong {
-  color: #17233d;
+  color: #111111;
   font-family: Georgia, serif;
   font-size: 20px;
 }
@@ -1591,7 +1591,7 @@ button {
   border: 1.5px solid #e4dac5;
   border-radius: 8px;
   background: #fff;
-  color: #14213d;
+  color: #111111;
   outline: 0;
   padding: 0 12px 0 38px;
   font-size: 13px;
@@ -1623,7 +1623,7 @@ button {
   border: 0;
   border-bottom: 1px solid #f1ece2;
   background: transparent;
-  color: #14213d;
+  color: #111111;
   padding: 9px 12px;
   text-align: left;
 }
@@ -1647,7 +1647,7 @@ button {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #14213d;
+  background: #111111;
   color: #fff;
   font-size: 11px;
   font-weight: 900;
@@ -1681,7 +1681,7 @@ button {
 .participant-modal-actions .secondary-action {
   border: 1px solid #d8d1c4;
   background: #fff;
-  color: #14213d;
+  color: #111111;
 }
 
 .participant-modal-actions button:disabled {
@@ -1771,7 +1771,7 @@ button {
   min-height: 34px;
   border: 1px solid #e6dfd3;
   border-radius: 8px;
-  color: #14213d;
+  color: #111111;
   font-size: 14px;
   font-weight: 900;
   text-align: center;
@@ -1900,7 +1900,7 @@ button {
 }
 
 .procedure-schedule-head strong {
-  color: #14213d;
+  color: #111111;
   font-family: "Source Serif 4", Georgia, serif;
   font-size: 17px;
 }
@@ -1950,7 +1950,7 @@ button {
 }
 
 .manage-row strong {
-  color: #14213d;
+  color: #111111;
   font-weight: 900;
 }
 
@@ -1987,7 +1987,7 @@ button {
 .standings-table-row strong {
   display: grid;
   gap: 2px;
-  color: #14213d;
+  color: #111111;
   font-weight: 900;
 }
 
@@ -2040,7 +2040,7 @@ button {
 }
 
 .pairing-row strong {
-  color: #14213d;
+  color: #111111;
   font-size: 13.5px;
   font-weight: 900;
 }
@@ -2096,7 +2096,7 @@ button {
 }
 
 .bracket-manage-row strong {
-  color: #14213d;
+  color: #111111;
   font-size: 13.5px;
   font-weight: 900;
 }
@@ -2119,7 +2119,7 @@ button {
 
 .website-bracket-host .bracket-panel {
   overflow: hidden;
-  border: 1px solid rgba(30, 43, 69, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 10px;
   background: linear-gradient(180deg, #fffdf8 0%, #fff8ec 100%);
 }
@@ -2130,7 +2130,7 @@ button {
 
 .bracket-panel h2 {
   margin: 0;
-  color: #111827;
+  color: #111111;
   font-family: "Cormorant Garamond", Georgia, serif;
   font-size: 22px;
   font-weight: 800;
@@ -2153,9 +2153,9 @@ button {
 .bracket-switch button {
   height: 38px;
   padding: 0 20px;
-  color: #1e2b45;
+  color: #111111;
   background: transparent;
-  border: 1px solid rgba(30, 43, 69, 0.28);
+  border: 1px solid rgba(17, 17, 17, 0.28);
   border-radius: 8px;
   cursor: pointer;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
@@ -2169,8 +2169,8 @@ button {
 
 .bracket-switch button.active {
   color: #f5efe3;
-  background: #1e2b45;
-  border-color: #1e2b45;
+  background: #111111;
+  border-color: #111111;
 }
 
 .bracket-round-nav {
@@ -2190,9 +2190,9 @@ button {
   flex: none;
   height: 34px;
   padding: 0 14px;
-  color: rgba(30, 43, 69, 0.72);
+  color: rgba(17, 17, 17, 0.72);
   background: rgba(255, 252, 244, 0.68);
-  border: 1px solid rgba(30, 43, 69, 0.18);
+  border: 1px solid rgba(17, 17, 17, 0.18);
   border-radius: 8px;
   cursor: pointer;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
@@ -2209,9 +2209,9 @@ button {
 
 .bracket-round-nav button.active {
   color: #f5efe3;
-  background: #1e2b45;
-  border-color: #1e2b45;
-  box-shadow: 0 1px 4px rgba(30, 43, 69, 0.14);
+  background: #111111;
+  border-color: #111111;
+  box-shadow: 0 1px 4px rgba(17, 17, 17, 0.14);
 }
 
 .bracket-scroll {
@@ -2222,7 +2222,7 @@ button {
   cursor: grab;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(30, 43, 69, 0.3) transparent;
+  scrollbar-color: rgba(17, 17, 17, 0.3) transparent;
 }
 
 .bracket-scroll::-webkit-scrollbar {
@@ -2230,7 +2230,7 @@ button {
 }
 
 .bracket-scroll::-webkit-scrollbar-thumb {
-  background: rgba(30, 43, 69, 0.25);
+  background: rgba(17, 17, 17, 0.25);
   border-radius: 4px;
 }
 
@@ -2269,7 +2269,7 @@ button {
   justify-content: center;
   margin: 0;
   padding: 0 4px 10px;
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.25;
@@ -2287,7 +2287,7 @@ button {
   max-width: 220px;
   display: block;
   margin-top: 4px;
-  color: rgba(30, 43, 69, 0.5);
+  color: rgba(17, 17, 17, 0.5);
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-size: 10px;
   font-style: normal;
@@ -2315,14 +2315,14 @@ button {
   display: block;
   appearance: none;
   padding: 12px 14px;
-  border: 1px solid rgba(30, 43, 69, 0.14);
-  border-left: 3px solid rgba(30, 43, 69, 0.2);
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  border-left: 3px solid rgba(17, 17, 17, 0.2);
   border-radius: 8px;
   background: rgba(255, 252, 244, 0.96);
   color: inherit;
   cursor: default;
   font: inherit;
-  box-shadow: 0 2px 8px rgba(30, 43, 69, 0.07);
+  box-shadow: 0 2px 8px rgba(17, 17, 17, 0.07);
   text-align: left;
 }
 
@@ -2332,7 +2332,7 @@ button {
 
 .bracket-match.rich.selectable:hover {
   border-color: rgba(122, 36, 49, 0.4);
-  box-shadow: 0 4px 12px rgba(30, 43, 69, 0.12);
+  box-shadow: 0 4px 12px rgba(17, 17, 17, 0.12);
 }
 
 .bracket-match.rich.selectable:focus-visible {
@@ -2343,7 +2343,7 @@ button {
 .bracket-match.rich.selected-board {
   border-color: rgba(122, 36, 49, 0.58);
   border-left-color: #7a2431;
-  box-shadow: 0 0 0 3px rgba(122, 36, 49, 0.11), 0 4px 12px rgba(30, 43, 69, 0.12);
+  box-shadow: 0 0 0 3px rgba(122, 36, 49, 0.11), 0 4px 12px rgba(17, 17, 17, 0.12);
 }
 
 .bracket-match.rich.complete {
@@ -2371,7 +2371,7 @@ button {
 }
 
 .bracket-match-number {
-  color: rgba(30, 43, 69, 0.52);
+  color: rgba(17, 17, 17, 0.52);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 9.5px;
   font-weight: 800;
@@ -2403,7 +2403,7 @@ button {
 }
 
 .rich-bracket-panel.bracket-view-losers .bracket-column-major h3 {
-  color: rgba(30, 43, 69, 0.78);
+  color: rgba(17, 17, 17, 0.78);
 }
 
 .rich-bracket-panel.bracket-view-losers .bracket-column-major h3 em {
@@ -2420,7 +2420,7 @@ button {
 }
 
 .rich-bracket-panel.bracket-view-losers .bracket-match.rich.pending {
-  border-left-color: rgba(30, 43, 69, 0.18);
+  border-left-color: rgba(17, 17, 17, 0.18);
 }
 
 .bracket-live-tag {
@@ -2456,13 +2456,13 @@ button {
 .bracket-player + .bracket-player {
   margin-top: 5px;
   padding-top: 5px;
-  border-top: 1px solid rgba(30, 43, 69, 0.08);
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
 }
 
 .bracket-player span {
   min-width: 0;
   overflow: hidden;
-  color: #1e2b45;
+  color: #111111;
   font-size: 13px;
   font-weight: 400;
   text-overflow: ellipsis;
@@ -2475,12 +2475,12 @@ button {
 
 .bracket-player.muted span,
 .bracket-player.muted strong {
-  color: rgba(30, 43, 69, 0.45);
+  color: rgba(17, 17, 17, 0.45);
 }
 
 .bracket-player strong {
   flex: none;
-  color: #1e2b45;
+  color: #111111;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 13px;
   font-weight: 600;
@@ -2490,7 +2490,7 @@ button {
   overflow-x: auto;
   padding: 20px 18px 22px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(33, 48, 78, 0.24) transparent;
+  scrollbar-color: rgba(17, 17, 17, 0.24) transparent;
 }
 
 .admin-bracket-track {
@@ -2527,12 +2527,12 @@ button {
 .admin-bracket-card {
   position: relative;
   min-height: 76px;
-  border: 1px solid rgba(33, 48, 78, 0.14);
-  border-left: 3px solid rgba(33, 48, 78, 0.22);
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  border-left: 3px solid rgba(17, 17, 17, 0.22);
   border-radius: 8px;
   background: #fffcf4;
   padding: 10px 12px;
-  box-shadow: 0 1px 3px rgba(33, 48, 78, 0.06);
+  box-shadow: 0 1px 3px rgba(17, 17, 17, 0.06);
 }
 
 .admin-bracket-card:not(.last-round)::after {
@@ -2541,7 +2541,7 @@ button {
   top: 50%;
   right: -35px;
   width: 34px;
-  border-top: 1.5px solid rgba(33, 48, 78, 0.24);
+  border-top: 1.5px solid rgba(17, 17, 17, 0.24);
 }
 
 .admin-bracket-card.complete {
@@ -2587,13 +2587,13 @@ button {
 .admin-bracket-player + .admin-bracket-player {
   margin-top: 5px;
   padding-top: 5px;
-  border-top: 1px solid rgba(33, 48, 78, 0.08);
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
 }
 
 .admin-bracket-player span {
   min-width: 0;
   overflow: hidden;
-  color: #14213d;
+  color: #111111;
   font-size: 13px;
   font-weight: 800;
   text-overflow: ellipsis;
@@ -2608,11 +2608,11 @@ button {
 
 .admin-bracket-player.muted span,
 .admin-bracket-player.muted strong {
-  color: rgba(33, 48, 78, 0.44);
+  color: rgba(17, 17, 17, 0.44);
 }
 
 .admin-bracket-player strong {
-  color: #14213d;
+  color: #111111;
   font-family: "JetBrains Mono", monospace;
   font-size: 13px;
   font-weight: 900;
@@ -2625,7 +2625,7 @@ button {
   width: 20px;
   height: 20px;
   overflow: visible;
-  border: 1px solid rgba(20, 33, 61, 0.28);
+  border: 1px solid rgba(17, 17, 17, 0.28);
   border-radius: 4px;
   font-family: "JetBrains Mono", monospace;
   font-size: 10px;
@@ -2635,12 +2635,12 @@ button {
 
 .chess-color-chip.white {
   background: #fff;
-  color: #14213d;
+  color: #111111;
 }
 
 .chess-color-chip.black {
-  border-color: #14213d;
-  background: #14213d;
+  border-color: #111111;
+  background: #111111;
   color: #fff;
 }
 
@@ -2649,7 +2649,7 @@ button {
   flex-basis: 18px;
   width: 18px;
   height: 18px;
-  color: #14213d;
+  color: #111111;
   font-size: 9px;
 }
 
@@ -2705,7 +2705,7 @@ button {
 
 .board-player-bar strong {
   overflow: hidden;
-  color: #14213d;
+  color: #111111;
   font-size: 13px;
   font-weight: 900;
   text-overflow: ellipsis;
@@ -2718,7 +2718,7 @@ button {
 
 .live-board-area > .board-player-bar {
   width: min(100%, 520px);
-  border: 1px solid rgba(20, 33, 61, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   padding: 9px 11px;
 }
 
@@ -2765,7 +2765,7 @@ button {
   border: 1.5px solid #e6dfd3;
   border-radius: 9px;
   background: #fff;
-  color: #14213d;
+  color: #111111;
   padding: 0 10px;
   font-size: 12.5px;
   font-weight: 800;
@@ -2795,7 +2795,7 @@ button {
   border: 1px solid #ded6c8;
   border-radius: 7px;
   background: #fff;
-  color: #21304e;
+  color: #111111;
   cursor: pointer;
 }
 
@@ -2827,9 +2827,9 @@ button {
   grid-template-columns: repeat(8, minmax(0, 1fr));
   aspect-ratio: 1;
   overflow: hidden;
-  border: 3px solid #21304e;
+  border: 3px solid #111111;
   border-radius: 10px;
-  background: #21304e;
+  background: #111111;
 }
 
 .digital-square {
@@ -2838,7 +2838,7 @@ button {
   place-items: center;
   min-width: 0;
   border: 0;
-  color: #14213d;
+  color: #111111;
   font-size: clamp(20px, 5vw, 34px);
   line-height: 1;
 }
@@ -2896,7 +2896,7 @@ button {
   border: 1px solid #e6dfd3;
   border-radius: 8px;
   background: #fff;
-  color: #14213d;
+  color: #111111;
   padding: 10px;
   font-family: "JetBrains Mono", monospace;
   font-size: 11.5px;
@@ -2922,7 +2922,7 @@ button {
 }
 
 .live-match-card strong {
-  color: #14213d;
+  color: #111111;
   font-size: 14px;
   font-weight: 900;
 }
@@ -2974,7 +2974,7 @@ button {
 }
 
 .move-list-head strong {
-  color: #14213d;
+  color: #111111;
   font-size: 13.5px;
   font-weight: 900;
 }
@@ -2996,9 +2996,9 @@ button {
   display: grid;
   grid-template-columns: 32px 1fr 1fr;
   gap: 8px;
-  border-bottom: 1px solid rgba(33, 48, 78, 0.08);
+  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
   padding: 6px 0;
-  color: #14213d;
+  color: #111111;
   font-family: "JetBrains Mono", monospace;
   font-size: 12px;
 }
@@ -3041,7 +3041,7 @@ button {
 }
 
 .prototype-table td strong {
-  color: #14213d;
+  color: #111111;
   font-weight: 900;
 }
 
@@ -3068,7 +3068,7 @@ button {
   padding: 3px 9px;
   border-radius: 6px;
   background: #eef1f6;
-  color: #33415f;
+  color: #111111;
   font-size: 11.5px;
   font-weight: 900;
 }
@@ -3094,7 +3094,7 @@ button {
 .mini-button.ghost {
   border: 1px solid #d8d1c4;
   background: #fff;
-  color: #14213d;
+  color: #111111;
 }
 
 .mini-button.danger {
@@ -3133,7 +3133,7 @@ button {
 
 .delete-tournament-copy h2 {
   margin: 7px 0 10px;
-  color: #14213d;
+  color: #111111;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 23px;
   letter-spacing: 0;
@@ -3147,7 +3147,7 @@ button {
 }
 
 .delete-tournament-copy p strong {
-  color: #14213d;
+  color: #111111;
 }
 
 .delete-player-names {
@@ -3155,7 +3155,7 @@ button {
   max-height: 88px;
   margin-top: 12px;
   overflow: auto;
-  color: #14213d;
+  color: #111111;
   font-size: 12.5px;
   line-height: 1.55;
 }
@@ -3180,7 +3180,7 @@ button {
 .delete-tournament-actions .secondary-action {
   border: 1px solid #d8d1c4;
   background: #fff;
-  color: #14213d;
+  color: #111111;
 }
 
 .delete-tournament-actions .delete-action {
@@ -3195,7 +3195,7 @@ button {
 }
 
 .mini-button.dark {
-  background: #14213d;
+  background: #111111;
   color: #fff;
 }
 
@@ -3216,7 +3216,7 @@ button {
   border: 1px solid #d8d1c4;
   border-radius: 8px;
   background: #fff;
-  color: #14213d;
+  color: #111111;
   padding: 0 28px 0 10px;
   font-family: inherit;
   font-size: 12px;
@@ -3238,7 +3238,7 @@ button {
 }
 
 .empty-state strong {
-  color: #14213d;
+  color: #111111;
   font-size: 15px;
 }
 
@@ -3378,7 +3378,7 @@ button {
   padding: 12px 14px;
   border-bottom: 1px solid #f4f0e8;
   background: #faf7f1;
-  color: #14213d;
+  color: #111111;
   font-size: 14px;
 }
 
@@ -3394,7 +3394,7 @@ button {
   z-index: 80;
   display: grid;
   place-items: center;
-  background: rgba(20, 33, 61, 0.36);
+  background: rgba(17, 17, 17, 0.36);
   padding: 20px;
 }
 
@@ -3404,11 +3404,11 @@ button {
   border: 1px solid #e6dfd3;
   border-radius: 14px;
   background: #fff;
-  box-shadow: 0 30px 90px -35px rgba(20, 33, 61, 0.6);
+  box-shadow: 0 30px 90px -35px rgba(17, 17, 17, 0.6);
 }
 
 .player-modal .panel-head button {
-  color: #14213d;
+  color: #111111;
   font-size: 22px;
 }
 
@@ -3436,7 +3436,7 @@ button {
 }
 
 .field-grid strong {
-  color: #14213d;
+  color: #111111;
   font-size: 13px;
 }
 
@@ -3599,7 +3599,7 @@ button {
 }
 
 .tournament-check-list strong {
-  color: #14213d;
+  color: #111111;
 }
 
 .channel-picker {
@@ -3638,7 +3638,7 @@ button {
 }
 
 .channel-picker strong {
-  color: #14213d;
+  color: #111111;
   font-size: 13px;
   font-weight: 900;
 }

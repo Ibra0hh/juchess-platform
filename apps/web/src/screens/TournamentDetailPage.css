@@ -1,7 +1,7 @@
 .detail-screen {
   min-height: 100vh;
   background: #f5efe3;
-  color: #1e2b45;
+  color: #111111;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   overflow-x: clip;
 }
@@ -24,7 +24,7 @@
   border: 1px solid rgba(122, 36, 49, 0.3);
   border-radius: 999px;
   padding: 8px 18px 8px 12px;
-  box-shadow: 0 2px 8px rgba(30, 43, 69, 0.06);
+  box-shadow: 0 2px 8px rgba(17, 17, 17, 0.06);
 }
 
 .detail-back:hover {
@@ -60,7 +60,7 @@
 
 .detail-hero p {
   font-size: 13.5px;
-  color: rgba(30, 43, 69, 0.68);
+  color: rgba(17, 17, 17, 0.68);
   margin: 8px 0 0;
   line-height: 1.45;
 }
@@ -103,8 +103,8 @@
 }
 
 .detail-status.completed {
-  color: rgba(30, 43, 69, 0.6);
-  border: 1px solid rgba(30, 43, 69, 0.25);
+  color: rgba(17, 17, 17, 0.6);
+  border: 1px solid rgba(17, 17, 17, 0.25);
 }
 
 .detail-note {
@@ -113,7 +113,7 @@
   border: 1px solid rgba(169, 138, 63, 0.32);
   border-radius: 8px;
   background: rgba(255, 252, 244, 0.68);
-  color: rgba(30, 43, 69, 0.72);
+  color: rgba(17, 17, 17, 0.72);
   font-size: 12.5px;
 }
 
@@ -122,14 +122,14 @@
   justify-content: center;
   gap: 2px;
   margin-top: 26px;
-  border-bottom: 1px solid rgba(30, 43, 69, 0.18);
+  border-bottom: 1px solid rgba(17, 17, 17, 0.18);
 }
 
 .detail-tabs button {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: rgba(30, 43, 69, 0.66);
+  color: rgba(17, 17, 17, 0.66);
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -154,7 +154,7 @@
 
 .overview-grid {
   background: #fffcf4;
-  border: 1px solid rgba(30, 43, 69, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 10px;
   padding: 18px 20px;
   display: grid;
@@ -172,7 +172,7 @@
   font-size: 10.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(30, 43, 69, 0.5);
+  color: rgba(17, 17, 17, 0.5);
   font-weight: 600;
 }
 
@@ -192,7 +192,7 @@
 .detail-description {
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(30, 43, 69, 0.72);
+  color: rgba(17, 17, 17, 0.72);
   margin: 16px 0 0;
   max-width: 720px;
 }
@@ -207,7 +207,7 @@
   align-items: center;
   gap: 20px;
   flex-wrap: wrap;
-  box-shadow: 0 2px 10px rgba(30, 43, 69, 0.05);
+  box-shadow: 0 2px 10px rgba(17, 17, 17, 0.05);
 }
 
 .register-icon {
@@ -232,7 +232,7 @@
 
 .register-card p {
   font-size: 13px;
-  color: rgba(30, 43, 69, 0.7);
+  color: rgba(17, 17, 17, 0.7);
   margin: 3px 0 0;
 }
 
@@ -263,8 +263,8 @@
 }
 
 .secondary-action {
-  color: #1e2b45;
-  border: 1px solid rgba(30, 43, 69, 0.3);
+  color: #111111;
+  border: 1px solid rgba(17, 17, 17, 0.3);
 }
 
 .secondary-action:hover {
@@ -273,7 +273,7 @@
 }
 
 .register-card.muted {
-  color: rgba(30, 43, 69, 0.65);
+  color: rgba(17, 17, 17, 0.65);
   font-size: 13.5px;
 }
 
@@ -291,7 +291,7 @@
 
 .register-card button.secondary-action {
   background: transparent;
-  border: 1px solid rgba(30, 43, 69, 0.3);
+  border: 1px solid rgba(17, 17, 17, 0.3);
 }
 
 .register-card button:disabled {
@@ -328,7 +328,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(30, 43, 69, 0.55);
+  color: rgba(17, 17, 17, 0.55);
 }
 
 .checkin-pass strong {
@@ -336,13 +336,13 @@
   font-family: "Cormorant Garamond", Georgia, serif;
   font-size: 26px;
   letter-spacing: 0.08em;
-  color: #1e2b45;
+  color: #111111;
 }
 
 .checkin-pass small {
   display: block;
   font-size: 12px;
-  color: rgba(30, 43, 69, 0.6);
+  color: rgba(17, 17, 17, 0.6);
   margin-top: 2px;
 }
 
@@ -376,7 +376,7 @@
 .standings-panel,
 .bracket-panel {
   background: #fffcf4;
-  border: 1px solid rgba(30, 43, 69, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -388,7 +388,7 @@
   justify-content: space-between;
   gap: 14px;
   padding: 16px 18px;
-  border-bottom: 1px solid rgba(30, 43, 69, 0.1);
+  border-bottom: 1px solid rgba(17, 17, 17, 0.1);
 }
 
 .panel-heading h2,
@@ -401,7 +401,7 @@
 }
 
 .panel-heading > span {
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-size: 12px;
   font-weight: 600;
 }
@@ -430,11 +430,11 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-top: 1px solid rgba(30, 43, 69, 0.08);
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
 }
 
 .game-mini {
-  color: #1e2b45;
+  color: #111111;
   text-decoration: none;
 }
 
@@ -452,7 +452,7 @@
 .game-mini small,
 .schedule-row small {
   display: block;
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-size: 12px;
   margin-top: 2px;
 }
@@ -461,12 +461,12 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 1px solid rgba(30, 43, 69, 0.35);
+  border: 1px solid rgba(17, 17, 17, 0.35);
   flex: none;
 }
 
 .schedule-row.done > span {
-  background: rgba(30, 43, 69, 0.35);
+  background: rgba(17, 17, 17, 0.35);
 }
 
 .schedule-row.now {
@@ -485,7 +485,7 @@
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   overflow: hidden;
-  border: 1px solid rgba(30, 43, 69, 0.18);
+  border: 1px solid rgba(17, 17, 17, 0.18);
   border-radius: 7px;
   flex: none;
 }
@@ -515,7 +515,7 @@
 
 .games-toolbar p {
   margin: 4px 0 0;
-  color: rgba(30, 43, 69, 0.64);
+  color: rgba(17, 17, 17, 0.64);
   font-size: 13px;
 }
 
@@ -534,10 +534,10 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  color: #1e2b45;
+  color: #111111;
   text-decoration: none;
   background: #fffcf4;
-  border: 1px solid rgba(30, 43, 69, 0.15);
+  border: 1px solid rgba(17, 17, 17, 0.15);
   border-radius: 10px;
   padding: 14px;
 }
@@ -549,7 +549,7 @@
 
 .game-card:hover {
   border-color: #a98a3f;
-  box-shadow: 0 5px 18px rgba(30, 43, 69, 0.1);
+  box-shadow: 0 5px 18px rgba(17, 17, 17, 0.1);
 }
 
 .game-card-body {
@@ -563,7 +563,7 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(30, 43, 69, 0.52);
+  color: rgba(17, 17, 17, 0.52);
   font-weight: 600;
 }
 
@@ -585,7 +585,7 @@
 
 .tournament-media-panel {
   overflow: hidden;
-  border: 1px solid rgba(30, 43, 69, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 8px;
   background: #fffcf4;
 }
@@ -596,7 +596,7 @@
 
 .tournament-media-panel .panel-heading p {
   margin: 3px 0 0;
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-size: 12px;
 }
 
@@ -610,7 +610,7 @@
 .public-media-card {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid rgba(30, 43, 69, 0.15);
+  border: 1px solid rgba(17, 17, 17, 0.15);
   border-radius: 8px;
   background: #fffef9;
 }
@@ -620,7 +620,7 @@
   width: 100%;
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  background: #1e2b45;
+  background: #111111;
   place-items: center;
 }
 
@@ -653,7 +653,7 @@
 }
 
 .public-media-meta span {
-  color: rgba(30, 43, 69, 0.56);
+  color: rgba(17, 17, 17, 0.56);
   font-size: 10.5px;
 }
 
@@ -677,12 +677,12 @@
   gap: 7px;
   align-content: center;
   justify-items: center;
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   text-align: center;
 }
 
 .public-media-empty strong {
-  color: #1e2b45;
+  color: #111111;
   font-family: "Cormorant Garamond", Georgia, serif;
   font-size: 22px;
 }
@@ -704,7 +704,7 @@
   flex: 0 0 20px;
   width: 20px;
   height: 20px;
-  border: 1px solid rgba(20, 33, 61, 0.28);
+  border: 1px solid rgba(17, 17, 17, 0.28);
   border-radius: 4px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 10px;
@@ -714,17 +714,17 @@
 
 .tournament-color-chip.white {
   background: #fff;
-  color: #14213d;
+  color: #111111;
 }
 
 .tournament-color-chip.black {
-  border-color: #14213d;
-  background: #14213d;
+  border-color: #111111;
+  background: #111111;
   color: #fff;
 }
 
 .game-card-body small {
-  color: rgba(30, 43, 69, 0.6);
+  color: rgba(17, 17, 17, 0.6);
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -742,16 +742,16 @@
   display: flex;
   gap: 8px;
   padding: 0 16px 14px;
-  border-bottom: 1px solid rgba(30, 43, 69, 0.08);
+  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
 }
 
 .stage-round-tabs button {
   flex: 1;
   min-height: 38px;
-  border: 1px solid rgba(30, 43, 69, 0.16);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 8px;
   background: #fffaf0;
-  color: rgba(30, 43, 69, 0.72);
+  color: rgba(17, 17, 17, 0.72);
   font: inherit;
   font-size: 13px;
   font-weight: 800;
@@ -765,8 +765,8 @@
 }
 
 .stage-round-tabs button.active {
-  background: #1e2b45;
-  border-color: #1e2b45;
+  background: #111111;
+  border-color: #111111;
   color: #fffaf0;
 }
 
@@ -781,10 +781,10 @@
   justify-items: center;
   gap: 8px;
   margin: 16px;
-  border: 1px dashed rgba(30, 43, 69, 0.18);
+  border: 1px dashed rgba(17, 17, 17, 0.18);
   border-radius: 12px;
   background: rgba(255, 252, 244, 0.72);
-  color: rgba(30, 43, 69, 0.68);
+  color: rgba(17, 17, 17, 0.68);
   padding: 28px 18px;
   text-align: center;
 }
@@ -794,7 +794,7 @@
 }
 
 .unpublished-panel strong {
-  color: #14213d;
+  color: #111111;
   font-size: 16px;
   font-weight: 900;
 }
@@ -821,7 +821,7 @@
   padding: 14px 22px;
   border-bottom: 1px solid #e6dfd3;
   background: #faf7f1;
-  color: #14213d;
+  color: #111111;
   font-size: 14px;
   font-weight: 900;
 }
@@ -864,7 +864,7 @@
 
 .round-admin-pairing strong {
   min-width: 0;
-  color: #14213d;
+  color: #111111;
   font-size: 13.5px;
   font-weight: 900;
   overflow-wrap: anywhere;
@@ -907,8 +907,8 @@
 }
 
 .round-card {
-  border: 1px solid rgba(30, 43, 69, 0.14);
-  border-left: 3px solid rgba(30, 43, 69, 0.24);
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  border-left: 3px solid rgba(17, 17, 17, 0.24);
   border-radius: 8px;
   background: rgba(255, 252, 244, 0.72);
   overflow: hidden;
@@ -930,7 +930,7 @@
   justify-content: space-between;
   gap: 14px;
   padding: 13px 14px;
-  border-bottom: 1px solid rgba(30, 43, 69, 0.08);
+  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
 }
 
 .round-card-heading h3 {
@@ -943,7 +943,7 @@
 .round-card-heading small {
   display: block;
   margin-top: 2px;
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-size: 12px;
 }
 
@@ -951,8 +951,8 @@
   flex: none;
   border-radius: 999px;
   padding: 4px 9px;
-  background: rgba(30, 43, 69, 0.06);
-  color: rgba(30, 43, 69, 0.62);
+  background: rgba(17, 17, 17, 0.06);
+  color: rgba(17, 17, 17, 0.62);
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -980,18 +980,18 @@
   align-items: center;
   gap: 10px;
   padding: 11px 14px;
-  border-top: 1px solid rgba(30, 43, 69, 0.07);
+  border-top: 1px solid rgba(17, 17, 17, 0.07);
 }
 
 .round-pairing span {
-  color: rgba(30, 43, 69, 0.55);
+  color: rgba(17, 17, 17, 0.55);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 11px;
 }
 
 .round-pairing strong {
   min-width: 0;
-  color: #1e2b45;
+  color: #111111;
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1016,7 +1016,7 @@
 
 .players-panel th,
 .standings-panel th {
-  background: #1e2b45;
+  background: #111111;
   color: #f5efe3;
   text-align: left;
   padding: 10px 14px;
@@ -1029,7 +1029,7 @@
 .players-panel td,
 .standings-panel td {
   padding: 11px 14px;
-  border-top: 1px solid rgba(30, 43, 69, 0.1);
+  border-top: 1px solid rgba(17, 17, 17, 0.1);
 }
 
 .players-panel tr:nth-child(1),
@@ -1046,7 +1046,7 @@
 
 .players-panel td small,
 .standings-panel td small {
-  color: rgba(30, 43, 69, 0.55);
+  color: rgba(17, 17, 17, 0.55);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 11.5px;
   margin-top: 2px;
@@ -1056,8 +1056,8 @@
   display: inline-flex;
   border-radius: 999px;
   padding: 4px 9px;
-  background: rgba(30, 43, 69, 0.06);
-  color: rgba(30, 43, 69, 0.62);
+  background: rgba(17, 17, 17, 0.06);
+  color: rgba(17, 17, 17, 0.62);
   font-size: 11px;
   font-weight: 600;
 }
@@ -1089,9 +1089,9 @@
 .bracket-switch button {
   height: 38px;
   padding: 0 20px;
-  color: #1e2b45;
+  color: #111111;
   background: transparent;
-  border: 1px solid rgba(30, 43, 69, 0.28);
+  border: 1px solid rgba(17, 17, 17, 0.28);
   border-radius: 8px;
   cursor: pointer;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
@@ -1105,8 +1105,8 @@
 
 .bracket-switch button.active {
   color: #f5efe3;
-  background: #1e2b45;
-  border-color: #1e2b45;
+  background: #111111;
+  border-color: #111111;
 }
 
 .bracket-round-nav {
@@ -1126,9 +1126,9 @@
   flex: none;
   height: 34px;
   padding: 0 14px;
-  color: rgba(30, 43, 69, 0.72);
+  color: rgba(17, 17, 17, 0.72);
   background: rgba(255, 252, 244, 0.68);
-  border: 1px solid rgba(30, 43, 69, 0.18);
+  border: 1px solid rgba(17, 17, 17, 0.18);
   border-radius: 8px;
   cursor: pointer;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
@@ -1145,9 +1145,9 @@
 
 .bracket-round-nav button.active {
   color: #f5efe3;
-  background: #1e2b45;
-  border-color: #1e2b45;
-  box-shadow: 0 1px 4px rgba(30, 43, 69, 0.14);
+  background: #111111;
+  border-color: #111111;
+  box-shadow: 0 1px 4px rgba(17, 17, 17, 0.14);
 }
 
 .bracket-scroll {
@@ -1158,7 +1158,7 @@
   cursor: grab;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(30, 43, 69, 0.3) transparent;
+  scrollbar-color: rgba(17, 17, 17, 0.3) transparent;
 }
 
 .bracket-scroll::-webkit-scrollbar {
@@ -1166,7 +1166,7 @@
 }
 
 .bracket-scroll::-webkit-scrollbar-thumb {
-  background: rgba(30, 43, 69, 0.25);
+  background: rgba(17, 17, 17, 0.25);
   border-radius: 4px;
 }
 
@@ -1204,7 +1204,7 @@
   justify-content: center;
   margin: 0;
   padding: 0 4px 10px;
-  color: rgba(30, 43, 69, 0.58);
+  color: rgba(17, 17, 17, 0.58);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.25;
@@ -1231,18 +1231,18 @@
   margin: 0;
   display: block;
   padding: 11px 13px;
-  border: 1px solid rgba(30, 43, 69, 0.14);
-  border-left: 3px solid rgba(30, 43, 69, 0.2);
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  border-left: 3px solid rgba(17, 17, 17, 0.2);
   border-radius: 8px;
   background: #fffcf4;
-  box-shadow: 0 1px 3px rgba(30, 43, 69, 0.06);
+  box-shadow: 0 1px 3px rgba(17, 17, 17, 0.06);
   color: inherit;
   text-decoration: none;
 }
 
 .bracket-match.rich.clickable-game:hover {
   border-color: rgba(122, 36, 49, 0.36);
-  box-shadow: 0 5px 16px rgba(30, 43, 69, 0.12);
+  box-shadow: 0 5px 16px rgba(17, 17, 17, 0.12);
 }
 
 .bracket-match.rich.complete {
@@ -1269,7 +1269,7 @@
 }
 
 .bracket-match-number {
-  color: rgba(30, 43, 69, 0.52);
+  color: rgba(17, 17, 17, 0.52);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 9.5px;
   font-weight: 800;
@@ -1311,13 +1311,13 @@
 .bracket-player + .bracket-player {
   margin-top: 5px;
   padding-top: 5px;
-  border-top: 1px solid rgba(30, 43, 69, 0.08);
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
 }
 
 .bracket-player span {
   min-width: 0;
   overflow: hidden;
-  color: #1e2b45;
+  color: #111111;
   font-size: 13px;
   font-weight: 400;
   text-overflow: ellipsis;
@@ -1330,12 +1330,12 @@
 
 .bracket-player.muted span,
 .bracket-player.muted strong {
-  color: rgba(30, 43, 69, 0.45);
+  color: rgba(17, 17, 17, 0.45);
 }
 
 .bracket-player strong {
   flex: none;
-  color: #1e2b45;
+  color: #111111;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 13px;
   font-weight: 600;
@@ -1346,7 +1346,7 @@
   width: 18px;
   height: 18px;
   overflow: visible;
-  color: #14213d;
+  color: #111111;
   font-size: 9px;
 }
 
@@ -1362,7 +1362,7 @@
   align-content: center;
   gap: 10px;
   text-align: center;
-  color: rgba(30, 43, 69, 0.7);
+  color: rgba(17, 17, 17, 0.7);
 }
 
 .detail-empty h1 {

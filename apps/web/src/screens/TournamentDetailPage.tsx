@@ -637,7 +637,7 @@ function CheckInPass({ checkIn }: { checkIn: MyCheckIn | null }) {
     QRCode.toCanvas(canvas, checkInQrPayload(checkIn), {
       width: 148,
       margin: 1,
-      color: { dark: '#1E2B45', light: '#FDF8EC' },
+      color: { dark: '#111111', light: '#FDF8EC' },
     }).catch(() => undefined)
   }, [checkIn])
 
@@ -1956,7 +1956,7 @@ function drawBracketLines(track: HTMLDivElement) {
 
       path.setAttribute('d', `M${x1} ${y1} H${midX} V${y2} H${x2}`)
       path.setAttribute('fill', 'none')
-      path.setAttribute('stroke', decided ? '#7A2431' : live ? '#A98A3F' : 'rgba(30,43,69,.22)')
+      path.setAttribute('stroke', decided ? '#7A2431' : live ? '#A98A3F' : 'rgba(17, 17, 17,.22)')
       path.setAttribute('stroke-width', decided ? '2.25' : '1.5')
       path.setAttribute('stroke-linejoin', 'round')
       path.setAttribute('stroke-linecap', 'round')

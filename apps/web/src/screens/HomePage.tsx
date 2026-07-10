@@ -37,11 +37,11 @@ const visionCards = [
 ]
 
 const teamMembers = [
-  { initials: 'IA', name: 'Ibrahim Ahmad', role: 'Chair', note: 'Leads the club and its tournament program.', tone: 'navy' },
+  { initials: 'IA', name: 'Ibrahim Ahmad', role: 'Chair', note: 'Leads the club and its tournament program.', tone: 'black' },
   { initials: 'LH', name: 'Leen Haddad', role: 'Vice Chair', note: 'Runs sessions and player relations.', tone: 'cream' },
-  { initials: 'YK', name: 'Yazan Khaled', role: 'Software Developer', note: 'Builds and maintains the JuChess platform.', tone: 'navy' },
+  { initials: 'YK', name: 'Yazan Khaled', role: 'Software Developer', note: 'Builds and maintains the JuChess platform.', tone: 'black' },
   { initials: 'SN', name: 'Sara Nasser', role: 'Designer', note: 'Shapes the club visual identity.', tone: 'cream' },
-  { initials: 'OS', name: 'Omar Saleh', role: 'Event Manager', note: 'Plans and stages every tournament.', tone: 'navy' },
+  { initials: 'OS', name: 'Omar Saleh', role: 'Event Manager', note: 'Plans and stages every tournament.', tone: 'black' },
   { initials: 'MK', name: 'Mohammad Al-Khatib', role: 'Media & Outreach', note: 'Grows the club across campus and online.', tone: 'cream' },
 ]
 

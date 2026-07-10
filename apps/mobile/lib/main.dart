@@ -1654,14 +1654,14 @@ class JuChessApp extends StatelessWidget {
 }
 
 class PrototypeColors {
-  static const navy = Color(0xff21304e);
+  static const black = Color(0xff111111);
   static const burgundy = Color(0xff7d2434);
   static const cream = Color(0xfff6f0e2);
   static const surface = Color(0xfffffaf0);
   static const header = Color(0xfff2ebd9);
   static const pageBg = Color(0xffd7cfbd);
   static const gold = Color(0xffa98a3f);
-  static const muted = Color(0xff6a7489);
+  static const muted = Color(0xff6b6b6b);
   static const screen = Color(0xfff6f0e2);
 }
 
@@ -1775,7 +1775,7 @@ class SplashLogoMark extends StatelessWidget {
         const Text(
           'University of Jordan',
           style: TextStyle(
-            color: Color(0xa621304e),
+            color: Color(0xa6111111),
             decoration: TextDecoration.none,
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -1845,7 +1845,7 @@ class SplashBackdropPainter extends CustomPainter {
 
   void _paintGrid(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0x0a16213b)
+      ..color = const Color(0x0a111111)
       ..strokeWidth = 1;
     const step = 72.0;
     for (var x = 0.0; x <= size.width; x += step) {
@@ -1883,7 +1883,7 @@ class SplashBackdropPainter extends CustomPainter {
         text: TextSpan(
           text: faller.glyph,
           style: TextStyle(
-            color: PrototypeColors.navy.withValues(alpha: opacity),
+            color: PrototypeColors.black.withValues(alpha: opacity),
             fontSize: faller.size,
             fontWeight: FontWeight.w600,
           ),
@@ -1956,7 +1956,7 @@ class _PrototypeShellState extends State<PrototypeShell> {
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: const [
                       BoxShadow(
-                        color: Color(0x3321304e),
+                        color: Color(0x33111111),
                         blurRadius: 42,
                         offset: Offset(0, 20),
                       ),
@@ -2244,7 +2244,7 @@ class PrototypeHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: const BoxDecoration(
         color: PrototypeColors.header,
-        border: Border(bottom: BorderSide(color: Color(0x1f21304e))),
+        border: Border(bottom: BorderSide(color: Color(0x1f111111))),
       ),
       child: Row(
         children: [
@@ -2265,7 +2265,7 @@ class PrototypeHeader extends StatelessWidget {
                   Text(
                     subtitle!,
                     style: const TextStyle(
-                      color: Color(0x9921304e),
+                      color: Color(0x99111111),
                       fontSize: 11,
                     ),
                   ),
@@ -2390,7 +2390,7 @@ class _HomeTournamentCarouselState extends State<HomeTournamentCarousel> {
                   decoration: BoxDecoration(
                     color: _page == i
                         ? PrototypeColors.burgundy
-                        : const Color(0x3321304e),
+                        : const Color(0x33111111),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -2440,7 +2440,7 @@ class GuestCard extends StatelessWidget {
                       ? 'Ready for your next club game.'
                       : 'Sign in to register and save analyses',
                   style: const TextStyle(
-                    color: Color(0x9921304e),
+                    color: Color(0x99111111),
                     fontSize: 12,
                   ),
                 ),
@@ -2487,7 +2487,7 @@ class FeaturedTournamentCard extends StatelessWidget {
               Text(
                 eyebrow,
                 style: const TextStyle(
-                  color: Color(0x8021304e),
+                  color: Color(0x80111111),
                   fontSize: 9.8,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.6,
@@ -2514,7 +2514,7 @@ class FeaturedTournamentCard extends StatelessWidget {
             event.meta,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0x9921304e), fontSize: 11.8),
+            style: const TextStyle(color: Color(0x99111111), fontSize: 11.8),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -2536,7 +2536,7 @@ class FeaturedTournamentCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 3.5,
-              backgroundColor: const Color(0x1f21304e),
+              backgroundColor: const Color(0x1f111111),
               valueColor: const AlwaysStoppedAnimation<Color>(
                 PrototypeColors.gold,
               ),
@@ -2586,7 +2586,7 @@ class HomeTournamentEmptyCard extends StatelessWidget {
               Text(
                 '${slot.label.toUpperCase()} TOURNAMENT',
                 style: const TextStyle(
-                  color: Color(0x8021304e),
+                  color: Color(0x80111111),
                   fontSize: 9.8,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.6,
@@ -2607,7 +2607,7 @@ class HomeTournamentEmptyCard extends StatelessWidget {
           Text(
             slot.emptyBody,
             style: const TextStyle(
-              color: Color(0x9921304e),
+              color: Color(0x99111111),
               fontSize: 12.5,
               height: 1.35,
             ),
@@ -2647,7 +2647,7 @@ class EmptyTournamentCard extends StatelessWidget {
           const Text(
             'FEATURED TOURNAMENT',
             style: TextStyle(
-              color: Color(0x8021304e),
+              color: Color(0x80111111),
               fontSize: 9.8,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.6,
@@ -2665,7 +2665,7 @@ class EmptyTournamentCard extends StatelessWidget {
             ready
                 ? 'Create a tournament in the control center to publish it here.'
                 : 'Tournaments will appear here after they are published.',
-            style: const TextStyle(color: Color(0x9921304e), fontSize: 11.8),
+            style: const TextStyle(color: Color(0x99111111), fontSize: 11.8),
           ),
           const SizedBox(height: 10),
           SizedBox(
@@ -2743,7 +2743,7 @@ class QuickActionsGrid extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: PrototypeColors.navy,
+                          color: PrototypeColors.black,
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
@@ -2817,14 +2817,14 @@ class TournamentTabs extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: const BoxDecoration(
         color: PrototypeColors.screen,
-        border: Border(bottom: BorderSide(color: Color(0x1421304e))),
+        border: Border(bottom: BorderSide(color: Color(0x14111111))),
       ),
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: const Color(0x1021304e),
+          color: const Color(0x10111111),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0x2021304e)),
+          border: Border.all(color: const Color(0x20111111)),
         ),
         child: Row(
           children: [
@@ -2892,7 +2892,7 @@ class TournamentCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               event.meta,
-              style: const TextStyle(color: Color(0x9921304e), fontSize: 12.5),
+              style: const TextStyle(color: Color(0x99111111), fontSize: 12.5),
             ),
             const SizedBox(height: 10),
             Wrap(
@@ -3012,7 +3012,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       decoration: const BoxDecoration(
                         color: PrototypeColors.header,
                         border: Border(
-                          bottom: BorderSide(color: Color(0x1f21304e)),
+                          bottom: BorderSide(color: Color(0x1f111111)),
                         ),
                       ),
                       child: Row(
@@ -3081,8 +3081,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       decoration: const BoxDecoration(
                         color: PrototypeColors.screen,
                         border: Border(
-                          top: BorderSide(color: Color(0x1421304e)),
-                          bottom: BorderSide(color: Color(0x1a21304e)),
+                          top: BorderSide(color: Color(0x14111111)),
+                          bottom: BorderSide(color: Color(0x1a111111)),
                         ),
                       ),
                       child: Row(
@@ -3201,8 +3201,8 @@ class DetailTabPill extends StatelessWidget {
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
       decoration: BoxDecoration(
-        color: selected ? PrototypeColors.navy : Colors.transparent,
-        border: Border.all(color: const Color(0x4021304e)),
+        color: selected ? PrototypeColors.black : Colors.transparent,
+        border: Border.all(color: const Color(0x40111111)),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -3226,7 +3226,7 @@ class DetailTabPill extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: selected ? PrototypeColors.cream : PrototypeColors.navy,
+                color: selected ? PrototypeColors.cream : PrototypeColors.black,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w800,
               ),
@@ -3311,7 +3311,7 @@ class _TournamentMediaGallery extends StatelessWidget {
             Text(
               '${items.length} ${items.length == 1 ? 'file' : 'files'}',
               style: const TextStyle(
-                color: Color(0x9921304e),
+                color: Color(0x99111111),
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
@@ -3325,18 +3325,18 @@ class _TournamentMediaGallery extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: PrototypeColors.surface,
-              border: Border.all(color: const Color(0x2621304e)),
+              border: Border.all(color: const Color(0x26111111)),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.photo_library_outlined, color: Color(0x9921304e)),
+                Icon(Icons.photo_library_outlined, color: Color(0x99111111)),
                 SizedBox(height: 7),
                 Text(
                   'No media published yet',
                   style: TextStyle(
-                    color: PrototypeColors.navy,
+                    color: PrototypeColors.black,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -3376,7 +3376,7 @@ class _TournamentMediaCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: PrototypeColors.surface,
-        border: Border.all(color: const Color(0x2621304e)),
+        border: Border.all(color: const Color(0x26111111)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -3385,7 +3385,7 @@ class _TournamentMediaCard extends StatelessWidget {
           AspectRatio(
             aspectRatio: 16 / 10,
             child: ColoredBox(
-              color: PrototypeColors.navy,
+              color: PrototypeColors.black,
               child: item.isVideo
                   ? _TournamentVideo(uri: item.viewUri)
                   : Image.network(
@@ -3417,7 +3417,7 @@ class _TournamentMediaCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: PrototypeColors.navy,
+                          color: PrototypeColors.black,
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
                         ),
@@ -3425,7 +3425,7 @@ class _TournamentMediaCard extends StatelessWidget {
                       Text(
                         _formatMediaSize(item.size),
                         style: const TextStyle(
-                          color: Color(0x9921304e),
+                          color: Color(0x99111111),
                           fontSize: 10.5,
                         ),
                       ),
@@ -3581,11 +3581,11 @@ class _RegistrationStatusCard extends StatelessWidget {
             backgroundColor: const Color(0xFFFDF8EC),
             eyeStyle: const QrEyeStyle(
               eyeShape: QrEyeShape.square,
-              color: PrototypeColors.navy,
+              color: PrototypeColors.black,
             ),
             dataModuleStyle: const QrDataModuleStyle(
               dataModuleShape: QrDataModuleShape.square,
-              color: PrototypeColors.navy,
+              color: PrototypeColors.black,
             ),
           ),
           const SizedBox(width: 14),
@@ -3596,7 +3596,7 @@ class _RegistrationStatusCard extends StatelessWidget {
                 const Text(
                   'CHECK-IN CODE',
                   style: TextStyle(
-                    color: Color(0x9921304e),
+                    color: Color(0x99111111),
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.4,
@@ -3606,7 +3606,7 @@ class _RegistrationStatusCard extends StatelessWidget {
                 Text(
                   code,
                   style: const TextStyle(
-                    color: PrototypeColors.navy,
+                    color: PrototypeColors.black,
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.2,
@@ -3618,7 +3618,7 @@ class _RegistrationStatusCard extends StatelessWidget {
                       ? 'Checked in at the venue'
                       : 'Show this at the venue to check in',
                   style: const TextStyle(
-                    color: Color(0x9921304e),
+                    color: Color(0x99111111),
                     fontSize: 12,
                   ),
                 ),
@@ -3644,7 +3644,7 @@ class _RegistrationNotice extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFDF8EC),
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: const Color(0x4021304e)),
+        border: Border.all(color: const Color(0x40111111)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3652,7 +3652,7 @@ class _RegistrationNotice extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-              color: PrototypeColors.navy,
+              color: PrototypeColors.black,
               fontSize: 15,
               fontWeight: FontWeight.w800,
             ),
@@ -3660,7 +3660,7 @@ class _RegistrationNotice extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             body,
-            style: const TextStyle(color: Color(0x9921304e), fontSize: 12.5),
+            style: const TextStyle(color: Color(0x99111111), fontSize: 12.5),
           ),
         ],
       ),
@@ -3690,7 +3690,7 @@ class PlayerColorLine extends StatelessWidget {
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(3),
-            border: border ? Border.all(color: const Color(0x6621304e)) : null,
+            border: border ? Border.all(color: const Color(0x66111111)) : null,
           ),
         ),
         const SizedBox(width: 7),
@@ -3934,7 +3934,7 @@ class _TournamentBracketViewState extends State<TournamentBracketView> {
           const SizedBox(height: 8),
           const Text(
             'Scroll sideways to follow the bracket · ✓ marks the winner',
-            style: TextStyle(color: Color(0x8021304e), fontSize: 11),
+            style: TextStyle(color: Color(0x80111111), fontSize: 11),
           ),
         ],
       ),
@@ -4044,13 +4044,13 @@ class BracketRoundChip extends StatelessWidget {
         minimumSize: const Size(0, 36),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-        backgroundColor: selected ? PrototypeColors.navy : Colors.transparent,
+        backgroundColor: selected ? PrototypeColors.black : Colors.transparent,
         foregroundColor: selected
             ? PrototypeColors.cream
-            : PrototypeColors.navy,
+            : PrototypeColors.black,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(999),
-          side: const BorderSide(color: Color(0x3821304e)),
+          side: const BorderSide(color: Color(0x38111111)),
         ),
       ),
       child: Text(
@@ -4090,7 +4090,7 @@ class BracketColumn extends StatelessWidget {
             child: Text(
               round.label.toUpperCase(),
               style: const TextStyle(
-                color: Color(0x8c21304e),
+                color: Color(0x8c111111),
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.6,
@@ -4172,7 +4172,7 @@ class BracketConnectorPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final mutedPaint = Paint()
-      ..color = const Color(0x3821304e)
+      ..color = const Color(0x38111111)
       ..strokeWidth = 1.45
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
@@ -4264,7 +4264,7 @@ class BracketMatchCard extends StatelessWidget {
         ? const Color(0x807d2434)
         : _whiteWon || _blackWon
         ? const Color(0x66a98a3f)
-        : const Color(0x2421304e);
+        : const Color(0x24111111);
     final content = Container(
       decoration: BoxDecoration(
         color: _live ? const Color(0xfffff7ee) : const Color(0xfffffcf4),
@@ -4272,7 +4272,7 @@ class BracketMatchCard extends StatelessWidget {
         border: Border.all(color: borderColor),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x1221304e),
+            color: Color(0x12111111),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -4289,7 +4289,7 @@ class BracketMatchCard extends StatelessWidget {
                   Text(
                     'MATCH ${match.matchNumber}',
                     style: const TextStyle(
-                      color: Color(0x8a21304e),
+                      color: Color(0x8a111111),
                       fontSize: 8.5,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
@@ -4392,7 +4392,7 @@ class BracketPlayerRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
           decoration: BoxDecoration(
             border: bottomBorder
-                ? const Border(bottom: BorderSide(color: Color(0x1421304e)))
+                ? const Border(bottom: BorderSide(color: Color(0x14111111)))
                 : null,
           ),
           child: Row(
@@ -4416,7 +4416,7 @@ class BracketPlayerRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: PrototypeColors.navy,
+                    color: PrototypeColors.black,
                     fontSize: 12.5,
                     fontWeight: winner ? FontWeight.w800 : FontWeight.w500,
                     fontStyle: _pending || _placeholder
@@ -4448,14 +4448,16 @@ class ChessColorBadge extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: isWhite ? Colors.white : PrototypeColors.navy,
-        border: Border.all(color: PrototypeColors.navy.withValues(alpha: 0.35)),
+        color: isWhite ? Colors.white : PrototypeColors.black,
+        border: Border.all(
+          color: PrototypeColors.black.withValues(alpha: 0.35),
+        ),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         isWhite ? 'W' : 'B',
         style: TextStyle(
-          color: isWhite ? PrototypeColors.navy : Colors.white,
+          color: isWhite ? PrototypeColors.black : Colors.white,
           fontFamily: 'monospace',
           fontSize: compact ? 8 : 9,
           fontWeight: FontWeight.w900,
@@ -4486,7 +4488,7 @@ class StandingRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0x1421304e))),
+        border: Border(bottom: BorderSide(color: Color(0x14111111))),
       ),
       child: Row(
         children: [
@@ -4507,7 +4509,7 @@ class StandingRow extends StatelessWidget {
                 Text(
                   '$rating · $record',
                   style: const TextStyle(
-                    color: Color(0x8c21304e),
+                    color: Color(0x8c111111),
                     fontSize: 11.5,
                   ),
                 ),
@@ -4518,7 +4520,7 @@ class StandingRow extends StatelessWidget {
             points,
             style: const TextStyle(
               fontFamily: 'monospace',
-              color: PrototypeColors.navy,
+              color: PrototypeColors.black,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -4620,7 +4622,7 @@ class TournamentRoundPanel extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: PrototypeColors.navy,
+                      color: PrototypeColors.black,
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
                     ),
@@ -4762,7 +4764,7 @@ class TournamentPairingPlayer extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           textAlign: alignEnd ? TextAlign.right : TextAlign.left,
           style: const TextStyle(
-            color: PrototypeColors.navy,
+            color: PrototypeColors.black,
             fontSize: 13,
             fontWeight: FontWeight.w900,
             height: 1.15,
@@ -4807,9 +4809,9 @@ class StageRoundNav extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0x1021304e),
+        color: const Color(0x10111111),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0x2021304e)),
+        border: Border.all(color: const Color(0x20111111)),
       ),
       child: Row(
         children: [
@@ -4900,14 +4902,14 @@ class MatchLine extends StatelessWidget {
           Text(
             result,
             style: const TextStyle(
-              color: PrototypeColors.navy,
+              color: PrototypeColors.black,
               fontFamily: 'monospace',
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: PlayerColorLine(color: const Color(0xff232a36), name: black),
+            child: PlayerColorLine(color: const Color(0xff111111), name: black),
           ),
         ],
       ),
@@ -4941,7 +4943,7 @@ class TournamentEmptyPanel extends StatelessWidget {
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0x9921304e), fontSize: 12.5),
+            style: const TextStyle(color: Color(0x99111111), fontSize: 12.5),
           ),
         ],
       ),
@@ -5058,7 +5060,7 @@ class TournamentInfoTile extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              color: Color(0x9921304e),
+              color: Color(0x99111111),
               fontSize: 10.5,
               fontWeight: FontWeight.w800,
             ),
@@ -5069,7 +5071,7 @@ class TournamentInfoTile extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: PrototypeColors.navy,
+              color: PrototypeColors.black,
               fontSize: 12.4,
               fontWeight: FontWeight.w800,
             ),
@@ -5098,7 +5100,7 @@ class TournamentStep extends StatelessWidget {
       children: [
         Icon(
           done ? Icons.check_circle : Icons.radio_button_unchecked,
-          color: done ? PrototypeColors.burgundy : const Color(0x8021304e),
+          color: done ? PrototypeColors.burgundy : const Color(0x80111111),
           size: 19,
         ),
         const SizedBox(width: 10),
@@ -5106,7 +5108,7 @@ class TournamentStep extends StatelessWidget {
           child: Text(
             label,
             style: const TextStyle(
-              color: PrototypeColors.navy,
+              color: PrototypeColors.black,
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -5114,7 +5116,7 @@ class TournamentStep extends StatelessWidget {
         ),
         Text(
           value,
-          style: const TextStyle(color: Color(0x9921304e), fontSize: 12),
+          style: const TextStyle(color: Color(0x99111111), fontSize: 12),
         ),
       ],
     );
@@ -5128,7 +5130,7 @@ class TournamentDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 12),
-      child: Divider(height: 1, color: Color(0x1821304e)),
+      child: Divider(height: 1, color: Color(0x18111111)),
     );
   }
 }
@@ -5167,7 +5169,7 @@ class TournamentEmptyState extends StatelessWidget {
                 ? 'Create one in the control center to show it here.'
                 : 'Tournaments will appear here after they are published.',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0x9921304e), fontSize: 12),
+            style: const TextStyle(color: Color(0x99111111), fontSize: 12),
           ),
         ],
       ),
@@ -5268,14 +5270,14 @@ class ProfileScreen extends StatelessWidget {
                 width: 76,
                 height: 76,
                 decoration: BoxDecoration(
-                  color: const Color(0x1221304e),
-                  border: Border.all(color: const Color(0x3321304e)),
+                  color: const Color(0x12111111),
+                  border: Border.all(color: const Color(0x33111111)),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
                   child: Text(
                     '♟',
-                    style: TextStyle(fontSize: 30, color: Color(0x6621304e)),
+                    style: TextStyle(fontSize: 30, color: Color(0x66111111)),
                   ),
                 ),
               ),
@@ -5294,7 +5296,7 @@ class ProfileScreen extends StatelessWidget {
                           'Your JuChess account is active on this device.'
                     : 'Sign in to view your rating, registrations, saved analyses, and achievements.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0x9921304e), height: 1.45),
+                style: const TextStyle(color: Color(0x99111111), height: 1.45),
               ),
               const SizedBox(height: 18),
               PrototypeButton(
@@ -5357,7 +5359,7 @@ class BigActionCard extends StatelessWidget {
             color: filled ? PrototypeColors.burgundy : PrototypeColors.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: filled ? PrototypeColors.burgundy : PrototypeColors.navy,
+              color: filled ? PrototypeColors.burgundy : PrototypeColors.black,
               width: filled ? 0 : 1.5,
             ),
           ),
@@ -5382,7 +5384,7 @@ class BigActionCard extends StatelessWidget {
                       style: TextStyle(
                         color: filled
                             ? PrototypeColors.cream
-                            : PrototypeColors.navy,
+                            : PrototypeColors.black,
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                       ),
@@ -5393,7 +5395,7 @@ class BigActionCard extends StatelessWidget {
                       style: TextStyle(
                         color: filled
                             ? const Color(0xccf7f1e3)
-                            : const Color(0x9921304e),
+                            : const Color(0x99111111),
                         fontSize: 12,
                       ),
                     ),
@@ -5402,7 +5404,7 @@ class BigActionCard extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right,
-                color: filled ? PrototypeColors.cream : PrototypeColors.navy,
+                color: filled ? PrototypeColors.cream : PrototypeColors.black,
               ),
             ],
           ),
@@ -5464,7 +5466,7 @@ class ToolTile extends StatelessWidget {
                     Text(
                       title,
                       style: const TextStyle(
-                        color: PrototypeColors.navy,
+                        color: PrototypeColors.black,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                       ),
@@ -5473,14 +5475,14 @@ class ToolTile extends StatelessWidget {
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        color: Color(0x9921304e),
+                        color: Color(0x99111111),
                         fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Color(0x6621304e)),
+              const Icon(Icons.chevron_right, color: Color(0x66111111)),
             ],
           ),
         ),
@@ -5511,7 +5513,7 @@ class PrototypeRouteScaffold extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: const BoxDecoration(
               color: PrototypeColors.header,
-              border: Border(bottom: BorderSide(color: Color(0x1f21304e))),
+              border: Border(bottom: BorderSide(color: Color(0x1f111111))),
             ),
             child: Row(
               children: [
@@ -5555,11 +5557,11 @@ class SquareIconButton extends StatelessWidget {
       icon: Icon(icon, size: 21),
       style: IconButton.styleFrom(
         backgroundColor: PrototypeColors.surface,
-        foregroundColor: PrototypeColors.navy,
+        foregroundColor: PrototypeColors.black,
         fixedSize: const Size(40, 40),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0x2e21304e)),
+          side: const BorderSide(color: Color(0x2e111111)),
         ),
       ),
     );
@@ -5615,7 +5617,7 @@ class LeaderboardRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0x1421304e))),
+        border: Border(bottom: BorderSide(color: Color(0x14111111))),
       ),
       child: Row(
         children: [
@@ -5646,7 +5648,7 @@ class LeaderboardRow extends StatelessWidget {
                 Text(
                   '@$username',
                   style: const TextStyle(
-                    color: Color(0x8c21304e),
+                    color: Color(0x8c111111),
                     fontSize: 11,
                   ),
                 ),
@@ -5657,7 +5659,7 @@ class LeaderboardRow extends StatelessWidget {
             '$rating',
             style: const TextStyle(
               fontFamily: 'monospace',
-              color: PrototypeColors.navy,
+              color: PrototypeColors.black,
               fontSize: 13.5,
               fontWeight: FontWeight.w800,
             ),
@@ -5745,7 +5747,7 @@ class PuzzlesScreen extends StatelessWidget {
               SizedBox(height: 5),
               Text(
                 'Pick a puzzle, find the best move, and solve it on the board.',
-                style: TextStyle(color: Color(0x9921304e), height: 1.4),
+                style: TextStyle(color: Color(0x99111111), height: 1.4),
               ),
             ],
           ),
@@ -5844,7 +5846,7 @@ class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
               Text(
                 widget.puzzle.theme.toUpperCase(),
                 style: const TextStyle(
-                  color: Color(0x9921304e),
+                  color: Color(0x99111111),
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.6,
@@ -5878,7 +5880,7 @@ class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
           child: Text(
             notice,
             style: TextStyle(
-              color: solved ? PrototypeColors.burgundy : PrototypeColors.navy,
+              color: solved ? PrototypeColors.burgundy : PrototypeColors.black,
               fontSize: 13,
               fontWeight: FontWeight.w800,
               height: 1.4,
@@ -6093,7 +6095,7 @@ class _TournamentGameDetailScreenState
               Text(
                 widget.roundLabel,
                 style: const TextStyle(
-                  color: Color(0x9921304e),
+                  color: Color(0x99111111),
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                 ),
@@ -6150,7 +6152,7 @@ class _TournamentGameDetailScreenState
               const Text(
                 'Moves',
                 style: TextStyle(
-                  color: PrototypeColors.navy,
+                  color: PrototypeColors.black,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
@@ -6161,7 +6163,7 @@ class _TournamentGameDetailScreenState
                     ? 'No moves have been saved for this game yet.'
                     : _formatStoredMoves(moves),
                 style: const TextStyle(
-                  color: PrototypeColors.navy,
+                  color: PrototypeColors.black,
                   fontSize: 13,
                   height: 1.55,
                 ),
@@ -6196,12 +6198,12 @@ class TournamentBoardPlayerBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: color == 'black' ? const Color(0xffece8df) : Colors.white,
         border: Border(
-          top: const BorderSide(color: Color(0x2a21304e)),
-          left: const BorderSide(color: Color(0x2a21304e)),
-          right: const BorderSide(color: Color(0x2a21304e)),
+          top: const BorderSide(color: Color(0x2a111111)),
+          left: const BorderSide(color: Color(0x2a111111)),
+          right: const BorderSide(color: Color(0x2a111111)),
           bottom: isTop
               ? BorderSide.none
-              : const BorderSide(color: Color(0x2a21304e)),
+              : const BorderSide(color: Color(0x2a111111)),
         ),
         borderRadius: BorderRadius.vertical(
           top: isTop ? const Radius.circular(8) : Radius.zero,
@@ -6230,7 +6232,7 @@ class TournamentBoardPlayerBar extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: PrototypeColors.navy,
+                    color: PrototypeColors.black,
                     fontSize: 13,
                     fontWeight: FontWeight.w900,
                   ),
@@ -6299,7 +6301,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                       color: PrototypeColors.cream,
                       shape: BoxShape.circle,
                       border: Border.fromBorderSide(
-                        BorderSide(color: Color(0x6621304e)),
+                        BorderSide(color: Color(0x66111111)),
                       ),
                     ),
                   ),
@@ -6311,7 +6313,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                               : 'Black to move'
                         : 'Result $result',
                     style: TextStyle(
-                      color: Color(0xcc21304e),
+                      color: Color(0xcc111111),
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -6329,7 +6331,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                     })
                     .join('  '),
                 style: const TextStyle(
-                  color: PrototypeColors.navy,
+                  color: PrototypeColors.black,
                   fontSize: 13,
                   height: 1.5,
                 ),
@@ -6379,7 +6381,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
           child: Text(
             'Guest mode - sign in to keep saved analyses',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0x8021304e), fontSize: 12),
+            style: TextStyle(color: Color(0x80111111), fontSize: 12),
           ),
         ),
       ],
@@ -6612,7 +6614,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
                               width: 14,
                               height: 14,
                               decoration: const BoxDecoration(
-                                color: Color(0x66213045),
+                                color: Color(0x66111111),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -6621,7 +6623,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
                               margin: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 border: Border.all(
-                                  color: const Color(0x66213045),
+                                  color: const Color(0x66111111),
                                   width: 3,
                                 ),
                                 shape: BoxShape.circle,
@@ -6646,7 +6648,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: const [
                         BoxShadow(
-                          color: Color(0x33213045),
+                          color: Color(0x33111111),
                           blurRadius: 24,
                           offset: Offset(0, 12),
                         ),
@@ -6919,7 +6921,7 @@ class _ChessClockScreenState extends State<ChessClockScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PrototypeColors.navy,
+      backgroundColor: PrototypeColors.black,
       body: SafeArea(
         child: Column(
           children: [
@@ -7408,7 +7410,7 @@ class _ClockSide extends StatelessWidget {
             : const Color(0xffefe3c7);
         final foregroundColor = active
             ? PrototypeColors.cream
-            : PrototypeColors.navy;
+            : PrototypeColors.black;
         final accentColor = active
             ? PrototypeColors.gold
             : PrototypeColors.burgundy;
@@ -7645,7 +7647,7 @@ class SavedAnalysesScreen extends StatelessWidget {
                 const Text(
                   'Sign in to keep analyses across sessions.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0x9921304e), fontSize: 12.5),
+                  style: TextStyle(color: Color(0x99111111), fontSize: 12.5),
                 ),
                 const SizedBox(height: 14),
                 PrototypeButton(
@@ -7721,7 +7723,7 @@ class PrototypeOptionTile extends StatelessWidget {
                     Text(
                       title,
                       style: const TextStyle(
-                        color: PrototypeColors.navy,
+                        color: PrototypeColors.black,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                       ),
@@ -7730,7 +7732,7 @@ class PrototypeOptionTile extends StatelessWidget {
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        color: Color(0x9921304e),
+                        color: Color(0x99111111),
                         fontSize: 12.5,
                       ),
                     ),
@@ -7761,8 +7763,8 @@ class PrototypeOutlineButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        foregroundColor: PrototypeColors.navy,
-        side: const BorderSide(color: PrototypeColors.navy, width: 1.5),
+        foregroundColor: PrototypeColors.black,
+        side: const BorderSide(color: PrototypeColors.black, width: 1.5),
         padding: const EdgeInsets.symmetric(vertical: 13),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
         textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
@@ -7789,9 +7791,9 @@ class SegmentedPills extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0x1021304e),
+        color: const Color(0x10111111),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0x2021304e)),
+        border: Border.all(color: const Color(0x20111111)),
       ),
       child: Row(
         children: labels
@@ -7827,7 +7829,7 @@ class LeaderboardPreview extends StatelessWidget {
                   vertical: 11,
                 ),
                 decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0x1421304e))),
+                  border: Border(bottom: BorderSide(color: Color(0x14111111))),
                 ),
                 child: Row(
                   children: [
@@ -7856,7 +7858,7 @@ class LeaderboardPreview extends StatelessWidget {
                           Text(
                             '@${player.username}',
                             style: const TextStyle(
-                              color: Color(0x8c21304e),
+                              color: Color(0x8c111111),
                               fontSize: 11,
                             ),
                           ),
@@ -7928,7 +7930,7 @@ class NewsTile extends StatelessWidget {
                 Text(
                   subtitle,
                   style: const TextStyle(
-                    color: Color(0x9921304e),
+                    color: Color(0x99111111),
                     fontSize: 12,
                   ),
                 ),
@@ -8077,7 +8079,7 @@ class AppNotice extends StatelessWidget {
       child: Text(
         text,
         style: const TextStyle(
-          color: Color(0xcc21304e),
+          color: Color(0xcc111111),
           fontSize: 12,
           height: 1.35,
         ),
@@ -8089,10 +8091,10 @@ class AppNotice extends StatelessWidget {
 BoxDecoration cardDecoration({double radius = 14}) {
   return BoxDecoration(
     color: PrototypeColors.surface,
-    border: Border.all(color: const Color(0x2421304e)),
+    border: Border.all(color: const Color(0x24111111)),
     borderRadius: BorderRadius.circular(radius),
     boxShadow: const [
-      BoxShadow(color: Color(0x0d21304e), blurRadius: 3, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x0d111111), blurRadius: 3, offset: Offset(0, 1)),
     ],
   );
 }
@@ -8136,11 +8138,11 @@ class HeaderNotificationButton extends StatelessWidget {
           icon: const Icon(Icons.notifications_none),
           style: IconButton.styleFrom(
             backgroundColor: PrototypeColors.surface,
-            foregroundColor: PrototypeColors.navy,
+            foregroundColor: PrototypeColors.black,
             fixedSize: const Size(42, 42),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(13),
-              side: const BorderSide(color: Color(0x3021304e)),
+              side: const BorderSide(color: Color(0x30111111)),
             ),
           ),
         ),
@@ -8271,7 +8273,7 @@ class NotificationScreen extends StatelessWidget {
                         Text(
                           notification.time,
                           style: const TextStyle(
-                            color: Color(0x9921304e),
+                            color: Color(0x99111111),
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                           ),
@@ -8280,7 +8282,7 @@ class NotificationScreen extends StatelessWidget {
                         Text(
                           notification.title,
                           style: const TextStyle(
-                            color: PrototypeColors.navy,
+                            color: PrototypeColors.black,
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                           ),
@@ -8294,7 +8296,7 @@ class NotificationScreen extends StatelessWidget {
               Text(
                 notification.body,
                 style: const TextStyle(
-                  color: Color(0xcc21304e),
+                  color: Color(0xcc111111),
                   fontSize: 13.5,
                   height: 1.45,
                 ),
@@ -8368,16 +8370,16 @@ class StatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
-        color: upcoming ? const Color(0x1fa98a3f) : const Color(0x1021304e),
+        color: upcoming ? const Color(0x1fa98a3f) : const Color(0x10111111),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: upcoming ? const Color(0x55a98a3f) : const Color(0x2421304e),
+          color: upcoming ? const Color(0x55a98a3f) : const Color(0x24111111),
         ),
       ),
       child: Text(
         upcoming ? 'Soon' : 'Done',
         style: TextStyle(
-          color: upcoming ? const Color(0xff79622a) : const Color(0x9921304e),
+          color: upcoming ? const Color(0xff79622a) : const Color(0x99111111),
           fontSize: 10,
           fontWeight: FontWeight.w800,
         ),
@@ -8396,14 +8398,14 @@ class ChipPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0x0d21304e),
-        border: Border.all(color: const Color(0x2621304e)),
+        color: const Color(0x0d111111),
+        border: Border.all(color: const Color(0x26111111)),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          color: PrototypeColors.navy,
+          color: PrototypeColors.black,
           fontSize: 11.5,
           fontWeight: FontWeight.w700,
         ),
@@ -8456,7 +8458,7 @@ class TabPill extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: selected ? PrototypeColors.cream : PrototypeColors.navy,
+          color: selected ? PrototypeColors.cream : PrototypeColors.black,
           fontSize: 12.5,
           fontWeight: FontWeight.w800,
         ),
@@ -8490,7 +8492,7 @@ class SerifText extends StatelessWidget {
       maxLines: maxLines,
       overflow: overflow,
       style: TextStyle(
-        color: PrototypeColors.navy,
+        color: PrototypeColors.black,
         fontFamily: 'Georgia',
         fontSize: size,
         fontWeight: weight,
@@ -8828,7 +8830,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
         const Text(
           'Enter your username, email, or University ID, then choose how you would like to receive your one-time code.',
           style: TextStyle(
-            color: Color(0xa621304e),
+            color: Color(0xa6111111),
             fontSize: 13.5,
             height: 1.5,
           ),
@@ -8893,7 +8895,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
           'If an account matches, a recovery link will be sent. Password recovery is email based.',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Color(0x8021304e),
+            color: Color(0x80111111),
             fontSize: 11.5,
             height: 1.5,
           ),
@@ -9013,7 +9015,7 @@ class _AuthBrandCopy extends StatelessWidget {
         const SizedBox(height: 2),
         const Text(
           'University of Jordan Chess Club',
-          style: TextStyle(color: Color(0x9e21304e), fontSize: 11.5),
+          style: TextStyle(color: Color(0x9e111111), fontSize: 11.5),
         ),
       ],
     );
@@ -9032,9 +9034,9 @@ class RoundBackButton extends StatelessWidget {
       icon: const Icon(Icons.arrow_back, size: 20),
       style: IconButton.styleFrom(
         backgroundColor: PrototypeColors.surface,
-        foregroundColor: PrototypeColors.navy,
+        foregroundColor: PrototypeColors.black,
         fixedSize: const Size(42, 42),
-        shape: const CircleBorder(side: BorderSide(color: Color(0x3821304e))),
+        shape: const CircleBorder(side: BorderSide(color: Color(0x38111111))),
       ),
     );
   }
@@ -9054,11 +9056,11 @@ class SquareBackButton extends StatelessWidget {
         icon: const Icon(Icons.chevron_left, size: 24),
         style: IconButton.styleFrom(
           backgroundColor: PrototypeColors.surface,
-          foregroundColor: PrototypeColors.navy,
+          foregroundColor: PrototypeColors.black,
           fixedSize: const Size(42, 42),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0x2e21304e)),
+            side: const BorderSide(color: Color(0x2e111111)),
           ),
         ),
       ),
@@ -9112,7 +9114,7 @@ class AuthField extends StatelessWidget {
                 const TextSpan(
                   text: ' (optional)',
                   style: TextStyle(
-                    color: Color(0x8021304e),
+                    color: Color(0x80111111),
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -9128,13 +9130,13 @@ class AuthField extends StatelessWidget {
           validator: validator,
           onChanged: onChanged,
           style: const TextStyle(
-            color: PrototypeColors.navy,
+            color: PrototypeColors.black,
             fontSize: 15,
             fontWeight: FontWeight.w500,
           ),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: const TextStyle(color: Color(0x6121304e)),
+            hintStyle: const TextStyle(color: Color(0x61111111)),
             filled: true,
             fillColor: PrototypeColors.surface,
             contentPadding: const EdgeInsets.symmetric(
@@ -9148,7 +9150,7 @@ class AuthField extends StatelessWidget {
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0x4721304e)),
+              borderSide: const BorderSide(color: Color(0x47111111)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
@@ -9168,7 +9170,7 @@ class AuthField extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             helperText!,
-            style: const TextStyle(color: Color(0x8c21304e), fontSize: 11.5),
+            style: const TextStyle(color: Color(0x8c111111), fontSize: 11.5),
           ),
         ],
       ],
@@ -9191,7 +9193,7 @@ class PasswordToggle extends StatelessWidget {
     return IconButton(
       onPressed: onPressed,
       icon: Icon(visible ? Icons.visibility_off_outlined : Icons.visibility),
-      color: const Color(0x9921304e),
+      color: const Color(0x99111111),
       tooltip: visible ? 'Hide password' : 'Show password',
       style: IconButton.styleFrom(
         fixedSize: const Size(48, 48),
@@ -9214,7 +9216,7 @@ class PasswordRequirements extends StatelessWidget {
           Text(
             '1. At least 8 characters',
             style: TextStyle(
-              color: Color(0xa621304e),
+              color: Color(0xa6111111),
               fontSize: 12,
               height: 1.7,
             ),
@@ -9222,7 +9224,7 @@ class PasswordRequirements extends StatelessWidget {
           Text(
             '2. Use a mix of letters, numbers, and a symbol',
             style: TextStyle(
-              color: Color(0xa621304e),
+              color: Color(0xa6111111),
               fontSize: 12,
               height: 1.7,
             ),
@@ -9244,7 +9246,7 @@ class PasswordStrength extends StatelessWidget {
         ? PrototypeColors.gold
         : score >= 2
         ? PrototypeColors.burgundy
-        : const Color(0x8021304e);
+        : const Color(0x80111111);
     final label = score >= 3
         ? 'Strong'
         : score >= 2
@@ -9264,7 +9266,7 @@ class PasswordStrength extends StatelessWidget {
                   height: 5,
                   margin: EdgeInsets.only(right: index == 2 ? 0 : 5),
                   decoration: BoxDecoration(
-                    color: index < score ? color : const Color(0x1a21304e),
+                    color: index < score ? color : const Color(0x1a111111),
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -9295,15 +9297,15 @@ class AuthDivider extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 22),
       child: Row(
         children: const [
-          Expanded(child: Divider(color: Color(0x2921304e))),
+          Expanded(child: Divider(color: Color(0x29111111))),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               'or continue with',
-              style: TextStyle(color: Color(0x8021304e), fontSize: 12),
+              style: TextStyle(color: Color(0x80111111), fontSize: 12),
             ),
           ),
-          Expanded(child: Divider(color: Color(0x2921304e))),
+          Expanded(child: Divider(color: Color(0x29111111))),
         ],
       ),
     );
@@ -9327,9 +9329,9 @@ class AuthSocialButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        foregroundColor: PrototypeColors.navy,
+        foregroundColor: PrototypeColors.black,
         backgroundColor: PrototypeColors.surface,
-        side: const BorderSide(color: Color(0x4021304e)),
+        side: const BorderSide(color: Color(0x40111111)),
         padding: const EdgeInsets.symmetric(vertical: 13),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
@@ -9363,7 +9365,7 @@ class AuthInlineSwitch extends StatelessWidget {
         children: [
           Text(
             '$prefix ',
-            style: const TextStyle(color: Color(0xa621304e), fontSize: 13.5),
+            style: const TextStyle(color: Color(0xa6111111), fontSize: 13.5),
           ),
           TextButton(
             onPressed: onTap,
@@ -9395,9 +9397,9 @@ class AuthGuestButton extends StatelessWidget {
       icon: const Icon(Icons.person_outline, size: 18),
       label: const Text('Continue as guest'),
       style: OutlinedButton.styleFrom(
-        foregroundColor: PrototypeColors.navy,
+        foregroundColor: PrototypeColors.black,
         backgroundColor: PrototypeColors.surface,
-        side: const BorderSide(color: Color(0x4021304e)),
+        side: const BorderSide(color: Color(0x40111111)),
         padding: const EdgeInsets.symmetric(vertical: 13),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
@@ -9416,7 +9418,7 @@ class AuthGuestTextButton extends StatelessWidget {
     return TextButton(
       onPressed: onTap,
       style: TextButton.styleFrom(
-        foregroundColor: PrototypeColors.navy,
+        foregroundColor: PrototypeColors.black,
         padding: const EdgeInsets.symmetric(vertical: 10),
         textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
       ),
@@ -9472,7 +9474,7 @@ class RecoveryMethodCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: selected ? const Color(0x147d2434) : PrototypeColors.surface,
         border: Border.all(
-          color: selected ? PrototypeColors.burgundy : const Color(0x2e21304e),
+          color: selected ? PrototypeColors.burgundy : const Color(0x2e111111),
           width: 1.5,
         ),
         borderRadius: BorderRadius.circular(13),
