@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
 import { AuthProvider } from './context/AuthContext'
@@ -10,6 +11,9 @@ import OnlineGamesPage from './screens/OnlineGamesPage'
 import ProfilePage from './screens/ProfilePage'
 import TournamentDetailPage from './screens/TournamentDetailPage'
 import TournamentsPage from './screens/TournamentsPage'
+
+// Code-split: the Stockfish engine + review pipeline only load on /analysis.
+const AnalysisPage = lazy(() => import('./screens/AnalysisPage'))
 
 function NotFound() {
   const homeUrl = `${import.meta.env.BASE_URL}home`
@@ -35,6 +39,14 @@ function App() {
         <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/games" element={<OnlineGamesPage />} />
+        <Route
+          path="/analysis"
+          element={
+            <Suspense fallback={<div style={{ minHeight: '100vh', background: '#1f1d1b' }} />}>
+              <AnalysisPage />
+            </Suspense>
+          }
+        />
         <Route path="/tools" element={<GamesPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
