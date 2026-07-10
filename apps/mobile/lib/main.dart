@@ -449,9 +449,7 @@ class AppwriteService {
     return rows;
   }
 
-  Future<TournamentLiveGameState?> loadTournamentLiveGame(
-    String gameId,
-  ) async {
+  Future<TournamentLiveGameState?> loadTournamentLiveGame(String gameId) async {
     if (!ready || gameId.trim().isEmpty) return null;
 
     try {
@@ -1190,6 +1188,12 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> registerForTournament(TournamentSeed event) async {
+    if (!isTournamentRegistrationOpen(event)) {
+      error = 'Registration is closed for this tournament.';
+      notifyListeners();
+      return false;
+    }
+
     if (!signedIn) {
       error = 'Sign in to register for this tournament.';
       notifyListeners();
@@ -1472,6 +1476,9 @@ int _statusOrder(String status) {
   if (status == 'active') return 1;
   return 2;
 }
+
+bool isTournamentRegistrationOpen(TournamentSeed event) =>
+    event.status == 'upcoming';
 
 const tournamentFormatOrder = [
   'Swiss',
@@ -3191,6 +3198,8 @@ class _TournamentOverview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final completed = event.status == 'completed';
+    final active = event.status == 'active';
+    final registrationOpen = isTournamentRegistrationOpen(event);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -3204,10 +3213,14 @@ class _TournamentOverview extends StatelessWidget {
           PrototypeButton(
             label: completed
                 ? 'View final ${_mainTabLabel(event).toLowerCase()}'
+                : active
+                ? 'View live ${_mainTabLabel(event).toLowerCase()}'
+                : !registrationOpen
+                ? 'Registration closed'
                 : registered
                 ? 'Cancel registration'
                 : 'Register',
-            onTap: completed ? onMain : onRegister,
+            onTap: registrationOpen ? onRegister : onMain,
           ),
         ],
       ),

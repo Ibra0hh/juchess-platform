@@ -392,6 +392,11 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
 
   const tournamentRowId = tournament.rowId
   const profileId = profile?.$id
+  const registrationOpen = tournament.status === 'Upcoming'
+  const closedTitle = tournament.status === 'Active' ? 'Tournament is live' : 'Registration closed'
+  const closedMessage = tournament.status === 'Active'
+    ? 'This tournament has started. New registrations are no longer accepted.'
+    : 'This tournament is completed. Registration is no longer available.'
 
   const refreshRegistration = useCallback(async () => {
     if (!tournamentRowId || !profileId) {
@@ -424,6 +429,20 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
     return <div className="register-card muted">Checking your club account...</div>
   }
 
+  if (!registrationOpen && !user) {
+    return (
+      <div className="register-card muted">
+        <div className="register-icon">
+          <ShieldCheck size={24} aria-hidden="true" />
+        </div>
+        <div>
+          <h2>{closedTitle}</h2>
+          <p>{closedMessage}</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!user) {
     return (
       <div className="register-card">
@@ -451,7 +470,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   }
 
   async function handleRegister() {
-    if (!tournamentRowId || !user) return
+    if (!tournamentRowId || !user || !registrationOpen) return
     setBusy(true)
     setMessage(null)
     try {
@@ -503,6 +522,11 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
       <div className="register-body">
         {registrationLoading ? (
           <p>Loading your registration...</p>
+        ) : !registrationOpen && !isRegistered ? (
+          <>
+            <h2>{closedTitle}</h2>
+            <p>{closedMessage}</p>
+          </>
         ) : !isRegistered ? (
           <>
             <h2>Play in this tournament</h2>
@@ -528,7 +552,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
         {message ? <p className="register-message" role="status">{message}</p> : null}
       </div>
       <div className="register-actions">
-        {!isRegistered ? (
+        {!registrationOpen ? null : !isRegistered ? (
           <button type="button" className="primary-action" disabled={busy} onClick={handleRegister}>
             {busy ? 'Registering...' : 'Register'}
           </button>

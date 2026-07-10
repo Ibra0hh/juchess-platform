@@ -13,16 +13,17 @@ void main() {
     expect(find.text('Sign in to register and save analyses'), findsOneWidget);
   });
 
-  testWidgets('home carousel shows the empty upcoming slot without cloud data', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(const JuChessApp(connectCloud: false));
-    await tester.pump();
+  testWidgets(
+    'home carousel shows the empty upcoming slot without cloud data',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(const JuChessApp(connectCloud: false));
+      await tester.pump();
 
-    // The carousel opens on the Upcoming slot. With nothing published it must
-    // say so rather than invent a featured event.
-    expect(find.text('No upcoming tournament'), findsOneWidget);
-  });
+      // The carousel opens on the Upcoming slot. With nothing published it must
+      // say so rather than invent a featured event.
+      expect(find.text('No upcoming tournament'), findsOneWidget);
+    },
+  );
 
   group('buildHomeTournamentSlots', () {
     test('always offers upcoming, live and completed slots', () {
@@ -56,6 +57,21 @@ void main() {
       expect(slots[1].event, isNull, reason: 'no active tournament exists');
       expect(slots[2].event, isNull, reason: 'no completed tournament exists');
     });
+  });
+
+  test('registration is available only for upcoming tournaments', () {
+    expect(
+      isTournamentRegistrationOpen(_seed('next-event', 'upcoming')),
+      isTrue,
+    );
+    expect(
+      isTournamentRegistrationOpen(_seed('live-event', 'active')),
+      isFalse,
+    );
+    expect(
+      isTournamentRegistrationOpen(_seed('finished-event', 'completed')),
+      isFalse,
+    );
   });
 }
 
