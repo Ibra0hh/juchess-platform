@@ -274,7 +274,6 @@ function balancePairingColors(pairings, profileIds, previousGames = [], options 
     ...pairings.flatMap((game) => [game.whiteProfileId, game.blackProfileId]),
   ].filter((profileId) => profileId && profileId !== SYSTEM_BYE_PROFILE_ID))];
   const stats = buildAssignedColorStats(orderedIds, previousGames);
-  const rankByProfile = new Map(orderedIds.map((profileId, index) => [profileId, index]));
   const seedByProfile = new Map(orderedIds.map((profileId, index) => [profileId, index + 1]));
   const inferredInitialColor = inferSwissInitialColor(
     orderedIds,
@@ -297,8 +296,6 @@ function balancePairingColors(pairings, profileIds, previousGames = [], options 
       pairing.whiteProfileId,
       pairing.blackProfileId,
       stats,
-      rankByProfile,
-      seedByProfile,
       initialColor,
     );
     recordAssignedColors(stats, colors.whiteProfileId, colors.blackProfileId, pairing.round);
@@ -890,6 +887,20 @@ function mostRecentOppositeSwissColors(playerStats, opponentStats) {
   return null;
 }
 
+function neutralSwissColorAssignment(playerId, opponentId, initialColor) {
+  const orderedIds = [playerId, opponentId].sort((a, b) => a.localeCompare(b));
+  let hash = 2166136261;
+  for (const character of `${orderedIds[0]}\u0000${orderedIds[1]}`) {
+    hash ^= character.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return {
+    profileId: orderedIds[0],
+    color: (hash >>> 0) % 2 === 0 ? initialColor : oppositeSwissColor(initialColor),
+  };
+}
+
 function inferSwissInitialColor(playerIds, games, seedByProfile, byeProfileId) {
   const topPlayerId = [...playerIds].sort((a, b) => (
     (seedByProfile.get(a) ?? 9999) - (seedByProfile.get(b) ?? 9999)
@@ -911,8 +922,6 @@ function allocateSwissColors(
   playerId,
   opponentId,
   stats,
-  rankByProfile,
-  seedByProfile,
   initialColor,
 ) {
   const playerStats = stats.get(playerId);
@@ -954,20 +963,10 @@ function allocateSwissColors(
   const historicalPlayerColor = mostRecentOppositeSwissColors(playerStats, opponentStats);
   if (historicalPlayerColor) return pairWithColor(playerId, historicalPlayerColor);
 
-  const higherRankedId = (rankByProfile.get(playerId) ?? 9999) <= (rankByProfile.get(opponentId) ?? 9999)
-    ? playerId
-    : opponentId;
-  const higherPreference = higherRankedId === playerId ? playerPreference : opponentPreference;
-  if (higherPreference.color) return pairWithColor(higherRankedId, higherPreference.color);
-
-  // First-round fallback: odd pairing numbers receive the drawn initial colour;
-  // even pairing numbers receive the opposite colour.
-  const higherPairingNumber = Number(seedByProfile.get(higherRankedId))
-    || (rankByProfile.get(higherRankedId) ?? 0) + 1;
-  const higherColor = higherPairingNumber % 2 === 1
-    ? initialColor
-    : oppositeSwissColor(initialColor);
-  return pairWithColor(higherRankedId, higherColor);
+  // No player receives a colour advantage because of score, seed, or ranking.
+  // A stable pairing-only tiebreak keeps regeneration reproducible.
+  const neutral = neutralSwissColorAssignment(playerId, opponentId, initialColor);
+  return pairWithColor(neutral.profileId, neutral.color);
 }
 
 function buildSwissPairings(playerIds, games, seedByProfile, byeProfileId, options = {}) {
@@ -1021,7 +1020,6 @@ function buildSwissPairings(playerIds, games, seedByProfile, byeProfileId, optio
     || (seedByProfile.get(a) ?? 9999) - (seedByProfile.get(b) ?? 9999)
     || a.localeCompare(b)
   ));
-  const rankByProfile = new Map(ordered.map((profileId, index) => [profileId, index]));
   const inferredInitialColor = inferSwissInitialColor(playerIds, games, seedByProfile, byeProfileId);
   const initialColor = options.initialColor === 'white' || options.initialColor === 'black'
     ? options.initialColor
@@ -1067,8 +1065,6 @@ function buildSwissPairings(playerIds, games, seedByProfile, byeProfileId, optio
       playerId,
       opponentId,
       stats,
-      rankByProfile,
-      seedByProfile,
       initialColor,
     );
 

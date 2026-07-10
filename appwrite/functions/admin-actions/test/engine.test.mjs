@@ -233,22 +233,18 @@ test('swiss: nobody receives a second bye while others have none', () => {
   assert.equal(new Set(byes).size, 3, 'three players, three rounds, three distinct byes')
 })
 
-test('swiss: the drawn initial colour follows pairing-number parity', () => {
+test('swiss: first-round colours do not depend on player ranking', () => {
   const players = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
-  const seeds = new Map(players.map((player, index) => [player, index + 1]))
-  const { pairings } = engine.buildSwissPairings(players, [], seeds, 'system_bye', { initialColor: 'black' })
+  const forwardSeeds = new Map(players.map((player, index) => [player, index + 1]))
+  const reverseSeeds = new Map(players.map((player, index) => [player, players.length - index]))
+  const forward = engine.buildSwissPairings(players, [], forwardSeeds, 'system_bye', { initialColor: 'black' })
+  const reverse = engine.buildSwissPairings(players, [], reverseSeeds, 'system_bye', { initialColor: 'black' })
 
-  for (const pairing of pairings) {
-    const higher = seeds.get(pairing.whiteProfileId) < seeds.get(pairing.blackProfileId)
-      ? pairing.whiteProfileId
-      : pairing.blackProfileId
-    const expected = seeds.get(higher) % 2 === 1 ? 'black' : 'white'
-    assert.equal(
-      pairing.whiteProfileId === higher ? 'white' : 'black',
-      expected,
-      `pairing number ${seeds.get(higher)} receives its prescribed first-round colour`,
-    )
-  }
+  const colorsByPair = (pairings) => new Map(pairings.map((pairing) => [
+    [pairing.whiteProfileId, pairing.blackProfileId].sort().join(':'),
+    pairing.whiteProfileId,
+  ]))
+  assert.deepEqual(colorsByPair(forward.pairings), colorsByPair(reverse.pairings))
 })
 
 test('swiss: two consecutive Whites force Black and two Blacks force White', () => {
@@ -266,7 +262,7 @@ test('swiss: two consecutive Whites force Black and two Blacks force White', () 
   assert.equal(pairings[0].blackProfileId, 'a')
 })
 
-test('swiss: equal colour preferences are granted to the higher-ranked player', () => {
+test('swiss: equal colour preferences do not favour the higher-ranked player', () => {
   const players = ['a', 'b']
   const seeds = new Map([['a', 1], ['b', 2]])
   const games = [
@@ -278,9 +274,11 @@ test('swiss: equal colour preferences are granted to the higher-ranked player', 
     { round: 3, board: 2, whiteProfileId: 'b', blackProfileId: 'y3', status: 'completed', result: '1/2-1/2' },
   ]
 
-  const { pairings } = engine.buildSwissPairings(players, games, seeds, 'system_bye', { initialColor: 'white' })
-  assert.equal(pairings[0].whiteProfileId, 'b')
-  assert.equal(pairings[0].blackProfileId, 'a', 'higher-ranked a receives its shared Black preference')
+  const reversedSeeds = new Map([['a', 2], ['b', 1]])
+  const first = engine.buildSwissPairings(players, games, seeds, 'system_bye', { initialColor: 'white' }).pairings[0]
+  const second = engine.buildSwissPairings(players, games, reversedSeeds, 'system_bye', { initialColor: 'white' }).pairings[0]
+  assert.equal(first.whiteProfileId, second.whiteProfileId)
+  assert.equal(first.blackProfileId, second.blackProfileId)
 })
 
 test('swiss: equal preferences use the most recent opposite-colour history', () => {
