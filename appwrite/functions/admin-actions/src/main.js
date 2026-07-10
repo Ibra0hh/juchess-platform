@@ -1558,6 +1558,21 @@ function isDeletableTournamentStatus(status) {
   return status === 'draft' || status === 'archived';
 }
 
+function assertTournamentStatusTransition(currentStatus, nextStatus) {
+  if (!nextStatus || currentStatus === nextStatus) return;
+
+  const allowed = {
+    draft: ['upcoming'],
+    upcoming: ['draft', 'active'],
+    active: ['upcoming', 'completed'],
+    completed: ['active', 'archived'],
+    archived: ['completed'],
+  };
+  if (!allowed[currentStatus]?.includes(nextStatus)) {
+    throw new HttpError(409, `Tournament status must move one step at a time from ${currentStatus} to ${nextStatus}.`);
+  }
+}
+
 async function deleteTournamentRows(tablesDB, databaseId, tableId, tournamentId) {
   let deleted = 0;
 
@@ -1683,8 +1698,8 @@ async function createTournamentGames(tablesDB, databaseId, tournamentId, games, 
   return rows;
 }
 
-async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextData = {}) {
-  const tournament = await tablesDB.getRow({
+async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextData = {}, currentTournament) {
+  const tournament = currentTournament ?? await tablesDB.getRow({
     databaseId,
     tableId: tableIds.tournaments,
     rowId: tournamentId,
@@ -1708,6 +1723,7 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
   const publishedRounds = Math.max(1, ...existingGames.map((game) => Number(game.round) || 0));
   return {
     createdGames: [],
+    currentRound: Number(nextTournament.currentRound) || 1,
     roundsTotal: Math.max(publishedRounds, Number(nextTournament.roundsTotal) || 0),
     bracketSnapshot: nextTournament.bracketSnapshot ?? null,
   };
@@ -2657,8 +2673,14 @@ export default async ({ req, res, log, error }) => {
     if (method === 'PATCH' && segments[0] === 'tournaments' && segments[1]) {
       const roundsTotal = validateTournamentRoundCount(body.format, body.roundsTotal);
       const playMode = body.playMode === undefined ? undefined : validateTournamentPlayMode(body.playMode);
+      const currentTournament = await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: segments[1],
+      });
+      assertTournamentStatusTransition(currentTournament.status, body.status);
       const activation = body.status === 'active'
-        ? await startTournamentIfNeeded(tablesDB, databaseId, segments[1], body)
+        ? await startTournamentIfNeeded(tablesDB, databaseId, segments[1], body, currentTournament)
         : null;
       const row = await tablesDB.updateRow({
         databaseId,
@@ -2670,7 +2692,7 @@ export default async ({ req, res, log, error }) => {
           status: body.status,
           format: body.format,
           timeControl: body.timeControl,
-          currentRound: body.status === 'active' ? body.currentRound ?? 1 : body.currentRound,
+          currentRound: body.status === 'active' ? body.currentRound ?? activation?.currentRound ?? 1 : body.currentRound,
           startsAt: body.startsAt,
           endsAt: body.endsAt,
           playMode,

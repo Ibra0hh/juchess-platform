@@ -47,6 +47,7 @@ const EXPORTED = [
   'updateGamePgn',
   'submitGameResult',
   'isDeletableTournamentStatus',
+  'assertTournamentStatusTransition',
   'deleteTournamentRows',
   'assertPlayersCanBeDeleted',
   'assertParticipantCanBeAdded',
@@ -117,6 +118,15 @@ test('tournament deletion is restricted to draft and archived status', () => {
   assert.equal(engine.isDeletableTournamentStatus('upcoming'), false)
   assert.equal(engine.isDeletableTournamentStatus('active'), false)
   assert.equal(engine.isDeletableTournamentStatus('completed'), false)
+})
+
+test('tournament status rollback moves through adjacent lifecycle states', () => {
+  assert.doesNotThrow(() => engine.assertTournamentStatusTransition('completed', 'active'))
+  assert.doesNotThrow(() => engine.assertTournamentStatusTransition('active', 'upcoming'))
+  assert.throws(
+    () => engine.assertTournamentStatusTransition('completed', 'upcoming'),
+    (error) => error.statusCode === 409 && /one step at a time/i.test(error.message),
+  )
 })
 
 test('tournament deletion removes every dependent row across repeated batches', async () => {
@@ -727,12 +737,13 @@ test('activation preserves the exact published games and bracket snapshot', asyn
     { $id: 'r2', tournamentId: 't1', profileId: 'p2', status: 'confirmed', seed: 2 },
   ]
   const tablesDB = {
-    getRow: async () => ({ $id: 't1', status: 'upcoming', format: 'Swiss', bracketSnapshot }),
+    getRow: async () => ({ $id: 't1', status: 'completed', format: 'Swiss', currentRound: 5, bracketSnapshot }),
     listRows: async ({ tableId }) => ({ rows: tableId === 'games' ? games : registrations }),
   }
 
   const activation = await engine.startTournamentIfNeeded(tablesDB, 'juchess', 't1', { status: 'active' })
   assert.deepEqual(activation.createdGames, [])
+  assert.equal(activation.currentRound, 5)
   assert.equal(activation.roundsTotal, 1)
   assert.equal(activation.bracketSnapshot, bracketSnapshot)
 })

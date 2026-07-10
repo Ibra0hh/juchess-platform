@@ -1471,6 +1471,7 @@ function TournamentsScreen({
             void handleStatusChange(item, 'completed')
             setManageTournamentKey('')
           }}
+          onMoveBack={(item, status) => void handleStatusChange(item, status)}
           onMessage={setMessage}
           onGameResult={handleGameResult}
           onGamePgn={handleGamePgn}
@@ -1883,6 +1884,7 @@ function TournamentActionButtons({
       <>
         <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onManage(item)}>Manage</button>
         <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onEdit(item)}>Edit</button>
+        <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => void onStatusChange(item, 'active')}>Active</button>
         <button type="button" className="mini-button" disabled={disabled} onClick={() => onPhotos(item)}>Photos</button>
         <button type="button" className="mini-button warn" disabled={disabled} onClick={() => void onStatusChange(item, 'archived')}>Archive</button>
       </>
@@ -2061,6 +2063,7 @@ function TournamentManageView({
   onGameResult,
   onGameStart,
   onMessage,
+  onMoveBack,
   onPublish,
   onProcedureConfigure,
   onShuffle,
@@ -2088,6 +2091,7 @@ function TournamentManageView({
   }) => Promise<void>
   onGameStart: (gameId: string, physicalBoard: number) => Promise<void>
   onMessage: (message: string) => void
+  onMoveBack: (item: AdminTournament, status: 'active' | 'upcoming') => void
   onPublish: (item: AdminTournament, games: PairingPublishInput[], bracketSnapshot?: string) => void
   onProcedureConfigure: (item: AdminTournament, physicalBoards: number) => Promise<void>
   onShuffle: (item: AdminTournament) => void
@@ -2392,9 +2396,12 @@ function TournamentManageView({
             </>
           ) : tournament.status === 'active' ? (
             <>
+              <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onMoveBack(tournament, 'upcoming')}>Move to upcoming</button>
               <button type="button" className="mini-button" disabled={disabled} onClick={() => void onAdvanceRound(tournament)}>Advance round</button>
               <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onComplete(tournament)}>Complete tournament</button>
             </>
+          ) : tournament.status === 'completed' ? (
+            <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onMoveBack(tournament, 'active')}>Move to active</button>
           ) : null}
         </div>
       </div>
