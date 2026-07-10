@@ -3908,12 +3908,14 @@ class BracketMatchCard extends StatelessWidget {
               ),
             ),
           BracketPlayerRow(
+            color: 'white',
             name: match.white,
             winner: _whiteWon,
             faded: _blackWon,
             bottomBorder: true,
           ),
           BracketPlayerRow(
+            color: 'black',
             name: match.black,
             winner: _blackWon,
             faded: _whiteWon,
@@ -3968,6 +3970,7 @@ class BracketMatchCard extends StatelessWidget {
 
 class BracketPlayerRow extends StatelessWidget {
   const BracketPlayerRow({
+    required this.color,
     required this.name,
     required this.winner,
     required this.faded,
@@ -3975,6 +3978,7 @@ class BracketPlayerRow extends StatelessWidget {
     super.key,
   });
 
+  final String color;
   final String name;
   final bool winner;
   final bool faded;
@@ -4002,6 +4006,8 @@ class BracketPlayerRow extends StatelessWidget {
           ),
           child: Row(
             children: [
+              ChessColorBadge(color: color),
+              const SizedBox(width: 7),
               if (winner) ...[
                 const Text(
                   '✓',
@@ -4030,6 +4036,38 @@ class BracketPlayerRow extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class ChessColorBadge extends StatelessWidget {
+  const ChessColorBadge({required this.color, this.compact = false, super.key});
+
+  final String color;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final isWhite = color == 'white';
+    final size = compact ? 17.0 : 20.0;
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isWhite ? Colors.white : PrototypeColors.navy,
+        border: Border.all(color: PrototypeColors.navy.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        isWhite ? 'W' : 'B',
+        style: TextStyle(
+          color: isWhite ? PrototypeColors.navy : Colors.white,
+          fontFamily: 'monospace',
+          fontSize: compact ? 8 : 9,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -4266,6 +4304,7 @@ class TournamentPairingRow extends StatelessWidget {
           Expanded(
             child: TournamentPairingPlayer(
               alignEnd: true,
+              color: 'white',
               event: event,
               name: match.white,
             ),
@@ -4283,7 +4322,11 @@ class TournamentPairingRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: TournamentPairingPlayer(event: event, name: match.black),
+            child: TournamentPairingPlayer(
+              color: 'black',
+              event: event,
+              name: match.black,
+            ),
           ),
         ],
       ),
@@ -4303,6 +4346,7 @@ class TournamentPairingRow extends StatelessWidget {
 
 class TournamentPairingPlayer extends StatelessWidget {
   const TournamentPairingPlayer({
+    required this.color,
     required this.event,
     required this.name,
     this.alignEnd = false,
@@ -4310,6 +4354,7 @@ class TournamentPairingPlayer extends StatelessWidget {
   });
 
   final bool alignEnd;
+  final String color;
   final TournamentSeed event;
   final String name;
 
@@ -4333,14 +4378,23 @@ class TournamentPairingPlayer extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          '${_ratingForPlayerName(event, name)}',
-          style: const TextStyle(
-            color: Color(0xff8b8577),
-            fontFamily: 'monospace',
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
+        Row(
+          mainAxisAlignment: alignEnd
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          children: [
+            ChessColorBadge(color: color, compact: true),
+            const SizedBox(width: 6),
+            Text(
+              '${_ratingForPlayerName(event, name)}',
+              style: const TextStyle(
+                color: Color(0xff8b8577),
+                fontFamily: 'monospace',
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -5613,11 +5667,25 @@ class _TournamentGameDetailScreenState
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: PrototypeChessBoard(
-            flipped: flipped,
-            moves: moves,
-            readOnly: true,
-            onChanged: (_, _) {},
+          child: Column(
+            children: [
+              TournamentBoardPlayerBar(
+                color: flipped ? 'white' : 'black',
+                name: flipped ? widget.match.white : widget.match.black,
+              ),
+              const SizedBox(height: 7),
+              PrototypeChessBoard(
+                flipped: flipped,
+                moves: moves,
+                readOnly: true,
+                onChanged: (_, _) {},
+              ),
+              const SizedBox(height: 7),
+              TournamentBoardPlayerBar(
+                color: flipped ? 'black' : 'white',
+                name: flipped ? widget.match.black : widget.match.white,
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -5649,6 +5717,53 @@ class _TournamentGameDetailScreenState
           ),
         ),
         const SizedBox(height: 18),
+      ],
+    );
+  }
+}
+
+class TournamentBoardPlayerBar extends StatelessWidget {
+  const TournamentBoardPlayerBar({
+    required this.color,
+    required this.name,
+    super.key,
+  });
+
+  final String color;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        ChessColorBadge(color: color),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                color.toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xff8b8577),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: PrototypeColors.navy,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

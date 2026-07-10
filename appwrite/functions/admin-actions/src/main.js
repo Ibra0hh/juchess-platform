@@ -226,22 +226,106 @@ function compareRegistrationSeeds(a, b) {
     || String(a.profileId || '').localeCompare(String(b.profileId || ''));
 }
 
-function splitSeededPairings(profileIds) {
-  const half = Math.ceil(profileIds.length / 2);
-  return profileIds.slice(0, half).flatMap((whiteProfileId, index) => {
-    const blackProfileId = profileIds[index + half];
-    if (!blackProfileId || whiteProfileId === blackProfileId) return [];
-    return [{ whiteProfileId, blackProfileId, board: index + 1 }];
+function buildAssignedColorStats(profileIds, games, byeProfileId = SYSTEM_BYE_PROFILE_ID) {
+  const stats = new Map(profileIds.map((profileId) => [profileId, {
+    whites: 0,
+    blacks: 0,
+    colorHistory: [],
+  }]));
+  const orderedGames = [...games].sort((a, b) => (
+    Number(a.round) - Number(b.round)
+    || Number(a.board) - Number(b.board)
+  ));
+
+  for (const game of orderedGames) {
+    if (!game.whiteProfileId || !game.blackProfileId || game.blackProfileId === byeProfileId) continue;
+    if (!stats.has(game.whiteProfileId)) {
+      stats.set(game.whiteProfileId, { whites: 0, blacks: 0, colorHistory: [] });
+    }
+    if (!stats.has(game.blackProfileId)) {
+      stats.set(game.blackProfileId, { whites: 0, blacks: 0, colorHistory: [] });
+    }
+    const white = stats.get(game.whiteProfileId);
+    const black = stats.get(game.blackProfileId);
+    white.whites += 1;
+    white.colorHistory.push({ round: Number(game.round) || 0, color: 'white' });
+    black.blacks += 1;
+    black.colorHistory.push({ round: Number(game.round) || 0, color: 'black' });
+  }
+
+  return stats;
+}
+
+function recordAssignedColors(stats, whiteProfileId, blackProfileId, round) {
+  const white = stats.get(whiteProfileId) ?? { whites: 0, blacks: 0, colorHistory: [] };
+  const black = stats.get(blackProfileId) ?? { whites: 0, blacks: 0, colorHistory: [] };
+  white.whites += 1;
+  white.colorHistory.push({ round: Number(round) || 0, color: 'white' });
+  black.blacks += 1;
+  black.colorHistory.push({ round: Number(round) || 0, color: 'black' });
+  stats.set(whiteProfileId, white);
+  stats.set(blackProfileId, black);
+}
+
+function balancePairingColors(pairings, profileIds, previousGames = [], options = {}) {
+  const orderedIds = [...new Set([
+    ...profileIds,
+    ...previousGames.flatMap((game) => [game.whiteProfileId, game.blackProfileId]),
+    ...pairings.flatMap((game) => [game.whiteProfileId, game.blackProfileId]),
+  ].filter((profileId) => profileId && profileId !== SYSTEM_BYE_PROFILE_ID))];
+  const stats = buildAssignedColorStats(orderedIds, previousGames);
+  const rankByProfile = new Map(orderedIds.map((profileId, index) => [profileId, index]));
+  const seedByProfile = new Map(orderedIds.map((profileId, index) => [profileId, index + 1]));
+  const inferredInitialColor = inferSwissInitialColor(
+    orderedIds,
+    previousGames,
+    seedByProfile,
+    SYSTEM_BYE_PROFILE_ID,
+  );
+  const initialColor = options.initialColor === 'white' || options.initialColor === 'black'
+    ? options.initialColor
+    : inferredInitialColor ?? ((options.random?.() ?? Math.random()) < 0.5 ? 'white' : 'black');
+
+  return pairings.map((pairing) => {
+    if (
+      !pairing.whiteProfileId
+      || !pairing.blackProfileId
+      || pairing.blackProfileId === SYSTEM_BYE_PROFILE_ID
+    ) return pairing;
+
+    const colors = allocateSwissColors(
+      pairing.whiteProfileId,
+      pairing.blackProfileId,
+      stats,
+      rankByProfile,
+      seedByProfile,
+      initialColor,
+    );
+    recordAssignedColors(stats, colors.whiteProfileId, colors.blackProfileId, pairing.round);
+    return { ...pairing, ...colors };
   });
 }
 
-function buildRoundRobinSchedule(profileIds, doubleCycle = false) {
+function splitSeededPairings(profileIds, options = {}) {
+  const half = Math.ceil(profileIds.length / 2);
+  const pairings = profileIds.slice(0, half).flatMap((firstProfileId, index) => {
+    const secondProfileId = profileIds[index + half];
+    if (!secondProfileId || firstProfileId === secondProfileId) return [];
+    return [{ whiteProfileId: firstProfileId, blackProfileId: secondProfileId, board: index + 1, round: 1 }];
+  });
+  return balancePairingColors(pairings, profileIds, [], options);
+}
+
+function buildRoundRobinSchedule(profileIds, doubleCycle = false, options = {}) {
   if (profileIds.length < 2) return [];
 
   const entrants = profileIds.length % 2 === 0 ? [...profileIds] : [...profileIds, null];
   let rotation = [...entrants];
   const roundCount = entrants.length - 1;
-  const games = [];
+  const candidateGames = [];
+  const initialColor = options.initialColor === 'white' || options.initialColor === 'black'
+    ? options.initialColor
+    : (options.random?.() ?? Math.random()) < 0.5 ? 'white' : 'black';
 
   for (let round = 1; round <= roundCount; round += 1) {
     let board = 1;
@@ -249,11 +333,18 @@ function buildRoundRobinSchedule(profileIds, doubleCycle = false) {
       const first = rotation[index];
       const second = rotation[rotation.length - 1 - index];
       if (first && second && first !== second) {
-        games.push({
+        // Berger-table orientation: the fixed board alternates each round and
+        // the remaining boards alternate by board index. This prevents three
+        // equal colors in a row while keeping final totals within one game.
+        const firstGetsInitialColor = index === 0 ? round % 2 === 1 : index % 2 === 0;
+        const firstGetsWhite = initialColor === 'white'
+          ? firstGetsInitialColor
+          : !firstGetsInitialColor;
+        candidateGames.push({
           round,
           board,
-          whiteProfileId: round % 2 === 0 ? second : first,
-          blackProfileId: round % 2 === 0 ? first : second,
+          whiteProfileId: firstGetsWhite ? first : second,
+          blackProfileId: firstGetsWhite ? second : first,
         });
         board += 1;
       }
@@ -262,6 +353,7 @@ function buildRoundRobinSchedule(profileIds, doubleCycle = false) {
     rotation = [rotation[0], rotation[rotation.length - 1], ...rotation.slice(1, -1)];
   }
 
+  const games = candidateGames;
   if (!doubleCycle) return games;
 
   return [
@@ -651,8 +743,14 @@ function buildKnockoutSnapshot(structure, entrants, games, names, tournament, op
           const game = resolver.gameFor(roundIndex, structure.rounds[roundIndex].matches.indexOf(match));
           const aResolved = resolver.resolveRef(match.a);
           const bResolved = resolver.resolveRef(match.b);
-          const white = match.a === null ? 'Bye' : aResolved.known && aResolved.profileId ? nameOf(aResolved.profileId) : describeRef(match.a);
-          const black = match.b === null ? 'Bye' : bResolved.known && bResolved.profileId ? nameOf(bResolved.profileId) : describeRef(match.b);
+          const whiteProfileId = game?.whiteProfileId ?? aResolved.profileId ?? undefined;
+          const blackProfileId = game?.blackProfileId ?? bResolved.profileId ?? undefined;
+          const white = game
+            ? nameOf(game.whiteProfileId)
+            : match.a === null ? 'Bye' : aResolved.known && aResolved.profileId ? nameOf(aResolved.profileId) : describeRef(match.a);
+          const black = game
+            ? nameOf(game.blackProfileId)
+            : match.b === null ? 'Bye' : bResolved.known && bResolved.profileId ? nameOf(bResolved.profileId) : describeRef(match.b);
           const decided = game && isGameDecided(game);
           const winnerSide = decided
             ? game.result === '1-0' ? 'white' : game.result === '0-1' ? 'black' : undefined
@@ -662,8 +760,8 @@ function buildKnockoutSnapshot(structure, entrants, games, names, tournament, op
             board: visibleIndex + 1,
             white,
             black,
-            whiteProfileId: aResolved.profileId ?? undefined,
-            blackProfileId: bResolved.profileId ?? undefined,
+            whiteProfileId,
+            blackProfileId,
             whiteScore: decided ? (game.result === '1-0' ? '1' : game.result === '0-1' ? '0' : '½') : undefined,
             blackScore: decided ? (game.result === '0-1' ? '1' : game.result === '1-0' ? '0' : '½') : undefined,
             winner: winnerSide,
@@ -1154,13 +1252,32 @@ async function advanceKnockout(tablesDB, databaseId, tournament, games, options 
     }
 
     if (!creatable.length) continue;
-    await createTournamentGames(
+    const coloredGames = balancePairingColors(creatable, entrants, games);
+    const createdGames = await createTournamentGames(
       tablesDB,
       databaseId,
       tournament.$id,
-      creatable,
+      coloredGames,
       normalizePhysicalBoards(tournament.physicalBoards),
     );
+    const updatedBracketGames = [
+      ...bracketGames,
+      ...createdGames.map((game) => ({ ...game, round: Number(game.round) - roundOffset })),
+    ];
+    const updatedSnapshotJson = buildKnockoutSnapshot(
+      structure,
+      entrants,
+      updatedBracketGames,
+      names,
+      tournament,
+      { stageTwoFromRound: snapshot?.stageTwoFromRound },
+    );
+    await tablesDB.updateRow({
+      databaseId,
+      tableId: tableIds.tournaments,
+      rowId: tournament.$id,
+      data: { bracketSnapshot: updatedSnapshotJson },
+    }).catch(() => undefined);
     await setCurrentRound(
       tablesDB,
       databaseId,
@@ -1185,12 +1302,19 @@ async function advanceKnockout(tablesDB, databaseId, tournament, games, options 
       const resetGame = bracketGames.find((game) => Number(game.round) === resetRound);
       if (winner && winnersFinalist && winner !== winnersFinalist && !resetGame) {
         // Losers-bracket finalist won the grand final: bracket reset.
-        await createTournamentGames(tablesDB, databaseId, tournament.$id, [{
+        const [resetPairing] = balancePairingColors([{
           round: resetRound + roundOffset,
           board: 1,
           whiteProfileId: winner,
           blackProfileId: winnersFinalist,
-        }], normalizePhysicalBoards(tournament.physicalBoards));
+        }], entrants, games);
+        await createTournamentGames(
+          tablesDB,
+          databaseId,
+          tournament.$id,
+          [resetPairing],
+          normalizePhysicalBoards(tournament.physicalBoards),
+        );
         await setCurrentRound(
           tablesDB,
           databaseId,
@@ -1320,7 +1444,7 @@ async function advanceMultiStage(tablesDB, databaseId, tournament, games, comple
   const structure = buildKnockoutStructure(qualifiers.length, false);
   const resolver = knockoutResolver(structure, qualifiers, []);
   const firstRound = structure.rounds[structure.winnersIndices[0]];
-  const stageTwoGames = firstRound.matches
+  const stageTwoCandidates = firstRound.matches
     .map((match, matchIndex) => ({ match, matchIndex }))
     .filter(({ match }) => match.a !== null && match.b !== null)
     .map(({ match, matchIndex }) => ({
@@ -1329,8 +1453,9 @@ async function advanceMultiStage(tablesDB, databaseId, tournament, games, comple
       whiteProfileId: qualifiers[match.a.e],
       blackProfileId: qualifiers[match.b.e],
     }));
+  const stageTwoGames = balancePairingColors(stageTwoCandidates, qualifiers, games);
 
-  await createTournamentGames(
+  const createdStageTwoGames = await createTournamentGames(
     tablesDB,
     databaseId,
     tournament.$id,
@@ -1338,7 +1463,8 @@ async function advanceMultiStage(tablesDB, databaseId, tournament, games, comple
     normalizePhysicalBoards(tournament.physicalBoards),
   );
   const names = await loadProfileNames(tablesDB, databaseId, qualifiers);
-  const snapshotJson = buildKnockoutSnapshot(structure, qualifiers, [], names, tournament, {
+  const snapshotGames = createdStageTwoGames.map((game) => ({ ...game, round: 1 }));
+  const snapshotJson = buildKnockoutSnapshot(structure, qualifiers, snapshotGames, names, tournament, {
     stageTwoFromRound,
   });
   await tablesDB.updateRow({
@@ -1466,7 +1592,7 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
     const structure = buildKnockoutStructure(entrants.length, double);
     const resolver = knockoutResolver(structure, entrants, []);
     const firstRoundIndex = structure.winnersIndices[0];
-    const schedule = structure.rounds[firstRoundIndex].matches
+    const scheduleCandidates = structure.rounds[firstRoundIndex].matches
       .map((match, matchIndex) => ({ match, matchIndex }))
       .filter(({ match }) => match.a !== null && match.b !== null)
       .map(({ match, matchIndex }) => ({
@@ -1475,13 +1601,14 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
         whiteProfileId: entrants[match.a.e],
         blackProfileId: entrants[match.b.e],
       }));
+    const schedule = balancePairingColors(scheduleCandidates, entrants);
     if (!schedule.length) {
       throw new HttpError(400, 'Could not build first-round games for this tournament.');
     }
 
     const createdGames = await createTournamentGames(tablesDB, databaseId, tournamentId, schedule, physicalBoards);
     const names = await loadProfileNames(tablesDB, databaseId, entrants);
-    const snapshotJson = buildKnockoutSnapshot(structure, entrants, [], names, nextTournament);
+    const snapshotJson = buildKnockoutSnapshot(structure, entrants, createdGames, names, nextTournament);
     return {
       createdGames,
       roundsTotal: knockoutGameRoundMap(structure).size,
@@ -1515,7 +1642,7 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
 
   const schedule = isRoundRobinTournament(nextTournament)
     ? buildRoundRobinSchedule(profileIds, isDoubleRoundRobinTournament(nextTournament))
-    : splitSeededPairings(profileIds).map((game) => ({ ...game, round: 1 }));
+    : splitSeededPairings(profileIds);
   if (!schedule.length) {
     throw new HttpError(400, 'Could not build first-round games for this tournament.');
   }

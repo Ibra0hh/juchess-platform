@@ -583,6 +583,42 @@
   overflow-wrap: anywhere;
 }
 
+.game-color-players {
+  display: grid;
+  gap: 6px;
+}
+
+.game-color-players p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tournament-color-chip {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(20, 33, 61, 0.28);
+  border-radius: 4px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tournament-color-chip.white {
+  background: #fff;
+  color: #14213d;
+}
+
+.tournament-color-chip.black {
+  border-color: #14213d;
+  background: #14213d;
+  color: #fff;
+}
+
 .game-card-body small {
   color: rgba(30, 43, 69, 0.6);
   font-size: 12.5px;
@@ -732,6 +768,21 @@
 
 .round-admin-pairing strong:first-of-type {
   text-align: right;
+}
+
+.round-color-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.round-color-player.white-player {
+  justify-content: flex-end;
+}
+
+.round-color-player > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .round-admin-pairing small {
@@ -1184,6 +1235,19 @@
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 13px;
   font-weight: 600;
+}
+
+.bracket-player .tournament-color-chip {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+  color: #14213d;
+  font-size: 9px;
+}
+
+.bracket-player .tournament-color-chip.black {
+  color: #fff;
 }
 
 .detail-loading,

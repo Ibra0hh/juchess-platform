@@ -1856,8 +1856,21 @@ button {
   font-weight: 900;
 }
 
-.pairing-row strong:first-of-type {
+.pairing-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pairing-player.white-side {
+  justify-content: flex-end;
   text-align: right;
+}
+
+.pairing-player > span:not(.chess-color-chip) {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .pairing-row small {
@@ -2416,6 +2429,46 @@ button {
   font-weight: 900;
 }
 
+.chess-color-chip {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  overflow: visible;
+  border: 1px solid rgba(20, 33, 61, 0.28);
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.chess-color-chip.white {
+  background: #fff;
+  color: #14213d;
+}
+
+.chess-color-chip.black {
+  border-color: #14213d;
+  background: #14213d;
+  color: #fff;
+}
+
+.bracket-player .chess-color-chip,
+.admin-bracket-player .chess-color-chip {
+  flex-basis: 18px;
+  width: 18px;
+  height: 18px;
+  color: #14213d;
+  font-size: 9px;
+}
+
+.bracket-player .chess-color-chip.black,
+.admin-bracket-player .chess-color-chip.black {
+  color: #fff;
+}
+
 .live-board-panel {
   margin: 0;
   overflow: hidden;
@@ -2437,6 +2490,41 @@ button {
 
 .live-board-area {
   min-width: 0;
+}
+
+.board-player-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 8px 2px;
+}
+
+.board-player-bar > div {
+  display: grid;
+  min-width: 0;
+}
+
+.board-player-bar small {
+  color: #8b8577;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.board-player-bar strong {
+  overflow: hidden;
+  color: #14213d;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-player-bar.compact {
+  padding: 4px 0;
 }
 
 .live-board-top {

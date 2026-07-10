@@ -689,14 +689,14 @@ function RoundPairingLink({ game }: { game: RoundPairing }) {
   const content = (
     <>
       <span>#{game.board}</span>
-      <strong>
-        {game.white.name}
-        <small>{game.white.rating}</small>
+      <strong className="round-color-player white-player">
+        <span className="tournament-color-chip white">W</span>
+        <span>{game.white.name}<small>{game.white.rating}</small></span>
       </strong>
       <em>vs</em>
-      <strong>
-        {game.black.name}
-        <small>{game.black.rating}</small>
+      <strong className="round-color-player black-player">
+        <span className="tournament-color-chip black">B</span>
+        <span>{game.black.name}<small>{game.black.rating}</small></span>
       </strong>
     </>
   )
@@ -757,9 +757,10 @@ function GamesTab({
                   <span>Board {game.board}</span>
                   <strong>{game.round}</strong>
                 </div>
-                <p>
-                  {game.white.name} vs {game.black.name}
-                </p>
+                <div className="game-color-players">
+                  <p><span className="tournament-color-chip white">W</span>{game.white.name}</p>
+                  <p><span className="tournament-color-chip black">B</span>{game.black.name}</p>
+                </div>
                 <small>{game.result === 'LIVE' ? 'Watch the game ->' : game.result === '*' ? 'Scheduled' : `Result ${game.result}`}</small>
               </div>
             </Link>
@@ -1770,11 +1771,13 @@ function BracketMatchCard({
       <BracketPlayerRow
         name={displayA}
         score={match.live ? '•' : formatBracketScore(match.sa)}
+        side="white"
         state={playerState(match, 'a')}
       />
       <BracketPlayerRow
         name={displayB}
         score={match.live ? '•' : formatBracketScore(match.sb)}
+        side="black"
         state={playerState(match, 'b')}
       />
     </>
@@ -1882,14 +1885,17 @@ function drawBracketLines(track: HTMLDivElement) {
 function BracketPlayerRow({
   name,
   score,
+  side,
   state,
 }: {
   name: string
   score: string
+  side: 'black' | 'white'
   state: 'neutral' | 'winner' | 'muted'
 }) {
   return (
     <div className={`bracket-player ${state}`}>
+      <span className={`tournament-color-chip ${side}`}>{side === 'white' ? 'W' : 'B'}</span>
       <span>{name}</span>
       <strong>{score}</strong>
     </div>

@@ -23,6 +23,10 @@ const EXPORTED = [
   'knockoutGameRoundMap',
   'knockoutResolver',
   'buildSwissPairings',
+  'balancePairingColors',
+  'buildRoundRobinSchedule',
+  'splitSeededPairings',
+  'buildKnockoutSnapshot',
   'seededKnockoutOrder',
   'swissRoundsTotal',
   'multiStageStageOneRounds',
@@ -528,4 +532,81 @@ test('round counts', () => {
   assert.equal(engine.swissRoundsTotal({ roundsTotal: 9 }, 20), 9, 'an explicit count wins')
   assert.equal(engine.multiStageStageOneRounds({ roundsTotal: 5 }, 8), 2)
   assert.equal(engine.multiStageStageOneRounds({ roundsTotal: 0 }, 8), 3, 'defaults to three qualifying rounds')
+})
+
+test('round robin: every planned round has balanced color assignments', () => {
+  const players = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
+  const schedule = engine.buildRoundRobinSchedule(players, false, { initialColor: 'white' })
+  const history = new Map(players.map((player) => [player, []]))
+
+  for (const game of schedule) {
+    history.get(game.whiteProfileId).push('white')
+    history.get(game.blackProfileId).push('black')
+  }
+
+  assert.equal(schedule.length, 15)
+  for (const colors of history.values()) {
+    const whites = colors.filter((color) => color === 'white').length
+    const blacks = colors.filter((color) => color === 'black').length
+    assert.ok(Math.abs(whites - blacks) <= 1, `unbalanced history: ${colors.join(',')}`)
+    assert.doesNotMatch(colors.join(''), /(white){3}|(black){3}/)
+  }
+})
+
+test('double round robin: every rematch reverses White and Black', () => {
+  const players = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
+  const schedule = engine.buildRoundRobinSchedule(players, true, { initialColor: 'black' })
+  const firstCycle = schedule.filter((game) => game.round <= 5)
+  const secondCycle = schedule.filter((game) => game.round > 5)
+
+  assert.equal(schedule.length, 30)
+  for (const game of firstCycle) {
+    const reverse = secondCycle.find((candidate) => (
+      candidate.round === game.round + 5
+      && candidate.whiteProfileId === game.blackProfileId
+      && candidate.blackProfileId === game.whiteProfileId
+    ))
+    assert.ok(reverse, `missing color-reversed rematch for round ${game.round}, board ${game.board}`)
+  }
+})
+
+test('generic first round changes colors with the drawn initial color', () => {
+  const players = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
+  const whiteDraw = engine.splitSeededPairings(players, { initialColor: 'white' })
+  const blackDraw = engine.splitSeededPairings(players, { initialColor: 'black' })
+
+  assert.deepEqual(
+    blackDraw.map((game) => [game.whiteProfileId, game.blackProfileId]),
+    whiteDraw.map((game) => [game.blackProfileId, game.whiteProfileId]),
+  )
+})
+
+test('knockout snapshot uses the persisted game colors', () => {
+  const entrants = ['p1', 'p2', 'p3', 'p4']
+  const structure = engine.buildKnockoutStructure(entrants.length, false)
+  const resolver = engine.knockoutResolver(structure, entrants, [])
+  const firstRoundIndex = structure.winnersIndices[0]
+  const firstMatch = structure.rounds[firstRoundIndex].matches[0]
+  const structuralWhite = resolver.resolveRef(firstMatch.a).profileId
+  const structuralBlack = resolver.resolveRef(firstMatch.b).profileId
+  const game = {
+    round: 1,
+    board: resolver.boardOf(firstRoundIndex, 0),
+    whiteProfileId: structuralBlack,
+    blackProfileId: structuralWhite,
+    status: 'scheduled',
+    result: '*',
+  }
+  const names = new Map(entrants.map((profileId) => [profileId, `Name ${profileId}`]))
+  const snapshot = JSON.parse(engine.buildKnockoutSnapshot(
+    structure,
+    entrants,
+    [game],
+    names,
+    { format: 'Single elimination' },
+  ))
+
+  assert.equal(snapshot.rounds[0].matches[0].whiteProfileId, structuralBlack)
+  assert.equal(snapshot.rounds[0].matches[0].blackProfileId, structuralWhite)
+  assert.equal(snapshot.rounds[0].matches[0].white, `Name ${structuralBlack}`)
 })

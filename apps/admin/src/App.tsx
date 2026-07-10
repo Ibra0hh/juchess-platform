@@ -1889,11 +1889,11 @@ function TournamentManageView({
   ), [published, tournament.bracketSnapshot])
   const generatedBracketConfig = useMemo(() => (
     knockout
-      ? buildAdminBracketConfig(tournament, tournamentPlayers, bracketPhase)
+      ? buildAdminBracketConfig(tournament, tournamentPlayers, bracketPhase, shuffleSeed)
       : multiStage
-      ? buildAdminMultiStageBracketConfig(tournament, tournamentPlayers, bracketPhase)
+      ? buildAdminMultiStageBracketConfig(tournament, tournamentPlayers, bracketPhase, shuffleSeed)
       : null
-  ), [bracketPhase, knockout, multiStage, tournament, tournamentPlayers])
+  ), [bracketPhase, knockout, multiStage, shuffleSeed, tournament, tournamentPlayers])
   const bracketConfig = savedBracketConfig ?? generatedBracketConfig
   const activeBracketRounds = bracketConfig?.type === 'double'
     ? bracketConfig.brackets[bracketView]
@@ -2125,9 +2125,15 @@ function TournamentManageView({
                 {round.pairings.map((pairing) => (
                   <div key={`${pairing.round ?? 1}-${pairing.board}`} className="pairing-row">
                     <span>#{pairing.board}</span>
-                    <strong>{pairing.white}<small>{pairing.whiteRating}</small></strong>
+                    <strong className="pairing-player white-side">
+                      <span className="chess-color-chip white">W</span>
+                      <span>{pairing.white}<small>{pairing.whiteRating}</small></span>
+                    </strong>
                     <em>vs</em>
-                    <strong>{pairing.black}<small>{pairing.blackRating}</small></strong>
+                    <strong className="pairing-player black-side">
+                      <span className="chess-color-chip black">B</span>
+                      <span>{pairing.black}<small>{pairing.blackRating}</small></span>
+                    </strong>
                   </div>
                 ))}
               </div>
@@ -2813,6 +2819,7 @@ function BracketPlayerRow({
 }) {
   return (
     <div className={`bracket-player ${state}`} data-brk-player={side}>
+      <span className={`chess-color-chip ${side}`}>{side === 'white' ? 'W' : 'B'}</span>
       <span>{name}</span>
       <strong>{score}</strong>
     </div>
@@ -2936,19 +2943,25 @@ function LiveTournamentBoard({
             </label>
             <span className="live-turn">{pairing?.completed ? `Recorded ${pairing.result}` : boardState.moves.length % 2 === 0 ? 'White to move' : 'Black to move'}</span>
           </div>
+          <BoardPlayerBar color="black" name={pairing?.black ?? 'Black player'} />
           <JuChessBoard moves={boardState.moves} onChange={handleBoardChange} />
+          <BoardPlayerBar color="white" name={pairing?.white ?? 'White player'} />
         </div>
         <aside className="live-game-side">
           <div className="live-match-card">
             <span>Current match</span>
-            <strong>{pairing?.white ?? 'No active board'}</strong>
-            <em>vs</em>
-            <strong>{pairing?.black ?? 'Select a live match'}</strong>
+            <BoardPlayerBar color="white" name={pairing?.white ?? 'No active board'} compact />
+            <BoardPlayerBar color="black" name={pairing?.black ?? 'Select a live match'} compact />
           </div>
           <div className="result-control">
             <span>Result</span>
             <div>
-              {['Live', '1-0', '0-1', '1/2-1/2'].map((value) => (
+              {[
+                { label: 'Live', value: 'Live' },
+                { label: '1-0 White', value: '1-0' },
+                { label: '0-1 Black', value: '0-1' },
+                { label: 'Draw', value: '1/2-1/2' },
+              ].map(({ label, value }) => (
                 <button
                   type="button"
                   className={boardState.result === value ? 'active' : undefined}
@@ -2956,7 +2969,7 @@ function LiveTournamentBoard({
                   onClick={() => recordResult(value)}
                   key={value}
                 >
-                  {value}
+                  {label}
                 </button>
               ))}
             </div>
@@ -2999,6 +3012,26 @@ function LiveTournamentBoard({
         </aside>
       </div>
     </section>
+  )
+}
+
+function BoardPlayerBar({
+  color,
+  compact = false,
+  name,
+}: {
+  color: 'black' | 'white'
+  compact?: boolean
+  name: string
+}) {
+  return (
+    <div className={`board-player-bar ${compact ? 'compact' : ''}`}>
+      <span className={`chess-color-chip ${color}`}>{color === 'white' ? 'W' : 'B'}</span>
+      <div>
+        <small>{color}</small>
+        <strong>{name}</strong>
+      </div>
+    </div>
   )
 }
 
@@ -3937,7 +3970,7 @@ function buildRoundRobinPairings(
   let rotation = [...entrants]
   const roundCount = entrants.length - 1
   const firstCycle: Pairing[] = []
-  const colorCounts = new Map<string, { white: number; black: number }>()
+  const initialColorIsWhite = seededBoolean(seed, 71)
 
   for (let round = 1; round <= roundCount; round += 1) {
     let board = 1
@@ -3945,7 +3978,20 @@ function buildRoundRobinPairings(
       const first = rotation[index]
       const second = rotation[rotation.length - 1 - index]
       if (first && second) {
-        firstCycle.push(buildColorAwarePairing(first, second, board, round, seed + round * 37 + index, colorCounts))
+        const firstGetsInitialColor = index === 0 ? round % 2 === 1 : index % 2 === 0
+        const firstGetsWhite = initialColorIsWhite ? firstGetsInitialColor : !firstGetsInitialColor
+        const white = firstGetsWhite ? first : second
+        const black = firstGetsWhite ? second : first
+        firstCycle.push({
+          round,
+          board,
+          white: white.name,
+          whiteProfileId: white.profileId ?? white.id,
+          whiteRating: white.rating,
+          black: black.name,
+          blackProfileId: black.profileId ?? black.id,
+          blackRating: black.rating,
+        })
         board += 1
       }
     }
@@ -4334,19 +4380,20 @@ function buildAdminBracketConfig(
   tournament: AdminTournament,
   players: Player[],
   phase: AdminBracketPhase,
+  colorSeed = 0,
 ): AdminBracketConfig {
   if (isDoubleEliminationTournament(tournament)) {
     return {
       type: 'double',
       title: 'Double elimination bracket',
-      brackets: buildAdminDoubleEliminationBrackets(tournament, players, phase),
+      brackets: buildAdminDoubleEliminationBrackets(tournament, players, phase, colorSeed),
     }
   }
 
   return {
     type: 'single',
     title: `${tournament.format} bracket`,
-    rounds: buildAdminSingleEliminationRounds(tournament, players, phase),
+    rounds: buildAdminSingleEliminationRounds(tournament, players, phase, { colorSeed }),
   }
 }
 
@@ -4354,6 +4401,7 @@ function buildAdminMultiStageBracketConfig(
   tournament: AdminTournament,
   players: Player[],
   phase: AdminBracketPhase,
+  colorSeed = 0,
 ): AdminBracketConfig {
   const phaseTwoPlayers = players.slice(0, Math.min(8, Math.max(2, players.length)))
   const phaseTwoPhase = isMultiStagePhaseTwo(tournament) ? phase : 'setup'
@@ -4365,6 +4413,7 @@ function buildAdminMultiStageBracketConfig(
       { ...tournament, format: 'Single elimination' },
       phaseTwoPlayers,
       phaseTwoPhase,
+      { colorSeed },
     ),
   }
 }
@@ -4483,6 +4532,7 @@ function buildAdminDoubleEliminationBrackets(
   tournament: AdminTournament,
   players: Player[],
   phase: AdminBracketPhase,
+  colorSeed = 0,
 ): Record<AdminBracketView, AdminBracketRound[]> {
   const winnerMatchCounts = bracketRoundCounts(players.length).map((count) => Math.max(1, count / 2))
   const matchNumbers = buildDoubleEliminationMatchNumbering(winnerMatchCounts)
@@ -4496,6 +4546,7 @@ function buildAdminDoubleEliminationBrackets(
     forceActiveRound: winnersForceRound,
     matchNumbers: matchNumbers.winners,
     prefix: 'W-',
+    colorSeed,
   })
   const firstLoserPool = adminLosersFromRound(winners[0], winners[0]?.name ?? 'W-Round')
   const incomingLosers = winners
@@ -4635,7 +4686,7 @@ function buildAdminSingleEliminationRounds(
   tournament: AdminTournament,
   players: Player[],
   phase: AdminBracketPhase,
-  options: { forceActiveRound?: number; matchNumbers?: number[][]; prefix?: string } = {},
+  options: { colorSeed?: number; forceActiveRound?: number; matchNumbers?: number[][]; prefix?: string } = {},
 ): AdminBracketRound[] {
   const entrants: BracketEntrant[] = players.map((player) => ({ name: player.name, profileId: player.profileId ?? player.id, rating: player.rating }))
   const counts = bracketRoundCounts(entrants.length)
@@ -4647,7 +4698,10 @@ function buildAdminSingleEliminationRounds(
   return labels.map((name, roundIndex) => {
     const complete = phase === 'completed' || (phase === 'active' && roundIndex < activeRound)
     const live = phase === 'active' && roundIndex === activeRound
-    const matches = pairEntrants(current).map(([white, black], matchIndex) => {
+    const matches = pairEntrants(current).map(([first, second], matchIndex) => {
+      const firstGetsWhite = seededBoolean(options.colorSeed ?? 0, (roundIndex + 1) * 101 + (matchIndex + 1) * 17)
+      const white = firstGetsWhite ? first : second
+      const black = firstGetsWhite ? second : first
       const hasTarget = roundIndex < labels.length - 1
       const matchNumber = options.matchNumbers?.[roundIndex]?.[matchIndex]
       return buildBracketMatchForPhase(
