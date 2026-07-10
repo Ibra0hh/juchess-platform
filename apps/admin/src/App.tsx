@@ -1211,13 +1211,8 @@ function TournamentsScreen({
       return
     }
 
-    if (usesSwissPublishFlow(item) && item.status !== 'active') {
-      setMessage(`${item.name} pairings are published after the tournament is moved to Active.`)
-      return
-    }
-
-    if (!usesSwissPublishFlow(item) && item.status !== 'upcoming') {
-      setMessage(`${item.name} pairings are published from Upcoming management.`)
+    if (item.status !== 'upcoming') {
+      setMessage(`${item.name} opening pairings can be published only from Upcoming management.`)
       return
     }
 
@@ -1252,6 +1247,11 @@ function TournamentsScreen({
 
     if (item.publishedGames <= 0) {
       setMessage(`${item.name} is not published.`)
+      return
+    }
+
+    if (item.status !== 'upcoming') {
+      setMessage(`${item.name} pairings can be unpublished only while the tournament is Upcoming.`)
       return
     }
 
@@ -1355,6 +1355,11 @@ function TournamentsScreen({
   async function handleProcedureConfigure(item: AdminTournament, physicalBoards: number) {
     if (!item.rowId) {
       setMessage('Only cloud tournaments can save a procedure plan.')
+      return
+    }
+
+    if (item.status !== 'active') {
+      setMessage('The procedure plan can be configured only while the tournament is Active.')
       return
     }
 
@@ -2046,27 +2051,27 @@ function TournamentManageView({
 }) {
   const knockout = isKnockoutTournament(tournament)
   const multiStage = isMultiStageTournament(tournament)
-  const swissFlow = usesSwissPublishFlow(tournament)
   const roundRobin = isRoundRobinTournament(tournament)
   const playStage = knockout ? 'bracket' : 'rounds'
+  const procedureAvailable = tournament.status === 'active' || tournament.status === 'completed'
   const manageStages = multiStage
     ? [
         { key: 'participants', label: 'Participants' },
         { key: 'rounds', label: 'Phase One' },
         { key: 'bracket', label: 'Phase Two' },
-        { key: 'procedure', label: 'Procedure' },
+        ...(procedureAvailable ? [{ key: 'procedure', label: 'Procedure' }] : []),
         { key: 'standings', label: 'Standings' },
       ]
     : knockout
     ? [
         { key: 'participants', label: 'Participants' },
         { key: playStage, label: capitalize(playStage) },
-        { key: 'procedure', label: 'Procedure' },
+        ...(procedureAvailable ? [{ key: 'procedure', label: 'Procedure' }] : []),
       ]
     : [
         { key: 'participants', label: 'Participants' },
         { key: playStage, label: capitalize(playStage) },
-        { key: 'procedure', label: 'Procedure' },
+        ...(procedureAvailable ? [{ key: 'procedure', label: 'Procedure' }] : []),
         { key: 'standings', label: 'Standings' },
       ]
   const [stage, setStage] = useState(playStage)
@@ -2156,8 +2161,8 @@ function TournamentManageView({
   const recordedResults = tournament.publishedGameRows.filter((game) => (
     game.status === 'completed' || game.status === 'forfeit'
   )).length
-  const canPublishPairings = tournament.status === 'upcoming' ? !swissFlow : tournament.status === 'active' && swissFlow
-  const canShufflePairings = tournament.status === 'upcoming' || (tournament.status === 'active' && swissFlow)
+  const canPublishPairings = tournament.status === 'upcoming'
+  const canShufflePairings = tournament.status === 'upcoming'
   const shuffleLocked = disabled || participantsLoading || published || !canShufflePairings
   const publishLocked = disabled || participantsLoading || published || !publishableGames.length || !canPublishPairings
   const participantAddLocked = disabled || participantsLoading || published || tournament.status === 'completed' || tournament.status === 'archived'
@@ -2235,8 +2240,22 @@ function TournamentManageView({
     const pgn = state.moves.length ? pgnFromMoves(state.moves) : undefined
 
     if (board.completed) {
-      if (!board.gameId || !pgn) {
-        onMessage('Enter or import moves before saving PGN for this finished game.')
+      if (!board.gameId) {
+        onMessage('This finished game is not connected to a cloud game row.')
+        return
+      }
+      const resultChanged = result !== '*' && result !== board.result
+      if (resultChanged) {
+        await onGameResult({
+          gameId: board.gameId,
+          result,
+          status: 'completed',
+          pgn,
+        })
+        return
+      }
+      if (!pgn) {
+        onMessage('Change the final result or enter/import moves before saving this finished game.')
         return
       }
       await onGamePgn(board.gameId, pgn)
@@ -2291,11 +2310,9 @@ function TournamentManageView({
     : 'Live Tournament'
   const publishState = published
     ? 'Published - shuffle locked'
-    : swissFlow && tournament.status === 'upcoming'
-    ? `${tournament.format} pairings publish after moving to Active`
     : roundRobin
     ? `${pairingRounds.length} rounds ready`
-    : 'Draft pairings'
+    : 'Opening pairings ready'
 
   return (
     <div className="tournament-manage-view">
@@ -2310,32 +2327,26 @@ function TournamentManageView({
           <p>{tournament.format} · {tournament.capacity || 'open'} players · {tournament.timeControl}</p>
         </div>
         <div className="manage-controls">
-          {tournament.status === 'upcoming' || (tournament.status === 'active' && swissFlow) ? (
+          {tournament.status === 'upcoming' ? (
             <>
               <button type="button" className="mini-button ghost" disabled={shuffleLocked} onClick={() => onShuffle(tournament)}>
                 Shuffle
               </button>
-              {canPublishPairings ? (
-                <button type="button" className="mini-button dark" disabled={publishLocked} onClick={publishPairings}>
-                  {published ? 'Published' : 'Publish'}
-                </button>
-              ) : (
-                <button type="button" className="mini-button dark" disabled>
-                  Publish in Active
-                </button>
-              )}
+              <button type="button" className="mini-button dark" disabled={publishLocked} onClick={publishPairings}>
+                {published ? 'Published' : 'Publish'}
+              </button>
               {published ? (
                 <button type="button" className="mini-button warn" disabled={disabled} onClick={() => onUnpublish(tournament)}>
                   Unpublish
                 </button>
               ) : null}
             </>
-          ) : (
+          ) : tournament.status === 'active' ? (
             <>
               <button type="button" className="mini-button" disabled={disabled} onClick={() => void onAdvanceRound(tournament)}>Advance round</button>
               <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onComplete(tournament)}>Complete tournament</button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -2437,7 +2448,7 @@ function TournamentManageView({
         {stage === 'rounds' ? (
           <>
             <div className="manage-panel-head">
-              <strong>{multiStage ? 'Phase One - Swiss rounds' : roundRobin ? 'Full round schedule' : tournament.status === 'upcoming' ? 'Round 1 pairings' : 'Live — current round'}</strong>
+              <strong>{multiStage ? 'Phase One - Swiss rounds' : roundRobin ? 'Full round schedule' : tournament.status === 'upcoming' ? 'Round 1 pairings' : tournament.status === 'completed' ? 'Final published rounds' : 'Live — current round'}</strong>
               <span>{publishState}</span>
             </div>
             {participantsLoading ? (
@@ -2517,6 +2528,7 @@ function TournamentManageView({
                   onSaveGame={saveLiveBoardResult}
                   panelRef={liveBoardRef}
                   selectedBoardKey={selectedBoardKey}
+                  allowCompletedCorrections={tournament.status === 'completed'}
                 />
               </div>
             ) : null}
@@ -2525,7 +2537,7 @@ function TournamentManageView({
                 active={tournament.status === 'active'}
                 advanceDisabled={disabled}
                 configuredTables={tournament.physicalBoards || 3}
-                disabled={disabled}
+                disabled={disabled || tournament.status !== 'active'}
                 onAdvanceRound={() => void onAdvanceRound(tournament)}
                 onConfigure={() => void onProcedureConfigure(tournament, physicalBoards)}
                 onMatchSelect={tournament.status === 'active' || tournament.status === 'completed' ? selectLiveBoard : undefined}
@@ -2633,6 +2645,7 @@ function ProcedurePlanner({
               type="number"
               min={1}
               max={64}
+              disabled={disabled}
               value={tableCount}
               onChange={(event) => onTablesChange(Math.max(1, Math.min(64, Math.floor(Number(event.target.value) || 1))))}
             />
@@ -2652,7 +2665,7 @@ function ProcedurePlanner({
       <div className="procedure-status-note">
         {active
           ? 'Start only the game shown on each free board. Saving the final result automatically prepares the next round.'
-          : 'This is the planned venue order. Games become startable when the tournament is active.'}
+          : 'Review finished games here. Select any game to correct its final result, moves, or PGN.'}
       </div>
 
       <section className="pairing-round-block procedure-wave-block">
@@ -3175,6 +3188,7 @@ function BracketPlayerRow({
 }
 
 function LiveTournamentBoard({
+  allowCompletedCorrections = false,
   boards,
   onBoardSelect,
   onMessage,
@@ -3183,6 +3197,7 @@ function LiveTournamentBoard({
   panelRef,
   selectedBoardKey,
 }: {
+  allowCompletedCorrections?: boolean
   boards: LiveBoardOption[]
   onBoardSelect: (boardKey: string) => void
   onMessage: (message: string) => void
@@ -3293,7 +3308,7 @@ function LiveTournamentBoard({
   }
 
   function recordResult(value: string) {
-    if (!pairing || pairing.completed) return
+    if (!pairing || (pairing.completed && (!allowCompletedCorrections || value === 'Live'))) return
     updateCurrentBoard({
       moves: boardState.moves,
       result: value,
@@ -3367,7 +3382,7 @@ function LiveTournamentBoard({
           </div>
           <BoardPlayerBar color="black" name={pairing?.black ?? 'Black player'} />
           <JuChessBoard
-            interactive={Boolean(pairing && !pairing.completed && !viewingHistory)}
+            interactive={Boolean(pairing && !viewingHistory && (!pairing.completed || allowCompletedCorrections))}
             moves={displayedMoves}
             onChange={handleBoardChange}
           />
@@ -3430,7 +3445,7 @@ function LiveTournamentBoard({
                 <button
                   type="button"
                   className={boardState.result === value ? 'active' : undefined}
-                  disabled={!pairing || pairing.completed || viewingHistory}
+                  disabled={!pairing || viewingHistory || Boolean(pairing.completed && (!allowCompletedCorrections || value === 'Live'))}
                   onClick={() => recordResult(value)}
                   key={value}
                 >
@@ -3471,7 +3486,7 @@ function LiveTournamentBoard({
             <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!boardState.moves.length || viewingHistory}>Undo move</button>
             <button type="button" className="mini-button ghost" onClick={resetGame} disabled={!pairing || viewingHistory}>Reset</button>
             <button type="button" className="mini-button dark" disabled={!pairing || saving || syncing || viewingHistory} onClick={saveBoard}>
-              {saving ? 'Saving...' : pairing?.completed ? 'Save PGN' : boardState.moves.length ? 'Save result + PGN' : 'Save result without PGN'}
+              {saving ? 'Saving...' : pairing?.completed ? allowCompletedCorrections ? 'Save corrections' : 'Save PGN' : boardState.moves.length ? 'Save result + PGN' : 'Save result without PGN'}
             </button>
           </div>
         </aside>
@@ -4421,10 +4436,6 @@ function isMultiStagePhaseTwo(item: AdminTournament) {
   return isMultiStageTournament(item) && /stage\s*(?:2|two)|phase\s*(?:2|two)|knockout|quarter|semi|final/i.test(item.round)
 }
 
-function usesSwissPublishFlow(item: AdminTournament) {
-  return isSwissTournament(item) || isMultiStageTournament(item)
-}
-
 function isRoundRobinTournament(item: AdminTournament) {
   return isSingleRoundRobinTournament(item) || isDoubleRoundRobinTournament(item)
 }
@@ -4740,7 +4751,7 @@ function buildPlayableBoardsFromAdminGames(games: AdminGame[]): PlayableBoard[] 
 
 function buildPlayableBoardsFromProcedureMatches(matches: ProcedureMatch[]): LiveBoardOption[] {
   return matches
-    .filter((match) => Boolean(match.gameId && (match.live || match.completed)))
+    .filter((match) => Boolean(match.gameId && !match.bye && (match.live || match.completed)))
     .map((match) => ({
       board: match.board,
       boardKey: match.boardKey,

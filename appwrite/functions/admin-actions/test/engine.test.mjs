@@ -39,6 +39,7 @@ const EXPORTED = [
   'normalizePhysicalBoards',
   'buildProcedureAssignments',
   'createTournamentGames',
+  'startTournamentIfNeeded',
   'configureTournamentProcedure',
   'startProcedureGame',
   'updateGamePgn',
@@ -531,7 +532,7 @@ test('procedure: configuring legacy live games requeues matches beyond board cap
   }))
   const updates = new Map()
   const tablesDB = {
-    getRow: async () => ({ $id: 't1', currentRound: 1, physicalBoards: 2 }),
+    getRow: async () => ({ $id: 't1', status: 'active', currentRound: 1, physicalBoards: 2 }),
     listRows: async () => ({ rows: games }),
     updateRow: async ({ tableId, rowId, data }) => {
       if (tableId === 'games') updates.set(rowId, data)
@@ -544,6 +545,17 @@ test('procedure: configuring legacy live games requeues matches beyond board cap
   assert.equal(updates.get('g2').status, undefined)
   assert.equal(updates.get('g3').status, 'scheduled')
   assert.equal(updates.get('g4').status, 'scheduled')
+})
+
+test('procedure: venue planning is blocked before the tournament is active', async () => {
+  const tablesDB = {
+    getRow: async () => ({ $id: 't1', status: 'upcoming', currentRound: 1, physicalBoards: 2 }),
+  }
+
+  await assert.rejects(
+    () => engine.configureTournamentProcedure(tablesDB, 'juchess', 't1', 2),
+    (error) => error.statusCode === 409 && /only while.*active/i.test(error.message),
+  )
 })
 
 test('procedure: start changes one assigned game to live and rejects an occupied board', async () => {
@@ -622,20 +634,105 @@ test('procedure: a queued game cannot receive a result before Start', async () =
 })
 
 test('procedure: a finished result cannot be submitted twice', async () => {
+  const game = {
+    $id: 'g1',
+    tournamentId: 't1',
+    round: 1,
+    status: 'completed',
+    result: '1-0',
+  }
   const tablesDB = {
-    getRow: async () => ({
-      $id: 'g1',
-      tournamentId: 't1',
-      round: 1,
-      status: 'completed',
-      result: '1-0',
-    }),
+    getRow: async ({ tableId }) => tableId === 'games' ? game : { $id: 't1', status: 'active' },
   }
 
   await assert.rejects(
     () => engine.submitGameResult(tablesDB, 'juchess', 'g1', { result: '1-0' }),
     (error) => error.statusCode === 409 && /already finished/i.test(error.message),
   )
+})
+
+test('completed procedure can correct a finished result without advancing rounds', async () => {
+  let savedGame = {
+    $id: 'g1',
+    tournamentId: 't1',
+    round: 1,
+    board: 1,
+    whiteProfileId: 'p1',
+    blackProfileId: 'p2',
+    status: 'completed',
+    result: '1-0',
+    startedAt: '2026-07-10T10:00:00.000Z',
+    finishedAt: '2026-07-10T10:30:00.000Z',
+  }
+  const tournament = { $id: 't1', status: 'completed', format: 'Swiss' }
+  const registrations = [
+    { $id: 'r1', tournamentId: 't1', profileId: 'p1', status: 'confirmed', seed: 1 },
+    { $id: 'r2', tournamentId: 't1', profileId: 'p2', status: 'confirmed', seed: 2 },
+  ]
+  const tablesDB = {
+    getRow: async ({ tableId }) => tableId === 'games' ? savedGame : tournament,
+    listRows: async ({ tableId }) => ({
+      rows: tableId === 'games' ? [savedGame] : tableId === 'registrations' ? registrations : [],
+    }),
+    updateRow: async ({ tableId, data }) => {
+      if (tableId === 'games') savedGame = { ...savedGame, ...data }
+      return tableId === 'games' ? savedGame : data
+    },
+    createRow: async ({ data }) => data,
+  }
+
+  const corrected = await engine.submitGameResult(tablesDB, 'juchess', 'g1', {
+    result: '0-1',
+    status: 'completed',
+  })
+  assert.equal(corrected.result, '0-1')
+  assert.equal(corrected.finishedAt, '2026-07-10T10:30:00.000Z')
+})
+
+test('activation requires the opening pairings to be published first', async () => {
+  const tablesDB = {
+    getRow: async () => ({ $id: 't1', status: 'upcoming', format: 'Swiss' }),
+    listRows: async ({ tableId }) => ({
+      rows: tableId === 'registrations'
+        ? [
+            { $id: 'r1', tournamentId: 't1', profileId: 'p1', status: 'confirmed', seed: 1 },
+            { $id: 'r2', tournamentId: 't1', profileId: 'p2', status: 'confirmed', seed: 2 },
+          ]
+        : [],
+    }),
+  }
+
+  await assert.rejects(
+    () => engine.startTournamentIfNeeded(tablesDB, 'juchess', 't1', { status: 'active' }),
+    (error) => error.statusCode === 409 && /publish the opening pairings/i.test(error.message),
+  )
+})
+
+test('activation preserves the exact published games and bracket snapshot', async () => {
+  const bracketSnapshot = JSON.stringify({ version: 1, entrants: ['p1', 'p2'] })
+  const games = [{
+    $id: 'g1',
+    tournamentId: 't1',
+    round: 1,
+    board: 1,
+    whiteProfileId: 'p1',
+    blackProfileId: 'p2',
+    status: 'scheduled',
+    result: '*',
+  }]
+  const registrations = [
+    { $id: 'r1', tournamentId: 't1', profileId: 'p1', status: 'confirmed', seed: 1 },
+    { $id: 'r2', tournamentId: 't1', profileId: 'p2', status: 'confirmed', seed: 2 },
+  ]
+  const tablesDB = {
+    getRow: async () => ({ $id: 't1', status: 'upcoming', format: 'Swiss', bracketSnapshot }),
+    listRows: async ({ tableId }) => ({ rows: tableId === 'games' ? games : registrations }),
+  }
+
+  const activation = await engine.startTournamentIfNeeded(tablesDB, 'juchess', 't1', { status: 'active' })
+  assert.deepEqual(activation.createdGames, [])
+  assert.equal(activation.roundsTotal, 1)
+  assert.equal(activation.bracketSnapshot, bracketSnapshot)
 })
 
 test('published pairings must contain exactly the confirmed participants', () => {

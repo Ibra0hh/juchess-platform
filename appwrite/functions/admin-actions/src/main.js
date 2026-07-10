@@ -1672,7 +1672,6 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
     rowId: tournamentId,
   });
   const nextTournament = { ...tournament, ...nextData };
-  const physicalBoards = normalizePhysicalBoards(nextTournament.physicalBoards);
 
   const [existingGames, registrations] = await Promise.all([
     listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId),
@@ -1683,85 +1682,17 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
     throw new HttpError(400, 'At least two confirmed players are required before a tournament can go active.');
   }
 
-  if (existingGames.length > 0) {
-    assertPublishedParticipantSet(nextTournament, existingGames, registrations);
-    const publishedRounds = Math.max(1, ...existingGames.map((game) => Number(game.round) || 0));
-    return {
-      createdGames: [],
-      roundsTotal: Math.max(publishedRounds, Number(nextTournament.roundsTotal) || 0),
-    };
+  if (existingGames.length === 0) {
+    throw new HttpError(409, 'Publish the opening pairings while the tournament is Upcoming before moving it to Active.');
   }
 
-  if (isKnockoutTournament(nextTournament)) {
-    // Freeze the entrant order in the snapshot; the whole bracket structure is
-    // derived from it on every advancement.
-    const entrants = seededKnockoutOrder(profileIds);
-    const double = isDoubleEliminationTournament(nextTournament);
-    const structure = buildKnockoutStructure(entrants.length, double);
-    const resolver = knockoutResolver(structure, entrants, []);
-    const firstRoundIndex = structure.winnersIndices[0];
-    const scheduleCandidates = structure.rounds[firstRoundIndex].matches
-      .map((match, matchIndex) => ({ match, matchIndex }))
-      .filter(({ match }) => match.a !== null && match.b !== null)
-      .map(({ match, matchIndex }) => ({
-        round: 1,
-        board: resolver.boardOf(firstRoundIndex, matchIndex),
-        whiteProfileId: entrants[match.a.e],
-        blackProfileId: entrants[match.b.e],
-      }));
-    const schedule = balancePairingColors(scheduleCandidates, entrants);
-    if (!schedule.length) {
-      throw new HttpError(400, 'Could not build first-round games for this tournament.');
-    }
-
-    const createdGames = await createTournamentGames(tablesDB, databaseId, tournamentId, schedule, physicalBoards);
-    const names = await loadProfileNames(tablesDB, databaseId, entrants);
-    const snapshotJson = buildKnockoutSnapshot(structure, entrants, createdGames, names, nextTournament);
-    return {
-      createdGames,
-      roundsTotal: knockoutGameRoundMap(structure).size,
-      bracketSnapshot: snapshotJson,
-    };
-  }
-
-  if (isSwissTournament(nextTournament) || isMultiStageTournament(nextTournament) || isArenaTournament(nextTournament)) {
-    const byeProfileId = SYSTEM_BYE_PROFILE_ID;
-    const seedByProfile = new Map(registrations.map((row, index) => [row.profileId, Number(row.seed) || index + 1]));
-    const { pairings, byePlayerId } = buildSwissPairings(profileIds, [], seedByProfile, byeProfileId);
-    if (!pairings.length) {
-      throw new HttpError(400, 'Could not build first-round games for this tournament.');
-    }
-
-    const createdGames = await writeSwissRound(
-      tablesDB,
-      databaseId,
-      tournamentId,
-      1,
-      pairings,
-      byePlayerId,
-      byeProfileId,
-      physicalBoards,
-    );
-    const roundsTotal = isMultiStageTournament(nextTournament)
-      ? Number(nextTournament.roundsTotal) || 0
-      : swissRoundsTotal(nextTournament, profileIds.length);
-    return { createdGames, roundsTotal: roundsTotal || 1 };
-  }
-
-  const schedule = isRoundRobinTournament(nextTournament)
-    ? buildRoundRobinSchedule(profileIds, isDoubleRoundRobinTournament(nextTournament))
-    : splitSeededPairings(profileIds);
-  if (!schedule.length) {
-    throw new HttpError(400, 'Could not build first-round games for this tournament.');
-  }
-
-  const roundsTotal = Math.max(
-    1,
-    ...schedule.map((game) => Number(game.round)).filter(Number.isFinite),
-    Number(nextTournament.roundsTotal) || 0,
-  );
-  const createdGames = await createTournamentGames(tablesDB, databaseId, tournamentId, schedule, physicalBoards);
-  return { createdGames, roundsTotal };
+  assertPublishedParticipantSet(nextTournament, existingGames, registrations);
+  const publishedRounds = Math.max(1, ...existingGames.map((game) => Number(game.round) || 0));
+  return {
+    createdGames: [],
+    roundsTotal: Math.max(publishedRounds, Number(nextTournament.roundsTotal) || 0),
+    bracketSnapshot: nextTournament.bracketSnapshot ?? null,
+  };
 }
 
 async function recalculateStandings(tablesDB, databaseId, tournamentId) {
@@ -1914,6 +1845,9 @@ async function configureTournamentProcedure(tablesDB, databaseId, tournamentId, 
     tableId: tableIds.tournaments,
     rowId: tournamentId,
   });
+  if (tournament.status !== 'active') {
+    throw new HttpError(409, 'The procedure plan can be configured only while the tournament is active.');
+  }
   const physicalBoards = normalizePhysicalBoards(requestedBoards);
   const previousBoards = normalizePhysicalBoards(tournament.physicalBoards);
   const games = await listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId);
@@ -2073,12 +2007,24 @@ async function submitGameResult(tablesDB, databaseId, gameId, body) {
     tableId: tableIds.games,
     rowId: gameId,
   });
+  const tournament = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.tournaments,
+    rowId: current.tournamentId,
+  });
+  const correctingCompletedGame = (
+    (current.status === 'completed' || current.status === 'forfeit') &&
+    tournament.status === 'completed'
+  );
 
   if (current.status === 'scheduled') {
     throw new HttpError(409, 'Start this game from Procedure before recording its result.');
   }
-  if (current.status === 'completed' || current.status === 'forfeit') {
+  if ((current.status === 'completed' || current.status === 'forfeit') && !correctingCompletedGame) {
     throw new HttpError(409, 'This game is already finished. Attach a PGN without submitting the result again.');
+  }
+  if (!correctingCompletedGame && tournament.status !== 'active') {
+    throw new HttpError(409, 'Game results can be entered only while the tournament is active.');
   }
 
   const finalStatus = status === 'completed' || status === 'forfeit';
@@ -2087,6 +2033,9 @@ async function submitGameResult(tablesDB, databaseId, gameId, body) {
   }
   if (!finalStatus && result !== '*') {
     throw new HttpError(400, 'A decisive result must complete or forfeit the game.');
+  }
+  if (correctingCompletedGame && !finalStatus) {
+    throw new HttpError(400, 'A completed tournament game must keep a final result.');
   }
 
   if (finalStatus) {
@@ -2102,12 +2051,12 @@ async function submitGameResult(tablesDB, databaseId, gameId, body) {
       result,
       pgn: body.pgn,
       startedAt: current.startedAt || body.startedAt || new Date().toISOString(),
-      finishedAt: finalStatus ? body.finishedAt ?? new Date().toISOString() : undefined,
+      finishedAt: finalStatus ? body.finishedAt ?? current.finishedAt ?? new Date().toISOString() : undefined,
     }),
   });
 
   await recalculateStandings(tablesDB, databaseId, row.tournamentId);
-  if (finalStatus) {
+  if (finalStatus && !correctingCompletedGame) {
     await advanceTournamentIfReady(tablesDB, databaseId, row.tournamentId, row.round);
   }
 
@@ -2706,8 +2655,8 @@ export default async ({ req, res, log, error }) => {
           description: body.description,
           physicalBoards: body.physicalBoards === undefined ? undefined : normalizePhysicalBoards(body.physicalBoards),
           roundsTotal: activation?.roundsTotal ?? body.roundsTotal,
-          // Activation replaces any stale pre-publish snapshot with the freshly
-          // generated bracket (knockouts) or clears it (other formats).
+          // Activation preserves the exact pairings and bracket snapshot that
+          // the manager published while the tournament was Upcoming.
           bracketSnapshot: body.status === 'active'
             ? activation?.bracketSnapshot ?? null
             : body.bracketSnapshot,
@@ -2748,6 +2697,9 @@ export default async ({ req, res, log, error }) => {
         tableId: tableIds.tournaments,
         rowId: tournamentId,
       });
+      if (tournament.status !== 'upcoming') {
+        throw new HttpError(409, 'Opening pairings can be published only while the tournament is Upcoming.');
+      }
 
       const existing = await tablesDB.listRows({
         databaseId,
@@ -2827,11 +2779,14 @@ export default async ({ req, res, log, error }) => {
     if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'pairings' && segments[3] === 'unpublish') {
       const tournamentId = segments[1];
 
-      await tablesDB.getRow({
+      const tournament = await tablesDB.getRow({
         databaseId,
         tableId: tableIds.tournaments,
         rowId: tournamentId,
       });
+      if (tournament.status !== 'upcoming') {
+        throw new HttpError(409, 'Pairings can be unpublished only while the tournament is Upcoming.');
+      }
 
       const existing = await tablesDB.listRows({
         databaseId,
