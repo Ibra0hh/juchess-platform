@@ -1554,6 +1554,28 @@ async function deleteTournamentRows(tablesDB, databaseId, tableId, tournamentId)
   }
 }
 
+function assertParticipantCanBeAdded(tournament, games, registrations, profileId) {
+  if (!['draft', 'upcoming', 'active'].includes(tournament.status)) {
+    throw new HttpError(409, 'Participants cannot be added to a completed or archived tournament.');
+  }
+  if (games.length) {
+    throw new HttpError(409, 'Unpublish pairings before changing the participant list.');
+  }
+
+  const existing = registrations.find((row) => row.profileId === profileId) ?? null;
+  if (existing && (existing.status === 'confirmed' || existing.checkedIn)) {
+    throw new HttpError(409, 'This player is already a tournament participant.');
+  }
+
+  const participantCount = registrations.filter((row) => row.status === 'confirmed' || row.checkedIn).length;
+  const capacity = Number(tournament.capacity) || 0;
+  if (capacity > 0 && participantCount >= capacity) {
+    throw new HttpError(409, `Tournament capacity is ${capacity}. Increase capacity before adding another participant.`);
+  }
+
+  return existing;
+}
+
 async function listConfirmedRegistrations(tablesDB, databaseId, tournamentId) {
   const rows = await listRowsByTournament(tablesDB, databaseId, tableIds.registrations, tournamentId);
   return rows
@@ -2201,6 +2223,7 @@ export default async ({ req, res, log, error }) => {
         'DELETE /tournaments/:id',
         'POST /tournaments/:id/pairings/publish',
         'POST /tournaments/:id/pairings/unpublish',
+        'POST /tournaments/:id/participants',
         'POST /tournaments/:id/games/result',
         'POST /tournaments/:id/rounds/next',
         'POST /tournaments/:id/procedure/configure',
@@ -2769,6 +2792,63 @@ export default async ({ req, res, log, error }) => {
       });
 
       return res.json({ ok: true, action: 'deleteTournament', rowId: tournamentId, deleted });
+    }
+
+    if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'participants') {
+      const missing = requireFields(body, ['profileId']);
+      if (missing.length) {
+        return badRequest(res, 'Choose a player to add.', { missing });
+      }
+
+      const tournamentId = segments[1];
+      const [tournament, games, registrations] = await Promise.all([
+        tablesDB.getRow({ databaseId, tableId: tableIds.tournaments, rowId: tournamentId }),
+        listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId),
+        listRowsByTournament(tablesDB, databaseId, tableIds.registrations, tournamentId),
+      ]);
+
+      let profile;
+      try {
+        profile = await tablesDB.getRow({
+          databaseId,
+          tableId: tableIds.profiles,
+          rowId: body.profileId,
+        });
+      } catch {
+        throw new HttpError(404, 'That player profile does not exist.');
+      }
+      if (profile.status !== 'active') {
+        throw new HttpError(409, 'Only active club players can be added to a tournament.');
+      }
+
+      const existing = assertParticipantCanBeAdded(tournament, games, registrations, profile.$id);
+      const nextSeed = Math.max(0, ...registrations.map((row) => Number(row.seed) || 0)) + 1;
+      const data = { status: 'confirmed', checkedIn: false, seed: nextSeed, checkInCode: null };
+      const row = existing
+        ? await tablesDB.updateRow({
+            databaseId,
+            tableId: tableIds.registrations,
+            rowId: existing.$id,
+            data,
+          })
+        : await tablesDB.createRow({
+            databaseId,
+            tableId: tableIds.registrations,
+            rowId: ID.unique(),
+            data: { tournamentId, profileId: profile.$id, ...data },
+            permissions: profile.accountId ? [Permission.read(Role.user(profile.accountId))] : [],
+          });
+      const checkIn = await issueCheckInCode(tablesDB, databaseId, row);
+
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'addTournamentParticipant',
+        targetTable: tableIds.registrations,
+        targetRowId: row.$id,
+        payload: { tournamentId, profileId: profile.$id, seed: nextSeed },
+      });
+
+      return res.json({ ok: true, action: 'addTournamentParticipant', row, checkIn });
     }
 
     if (

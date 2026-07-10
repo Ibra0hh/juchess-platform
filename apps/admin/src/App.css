@@ -1602,6 +1602,170 @@ button {
   font-weight: 800;
 }
 
+.participant-panel-head > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.add-participant-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.add-participant-button svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.5;
+}
+
+.add-participant-modal .panel-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.add-participant-modal .panel-head span {
+  color: #8b8577;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.add-participant-modal .panel-head button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #f4f0e8;
+}
+
+.add-participant-modal .panel-head button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.participant-search {
+  position: relative;
+  display: block;
+  padding: 16px 20px 12px;
+}
+
+.participant-search svg {
+  position: absolute;
+  top: 27px;
+  left: 32px;
+  width: 17px;
+  height: 17px;
+  color: #8b8577;
+  pointer-events: none;
+}
+
+.participant-search input {
+  width: 100%;
+  height: 40px;
+  border: 1.5px solid #e4dac5;
+  border-radius: 8px;
+  background: #fff;
+  color: #14213d;
+  outline: 0;
+  padding: 0 12px 0 38px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.participant-search input:focus {
+  border-color: #7d2434;
+  box-shadow: 0 0 0 3px rgba(125, 36, 52, 0.09);
+}
+
+.participant-picker {
+  min-height: 210px;
+  max-height: min(420px, 50vh);
+  margin: 0 20px 16px;
+  overflow-y: auto;
+  border: 1px solid #ece5d8;
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.participant-picker > button {
+  width: 100%;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  border: 0;
+  border-bottom: 1px solid #f1ece2;
+  background: transparent;
+  color: #14213d;
+  padding: 9px 12px;
+  text-align: left;
+}
+
+.participant-picker > button:last-child {
+  border-bottom: 0;
+}
+
+.participant-picker > button:hover,
+.participant-picker > button.selected {
+  background: #fbf1e9;
+}
+
+.participant-picker > button.selected {
+  box-shadow: inset 3px 0 #7d2434;
+}
+
+.participant-avatar {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #14213d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.participant-picker strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participant-picker strong small {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #8b8577;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participant-picker b {
+  color: #7d2434;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
+.participant-modal-actions .secondary-action {
+  border: 1px solid #d8d1c4;
+  background: #fff;
+  color: #14213d;
+}
+
+.participant-modal-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .procedure-planner {
   background: #fff;
 }

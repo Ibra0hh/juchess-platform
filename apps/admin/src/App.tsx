@@ -1,11 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus, Search, X } from 'lucide-react'
 import './App.css'
 import { JuChessBoard, type JuChessBoardChange } from './components/JuChessBoard'
 import { buildChessGame, deriveResult, parseChessPgn, pgnFromMoves } from './components/JuChessRules'
 import { appwriteReady } from './lib/appwrite'
 import {
   advanceTournamentRound,
+  addTournamentParticipant,
   blockIdentity,
   blockIp,
   createAdminProfile,
@@ -45,6 +46,7 @@ import {
   type AdminStatus,
   type AdminTournament,
   type BlockListLoadResult,
+  type ClubPlayer,
   type IdentityBlock,
   type IdentityBlockType,
   type IpBlock,
@@ -972,6 +974,24 @@ function WindowsScreen() {
   )
 }
 
+async function loadManagedTournamentParticipantRows(tournamentRowId: string) {
+  const [result, checkIns] = await Promise.all([
+    loadTournamentRegistrations(tournamentRowId),
+    loadTournamentCheckIns(tournamentRowId),
+  ])
+  const codeByProfile = new Map(checkIns.map((entry) => [entry.profileId, entry]))
+
+  return {
+    error: result.error,
+    registrations: result.registrations
+      .map((item) => {
+        const entry = codeByProfile.get(item.profileId)
+        return entry ? { ...item, checkInCode: entry.code, checkedIn: entry.checkedIn } : item
+      })
+      .filter((item) => item.status === 'confirmed' || item.checkedIn),
+  }
+}
+
 function TournamentsScreen({
   dataSource,
   onChanged,
@@ -1081,20 +1101,10 @@ function TournamentsScreen({
       }
 
       setManagedRegistrationsLoading(true)
-      const [result, checkIns] = await Promise.all([
-        loadTournamentRegistrations(managedTournament.rowId),
-        loadTournamentCheckIns(managedTournament.rowId),
-      ])
+      const result = await loadManagedTournamentParticipantRows(managedTournament.rowId)
       if (!alive) return
 
-      // Codes are stored outside the registration row, so join them back on.
-      const codeByProfile = new Map(checkIns.map((entry) => [entry.profileId, entry]))
-      setManagedRegistrations(result.registrations
-        .map((item) => {
-          const entry = codeByProfile.get(item.profileId)
-          return entry ? { ...item, checkInCode: entry.code, checkedIn: entry.checkedIn } : item
-        })
-        .filter((item) => item.status === 'confirmed' || item.checkedIn))
+      setManagedRegistrations(result.registrations)
       if (result.error) setMessage('Tournament participants are unavailable right now.')
       setManagedRegistrationsLoading(false)
     }
@@ -1414,6 +1424,31 @@ function TournamentsScreen({
     }
   }
 
+  async function handleAddParticipant(item: AdminTournament, profileId: string) {
+    if (!item.rowId) {
+      setMessage('Only cloud tournaments can add participants.')
+      return false
+    }
+
+    setSubmitting(true)
+    setManagedRegistrationsLoading(true)
+    setMessage(null)
+    try {
+      await addTournamentParticipant(item.rowId, profileId)
+      const refreshed = await loadManagedTournamentParticipantRows(item.rowId)
+      setManagedRegistrations(refreshed.registrations)
+      setMessage('Participant added and confirmed. A check-in code was issued.')
+      await onChanged()
+      return true
+    } catch (error) {
+      setMessage(formatAdminError(error))
+      return false
+    } finally {
+      setSubmitting(false)
+      setManagedRegistrationsLoading(false)
+    }
+  }
+
   async function handleGameResult(input: {
     gameId?: string
     tournamentId?: string
@@ -1522,6 +1557,7 @@ function TournamentsScreen({
       <div className="tournament-screen">
         <TournamentManageView
           disabled={submitting}
+          onAddParticipant={handleAddParticipant}
           onAdvanceRound={handleAdvanceRound}
           onBack={() => setManageTournamentKey('')}
           onComplete={(item) => {
@@ -1891,6 +1927,7 @@ function TournamentActionButtons({
 
 function TournamentManageView({
   disabled,
+  onAddParticipant,
   onAdvanceRound,
   onBack,
   onComplete,
@@ -1909,6 +1946,7 @@ function TournamentManageView({
   tournament,
 }: {
   disabled: boolean
+  onAddParticipant: (item: AdminTournament, profileId: string) => Promise<boolean>
   onAdvanceRound: (item: AdminTournament) => Promise<void>
   onBack: () => void
   onComplete: (item: AdminTournament) => void
@@ -1960,6 +1998,11 @@ function TournamentManageView({
         { key: 'standings', label: 'Standings' },
       ]
   const [stage, setStage] = useState(playStage)
+  const [addParticipantOpen, setAddParticipantOpen] = useState(false)
+  const [clubPlayers, setClubPlayers] = useState<ClubPlayer[]>([])
+  const [clubPlayersLoading, setClubPlayersLoading] = useState(false)
+  const [participantSearch, setParticipantSearch] = useState('')
+  const [selectedParticipantId, setSelectedParticipantId] = useState('')
   const [bracketView, setBracketView] = useState<AdminBracketView>('winners')
   const [selectedBoardKey, setSelectedBoardKey] = useState('')
   const [physicalBoards, setPhysicalBoards] = useState(tournament.physicalBoards || 3)
@@ -2045,6 +2088,40 @@ function TournamentManageView({
   const canShufflePairings = tournament.status === 'upcoming' || (tournament.status === 'active' && swissFlow)
   const shuffleLocked = disabled || participantsLoading || published || !canShufflePairings
   const publishLocked = disabled || participantsLoading || published || !publishableGames.length || !canPublishPairings
+  const participantAddLocked = disabled || participantsLoading || published || tournament.status === 'completed' || tournament.status === 'archived'
+  const participantIds = useMemo(() => new Set(participants.map((item) => item.profileId)), [participants])
+  const availableClubPlayers = useMemo(() => {
+    const needle = participantSearch.trim().toLowerCase()
+    return clubPlayers.filter((player) => (
+      player.status === 'active'
+      && !participantIds.has(player.id)
+      && (!needle
+        || player.name.toLowerCase().includes(needle)
+        || player.universityId.toLowerCase().includes(needle)
+        || player.email.toLowerCase().includes(needle))
+    ))
+  }, [clubPlayers, participantIds, participantSearch])
+
+  async function openAddParticipant() {
+    if (participantAddLocked) return
+    setAddParticipantOpen(true)
+    setParticipantSearch('')
+    setSelectedParticipantId('')
+    setClubPlayersLoading(true)
+    const result = await loadClubPlayers()
+    setClubPlayers(result.players)
+    setClubPlayersLoading(false)
+    if (result.error) onMessage(result.error)
+  }
+
+  async function confirmAddParticipant() {
+    if (!selectedParticipantId) return
+    const added = await onAddParticipant(tournament, selectedParticipantId)
+    if (added) {
+      setAddParticipantOpen(false)
+      setSelectedParticipantId('')
+    }
+  }
 
   function publishPairings() {
     const bracketSnapshot = knockout && generatedBracketConfig
@@ -2201,7 +2278,22 @@ function TournamentManageView({
       <section className={`manage-panel ${stage === 'bracket' ? 'website-bracket-host' : ''}`}>
         {stage === 'participants' ? (
           <>
-            <div className="manage-panel-head">Participants</div>
+            <div className="manage-panel-head participant-panel-head">
+              <strong>Participants</strong>
+              <div>
+                <span>{tournamentPlayers.length}/{tournament.capacity || 'open'}</span>
+                <button
+                  type="button"
+                  className="mini-button dark add-participant-button"
+                  disabled={participantAddLocked}
+                  onClick={() => void openAddParticipant()}
+                  title={published ? 'Unpublish pairings before changing participants' : 'Add a registered club player'}
+                >
+                  <Plus aria-hidden="true" />
+                  Add Participant
+                </button>
+              </div>
+            </div>
             {participantsLoading ? (
               <div className="empty-row">Loading participants...</div>
             ) : tournamentPlayers.length ? tournamentPlayers.map((player, index) => (
@@ -2212,6 +2304,62 @@ function TournamentManageView({
             )) : (
               <EmptyState title="No registered players" body="Players must register before pairings can be published." />
             )}
+            {addParticipantOpen ? (
+              <div className="modal-backdrop" onClick={() => !disabled && setAddParticipantOpen(false)}>
+                <section
+                  aria-labelledby="add-participant-title"
+                  aria-modal="true"
+                  className="player-modal add-participant-modal"
+                  onClick={(event) => event.stopPropagation()}
+                  role="dialog"
+                >
+                  <div className="panel-head">
+                    <div>
+                      <strong id="add-participant-title">Add Participant</strong>
+                      <span>{tournament.name}</span>
+                    </div>
+                    <button type="button" aria-label="Close add participant" disabled={disabled} onClick={() => setAddParticipantOpen(false)}>
+                      <X aria-hidden="true" />
+                    </button>
+                  </div>
+                  <label className="participant-search">
+                    <Search aria-hidden="true" />
+                    <input
+                      autoFocus
+                      value={participantSearch}
+                      onChange={(event) => setParticipantSearch(event.target.value)}
+                      placeholder="Search by name, university ID, or email"
+                    />
+                  </label>
+                  <div className="participant-picker" role="listbox" aria-label="Available club players">
+                    {clubPlayersLoading ? (
+                      <div className="empty-row">Loading club players...</div>
+                    ) : availableClubPlayers.length ? availableClubPlayers.map((player) => (
+                      <button
+                        key={player.id}
+                        type="button"
+                        aria-selected={selectedParticipantId === player.id}
+                        className={selectedParticipantId === player.id ? 'selected' : undefined}
+                        onClick={() => setSelectedParticipantId(player.id)}
+                        role="option"
+                      >
+                        <span className="participant-avatar">{playerInitials(player.name)}</span>
+                        <strong>{player.name}<small>{player.universityId} · {player.email || 'No email'}</small></strong>
+                        <b>{player.rating}</b>
+                      </button>
+                    )) : (
+                      <div className="empty-row">No eligible players match this search.</div>
+                    )}
+                  </div>
+                  <div className="modal-actions participant-modal-actions">
+                    <button type="button" className="secondary-action" disabled={disabled} onClick={() => setAddParticipantOpen(false)}>Cancel</button>
+                    <button type="button" disabled={disabled || !selectedParticipantId} onClick={() => void confirmAddParticipant()}>
+                      {disabled ? 'Adding...' : 'Add Participant'}
+                    </button>
+                  </div>
+                </section>
+              </div>
+            ) : null}
           </>
         ) : null}
         {stage === 'rounds' ? (

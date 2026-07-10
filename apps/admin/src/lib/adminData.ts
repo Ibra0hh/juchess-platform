@@ -645,6 +645,18 @@ export async function updateRegistrationStatus(
   return response.row
 }
 
+export async function addTournamentParticipant(tournamentRowId: string, profileId: string) {
+  const response = await runAdminAction<{ row: AppwriteRegistrationRow; checkIn: Record<string, unknown> }>(
+    {
+      method: ExecutionMethod.POST,
+      path: `/tournaments/${tournamentRowId}/participants`,
+      body: { profileId },
+    },
+  )
+
+  return response
+}
+
 export async function loadBlockLists(): Promise<BlockListLoadResult> {
   if (!appwriteReady) return { identityBlocks: [], ipBlocks: [] }
 

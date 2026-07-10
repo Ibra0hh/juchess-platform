@@ -45,6 +45,7 @@ const EXPORTED = [
   'submitGameResult',
   'isDeletableTournamentStatus',
   'deleteTournamentRows',
+  'assertParticipantCanBeAdded',
 ]
 
 const SDK_STUB = `
@@ -137,6 +138,30 @@ test('tournament deletion removes every dependent row across repeated batches', 
   assert.equal(await engine.deleteTournamentRows(database, 'juchess', 'games', 'target'), 3)
   assert.deepEqual(deleted, ['game-1', 'game-2', 'game-3'])
   assert.deepEqual(rows, [{ $id: 'other-game', tournamentId: 'other' }])
+})
+
+test('participants can be added only before pairings and within capacity', () => {
+  const registrations = [{ profileId: 'p1', status: 'confirmed', checkedIn: false, seed: 1 }]
+  assert.equal(
+    engine.assertParticipantCanBeAdded({ status: 'upcoming', capacity: 2 }, [], registrations, 'p2'),
+    null,
+  )
+  assert.throws(
+    () => engine.assertParticipantCanBeAdded({ status: 'upcoming', capacity: 2 }, [], registrations, 'p1'),
+    (error) => error.statusCode === 409 && /already/i.test(error.message),
+  )
+  assert.throws(
+    () => engine.assertParticipantCanBeAdded({ status: 'upcoming', capacity: 2 }, [{ $id: 'g1' }], registrations, 'p2'),
+    (error) => error.statusCode === 409 && /unpublish/i.test(error.message),
+  )
+  assert.throws(
+    () => engine.assertParticipantCanBeAdded({ status: 'upcoming', capacity: 1 }, [], registrations, 'p2'),
+    (error) => error.statusCode === 409 && /capacity/i.test(error.message),
+  )
+  assert.throws(
+    () => engine.assertParticipantCanBeAdded({ status: 'completed', capacity: 8 }, [], [], 'p2'),
+    (error) => error.statusCode === 409 && /completed or archived/i.test(error.message),
+  )
 })
 
 test('single elimination: 8 players produce QF, SF, Final', () => {
