@@ -43,6 +43,8 @@ const EXPORTED = [
   'startProcedureGame',
   'updateGamePgn',
   'submitGameResult',
+  'isDeletableTournamentStatus',
+  'deleteTournamentRows',
 ]
 
 const SDK_STUB = `
@@ -102,6 +104,39 @@ test('bracket size rounds up to a power of two', () => {
   assert.equal(engine.bracketSizeFor(5), 8)
   assert.equal(engine.bracketSizeFor(16), 16)
   assert.equal(engine.bracketSizeFor(17), 32)
+})
+
+test('tournament deletion is restricted to draft and archived status', () => {
+  assert.equal(engine.isDeletableTournamentStatus('draft'), true)
+  assert.equal(engine.isDeletableTournamentStatus('archived'), true)
+  assert.equal(engine.isDeletableTournamentStatus('upcoming'), false)
+  assert.equal(engine.isDeletableTournamentStatus('active'), false)
+  assert.equal(engine.isDeletableTournamentStatus('completed'), false)
+})
+
+test('tournament deletion removes every dependent row across repeated batches', async () => {
+  const rows = [
+    { $id: 'game-1', tournamentId: 'target' },
+    { $id: 'game-2', tournamentId: 'target' },
+    { $id: 'game-3', tournamentId: 'target' },
+    { $id: 'other-game', tournamentId: 'other' },
+  ]
+  const deleted = []
+  const database = {
+    async listRows() {
+      return { rows: rows.filter((row) => row.tournamentId === 'target').slice(0, 2) }
+    },
+    async deleteRow({ rowId }) {
+      const index = rows.findIndex((row) => row.$id === rowId)
+      assert.notEqual(index, -1)
+      rows.splice(index, 1)
+      deleted.push(rowId)
+    },
+  }
+
+  assert.equal(await engine.deleteTournamentRows(database, 'juchess', 'games', 'target'), 3)
+  assert.deepEqual(deleted, ['game-1', 'game-2', 'game-3'])
+  assert.deepEqual(rows, [{ $id: 'other-game', tournamentId: 'other' }])
 })
 
 test('single elimination: 8 players produce QF, SF, Final', () => {

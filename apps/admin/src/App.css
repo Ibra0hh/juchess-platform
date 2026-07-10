@@ -2963,6 +2963,89 @@ button {
   color: #8a2433;
 }
 
+.mini-button.danger:hover:not(:disabled) {
+  border-color: rgba(138, 36, 51, 0.42);
+  background: #fff4f4;
+}
+
+.delete-tournament-backdrop {
+  align-items: center;
+}
+
+.delete-tournament-dialog {
+  width: min(100%, 480px);
+  overflow: hidden;
+  border: 1px solid rgba(138, 36, 51, 0.16);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 32px 80px -28px rgba(0, 0, 0, 0.64);
+}
+
+.delete-tournament-copy {
+  padding: 24px 26px 22px;
+}
+
+.delete-tournament-copy > span {
+  color: #9a2e3e;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.delete-tournament-copy h2 {
+  margin: 7px 0 10px;
+  color: #14213d;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 23px;
+  letter-spacing: 0;
+}
+
+.delete-tournament-copy p {
+  margin: 0;
+  color: #625f59;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.delete-tournament-copy p strong {
+  color: #14213d;
+}
+
+.delete-tournament-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  border-top: 1px solid #efeae0;
+  background: #faf8f3;
+  padding: 14px 18px;
+}
+
+.delete-tournament-actions button {
+  min-height: 38px;
+  border-radius: 8px;
+  padding: 0 15px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.delete-tournament-actions .secondary-action {
+  border: 1px solid #d8d1c4;
+  background: #fff;
+  color: #14213d;
+}
+
+.delete-tournament-actions .delete-action {
+  border: 1px solid #8a2433;
+  background: #8a2433;
+  color: #fff;
+}
+
+.delete-tournament-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .mini-button.dark {
   background: #14213d;
   color: #fff;

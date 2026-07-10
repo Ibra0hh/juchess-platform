@@ -1536,6 +1536,24 @@ async function listRowsByTournament(tablesDB, databaseId, tableId, tournamentId)
   return response.rows;
 }
 
+function isDeletableTournamentStatus(status) {
+  return status === 'draft' || status === 'archived';
+}
+
+async function deleteTournamentRows(tablesDB, databaseId, tableId, tournamentId) {
+  let deleted = 0;
+
+  while (true) {
+    const rows = await listRowsByTournament(tablesDB, databaseId, tableId, tournamentId);
+    if (!rows.length) return deleted;
+
+    for (const row of rows) {
+      await tablesDB.deleteRow({ databaseId, tableId, rowId: row.$id });
+      deleted += 1;
+    }
+  }
+}
+
 async function listConfirmedRegistrations(tablesDB, databaseId, tournamentId) {
   const rows = await listRowsByTournament(tablesDB, databaseId, tableIds.registrations, tournamentId);
   return rows
@@ -2720,12 +2738,37 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (method === 'DELETE' && segments[0] === 'tournaments' && segments[1]) {
+      const tournamentId = segments[1];
+      const tournament = await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: tournamentId,
+      });
+
+      if (!isDeletableTournamentStatus(tournament.status)) {
+        throw new HttpError(409, 'Only Draft and Archived tournaments can be deleted.');
+      }
+
+      const deleted = {};
+      for (const tableId of [tableIds.checkIns, tableIds.games, tableIds.standings, tableIds.registrations]) {
+        deleted[tableId] = await deleteTournamentRows(tablesDB, databaseId, tableId, tournamentId);
+      }
+
       await tablesDB.deleteRow({
         databaseId,
         tableId: tableIds.tournaments,
-        rowId: segments[1],
+        rowId: tournamentId,
       });
-      return res.json({ ok: true, action: 'deleteTournament', rowId: segments[1] });
+
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'deleteTournament',
+        targetTable: tableIds.tournaments,
+        targetRowId: tournamentId,
+        payload: { name: tournament.name, status: tournament.status, deleted },
+      });
+
+      return res.json({ ok: true, action: 'deleteTournament', rowId: tournamentId, deleted });
     }
 
     if (

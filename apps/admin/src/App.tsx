@@ -10,6 +10,7 @@ import {
   blockIp,
   createAdminProfile,
   createTournament,
+  deleteTournament,
   formatAdminError,
   getAdminSession,
   loadAdminProfiles,
@@ -986,6 +987,7 @@ function TournamentsScreen({
   const [showCreate, setShowCreate] = useState(false)
   const [createStep, setCreateStep] = useState(0)
   const [editingTournament, setEditingTournament] = useState<AdminTournament | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<AdminTournament | null>(null)
   const [manageTournamentKey, setManageTournamentKey] = useState('')
   const [form, setForm] = useState<TournamentInput>(() => createInitialTournamentForm())
   const [timeCategory, setTimeCategory] = useState('Rapid')
@@ -1257,6 +1259,39 @@ function TournamentsScreen({
     try {
       await updateTournament(item.rowId, { status })
       setMessage('Tournament status updated.')
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function requestTournamentDelete(item: AdminTournament) {
+    if (!['draft', 'archived'].includes(item.status)) {
+      setMessage('Only Draft and Archived tournaments can be deleted.')
+      return
+    }
+
+    setDeleteTarget(item)
+    setMessage(null)
+  }
+
+  async function handleTournamentDelete() {
+    if (!deleteTarget?.rowId) {
+      setMessage('Only cloud tournaments can be deleted.')
+      setDeleteTarget(null)
+      return
+    }
+
+    const deletedName = deleteTarget.name
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      await deleteTournament(deleteTarget.rowId)
+      setDeleteTarget(null)
+      setSelectedTournamentKey('')
+      setMessage(`${deletedName} was permanently deleted.`)
       await onChanged()
     } catch (error) {
       setMessage(formatAdminError(error))
@@ -1655,11 +1690,45 @@ function TournamentsScreen({
           </form>
         </div>
       ) : null}
+      {deleteTarget ? (
+        <div
+          className="create-modal-backdrop delete-tournament-backdrop"
+          onClick={() => {
+            if (!submitting) setDeleteTarget(null)
+          }}
+        >
+          <section
+            aria-describedby="delete-tournament-description"
+            aria-labelledby="delete-tournament-title"
+            aria-modal="true"
+            className="delete-tournament-dialog"
+            onClick={(event) => event.stopPropagation()}
+            role="alertdialog"
+          >
+            <div className="delete-tournament-copy">
+              <span>Permanent action</span>
+              <h2 id="delete-tournament-title">Delete tournament?</h2>
+              <p id="delete-tournament-description">
+                <strong>{deleteTarget.name}</strong> and its registrations, check-ins, games, standings, bracket, and procedure data will be permanently removed.
+              </p>
+            </div>
+            <div className="delete-tournament-actions">
+              <button type="button" className="secondary-action" disabled={submitting} onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </button>
+              <button type="button" className="delete-action" disabled={submitting} onClick={() => void handleTournamentDelete()}>
+                {submitting ? 'Deleting...' : 'Delete permanently'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {message ? <div className="prototype-note" role="status">{message}</div> : null}
       <section className="panel-card table-card">
         {filtered.length ? (
           <TournamentTable
             disabled={submitting}
+            onDelete={requestTournamentDelete}
             onEdit={openEditPanel}
             onManage={openManagePanel}
             onPhotos={handlePhotos}
@@ -1689,6 +1758,7 @@ function TournamentsScreen({
 
 function TournamentTable({
   disabled,
+  onDelete,
   onEdit,
   onManage,
   onPhotos,
@@ -1696,6 +1766,7 @@ function TournamentTable({
   rows,
 }: {
   disabled: boolean
+  onDelete: (item: AdminTournament) => void
   onEdit: (item: AdminTournament) => void
   onManage: (item: AdminTournament) => void
   onPhotos: (item: AdminTournament) => void
@@ -1732,6 +1803,7 @@ function TournamentTable({
                   <TournamentActionButtons
                     disabled={disabled || !item.rowId}
                     item={item}
+                    onDelete={onDelete}
                     onEdit={onEdit}
                     onManage={onManage}
                     onPhotos={onPhotos}
@@ -1750,6 +1822,7 @@ function TournamentTable({
 function TournamentActionButtons({
   disabled,
   item,
+  onDelete,
   onEdit,
   onManage,
   onPhotos,
@@ -1757,6 +1830,7 @@ function TournamentActionButtons({
 }: {
   disabled: boolean
   item: AdminTournament
+  onDelete: (item: AdminTournament) => void
   onEdit: (item: AdminTournament) => void
   onManage: (item: AdminTournament) => void
   onPhotos: (item: AdminTournament) => void
@@ -1767,6 +1841,7 @@ function TournamentActionButtons({
       <>
         <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onEdit(item)}>Edit</button>
         <button type="button" className="mini-button" disabled={disabled} onClick={() => void onStatusChange(item, 'upcoming')}>Publish</button>
+        <button type="button" className="mini-button ghost danger" disabled={disabled} onClick={() => onDelete(item)}>Delete</button>
       </>
     )
   }
@@ -1805,9 +1880,12 @@ function TournamentActionButtons({
   }
 
   return (
-    <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => void onStatusChange(item, 'completed')}>
-      Completed
-    </button>
+    <>
+      <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => void onStatusChange(item, 'completed')}>
+        Completed
+      </button>
+      <button type="button" className="mini-button ghost danger" disabled={disabled} onClick={() => onDelete(item)}>Delete</button>
+    </>
   )
 }
 
