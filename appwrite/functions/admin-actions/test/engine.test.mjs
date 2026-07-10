@@ -31,6 +31,7 @@ const EXPORTED = [
   'publishedParticipantIds',
   'assertPublishedParticipantSet',
   'swissRoundsTotal',
+  'validateTournamentRoundCount',
   'multiStageStageOneRounds',
   'isGameDecided',
   'decisiveWinnerProfileId',
@@ -762,6 +763,19 @@ test('round counts', () => {
   assert.equal(engine.multiStageStageOneRounds({ roundsTotal: 0 }, 8), 3, 'defaults to three qualifying rounds')
   assert.equal(Math.max(...engine.buildRoundRobinSchedule(Array.from({ length: 16 }, (_, i) => `p${i}`), false).map((game) => game.round)), 15)
   assert.equal(Math.max(...engine.buildRoundRobinSchedule(Array.from({ length: 18 }, (_, i) => `p${i}`), true).map((game) => game.round)), 34)
+})
+
+test('Swiss tournament setup requires an explicit valid round count', () => {
+  assert.equal(engine.validateTournamentRoundCount('Swiss', 7), 7)
+  assert.equal(engine.validateTournamentRoundCount('Round robin', undefined), undefined)
+  assert.throws(
+    () => engine.validateTournamentRoundCount('Swiss', undefined),
+    /require a round count between 1 and 50/,
+  )
+  assert.throws(
+    () => engine.validateTournamentRoundCount('Swiss', 2.5),
+    /require a round count between 1 and 50/,
+  )
 })
 
 test('round robin: every planned round has balanced color assignments', () => {

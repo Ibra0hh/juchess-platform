@@ -1111,6 +1111,17 @@ function swissRoundsTotal(tournament, playerCount) {
   return Math.max(3, Math.ceil(Math.log2(Math.max(2, playerCount))) + 1);
 }
 
+function validateTournamentRoundCount(format, roundsTotal) {
+  if (normalizeTournamentFormat(format) !== 'swiss') return roundsTotal;
+
+  const count = Number(roundsTotal);
+  if (!Number.isInteger(count) || count < 1 || count > 50) {
+    throw new HttpError(400, 'Swiss tournaments require a round count between 1 and 50.');
+  }
+
+  return count;
+}
+
 function multiStageStageOneRounds(tournament, qualifierCount) {
   const knockoutRounds = Math.ceil(Math.log2(Math.max(2, qualifierCount)));
   const declared = Number(tournament.roundsTotal) || 0;
@@ -2607,6 +2618,7 @@ export default async ({ req, res, log, error }) => {
       if (missing.length > 0) {
         return badRequest(res, 'Missing required tournament fields.', { missing });
       }
+      const roundsTotal = validateTournamentRoundCount(body.format, body.roundsTotal);
 
       const row = await tablesDB.createRow({
         databaseId,
@@ -2618,7 +2630,7 @@ export default async ({ req, res, log, error }) => {
           status: body.status,
           format: body.format,
           timeControl: body.timeControl,
-          roundsTotal: body.roundsTotal,
+          roundsTotal,
           currentRound: body.currentRound,
           startsAt: body.startsAt,
           endsAt: body.endsAt,
@@ -2634,6 +2646,7 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (method === 'PATCH' && segments[0] === 'tournaments' && segments[1]) {
+      const roundsTotal = validateTournamentRoundCount(body.format, body.roundsTotal);
       const activation = body.status === 'active'
         ? await startTournamentIfNeeded(tablesDB, databaseId, segments[1], body)
         : null;
@@ -2654,7 +2667,7 @@ export default async ({ req, res, log, error }) => {
           capacity: body.capacity,
           description: body.description,
           physicalBoards: body.physicalBoards === undefined ? undefined : normalizePhysicalBoards(body.physicalBoards),
-          roundsTotal: activation?.roundsTotal ?? body.roundsTotal,
+          roundsTotal: activation?.roundsTotal ?? roundsTotal,
           // Activation preserves the exact pairings and bracket snapshot that
           // the manager published while the tournament was Upcoming.
           bracketSnapshot: body.status === 'active'

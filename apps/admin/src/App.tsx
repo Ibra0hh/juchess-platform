@@ -264,6 +264,7 @@ function createInitialTournamentForm(): TournamentInput {
     status: 'draft',
     format: 'Swiss',
     timeControl: '15+10 Rapid',
+    roundsTotal: 5,
     capacity: 16,
     location: '',
   }
@@ -913,7 +914,9 @@ function TournamentsScreen({
   const managedTournament = tournaments.find((item) => tournamentKey(item) === manageTournamentKey) ?? null
   const mediaTournament = tournaments.find((item) => tournamentKey(item) === mediaTournamentKey) ?? null
   const createEnabled = tab === 'draft'
-  const canSaveDraft = Boolean(form.name.trim() && form.format.trim()) && !submitting
+  const swissRoundsValid = form.format !== 'Swiss'
+    || (Number.isInteger(form.roundsTotal) && Number(form.roundsTotal) >= 1 && Number(form.roundsTotal) <= 50)
+  const canSaveDraft = Boolean(form.name.trim() && form.format.trim()) && swissRoundsValid && !submitting
   const isEditing = Boolean(editingTournament)
   const showRegistrationQueue = tab === 'upcoming' && !managedTournament
   const selectedTournamentRowId = showRegistrationQueue ? selectedTournament?.rowId : undefined
@@ -1096,6 +1099,11 @@ function TournamentsScreen({
     const format = form.format.trim()
     if (!name || !format) {
       setMessage('Tournament name and format are required.')
+      return
+    }
+
+    if (format === 'Swiss' && !swissRoundsValid) {
+      setMessage('Choose a Swiss round count between 1 and 50.')
       return
     }
 
@@ -1624,6 +1632,25 @@ function TournamentsScreen({
                       <label>Increment (seconds)<input value={timeIncrement} onChange={(event) => setTimeSelection({ increment: event.target.value })} placeholder="10" /></label>
                     </div>
                   </div>
+                  {form.format === 'Swiss' ? (
+                    <div className="format-time-panel">
+                      <div className="create-section-label">Swiss setup</div>
+                      <div className="create-grid compact-time-grid">
+                        <label>
+                          Number of rounds
+                          <input
+                            type="number"
+                            min={1}
+                            max={50}
+                            step={1}
+                            value={form.roundsTotal ?? ''}
+                            onChange={(event) => update('roundsTotal', event.target.value === '' ? undefined : Number(event.target.value))}
+                            required
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -5801,6 +5828,7 @@ function tournamentToEditForm(item: AdminTournament): TournamentInput {
     status: item.status,
     format: item.format,
     timeControl: item.timeControl,
+    roundsTotal: item.roundsTotal,
     capacity: item.capacity || undefined,
     location: item.location ?? '',
     description: item.description ?? '',
