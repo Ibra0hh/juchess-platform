@@ -64,6 +64,55 @@ void main() {
     expect(games.first.parsed?.moves, ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6']);
   });
 
+  test(
+    'uses Chess.com game URLs when PGN Site is only the provider name',
+    () async {
+      final providerSitePgn = testPgn.replaceFirst(
+        '[Site "https://example.test/mobile-game-1"]',
+        '[Site "Chess.com"]',
+      );
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('/archives')) {
+          return http.Response(
+            jsonEncode({
+              'archives': [
+                'https://api.chess.com/pub/player/alice/games/2026/07',
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'games': [
+              {
+                'end_time': 1783641602,
+                'pgn': providerSitePgn,
+                'rules': 'chess',
+                'url': 'https://www.chess.com/game/live/222222',
+              },
+              {
+                'end_time': 1783641601,
+                'pgn': providerSitePgn,
+                'rules': 'chess',
+                'url': 'https://www.chess.com/game/live/111111',
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final games = await loadMobileExternalGames(
+        MobileGameSource.chessCom,
+        'Alice',
+        client: client,
+      );
+
+      expect(games.map((game) => game.id), ['222222', '111111']);
+    },
+  );
+
   test('loads Lichess NDJSON games by username', () async {
     final lichessPgn = testPgn.replaceAll('Ruy Lopez', 'Sämisch Attack');
     final client = MockClient(

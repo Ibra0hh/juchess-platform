@@ -88,6 +88,18 @@ type ReviewInput = {
   pgn?: string
 }
 
+export type ReviewGameIdentityInput = {
+  fen?: string
+  id: string
+  key: string
+  moves: string[]
+  source: string
+}
+
+export function reviewGameIdentity(game: ReviewGameIdentityInput) {
+  return [game.source, game.key, game.id, game.fen || '', game.moves.join(' ')].join('\n')
+}
+
 type ReviewOptions = {
   depth?: number
   onProgress?: (completed: number, total: number) => void

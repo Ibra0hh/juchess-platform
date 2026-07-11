@@ -47,6 +47,41 @@ test('loads and maps recent Chess.com games', async () => {
   assert.deepEqual(games[0].moves, ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6'])
 })
 
+test('uses Chess.com game URLs when PGN Site is only the provider name', async () => {
+  const providerSitePgn = pgn.replace(
+    '[Site "https://example.test/game-1"]',
+    '[Site "Chess.com"]',
+  )
+  const fetchMock = async (input: string | URL | Request) => {
+    if (String(input).endsWith('/archives')) {
+      return Response.json({ archives: ['https://api.chess.com/pub/player/alice/games/2026/07'] })
+    }
+    return Response.json({
+      games: [
+        {
+          end_time: 1783641602,
+          pgn: providerSitePgn,
+          rules: 'chess',
+          url: 'https://www.chess.com/game/live/222222',
+        },
+        {
+          end_time: 1783641601,
+          pgn: providerSitePgn,
+          rules: 'chess',
+          url: 'https://www.chess.com/game/live/111111',
+        },
+      ],
+    })
+  }
+
+  const games = await loadExternalGames('chess.com', 'Alice', fetchMock as typeof fetch)
+
+  assert.deepEqual(games.map((game) => game.key), [
+    'chess.com-222222',
+    'chess.com-111111',
+  ])
+})
+
 test('loads Lichess NDJSON with embedded PGN', async () => {
   const fetchMock = async () => new Response(`${JSON.stringify({
     createdAt: 1783641600000,

@@ -373,9 +373,8 @@ MobileImportedGame? _mobileGameFromPgn({
   try {
     final parsed = MobileParsedReviewGame.fromPgn(pgn);
     final headers = parsed.headers;
-    final id = _mobileIdFromUrl(headers['Site']).isNotEmpty
-        ? _mobileIdFromUrl(headers['Site'])
-        : fallbackId;
+    final siteId = _mobileGameIdFromSiteHeader(headers['Site']);
+    final id = siteId.isNotEmpty ? siteId : fallbackId;
     return MobileImportedGame(
       black: headers['Black']?.trim().isNotEmpty == true
           ? headers['Black']!.trim()
@@ -425,6 +424,15 @@ String _mobileIdFromUrl(String? value) {
   final uri = Uri.tryParse(raw);
   final segments = uri?.pathSegments.where((segment) => segment.isNotEmpty);
   return segments == null || segments.isEmpty ? raw : segments.last;
+}
+
+String _mobileGameIdFromSiteHeader(String? value) {
+  final raw = value?.trim();
+  if (raw == null || raw.isEmpty) return '';
+  final uri = Uri.tryParse(raw);
+  if (uri == null || !uri.hasScheme) return '';
+  if (uri.scheme != 'http' && uri.scheme != 'https') return '';
+  return _mobileIdFromUrl(raw);
 }
 
 String _mobileTitleCase(String? value) {
@@ -5990,6 +5998,7 @@ class _MobileProfileHistoryPanelState extends State<MobileProfileHistoryPanel> {
     openPrototypeRoute(
       context,
       MobileGameReviewWorkspace(
+        key: ValueKey('${game.source.name}:${game.id}'),
         game: parsed,
         white: game.white,
         black: game.black,
@@ -6590,6 +6599,7 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
       openPrototypeRoute(
         context,
         MobileGameReviewWorkspace(
+          key: ValueKey('pgn:${parsed.moves.join('|')}'),
           game: parsed,
           white: parsed.headers['White'] ?? 'White',
           black: parsed.headers['Black'] ?? 'Black',
@@ -8226,6 +8236,7 @@ class _PickGameScreenState extends State<PickGameScreen> {
       openPrototypeRoute(
         context,
         MobileGameReviewWorkspace(
+          key: ValueKey('${game.source.name}:${game.id}'),
           game: parsed,
           white: game.white,
           black: game.black,
@@ -8531,6 +8542,9 @@ class _TournamentGameDetailScreenState
                   openPrototypeRoute(
                     context,
                     MobileGameReviewWorkspace(
+                      key: ValueKey(
+                        'tournament:${widget.match.gameId ?? widget.roundLabel}:${moves.join('|')}',
+                      ),
                       game: parsed,
                       white: widget.match.white,
                       black: widget.match.black,

@@ -7,6 +7,7 @@ import {
   moveAccuracyFromLoss,
   parseReviewGame,
   parseStockfishOutput,
+  reviewGameIdentity,
 } from './gameReview.ts'
 
 test('parses PGN into SAN, UCI, and every board position', () => {
@@ -18,6 +19,30 @@ test('parses PGN into SAN, UCI, and every board position', () => {
   assert.deepEqual(parsed.uciMoves, ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5'])
   assert.equal(parsed.fens.length, parsed.moves.length + 1)
   assert.equal(parsed.headers.White, 'Ibrahim')
+})
+
+test('keeps review sessions scoped to the exact selected game', () => {
+  const first = reviewGameIdentity({
+    id: 'game-1',
+    key: 'chess.com-game-1',
+    moves: ['e4', 'e5'],
+    source: 'chess.com',
+  })
+  const second = reviewGameIdentity({
+    id: 'game-2',
+    key: 'chess.com-game-2',
+    moves: ['d4', 'd5'],
+    source: 'chess.com',
+  })
+  const updatedFirst = reviewGameIdentity({
+    id: 'game-1',
+    key: 'chess.com-game-1',
+    moves: ['e4', 'e5', 'Nf3'],
+    source: 'chess.com',
+  })
+
+  assert.notEqual(first, second)
+  assert.notEqual(first, updatedFirst)
 })
 
 test('normalizes UCI scores to White perspective', () => {

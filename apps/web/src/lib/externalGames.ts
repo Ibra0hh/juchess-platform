@@ -214,7 +214,7 @@ function sampleGameFromPgn({
   try {
     const parsed = parseReviewGame({ pgn })
     const headers = parsed.headers
-    const id = gameIdFromUrl(headers.Site) || fallbackId
+    const id = gameIdFromSiteHeader(headers.Site) || fallbackId
     const event = headers.Event?.trim()
     return {
       bRating: numericHeader(headers.BlackElo) ?? fallbackBlackRating ?? 0,
@@ -266,6 +266,17 @@ function gameIdFromUrl(value?: string) {
     return segments.at(-1) || ''
   } catch {
     return value.split('/').filter(Boolean).at(-1) || ''
+  }
+}
+
+function gameIdFromSiteHeader(value?: string) {
+  if (!value) return ''
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''
+    return gameIdFromUrl(value)
+  } catch {
+    return ''
   }
 }
 

@@ -20,6 +20,7 @@ import {
 import {
   parseReviewGame,
   reviewGame,
+  reviewGameIdentity,
   StockfishReviewEngine,
   defaultReviewEngineStrength,
   getReviewEnginePreset,
@@ -36,6 +37,11 @@ import './ClubScreens.css'
 
 type GameMode = 'review' | 'analysis'
 type WorkspaceStep = 'source' | 'search' | 'list' | 'review' | 'workspace'
+
+type ScopedGameReview = {
+  gameIdentity: string
+  result: GameReviewResult
+}
 
 type SourceDef = {
   key: GameSource
@@ -121,7 +127,7 @@ function GamesPage() {
   const [saved, setSaved] = useState(false)
   const [ran, setRan] = useState(false)
   const [flipped, setFlipped] = useState(false)
-  const [review, setReview] = useState<GameReviewResult | null>(null)
+  const [reviewSession, setReviewSession] = useState<ScopedGameReview | null>(null)
   const [reviewStarted, setReviewStarted] = useState(false)
   const [reviewError, setReviewError] = useState('')
   const [reviewLoading, setReviewLoading] = useState(false)
@@ -130,6 +136,26 @@ function GamesPage() {
   const [engineSettingsOpen, setEngineSettingsOpen] = useState(false)
   const [engineStrength, setEngineStrength] = useState<ReviewEngineStrength>(loadReviewEngineStrength)
   const enginePreset = getReviewEnginePreset(engineStrength)
+  const activeGameIdentity = game ? reviewGameIdentity(game) : null
+  const review = reviewSession?.gameIdentity === activeGameIdentity
+    ? reviewSession.result
+    : null
+  const reviewRunRef = useRef(0)
+  const reviewAbortRef = useRef<AbortController | null>(null)
+  const reviewEngineRef = useRef<StockfishReviewEngine | null>(null)
+
+  const resetReviewState = () => {
+    reviewRunRef.current += 1
+    reviewAbortRef.current?.abort()
+    reviewAbortRef.current = null
+    reviewEngineRef.current?.dispose()
+    reviewEngineRef.current = null
+    setReviewSession(null)
+    setReviewStarted(false)
+    setReviewError('')
+    setReviewLoading(false)
+    setReviewProgress({ completed: 0, total: 0 })
+  }
 
   useEffect(() => {
     window.localStorage.setItem('juchess.review.engineStrength', engineStrength)
@@ -236,13 +262,15 @@ function GamesPage() {
   }, [liveCloudGameId, step])
 
   useEffect(() => {
-    setReview(null)
+    const run = ++reviewRunRef.current
+    const targetIdentity = activeGameIdentity
+    setReviewSession(null)
     setReviewStarted(false)
     setReviewError('')
     setReviewLoading(false)
     setReviewProgress({ completed: 0, total: 0 })
 
-    if (step !== 'review' || !game) return
+    if (step !== 'review' || !game || !targetIdentity) return
     if (game.live) {
       setReviewError('The live board is still changing. Full engine review becomes available when the game finishes.')
       return
@@ -258,6 +286,8 @@ function GamesPage() {
     })
     const controller = new AbortController()
     let active = true
+    reviewAbortRef.current = controller
+    reviewEngineRef.current = engine
     setReviewLoading(true)
     setReviewProgress({ completed: 0, total: game.moves.length + 1 })
 
@@ -268,25 +298,37 @@ function GamesPage() {
         depth: enginePreset.depth,
         signal: controller.signal,
         onProgress: (completed, total) => {
-          if (active) setReviewProgress({ completed, total })
+          if (active && run === reviewRunRef.current) {
+            setReviewProgress({ completed, total })
+          }
         },
       },
     ).then((result) => {
-      if (!active) return
-      setReview(result)
+      if (!active || run !== reviewRunRef.current) return
+      setReviewSession({ gameIdentity: targetIdentity, result })
       setReviewLoading(false)
     }).catch((error: unknown) => {
-      if (!active || (error instanceof DOMException && error.name === 'AbortError')) return
+      if (
+        !active
+        || run !== reviewRunRef.current
+        || (error instanceof DOMException && error.name === 'AbortError')
+      ) return
       setReviewError(error instanceof Error ? error.message : 'The engine could not review this game.')
       setReviewLoading(false)
-    }).finally(() => engine.dispose())
+    }).finally(() => {
+      engine.dispose()
+      if (reviewAbortRef.current === controller) reviewAbortRef.current = null
+      if (reviewEngineRef.current === engine) reviewEngineRef.current = null
+    })
 
     return () => {
       active = false
       controller.abort()
       engine.dispose()
+      if (reviewAbortRef.current === controller) reviewAbortRef.current = null
+      if (reviewEngineRef.current === engine) reviewEngineRef.current = null
     }
-  }, [enginePreset.depth, enginePreset.hashMb, game, step])
+  }, [activeGameIdentity, enginePreset.depth, enginePreset.hashMb, game, step])
 
   useEffect(() => {
     if (step !== 'review' || !game || !reviewStarted) return
@@ -428,6 +470,7 @@ function GamesPage() {
   const startSelectedGame = () => {
     if (!selectedGame) return
 
+    resetReviewState()
     setGame(selectedGame)
     setMoveIdx(Math.max(0, selectedGame.moves.length - 1))
     setSaved(false)
@@ -582,6 +625,7 @@ function GamesPage() {
               type="button"
               className={isReviewMode ? 'active' : undefined}
               onClick={() => {
+                resetReviewState()
                 setMode('review')
                 setStep('source')
                 setGame(null)
@@ -597,6 +641,7 @@ function GamesPage() {
               type="button"
               className={!isReviewMode ? 'active' : undefined}
               onClick={() => {
+                resetReviewState()
                 setMode('analysis')
                 setStep('source')
                 setGame(null)
@@ -674,6 +719,7 @@ function GamesPage() {
               selectedMove={selectedReviewMove}
               started={reviewStarted}
               onExit={() => {
+                resetReviewState()
                 setStep('source')
                 setGame(null)
                 setSelectedKey(null)
@@ -716,6 +762,7 @@ function GamesPage() {
               }}
               onReview={() => {
                 const nextGame = game || createWorkspaceGame(workspaceMoves, workspaceResult)
+                resetReviewState()
                 setGame(nextGame)
                 setMode('review')
                 setStep('review')
