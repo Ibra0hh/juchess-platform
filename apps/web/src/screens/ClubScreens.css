@@ -488,6 +488,12 @@
   color: rgba(17, 17, 17, 0.6);
 }
 
+.recent-game-row .live {
+  color: var(--wine);
+  border-color: rgba(122, 36, 49, 0.42);
+  font-size: 9.5px;
+}
+
 .recent-game-row strong,
 .recent-game-row small {
   display: block;
@@ -786,6 +792,18 @@
   justify-content: space-between;
   gap: 12px;
   padding: 9px 11px;
+}
+
+.profile-history-message {
+  padding: 24px 22px;
+  color: rgba(17, 17, 17, 0.58);
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.profile-history-message.error {
+  color: var(--wine);
 }
 
 .board-title-actions {
@@ -1197,6 +1215,12 @@
   font-size: 12.5px;
 }
 
+.search-panel .search-error {
+  margin-top: 10px;
+  color: var(--wine);
+  font-weight: 600;
+}
+
 .search-panel input,
 .pgn-panel textarea {
   width: 100%;
@@ -1243,6 +1267,11 @@
 .game-list-action button:hover,
 .workspace-actions .run:hover {
   background: var(--wine-dark);
+}
+
+.primary-rail-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .game-list-panel {
@@ -1336,6 +1365,23 @@
   margin-top: 3px;
   color: rgba(17, 17, 17, 0.6);
   font-size: 11.5px;
+}
+
+.game-list-empty {
+  display: grid;
+  gap: 4px;
+  padding: 28px 18px;
+  text-align: center;
+}
+
+.game-list-empty strong {
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+.game-list-empty span {
+  color: rgba(17, 17, 17, 0.58);
+  font-size: 12px;
 }
 
 .game-list-action {

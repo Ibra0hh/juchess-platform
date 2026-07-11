@@ -170,7 +170,9 @@ export type SampleGame = {
   id: string
   source: GameSource
   white: string
+  whiteProfileId?: string
   black: string
+  blackProfileId?: string
   wRating: number
   bRating: number
   result: string
@@ -181,6 +183,8 @@ export type SampleGame = {
   moves: string[]
   pgn?: string
   live?: boolean
+  tournamentId?: string
+  tournamentName?: string
 }
 
 export const tableIds = {
@@ -505,8 +509,11 @@ export async function loadTournamentGame(gameId: string | null | undefined): Pro
       rowId: gameId,
     })
     if (row.status === 'scheduled' || row.blackProfileId === 'system_bye') return null
-    const profiles = await loadProfilesForGame(row)
-    return appwriteGameToSampleGame(row, profiles)
+    const [profiles, tournamentNames] = await Promise.all([
+      loadProfilesForGame(row),
+      loadTournamentNames(row.tournamentId ? [row.tournamentId] : []),
+    ])
+    return appwriteGameToSampleGame(row, profiles, tournamentNames)
   } catch (error) {
     console.warn('JuChess cloud game read failed.', error)
     return null
@@ -514,10 +521,10 @@ export async function loadTournamentGame(gameId: string | null | undefined): Pro
 }
 
 export async function loadTournamentGameArchive(): Promise<SampleGame[]> {
-  if (!appwriteReady) return sampleGamesBySource.tournament
+  if (!appwriteReady) return []
 
   try {
-    const [games, profiles] = await Promise.all([
+    const [games, profiles, tournaments] = await Promise.all([
       tablesDB.listRows<AppwriteGameRow>({
         databaseId: appwriteConfig.databaseId,
         tableId: tableIds.games,
@@ -530,21 +537,70 @@ export async function loadTournamentGameArchive(): Promise<SampleGame[]> {
         queries: [Query.limit(1000)],
         total: false,
       }),
+      tablesDB.listRows<AppwriteTournamentRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.tournaments,
+        queries: [Query.limit(1000)],
+        total: false,
+      }),
     ])
     const profileMap = mapProfiles(profiles.rows)
+    const tournamentNames = mapTournamentNames(tournaments.rows)
     const mapped = games.rows
       .filter((row) => (
         row.blackProfileId !== 'system_bye'
         && (row.status === 'live' || row.status === 'completed' || row.status === 'forfeit')
       ))
-      .map((row) => appwriteGameToSampleGame(row, profileMap))
+      .sort((a, b) => gameTimestamp(b) - gameTimestamp(a))
+      .map((row) => appwriteGameToSampleGame(row, profileMap, tournamentNames))
       .filter((game): game is SampleGame => Boolean(game))
-      .sort((a, b) => b.date.localeCompare(a.date))
 
     return mapped
   } catch (error) {
     console.warn('JuChess cloud game archive read failed.', error)
-    return sampleGamesBySource.tournament
+    return []
+  }
+}
+
+export async function loadProfileGameHistory(profileId: string | null | undefined): Promise<SampleGame[]> {
+  if (!appwriteReady || !profileId) return []
+
+  try {
+    const [games, profiles, tournaments] = await Promise.all([
+      tablesDB.listRows<AppwriteGameRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.games,
+        queries: [Query.limit(1000)],
+        total: false,
+      }),
+      tablesDB.listRows<AppwriteProfileRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.profiles,
+        queries: [Query.limit(1000)],
+        total: false,
+      }),
+      tablesDB.listRows<AppwriteTournamentRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.tournaments,
+        queries: [Query.limit(1000)],
+        total: false,
+      }),
+    ])
+    const profileMap = mapProfiles(profiles.rows)
+    const tournamentNames = mapTournamentNames(tournaments.rows)
+
+    return games.rows
+      .filter((row) => (
+        row.blackProfileId !== 'system_bye'
+        && (row.whiteProfileId === profileId || row.blackProfileId === profileId)
+        && (row.status === 'live' || row.status === 'completed' || row.status === 'forfeit')
+      ))
+      .sort((a, b) => gameTimestamp(b) - gameTimestamp(a))
+      .map((row) => appwriteGameToSampleGame(row, profileMap, tournamentNames))
+      .filter((game): game is SampleGame => Boolean(game))
+  } catch (error) {
+    console.warn('JuChess player game history read failed.', error)
+    throw new Error('Tournament game history is unavailable right now.')
   }
 }
 
@@ -570,7 +626,11 @@ async function loadProfilesForGame(row: AppwriteGameRow) {
   return profiles
 }
 
-function appwriteGameToSampleGame(row: AppwriteGameRow, profiles: Map<string, Member>): SampleGame | null {
+function appwriteGameToSampleGame(
+  row: AppwriteGameRow,
+  profiles: Map<string, Member>,
+  tournamentNames = new Map<string, string>(),
+): SampleGame | null {
   if (!row.whiteProfileId || !row.blackProfileId) return null
 
   const white = profiles.get(row.whiteProfileId) ?? {
@@ -586,23 +646,61 @@ function appwriteGameToSampleGame(row: AppwriteGameRow, profiles: Map<string, Me
     universityId: row.blackProfileId,
   }
   const moves = parseStoredMoves(row.pgn)
+  const tournamentName = row.tournamentId
+    ? tournamentNames.get(row.tournamentId) || 'Tournament game'
+    : 'Tournament game'
   return {
     key: row.$id,
     id: row.$id,
     source: 'tournament',
     white: white.name,
+    whiteProfileId: row.whiteProfileId,
     black: black.name,
+    blackProfileId: row.blackProfileId,
     wRating: white.rating,
     bRating: black.rating,
     result: row.status === 'live' ? 'Live' : row.result || '*',
     date: formatDate(row.finishedAt || row.startedAt || row.$updatedAt || row.$createdAt),
-    opening: moves.length ? 'Saved tournament PGN' : 'Tournament game',
+    opening: tournamentName,
     round: `Round ${row.round ?? 1} · Board ${row.board ?? 1}`,
     fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     moves,
     pgn: row.pgn,
     live: row.status === 'live',
+    tournamentId: row.tournamentId,
+    tournamentName,
   }
+}
+
+async function loadTournamentNames(tournamentIds: string[]) {
+  const names = new Map<string, string>()
+  await Promise.all([...new Set(tournamentIds)].map(async (tournamentId) => {
+    try {
+      const row = await tablesDB.getRow<AppwriteTournamentRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.tournaments,
+        rowId: tournamentId,
+      })
+      names.set(row.$id, tournamentName(row))
+    } catch {
+      // A missing tournament title should not block opening its saved game.
+    }
+  }))
+  return names
+}
+
+function mapTournamentNames(rows: AppwriteTournamentRow[]) {
+  return new Map(rows.map((row) => [row.$id, tournamentName(row)]))
+}
+
+function tournamentName(row: AppwriteTournamentRow) {
+  return row.name?.trim() || row.format?.trim() || 'Tournament game'
+}
+
+function gameTimestamp(row: AppwriteGameRow) {
+  const value = row.finishedAt || row.startedAt || row.$updatedAt || row.$createdAt
+  const timestamp = Date.parse(value)
+  return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
 function parseStoredMoves(value?: string) {

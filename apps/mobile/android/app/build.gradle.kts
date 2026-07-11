@@ -35,6 +35,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            ndk {
+                // Stockfish symbols exceed 200 MB and are not needed in the installable APK build.
+                debugSymbolLevel = "none"
+            }
         }
     }
 }

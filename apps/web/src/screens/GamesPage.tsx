@@ -24,6 +24,7 @@ import {
   type ReviewClassification,
   type ReviewedMove,
 } from '../lib/gameReview'
+import { loadExternalGames } from '../lib/externalGames'
 import './ClubScreens.css'
 
 type GameMode = 'review' | 'analysis'
@@ -83,7 +84,10 @@ function GamesPage() {
   const [moveIdx, setMoveIdx] = useState(queryGame ? Math.max(0, queryGame.moves.length - 1) : 0)
   const [pgnText, setPgnText] = useState('')
   const [loadingGame, setLoadingGame] = useState(Boolean(queryGameId && !queryGame))
-  const [tournamentArchive, setTournamentArchive] = useState<SampleGame[]>(sampleGamesBySource.tournament)
+  const [tournamentArchive, setTournamentArchive] = useState<SampleGame[]>([])
+  const [sourceGames, setSourceGames] = useState<SampleGame[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState('')
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false)
   const [workspaceMoves, setWorkspaceMoves] = useState<string[]>([])
   const [workspaceResult, setWorkspaceResult] = useState('Live')
@@ -261,18 +265,18 @@ function GamesPage() {
   const visiblePool = useMemo(() => {
     if (!source) return []
 
-    const rawPool = source === 'tournament' ? tournamentArchive : sampleGamesBySource[source]
+    const rawPool = source === 'tournament' ? tournamentArchive : sourceGames
     if (source !== 'tournament') return rawPool
 
     const needle = searchText.trim().toLowerCase()
     if (!needle) return rawPool
 
-    const filtered = rawPool.filter((item) => (
-      `${item.white} ${item.black} ${item.round} ${item.opening}`.toLowerCase().includes(needle)
+    return rawPool.filter((item) => (
+      `${item.white} ${item.black} ${item.tournamentName || ''} ${item.round} ${item.opening}`
+        .toLowerCase()
+        .includes(needle)
     ))
-
-    return filtered.length ? filtered : rawPool
-  }, [searchText, source, tournamentArchive])
+  }, [searchText, source, sourceGames, tournamentArchive])
 
   const selectedGame = visiblePool.find((item) => item.key === selectedKey) || null
   const isReviewMode = mode === 'review'
@@ -318,7 +322,32 @@ function GamesPage() {
     setSource(nextSource)
     setSelectedKey(null)
     setSearchText('')
+    setSourceGames([])
+    setSearchError('')
+    setSearchLoading(false)
     setStep('search')
+  }
+
+  const searchSourceGames = async () => {
+    if (!source || searchLoading) return
+    setSelectedKey(null)
+    setSearchError('')
+
+    if (source === 'tournament') {
+      setStep('list')
+      return
+    }
+
+    setSearchLoading(true)
+    try {
+      const games = await loadExternalGames(source, searchText)
+      setSourceGames(games)
+      setStep('list')
+    } catch (error) {
+      setSearchError(error instanceof Error ? error.message : `${sourceName(source)} games could not be loaded.`)
+    } finally {
+      setSearchLoading(false)
+    }
   }
 
   const startSelectedGame = () => {
@@ -502,12 +531,12 @@ function GamesPage() {
               sourceLabel={sourceLabel}
               onBack={() => {
                 setSource(null)
+                setSearchError('')
                 setStep('source')
               }}
-              onSearch={() => {
-                setSelectedKey(null)
-                setStep('list')
-              }}
+              error={searchError}
+              loading={searchLoading}
+              onSearch={() => void searchSourceGames()}
               setSearchText={setSearchText}
             />
           ) : null}
@@ -671,6 +700,8 @@ function SourceStep({
 }
 
 function SearchStep({
+  error,
+  loading,
   onBack,
   onSearch,
   searchText,
@@ -678,6 +709,8 @@ function SearchStep({
   source,
   sourceLabel,
 }: {
+  error: string
+  loading: boolean
   onBack: () => void
   onSearch: () => void
   searchText: string
@@ -695,6 +728,9 @@ function SearchStep({
       <h2>{sourceLabel}</h2>
       <p>{isTournament ? 'Search by player, event, or round' : `Enter a ${sourceLabel} username`}</p>
       <input
+        autoCapitalize="none"
+        autoComplete="off"
+        disabled={loading}
         type="text"
         value={searchText}
         onChange={(event) => setSearchText(event.target.value)}
@@ -703,8 +739,9 @@ function SearchStep({
         }}
         placeholder={isTournament ? 'e.g. Ibrahim, Swiss, QF...' : 'e.g. ibrahim_ju'}
       />
-      <button type="button" className="primary-rail-button" onClick={onSearch}>
-        Search games
+      {error ? <p className="search-error" role="alert">{error}</p> : null}
+      <button type="button" className="primary-rail-button" disabled={loading} onClick={onSearch}>
+        {loading ? 'Loading games...' : 'Search games'}
       </button>
     </section>
   )
@@ -737,7 +774,7 @@ function ListStep({
         <span>{games.length} games</span>
       </div>
       <div className="game-list-scroll">
-        {games.map((game) => (
+        {games.length ? games.map((game) => (
           <button
             type="button"
             className={selectedKey === game.key ? 'selected' : undefined}
@@ -751,11 +788,21 @@ function ListStep({
               <em>{game.result}</em>
             </span>
             <small>
+              {game.tournamentName ? `${game.tournamentName} - ` : ''}
               {game.opening} - {game.date}
               {game.round ? ` - ${game.round}` : ''}
             </small>
           </button>
-        ))}
+        )) : (
+          <div className="game-list-empty">
+            <strong>No games found</strong>
+            <span>
+              {sourceLabel === 'Tournament Games'
+                ? 'Completed or live tournament games will appear here.'
+                : 'Check the username or try another account.'}
+            </span>
+          </div>
+        )}
       </div>
       {selectedKey ? (
         <div className="game-list-action">

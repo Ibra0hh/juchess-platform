@@ -8,6 +8,7 @@ import 'package:appwrite/models.dart' as models;
 import 'package:chess/chess.dart' as chess;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -120,6 +121,352 @@ class AppConfig {
     'APPWRITE_RECOVERY_URL',
     defaultValue: 'https://juchess.ju.edu.jo/reset-password',
   );
+}
+
+enum MobileGameSource { chessCom, lichess, tournament }
+
+class MobileImportedGame {
+  const MobileImportedGame({
+    required this.black,
+    required this.blackRating,
+    required this.date,
+    required this.event,
+    required this.id,
+    required this.result,
+    required this.round,
+    required this.source,
+    required this.white,
+    required this.whiteRating,
+    this.blackProfileId,
+    this.parsed,
+    this.whiteProfileId,
+  });
+
+  final String black;
+  final String? blackProfileId;
+  final int blackRating;
+  final String date;
+  final String event;
+  final String id;
+  final MobileParsedReviewGame? parsed;
+  final String result;
+  final String round;
+  final MobileGameSource source;
+  final String white;
+  final String? whiteProfileId;
+  final int whiteRating;
+}
+
+class MobileGameImportException implements Exception {
+  const MobileGameImportException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+Future<List<MobileImportedGame>> loadMobileExternalGames(
+  MobileGameSource source,
+  String username, {
+  http.Client? client,
+  http.Client Function()? clientFactory,
+}) async {
+  final normalized = username.trim();
+  if (normalized.isEmpty) {
+    throw MobileGameImportException(
+      'Enter a ${source == MobileGameSource.chessCom ? 'Chess.com' : 'Lichess'} username.',
+    );
+  }
+  if (source == MobileGameSource.tournament) return const [];
+
+  final requestClient = client ?? clientFactory?.call() ?? http.Client();
+  try {
+    return await (source == MobileGameSource.chessCom
+        ? _loadMobileChessComGames(normalized, requestClient)
+        : _loadMobileLichessGames(normalized, requestClient));
+  } finally {
+    if (client == null) requestClient.close();
+  }
+}
+
+Future<List<MobileImportedGame>> _loadMobileChessComGames(
+  String username,
+  http.Client client,
+) async {
+  final archivesUri = Uri.https(
+    'api.chess.com',
+    '/pub/player/${username.toLowerCase()}/games/archives',
+  );
+  final archivesResponse = await _mobileExternalGet(
+    client,
+    archivesUri,
+    provider: 'Chess.com',
+    accept: 'application/json',
+  );
+  final archivesPayload = jsonDecode(archivesResponse.body);
+  final archiveValues = archivesPayload is Map
+      ? archivesPayload['archives']
+      : null;
+  final archives = archiveValues is List
+      ? archiveValues.whereType<String>().toList()
+      : const <String>[];
+  if (archives.isEmpty) return const [];
+
+  final rows = <Map<String, dynamic>>[];
+  for (final archiveUrl in archives.reversed.take(3)) {
+    final response = await _mobileExternalGet(
+      client,
+      Uri.parse(archiveUrl),
+      provider: 'Chess.com',
+      accept: 'application/json',
+    );
+    final payload = jsonDecode(response.body);
+    final games = payload is Map ? payload['games'] : null;
+    if (games is List) {
+      rows.addAll(games.whereType<Map>().map(_stringKeyMap));
+    }
+    if (rows.length >= 20) break;
+  }
+
+  rows.sort(
+    (a, b) => _jsonInt(b['end_time']).compareTo(_jsonInt(a['end_time'])),
+  );
+  return rows
+      .where(
+        (row) =>
+            row['rules'] == 'chess' &&
+            row['pgn']?.toString().isNotEmpty == true,
+      )
+      .take(20)
+      .map((row) {
+        final white = _stringKeyMap(row['white']);
+        final black = _stringKeyMap(row['black']);
+        return _mobileGameFromPgn(
+          black: black['username']?.toString(),
+          blackRating: _jsonInt(black['rating']),
+          dateMilliseconds: _jsonInt(row['end_time']) * 1000,
+          fallbackId: _mobileIdFromUrl(row['url']?.toString()),
+          fallbackOpening:
+              _mobileChessComOpening(row['eco']?.toString()).isNotEmpty
+              ? _mobileChessComOpening(row['eco']?.toString())
+              : _mobileTitleCase(row['time_class']?.toString()),
+          pgn: row['pgn'].toString(),
+          source: MobileGameSource.chessCom,
+          white: white['username']?.toString(),
+          whiteRating: _jsonInt(white['rating']),
+        );
+      })
+      .whereType<MobileImportedGame>()
+      .toList();
+}
+
+Future<List<MobileImportedGame>> _loadMobileLichessGames(
+  String username,
+  http.Client client,
+) async {
+  final uri = Uri.https('lichess.org', '/api/games/user/$username', {
+    'clocks': 'false',
+    'evals': 'false',
+    'literate': 'false',
+    'max': '20',
+    'moves': 'true',
+    'opening': 'true',
+    'pgnInJson': 'true',
+  });
+  final response = await _mobileExternalGet(
+    client,
+    uri,
+    provider: 'Lichess',
+    accept: 'application/x-ndjson',
+  );
+  final rows = <Map<String, dynamic>>[];
+  final responseText = utf8.decode(response.bodyBytes);
+  for (final line in const LineSplitter().convert(responseText)) {
+    if (line.trim().isEmpty) continue;
+    try {
+      final decoded = jsonDecode(line);
+      if (decoded is Map) rows.add(_stringKeyMap(decoded));
+    } catch (_) {}
+  }
+  rows.sort(
+    (a, b) => _jsonInt(
+      b['lastMoveAt'] ?? b['createdAt'],
+    ).compareTo(_jsonInt(a['lastMoveAt'] ?? a['createdAt'])),
+  );
+
+  return rows
+      .where(
+        (row) =>
+            row['variant'] == 'standard' &&
+            row['pgn']?.toString().isNotEmpty == true,
+      )
+      .map((row) {
+        final players = _stringKeyMap(row['players']);
+        final white = _stringKeyMap(players['white']);
+        final black = _stringKeyMap(players['black']);
+        final whiteUser = _stringKeyMap(white['user']);
+        final blackUser = _stringKeyMap(black['user']);
+        final opening = _stringKeyMap(row['opening']);
+        return _mobileGameFromPgn(
+          black: blackUser['name']?.toString(),
+          blackRating: _jsonInt(black['rating']),
+          dateMilliseconds: _jsonInt(row['lastMoveAt'] ?? row['createdAt']),
+          fallbackId: row['id']?.toString() ?? '',
+          fallbackOpening: opening['name']?.toString(),
+          pgn: row['pgn'].toString(),
+          source: MobileGameSource.lichess,
+          white: whiteUser['name']?.toString(),
+          whiteRating: _jsonInt(white['rating']),
+        );
+      })
+      .whereType<MobileImportedGame>()
+      .toList();
+}
+
+Future<http.Response> _mobileExternalGet(
+  http.Client client,
+  Uri uri, {
+  required String accept,
+  required String provider,
+}) async {
+  late http.Response response;
+  try {
+    response = await client.get(
+      uri,
+      headers: {
+        'accept': accept,
+        'user-agent': 'JuChess/1.0 (University of Jordan Chess Club)',
+      },
+    );
+  } catch (caught) {
+    debugPrint('JuChess $provider game import failed: $caught');
+    throw MobileGameImportException(
+      '$provider could not be reached. Check your connection and try again.',
+    );
+  }
+  if (response.statusCode >= 200 && response.statusCode < 300) return response;
+  if (response.statusCode == 404) {
+    throw MobileGameImportException('$provider username was not found.');
+  }
+  if (response.statusCode == 429) {
+    throw MobileGameImportException(
+      '$provider is receiving too many requests. Wait a moment and try again.',
+    );
+  }
+  throw MobileGameImportException(
+    '$provider returned an error (${response.statusCode}).',
+  );
+}
+
+MobileImportedGame? _mobileGameFromPgn({
+  String? black,
+  required int blackRating,
+  required int dateMilliseconds,
+  required String fallbackId,
+  String? fallbackOpening,
+  required String pgn,
+  required MobileGameSource source,
+  String? white,
+  required int whiteRating,
+}) {
+  try {
+    final parsed = MobileParsedReviewGame.fromPgn(pgn);
+    final headers = parsed.headers;
+    final id = _mobileIdFromUrl(headers['Site']).isNotEmpty
+        ? _mobileIdFromUrl(headers['Site'])
+        : fallbackId;
+    return MobileImportedGame(
+      black: headers['Black']?.trim().isNotEmpty == true
+          ? headers['Black']!.trim()
+          : black ?? 'Black',
+      blackRating: int.tryParse(headers['BlackElo'] ?? '') ?? blackRating,
+      date: _mobileGameDate(
+        headers['UTCDate'] ?? headers['Date'],
+        dateMilliseconds,
+      ),
+      event: headers['Opening']?.trim().isNotEmpty == true
+          ? headers['Opening']!.trim()
+          : fallbackOpening?.trim().isNotEmpty == true
+          ? fallbackOpening!.trim()
+          : headers['ECO'] ?? 'Standard game',
+      id: id.isEmpty ? '${source.name}-$dateMilliseconds' : id,
+      parsed: parsed,
+      result: headers['Result'] ?? '*',
+      round: headers['Event']?.trim().isNotEmpty == true
+          ? headers['Event']!.trim()
+          : source == MobileGameSource.chessCom
+          ? 'Chess.com'
+          : 'Lichess',
+      source: source,
+      white: headers['White']?.trim().isNotEmpty == true
+          ? headers['White']!.trim()
+          : white ?? 'White',
+      whiteRating: int.tryParse(headers['WhiteElo'] ?? '') ?? whiteRating,
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+Map<String, dynamic> _stringKeyMap(Object? value) {
+  if (value is! Map) return const {};
+  return value.map((key, item) => MapEntry(key.toString(), item));
+}
+
+int _jsonInt(Object? value) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+String _mobileIdFromUrl(String? value) {
+  final raw = value?.trim();
+  if (raw == null || raw.isEmpty) return '';
+  final uri = Uri.tryParse(raw);
+  final segments = uri?.pathSegments.where((segment) => segment.isNotEmpty);
+  return segments == null || segments.isEmpty ? raw : segments.last;
+}
+
+String _mobileTitleCase(String? value) {
+  final raw = value?.trim();
+  if (raw == null || raw.isEmpty) return 'Standard game';
+  return '${raw[0].toUpperCase()}${raw.substring(1)} game';
+}
+
+String _mobileChessComOpening(String? value) {
+  final slug = _mobileIdFromUrl(value);
+  if (slug.isEmpty) return '';
+  final moveIndex = RegExp(r'-\d+\.').firstMatch(slug)?.start;
+  final name = moveIndex == null ? slug : slug.substring(0, moveIndex);
+  return Uri.decodeComponent(name).replaceAll('-', ' ').trim();
+}
+
+String _mobileGameDate(String? header, int fallbackMilliseconds) {
+  final normalized = header?.trim().replaceAll('.', '-');
+  final parsedHeader = normalized == null
+      ? null
+      : DateTime.tryParse(normalized);
+  final date =
+      parsedHeader ??
+      (fallbackMilliseconds > 0
+          ? DateTime.fromMillisecondsSinceEpoch(fallbackMilliseconds)
+          : null);
+  if (date == null) return 'Date unavailable';
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${months[date.month - 1]} ${date.day}, ${date.year}';
 }
 
 class AppwriteService {
@@ -480,6 +827,101 @@ class AppwriteService {
       );
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<List<MobileImportedGame>> loadTournamentGameArchive({
+    String? profileId,
+  }) async {
+    if (!ready) return const [];
+
+    try {
+      final gamesFuture = tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.gamesTableId,
+        queries: [Query.limit(1000)],
+        total: false,
+        ttl: 0,
+      );
+      final profilesFuture = tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.profilesTableId,
+        queries: [Query.limit(1000)],
+        total: false,
+        ttl: 0,
+      );
+      final tournamentsFuture = tablesDB.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.tournamentsTableId,
+        queries: [Query.limit(1000)],
+        total: false,
+        ttl: 0,
+      );
+
+      final games = await gamesFuture;
+      final profiles = _mapProfileRows((await profilesFuture).rows);
+      final tournaments = await tournamentsFuture;
+      final tournamentNames = <String, String>{};
+      for (final row in tournaments.rows) {
+        final data = row.data;
+        tournamentNames[row.$id] =
+            data['name']?.toString().trim().isNotEmpty == true
+            ? data['name'].toString().trim()
+            : normalizeTournamentFormat(
+                data['format']?.toString() ?? 'Tournament game',
+              );
+      }
+
+      final rows =
+          games.rows.where((row) {
+            final data = row.data;
+            final whiteProfileId = data['whiteProfileId']?.toString();
+            final blackProfileId = data['blackProfileId']?.toString();
+            final status = data['status']?.toString();
+            return blackProfileId != 'system_bye' &&
+                whiteProfileId != null &&
+                blackProfileId != null &&
+                const {'live', 'completed', 'forfeit'}.contains(status) &&
+                (profileId == null ||
+                    whiteProfileId == profileId ||
+                    blackProfileId == profileId);
+          }).toList()..sort(
+            (a, b) => _mobileGameRowTime(b).compareTo(_mobileGameRowTime(a)),
+          );
+
+      return rows.map((row) {
+        final data = row.data;
+        final whiteProfileId = data['whiteProfileId'].toString();
+        final blackProfileId = data['blackProfileId'].toString();
+        final tournamentId = data['tournamentId']?.toString();
+        final pgn = data['pgn']?.toString();
+        final parsed = _mobileStoredReview(pgn);
+        final status = data['status']?.toString();
+        final white = profiles[whiteProfileId];
+        final black = profiles[blackProfileId];
+        return MobileImportedGame(
+          black: black?.name ?? blackProfileId,
+          blackProfileId: blackProfileId,
+          blackRating: black?.rating ?? 1200,
+          date: _mobileGameDate(null, _mobileGameRowTime(row)),
+          event: tournamentId == null
+              ? 'Tournament game'
+              : tournamentNames[tournamentId] ?? 'Tournament game',
+          id: row.$id,
+          parsed: parsed,
+          result: status == 'live' ? 'Live' : data['result']?.toString() ?? '*',
+          round:
+              'Round ${_jsonInt(data['round']) == 0 ? 1 : _jsonInt(data['round'])} - Board ${_jsonInt(data['board']) == 0 ? 1 : _jsonInt(data['board'])}',
+          source: MobileGameSource.tournament,
+          white: white?.name ?? whiteProfileId,
+          whiteProfileId: whiteProfileId,
+          whiteRating: white?.rating ?? 1200,
+        );
+      }).toList();
+    } catch (_) {
+      throw const MobileGameImportException(
+        'Tournament game history is unavailable right now.',
+      );
     }
   }
 
@@ -5335,9 +5777,294 @@ class ProfileScreen extends StatelessWidget {
             ],
           ),
         ),
+        if (state.signedIn) ...[
+          const SizedBox(height: 20),
+          MobileProfileHistoryPanel(
+            key: ValueKey(state.profileId),
+            profileId: state.profileId,
+            service: state.service,
+          ),
+          const SizedBox(height: 18),
+        ],
       ],
     );
   }
+}
+
+class MobileProfileHistoryPanel extends StatefulWidget {
+  const MobileProfileHistoryPanel({
+    required this.profileId,
+    required this.service,
+    super.key,
+  });
+
+  final String? profileId;
+  final AppwriteService service;
+
+  @override
+  State<MobileProfileHistoryPanel> createState() =>
+      _MobileProfileHistoryPanelState();
+}
+
+class _MobileProfileHistoryPanelState extends State<MobileProfileHistoryPanel> {
+  late Future<List<MobileImportedGame>> historyFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    historyFuture = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant MobileProfileHistoryPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profileId != widget.profileId ||
+        oldWidget.service != widget.service) {
+      historyFuture = _load();
+    }
+  }
+
+  Future<List<MobileImportedGame>> _load() {
+    final profileId = widget.profileId;
+    if (profileId == null) return Future.value(const []);
+    return widget.service.loadTournamentGameArchive(profileId: profileId);
+  }
+
+  void _openGame(MobileImportedGame game) {
+    final parsed = game.parsed;
+    if (parsed == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This game does not have saved moves yet.'),
+        ),
+      );
+      return;
+    }
+    openPrototypeRoute(
+      context,
+      MobileGameReviewWorkspace(
+        game: parsed,
+        white: game.white,
+        black: game.black,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<MobileImportedGame>>(
+      future: historyFuture,
+      builder: (context, snapshot) {
+        final games = snapshot.data ?? const <MobileImportedGame>[];
+        final stats = _mobileProfileStats(games, widget.profileId);
+        return PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SerifText(
+                      'Tournament game history',
+                      size: 20,
+                      weight: FontWeight.w700,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MobileHistoryMetric(
+                            label: 'Games',
+                            value: stats.played,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _MobileHistoryMetric(
+                            label: 'Wins',
+                            value: stats.wins,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _MobileHistoryMetric(
+                            label: 'Draws',
+                            value: stats.draws,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (snapshot.connectionState == ConnectionState.waiting)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (snapshot.hasError)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text(
+                    'Tournament game history is unavailable right now.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: PrototypeColors.burgundy),
+                  ),
+                )
+              else if (games.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text(
+                    'No tournament games are connected to this account yet.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Color(0x99111111)),
+                  ),
+                )
+              else
+                ...games.map(
+                  (game) => InkWell(
+                    onTap: () => _openGame(game),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0x33111111),
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _mobileProfileResult(game, widget.profileId),
+                              style: const TextStyle(
+                                color: PrototypeColors.burgundy,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'vs ${game.whiteProfileId == widget.profileId ? game.black : game.white}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: PrototypeColors.black,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${game.event} - ${game.round} - ${game.date}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0x99111111),
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Color(0x66111111),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MobileHistoryMetric extends StatelessWidget {
+  const _MobileHistoryMetric({required this.label, required this.value});
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0x0fa98a3f),
+        border: Border.all(color: const Color(0x22111111)),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: PrototypeColors.black,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0x99111111),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+({int draws, int losses, int played, int wins}) _mobileProfileStats(
+  List<MobileImportedGame> games,
+  String? profileId,
+) {
+  var played = 0;
+  var wins = 0;
+  var draws = 0;
+  var losses = 0;
+  for (final game in games) {
+    if (game.result == 'Live' || game.result == '*') continue;
+    played += 1;
+    final isWhite = game.whiteProfileId == profileId;
+    if (game.result.contains('1/2')) {
+      draws += 1;
+    } else if ((isWhite && game.result == '1-0') ||
+        (!isWhite && game.result == '0-1')) {
+      wins += 1;
+    } else {
+      losses += 1;
+    }
+  }
+  return (draws: draws, losses: losses, played: played, wins: wins);
+}
+
+String _mobileProfileResult(MobileImportedGame game, String? profileId) {
+  if (game.result == 'Live') return 'LIVE';
+  if (game.result.contains('1/2')) return '1/2';
+  final isWhite = game.whiteProfileId == profileId;
+  return (isWhite && game.result == '1-0') || (!isWhite && game.result == '0-1')
+      ? 'W'
+      : 'L';
 }
 
 class BigActionCard extends StatelessWidget {
@@ -5757,7 +6484,8 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
                 minLines: 6,
                 maxLines: 10,
                 decoration: InputDecoration(
-                  hintText: '[White "Player"]\n[Black "Player"]\n\n1. e4 e5 ...',
+                  hintText:
+                      '[White "Player"]\n[Black "Player"]\n\n1. e4 e5 ...',
                   filled: true,
                   fillColor: const Color(0xfffbf6e8),
                   border: OutlineInputBorder(
@@ -5809,29 +6537,38 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
         const SizedBox(height: 12),
         PrototypeOptionTile(
           title: 'Chess.com games',
-          subtitle: 'Import from your linked account',
+          subtitle: 'Import by username',
           icon: '♘',
           onTap: () => openPrototypeRoute(
             context,
-            const PickGameScreen(title: 'Chess.com games'),
+            const PickGameScreen(
+              source: MobileGameSource.chessCom,
+              title: 'Chess.com games',
+            ),
           ),
         ),
         PrototypeOptionTile(
           title: 'Lichess games',
-          subtitle: 'Import from your linked account',
+          subtitle: 'Import by username',
           icon: '♞',
           onTap: () => openPrototypeRoute(
             context,
-            const PickGameScreen(title: 'Lichess games'),
+            const PickGameScreen(
+              source: MobileGameSource.lichess,
+              title: 'Lichess games',
+            ),
           ),
         ),
         PrototypeOptionTile(
           title: 'Tournament games',
-          subtitle: 'Your club tournament history',
+          subtitle: 'Search the club archive',
           icon: '♜',
           onTap: () => openPrototypeRoute(
             context,
-            const PickGameScreen(title: 'Tournament games'),
+            const PickGameScreen(
+              source: MobileGameSource.tournament,
+              title: 'Tournament games',
+            ),
           ),
         ),
         PrototypeOptionTile(
@@ -5865,8 +6602,7 @@ class MobileGameReviewWorkspace extends StatefulWidget {
       _MobileGameReviewWorkspaceState();
 }
 
-class _MobileGameReviewWorkspaceState
-    extends State<MobileGameReviewWorkspace> {
+class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
   MobileStockfishReviewEngine? engine;
   MobileGameReviewResult? review;
   String error = '';
@@ -5879,7 +6615,9 @@ class _MobileGameReviewWorkspaceState
   void initState() {
     super.initState();
     moveIndex = widget.game.moves.length - 1;
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_runReview()));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_runReview()),
+    );
   }
 
   Future<void> _runReview() async {
@@ -5903,7 +6641,9 @@ class _MobileGameReviewWorkspaceState
       return;
     } catch (exception) {
       if (mounted && !cancelled) {
-        setState(() => error = exception.toString().replaceFirst('Exception: ', ''));
+        setState(
+          () => error = exception.toString().replaceFirst('Exception: ', ''),
+        );
       }
     } finally {
       engine?.dispose();
@@ -5977,7 +6717,8 @@ class _MobileGameReviewWorkspaceState
               _ReviewNavButton(
                 icon: Icons.chevron_left,
                 tooltip: 'Previous move',
-                onTap: () => setState(() => moveIndex = math.max(0, moveIndex - 1)),
+                onTap: () =>
+                    setState(() => moveIndex = math.max(0, moveIndex - 1)),
               ),
               SizedBox(
                 width: 96,
@@ -6004,9 +6745,8 @@ class _MobileGameReviewWorkspaceState
               _ReviewNavButton(
                 icon: Icons.last_page,
                 tooltip: 'Last move',
-                onTap: () => setState(
-                  () => moveIndex = widget.game.moves.length - 1,
-                ),
+                onTap: () =>
+                    setState(() => moveIndex = widget.game.moves.length - 1),
               ),
             ],
           ),
@@ -6612,30 +7352,42 @@ class NewAnalysisScreen extends StatelessWidget {
           onTap: () => openPrototypeRoute(context, const AnalysisBoardScreen()),
         ),
         PrototypeOptionTile(
-          title: 'Tournament game history',
-          subtitle: 'Pick from your club games',
+          title: 'Tournament game archive',
+          subtitle: 'Pick from club games',
           icon: '♜',
           onTap: () => openPrototypeRoute(
             context,
-            const PickGameScreen(title: 'Tournament games', review: false),
+            const PickGameScreen(
+              source: MobileGameSource.tournament,
+              title: 'Tournament games',
+              review: false,
+            ),
           ),
         ),
         PrototypeOptionTile(
           title: 'Chess.com games',
-          subtitle: 'Pick from your linked account',
+          subtitle: 'Import by username',
           icon: '♘',
           onTap: () => openPrototypeRoute(
             context,
-            const PickGameScreen(title: 'Chess.com games', review: false),
+            const PickGameScreen(
+              source: MobileGameSource.chessCom,
+              title: 'Chess.com games',
+              review: false,
+            ),
           ),
         ),
         PrototypeOptionTile(
           title: 'Lichess games',
-          subtitle: 'Pick from your linked account',
+          subtitle: 'Import by username',
           icon: '♞',
           onTap: () => openPrototypeRoute(
             context,
-            const PickGameScreen(title: 'Lichess games', review: false),
+            const PickGameScreen(
+              source: MobileGameSource.lichess,
+              title: 'Lichess games',
+              review: false,
+            ),
           ),
         ),
       ],
@@ -6643,43 +7395,184 @@ class NewAnalysisScreen extends StatelessWidget {
   }
 }
 
-class PickGameScreen extends StatelessWidget {
-  const PickGameScreen({required this.title, this.review = true, super.key});
+class PickGameScreen extends StatefulWidget {
+  const PickGameScreen({
+    required this.source,
+    required this.title,
+    this.review = true,
+    super.key,
+  });
 
-  final String title;
   final bool review;
+  final MobileGameSource source;
+  final String title;
+
+  @override
+  State<PickGameScreen> createState() => _PickGameScreenState();
+}
+
+class _PickGameScreenState extends State<PickGameScreen> {
+  final usernameController = TextEditingController();
+  List<MobileImportedGame> games = const [];
+  String error = '';
+  bool loading = false;
+  bool searched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.source == MobileGameSource.tournament) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_load()));
+    }
+  }
+
+  @override
+  void dispose() {
+    usernameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    if (loading) return;
+    setState(() {
+      error = '';
+      loading = true;
+    });
+
+    try {
+      List<MobileImportedGame> loaded;
+      if (widget.source == MobileGameSource.tournament) {
+        final state = context.read<AppState>();
+        loaded = await state.service.loadTournamentGameArchive();
+      } else {
+        loaded = await loadMobileExternalGames(
+          widget.source,
+          usernameController.text,
+        );
+      }
+      if (!mounted) return;
+      setState(() => games = loaded);
+    } catch (caught) {
+      if (!mounted) return;
+      setState(() => error = caught.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          loading = false;
+          searched = true;
+        });
+      }
+    }
+  }
+
+  void _openGame(MobileImportedGame game) {
+    final parsed = game.parsed;
+    if (parsed == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This game does not have saved moves yet.'),
+        ),
+      );
+      return;
+    }
+
+    if (widget.review) {
+      openPrototypeRoute(
+        context,
+        MobileGameReviewWorkspace(
+          game: parsed,
+          white: game.white,
+          black: game.black,
+        ),
+      );
+      return;
+    }
+
+    openPrototypeRoute(
+      context,
+      AnalysisBoardScreen(
+        black: game.black,
+        initialMoves: parsed.moves,
+        white: game.white,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return PrototypeRouteScaffold(
-      title: title,
+      title: widget.title,
       children: [
         const SizedBox(height: 14),
-        ...sampleGames.map(
-          (game) => PrototypeOptionTile(
-            title: game.title,
-            subtitle: game.subtitle,
-            icon: game.result,
-            onTap: () {
-              if (!review) {
-                openPrototypeRoute(context, const AnalysisBoardScreen());
-                return;
-              }
-              final players = game.title.split(' vs ');
-              final parsed = MobileParsedReviewGame.fromPgn(
-                _GameReviewScreenState._samplePgn,
-              );
-              openPrototypeRoute(
-                context,
-                MobileGameReviewWorkspace(
-                  game: parsed,
-                  white: players.first,
-                  black: players.length > 1 ? players[1] : 'Black',
+        if (widget.source != MobileGameSource.tournament)
+          PrototypeCard(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: usernameController,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  keyboardType: TextInputType.text,
+                  onSubmitted: (_) => unawaited(_load()),
+                  textCapitalization: TextCapitalization.none,
+                  decoration: InputDecoration(
+                    labelText: widget.source == MobileGameSource.chessCom
+                        ? 'Chess.com username'
+                        : 'Lichess username',
+                    hintText: 'Enter username',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                  ),
                 ),
-              );
-            },
+                const SizedBox(height: 10),
+                PrototypeButton(
+                  label: loading ? 'Loading games...' : 'Search games',
+                  onTap: () => unawaited(_load()),
+                ),
+              ],
+            ),
           ),
-        ),
+        if (loading)
+          const PrototypeCard(
+            margin: EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        if (!loading && error.isNotEmpty)
+          PrototypeCard(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              error,
+              style: const TextStyle(
+                color: PrototypeColors.burgundy,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        if (!loading && error.isEmpty && searched && games.isEmpty)
+          PrototypeCard(
+            margin: EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              widget.source == MobileGameSource.tournament
+                  ? 'No completed or live tournament games found.'
+                  : 'No games found. Check the username and try again.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0x99111111)),
+            ),
+          ),
+        if (!loading && error.isEmpty)
+          ...games.map(
+            (game) => PrototypeOptionTile(
+              title: '${game.white} vs ${game.black}',
+              subtitle: '${game.event} - ${game.date} - ${game.round}',
+              icon: game.result,
+              onTap: () => _openGame(game),
+            ),
+          ),
+        const SizedBox(height: 18),
       ],
     );
   }
@@ -6884,9 +7777,9 @@ class _TournamentGameDetailScreenState
                     ),
                   );
                 } on FormatException catch (exception) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(exception.message)),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(exception.message)));
                 }
               },
             ),
@@ -6971,9 +7864,18 @@ class TournamentBoardPlayerBar extends StatelessWidget {
 }
 
 class AnalysisBoardScreen extends StatefulWidget {
-  const AnalysisBoardScreen({this.mode = 'analysis', super.key});
+  const AnalysisBoardScreen({
+    this.black = 'Black',
+    this.initialMoves = const [],
+    this.mode = 'analysis',
+    this.white = 'White',
+    super.key,
+  });
 
+  final String black;
+  final List<String> initialMoves;
   final String mode;
+  final String white;
 
   @override
   State<AnalysisBoardScreen> createState() => _AnalysisBoardScreenState();
@@ -6981,8 +7883,14 @@ class AnalysisBoardScreen extends StatefulWidget {
 
 class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
   bool flipped = false;
-  final moves = <String>[];
+  late final List<String> moves;
   String result = 'Live';
+
+  @override
+  void initState() {
+    super.initState();
+    moves = [...widget.initialMoves];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -7007,7 +7915,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                 capturedPieces: boardSummary.capturedBy(topColor),
                 color: topColor,
                 edge: 'top',
-                name: topColor == 'white' ? 'White' : 'Black',
+                name: topColor == 'white' ? widget.white : widget.black,
               ),
               PrototypeChessBoard(
                 flipped: flipped,
@@ -7025,7 +7933,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                 capturedPieces: boardSummary.capturedBy(bottomColor),
                 color: bottomColor,
                 edge: 'bottom',
-                name: bottomColor == 'white' ? 'White' : 'Black',
+                name: bottomColor == 'white' ? widget.white : widget.black,
               ),
             ],
           ),
@@ -7573,7 +8481,8 @@ class _MobileEvaluationBar extends StatelessWidget {
     final label = '${value > 0 ? '+' : ''}${value.toStringAsFixed(1)}';
 
     return Semantics(
-      label: '${engine ? 'Engine' : 'Material'} evaluation $label. Positive values favor White.',
+      label:
+          '${engine ? 'Engine' : 'Material'} evaluation $label. Positive values favor White.',
       child: LayoutBuilder(
         builder: (context, constraints) => Container(
           decoration: BoxDecoration(
@@ -8889,6 +9798,30 @@ List<String> _parseStoredMoves(String? value) {
   }
 
   return moves;
+}
+
+int _mobileGameRowTime(models.Row row) {
+  final data = row.data;
+  final raw =
+      data['finishedAt']?.toString() ??
+      data['startedAt']?.toString() ??
+      row.$updatedAt;
+  return DateTime.tryParse(raw)?.millisecondsSinceEpoch ?? 0;
+}
+
+MobileParsedReviewGame? _mobileStoredReview(String? pgn) {
+  final value = pgn?.trim();
+  if (value == null || value.isEmpty) return null;
+  try {
+    return MobileParsedReviewGame.fromPgn(value);
+  } catch (_) {
+    if (value.contains('[')) return null;
+    try {
+      return MobileParsedReviewGame.fromMoves(_parseStoredMoves(value));
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 class _MobileBoardSummary {
