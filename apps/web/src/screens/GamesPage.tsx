@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Square } from 'chess.js'
 import { FlipHorizontal2, Settings2, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
+import chessComLogo from '../assets/providers/chess-com.png'
+import lichessLogo from '../assets/providers/lichess.png'
 import {
   JuCapturedPieces,
   JuChessBoard,
@@ -48,14 +50,15 @@ type SourceDef = {
   name: string
   sub: string
   icon: string
+  image?: string
   tone: 'green' | 'blue' | 'wine'
 }
 
 const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
 const sourceDefs: SourceDef[] = [
-  { key: 'chess.com', name: 'Chess.com', sub: 'Import by username', icon: 'C', tone: 'green' },
-  { key: 'lichess', name: 'Lichess', sub: 'Import by username', icon: 'L', tone: 'blue' },
+  { key: 'chess.com', name: 'Chess.com', sub: 'Import by username', icon: '', image: chessComLogo, tone: 'green' },
+  { key: 'lichess', name: 'Lichess', sub: 'Import by username', icon: '', image: lichessLogo, tone: 'blue' },
   { key: 'tournament', name: 'Tournament Games', sub: 'Search the club archive', icon: '\u2655', tone: 'wine' },
 ]
 
@@ -880,7 +883,9 @@ function SourceStep({
           onClick={() => onSource(source.key)}
           key={source.key}
         >
-          <span className={`source-icon ${source.tone}`}>{source.icon}</span>
+          <span className={`source-icon ${source.image ? 'provider' : source.tone}`}>
+            {source.image ? <img src={source.image} alt="" aria-hidden="true" /> : source.icon}
+          </span>
           <span>
             <strong>{source.name}</strong>
             <small>{source.sub}</small>
@@ -914,14 +919,24 @@ function SearchStep({
   sourceLabel: string
 }) {
   const isTournament = source === 'tournament'
+  const sourceDef = sourceDefs.find((item) => item.key === source)
 
   return (
     <section className="rail-panel search-panel">
       <button type="button" className="rail-back" onClick={onBack}>
         &larr; Back
       </button>
-      <h2>{sourceLabel}</h2>
-      <p>{isTournament ? 'Search by player, event, or round' : `Enter a ${sourceLabel} username`}</p>
+      <div className="search-provider-heading">
+        {sourceDef?.image ? (
+          <span className="source-icon provider">
+            <img src={sourceDef.image} alt="" aria-hidden="true" />
+          </span>
+        ) : null}
+        <div>
+          <h2>{sourceLabel}</h2>
+          <p>{isTournament ? 'Search by player, event, or round' : `Enter a ${sourceLabel} username`}</p>
+        </div>
+      </div>
       <input
         autoCapitalize="none"
         autoComplete="off"

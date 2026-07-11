@@ -125,6 +125,14 @@ class AppConfig {
 
 enum MobileGameSource { chessCom, lichess, tournament }
 
+String? _mobileGameProviderLogo(MobileGameSource source) {
+  return switch (source) {
+    MobileGameSource.chessCom => 'assets/providers/chess-com.png',
+    MobileGameSource.lichess => 'assets/providers/lichess.png',
+    MobileGameSource.tournament => null,
+  };
+}
+
 class MobileImportedGame {
   const MobileImportedGame({
     required this.black,
@@ -6696,6 +6704,7 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
           title: 'Chess.com games',
           subtitle: 'Import by username',
           icon: '♘',
+          imageAsset: 'assets/providers/chess-com.png',
           onTap: () => openPrototypeRoute(
             context,
             const PickGameScreen(
@@ -6708,6 +6717,7 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
           title: 'Lichess games',
           subtitle: 'Import by username',
           icon: '♞',
+          imageAsset: 'assets/providers/lichess.png',
           onTap: () => openPrototypeRoute(
             context,
             const PickGameScreen(
@@ -8098,6 +8108,7 @@ class NewAnalysisScreen extends StatelessWidget {
           title: 'Chess.com games',
           subtitle: 'Import by username',
           icon: '♘',
+          imageAsset: 'assets/providers/chess-com.png',
           onTap: () => openPrototypeRoute(
             context,
             const PickGameScreen(
@@ -8111,6 +8122,7 @@ class NewAnalysisScreen extends StatelessWidget {
           title: 'Lichess games',
           subtitle: 'Import by username',
           icon: '♞',
+          imageAsset: 'assets/providers/lichess.png',
           onTap: () => openPrototypeRoute(
             context,
             const PickGameScreen(
@@ -8257,6 +8269,7 @@ class _PickGameScreenState extends State<PickGameScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final providerLogo = _mobileGameProviderLogo(widget.source);
     return PrototypeRouteScaffold(
       title: widget.title,
       children: [
@@ -8267,6 +8280,25 @@ class _PickGameScreenState extends State<PickGameScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (providerLogo != null) ...[
+                  Row(
+                    children: [
+                      _GameProviderLogo(asset: providerLogo),
+                      const SizedBox(width: 11),
+                      Text(
+                        widget.source == MobileGameSource.chessCom
+                            ? 'Chess.com'
+                            : 'Lichess',
+                        style: const TextStyle(
+                          color: PrototypeColors.black,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 TextField(
                   controller: usernameController,
                   autocorrect: false,
@@ -10243,18 +10275,41 @@ class SavedAnalysesScreen extends StatelessWidget {
   }
 }
 
+class _GameProviderLogo extends StatelessWidget {
+  const _GameProviderLogo({required this.asset});
+
+  final String asset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0x22111111)),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Image.asset(asset, fit: BoxFit.contain),
+    );
+  }
+}
+
 class PrototypeOptionTile extends StatelessWidget {
   const PrototypeOptionTile({
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.onTap,
+    this.imageAsset,
     super.key,
   });
 
   final String title;
   final String subtitle;
   final String icon;
+  final String? imageAsset;
   final VoidCallback onTap;
 
   @override
@@ -10274,17 +10329,28 @@ class PrototypeOptionTile extends StatelessWidget {
                 height: 42,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: const Color(0x147d2434),
+                  color: imageAsset == null
+                      ? const Color(0x147d2434)
+                      : Colors.white,
                   borderRadius: BorderRadius.circular(11),
-                  border: Border.all(color: const Color(0x337d2434)),
-                ),
-                child: Text(
-                  icon,
-                  style: const TextStyle(
-                    color: PrototypeColors.burgundy,
-                    fontWeight: FontWeight.w900,
+                  border: Border.all(
+                    color: imageAsset == null
+                        ? const Color(0x337d2434)
+                        : const Color(0x22111111),
                   ),
                 ),
+                child: imageAsset == null
+                    ? Text(
+                        icon,
+                        style: const TextStyle(
+                          color: PrototypeColors.burgundy,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Image.asset(imageAsset!, fit: BoxFit.contain),
+                      ),
               ),
               const SizedBox(width: 14),
               Expanded(

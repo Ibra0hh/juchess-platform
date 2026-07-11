@@ -70,6 +70,7 @@ flutter:
   assets:
     - assets/juchess-logo.png
     - assets/chess-pieces/
+    - assets/providers/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
