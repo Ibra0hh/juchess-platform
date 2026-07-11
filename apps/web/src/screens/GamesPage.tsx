@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Square } from 'chess.js'
-import { FlipHorizontal2 } from 'lucide-react'
+import { FlipHorizontal2, Settings2, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import {
   JuCapturedPieces,
@@ -21,11 +21,17 @@ import {
   parseReviewGame,
   reviewGame,
   StockfishReviewEngine,
+  defaultReviewEngineStrength,
+  getReviewEnginePreset,
+  reviewEnginePresets,
   type GameReviewResult,
   type ReviewClassification,
+  type ReviewEngineStrength,
   type ReviewedMove,
 } from '../lib/gameReview'
 import { loadExternalGames } from '../lib/externalGames'
+import type { AuthProfile } from '../lib/auth'
+import { useAuth } from '../context/AuthContext'
 import './ClubScreens.css'
 
 type GameMode = 'review' | 'analysis'
@@ -90,6 +96,7 @@ const classificationOrder: ReviewClassification[] = [
 ]
 
 function GamesPage() {
+  const { linkExternalGameUsername, profile } = useAuth()
   const [searchParams] = useSearchParams()
   const queryGameId = searchParams.get('game')
   const queryGame = findSampleGame(queryGameId)
@@ -107,6 +114,7 @@ function GamesPage() {
   const [sourceGames, setSourceGames] = useState<SampleGame[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState('')
+  const [searchNotice, setSearchNotice] = useState('')
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false)
   const [workspaceMoves, setWorkspaceMoves] = useState<string[]>([])
   const [workspaceResult, setWorkspaceResult] = useState('Live')
@@ -119,6 +127,13 @@ function GamesPage() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewProgress, setReviewProgress] = useState({ completed: 0, total: 0 })
   const [workspaceError, setWorkspaceError] = useState('')
+  const [engineSettingsOpen, setEngineSettingsOpen] = useState(false)
+  const [engineStrength, setEngineStrength] = useState<ReviewEngineStrength>(loadReviewEngineStrength)
+  const enginePreset = getReviewEnginePreset(engineStrength)
+
+  useEffect(() => {
+    window.localStorage.setItem('juchess.review.engineStrength', engineStrength)
+  }, [engineStrength])
 
   useEffect(() => {
     setReviewStarted(false)
@@ -222,6 +237,7 @@ function GamesPage() {
 
   useEffect(() => {
     setReview(null)
+    setReviewStarted(false)
     setReviewError('')
     setReviewLoading(false)
     setReviewProgress({ completed: 0, total: 0 })
@@ -236,7 +252,10 @@ function GamesPage() {
       return
     }
 
-    const engine = new StockfishReviewEngine()
+    const engine = new StockfishReviewEngine({
+      hashMb: enginePreset.hashMb,
+      multiPv: 2,
+    })
     const controller = new AbortController()
     let active = true
     setReviewLoading(true)
@@ -246,7 +265,7 @@ function GamesPage() {
       { fen: game.fen, moves: game.moves },
       engine,
       {
-        depth: 11,
+        depth: enginePreset.depth,
         signal: controller.signal,
         onProgress: (completed, total) => {
           if (active) setReviewProgress({ completed, total })
@@ -267,7 +286,7 @@ function GamesPage() {
       controller.abort()
       engine.dispose()
     }
-  }, [game, step])
+  }, [enginePreset.depth, enginePreset.hashMb, game, step])
 
   useEffect(() => {
     if (step !== 'review' || !game || !reviewStarted) return
@@ -350,35 +369,59 @@ function GamesPage() {
     : undefined
   const workspaceRows = buildWorkspaceRows(workspaceMoves)
 
-  const openSource = (nextSource: GameSource) => {
-    setSource(nextSource)
-    setSelectedKey(null)
-    setSearchText('')
-    setSourceGames([])
-    setSearchError('')
-    setSearchLoading(false)
-    setStep('search')
-  }
-
-  const searchSourceGames = async () => {
-    if (!source || searchLoading) return
+  const searchSourceGames = async (
+    targetSource: GameSource | null = source,
+    targetUsername = searchText,
+  ) => {
+    if (!targetSource || searchLoading) return
     setSelectedKey(null)
     setSearchError('')
+    setSearchNotice('')
 
-    if (source === 'tournament') {
+    if (targetSource === 'tournament') {
       setStep('list')
       return
     }
 
     setSearchLoading(true)
     try {
-      const games = await loadExternalGames(source, searchText)
+      const normalizedUsername = targetUsername.trim().toLowerCase()
+      const games = await loadExternalGames(targetSource, normalizedUsername)
       setSourceGames(games)
       setStep('list')
+
+      if (profile) {
+        try {
+          await linkExternalGameUsername(targetSource, normalizedUsername)
+          setSearchNotice(`${sourceName(targetSource)} account linked.`)
+        } catch (error) {
+          setSearchNotice(
+            error instanceof Error
+              ? `Games loaded, but the account could not be linked: ${error.message}`
+              : 'Games loaded, but the account could not be linked.',
+          )
+        }
+      }
     } catch (error) {
-      setSearchError(error instanceof Error ? error.message : `${sourceName(source)} games could not be loaded.`)
+      setSearchError(error instanceof Error ? error.message : `${sourceName(targetSource)} games could not be loaded.`)
     } finally {
       setSearchLoading(false)
+    }
+  }
+
+  const openSource = (nextSource: GameSource) => {
+    const linkedUsername = externalUsernameForSource(profile, nextSource)
+    setSource(nextSource)
+    setSelectedKey(null)
+    setSearchText(linkedUsername)
+    setSourceGames([])
+    setSearchError('')
+    setSearchNotice('')
+    setSearchLoading(false)
+    setStep('search')
+
+    if (linkedUsername && nextSource !== 'tournament') {
+      void searchSourceGames(nextSource, linkedUsername)
     }
   }
 
@@ -451,12 +494,37 @@ function GamesPage() {
           <div className="board-title-row">
             <h1>{inReview ? 'Game review' : inWorkspace ? 'Analysis board' : isReviewMode ? 'Review room' : 'Analysis room'}</h1>
             <div className="board-title-actions">
-              <span>{boardGame ? boardGame.round || boardGame.date : 'Standard position'}</span>
-              <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
-                <FlipHorizontal2 aria-hidden="true" />
-              </button>
+              <span>
+                {boardGame ? boardGame.round || boardGame.date : 'Standard position'}
+                {inReview ? <small>Stockfish 18 · {enginePreset.label}</small> : null}
+              </span>
+              <div className="board-control-stack">
+                <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
+                  <FlipHorizontal2 aria-hidden="true" />
+                </button>
+                {inReview ? (
+                  <button
+                    type="button"
+                    aria-expanded={engineSettingsOpen}
+                    aria-label="Engine settings"
+                    className={engineSettingsOpen ? 'active' : undefined}
+                    title="Engine settings"
+                    onClick={() => setEngineSettingsOpen((current) => !current)}
+                  >
+                    <Settings2 aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
+
+          {inReview && engineSettingsOpen ? (
+            <EngineSettingsPanel
+              strength={engineStrength}
+              onChange={setEngineStrength}
+              onClose={() => setEngineSettingsOpen(false)}
+            />
+          ) : null}
 
           <div className="board-player-frame">
             <PlayerBar {...topPlayer} edge="top" />
@@ -565,9 +633,11 @@ function GamesPage() {
               onBack={() => {
                 setSource(null)
                 setSearchError('')
+                setSearchNotice('')
                 setStep('source')
               }}
               error={searchError}
+              notice={searchNotice}
               loading={searchLoading}
               onSearch={() => void searchSourceGames()}
               setSearchText={setSearchText}
@@ -578,6 +648,7 @@ function GamesPage() {
             <ListStep
               games={visiblePool}
               isReviewMode={isReviewMode}
+              notice={searchNotice}
               selectedKey={selectedKey}
               sourceLabel={sourceLabel}
               onBack={() => {
@@ -657,6 +728,43 @@ function GamesPage() {
         </aside>
       </main>
     </div>
+  )
+}
+
+function EngineSettingsPanel({
+  onChange,
+  onClose,
+  strength,
+}: {
+  onChange: (strength: ReviewEngineStrength) => void
+  onClose: () => void
+  strength: ReviewEngineStrength
+}) {
+  return (
+    <section className="engine-settings-panel" aria-label="Stockfish engine settings">
+      <div>
+        <span>Engine</span>
+        <strong>Stockfish 18</strong>
+        <button type="button" aria-label="Close engine settings" title="Close" onClick={onClose}>
+          <X aria-hidden="true" />
+        </button>
+      </div>
+      <fieldset>
+        <legend>Strength</legend>
+        {reviewEnginePresets.map((preset) => (
+          <button
+            type="button"
+            className={preset.id === strength ? 'active' : undefined}
+            aria-pressed={preset.id === strength}
+            key={preset.id}
+            onClick={() => onChange(preset.id)}
+          >
+            <strong>{preset.label}</strong>
+            <span>Depth {preset.depth}</span>
+          </button>
+        ))}
+      </fieldset>
+    </section>
   )
 }
 
@@ -740,6 +848,7 @@ function SourceStep({
 function SearchStep({
   error,
   loading,
+  notice,
   onBack,
   onSearch,
   searchText,
@@ -749,6 +858,7 @@ function SearchStep({
 }: {
   error: string
   loading: boolean
+  notice: string
   onBack: () => void
   onSearch: () => void
   searchText: string
@@ -778,6 +888,7 @@ function SearchStep({
         placeholder={isTournament ? 'e.g. Ibrahim, Swiss, QF...' : 'e.g. ibrahim_ju'}
       />
       {error ? <p className="search-error" role="alert">{error}</p> : null}
+      {notice ? <p className="search-notice" role="status">{notice}</p> : null}
       <button type="button" className="primary-rail-button" disabled={loading} onClick={onSearch}>
         {loading ? 'Loading games...' : 'Search games'}
       </button>
@@ -788,6 +899,7 @@ function SearchStep({
 function ListStep({
   games,
   isReviewMode,
+  notice,
   onBack,
   onSelect,
   onStart,
@@ -796,6 +908,7 @@ function ListStep({
 }: {
   games: SampleGame[]
   isReviewMode: boolean
+  notice: string
   onBack: () => void
   onSelect: (key: string) => void
   onStart: () => void
@@ -811,6 +924,7 @@ function ListStep({
         <strong>{sourceLabel}</strong>
         <span>{games.length} games</span>
       </div>
+      {notice ? <p className="game-list-notice" role="status">{notice}</p> : null}
       <div className="game-list-scroll">
         {games.length ? games.map((game) => (
           <button
@@ -1164,6 +1278,19 @@ function sourceName(source: GameSource) {
   if (source === 'chess.com') return 'Chess.com'
   if (source === 'lichess') return 'Lichess'
   return 'Tournament Games'
+}
+
+function externalUsernameForSource(profile: AuthProfile | null, source: GameSource) {
+  if (source === 'chess.com') return profile?.chessComUsername?.trim() ?? ''
+  if (source === 'lichess') return profile?.lichessUsername?.trim() ?? ''
+  return ''
+}
+
+function loadReviewEngineStrength(): ReviewEngineStrength {
+  const saved = window.localStorage.getItem('juchess.review.engineStrength')
+  return reviewEnginePresets.some((preset) => preset.id === saved)
+    ? saved as ReviewEngineStrength
+    : defaultReviewEngineStrength
 }
 
 function getCurrentEval(

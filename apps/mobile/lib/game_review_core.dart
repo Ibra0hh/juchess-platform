@@ -19,6 +19,57 @@ enum MobileMoveClassification {
   forced,
 }
 
+enum MobileReviewStrength { quick, balanced, deep, maximum }
+
+class MobileReviewEnginePreset {
+  const MobileReviewEnginePreset({
+    required this.depth,
+    required this.hashMb,
+    required this.label,
+    required this.strength,
+  });
+
+  final int depth;
+  final int hashMb;
+  final String label;
+  final MobileReviewStrength strength;
+}
+
+const mobileReviewEnginePresets = <MobileReviewEnginePreset>[
+  MobileReviewEnginePreset(
+    depth: 12,
+    hashMb: 32,
+    label: 'Quick',
+    strength: MobileReviewStrength.quick,
+  ),
+  MobileReviewEnginePreset(
+    depth: 16,
+    hashMb: 64,
+    label: 'Balanced',
+    strength: MobileReviewStrength.balanced,
+  ),
+  MobileReviewEnginePreset(
+    depth: 20,
+    hashMb: 128,
+    label: 'Deep',
+    strength: MobileReviewStrength.deep,
+  ),
+  MobileReviewEnginePreset(
+    depth: 24,
+    hashMb: 128,
+    label: 'Maximum',
+    strength: MobileReviewStrength.maximum,
+  ),
+];
+
+const defaultMobileReviewStrength = MobileReviewStrength.balanced;
+
+MobileReviewEnginePreset mobileReviewPresetFor(MobileReviewStrength strength) {
+  return mobileReviewEnginePresets.firstWhere(
+    (preset) => preset.strength == strength,
+  );
+}
+
 const _mobileOpeningBookLines = <List<String>>[
   ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5', 'a7a6', 'b5a4', 'g8f6'],
   ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'g8f6', 'd2d3', 'f8c5'],
@@ -135,6 +186,7 @@ class MobileEngineLine {
     required this.moves,
     required this.multiPv,
     this.mate,
+    this.whiteExpectedScore,
   });
 
   final int depth;
@@ -142,6 +194,7 @@ class MobileEngineLine {
   final int? mate;
   final List<String> moves;
   final int multiPv;
+  final double? whiteExpectedScore;
 }
 
 class MobilePositionReview {
@@ -151,6 +204,7 @@ class MobilePositionReview {
     required this.lines,
     this.bestMove,
     this.mate,
+    this.whiteExpectedScore,
   });
 
   final String? bestMove;
@@ -158,6 +212,7 @@ class MobilePositionReview {
   final double evaluation;
   final List<MobileEngineLine> lines;
   final int? mate;
+  final double? whiteExpectedScore;
 }
 
 class MobileReviewedMove {
@@ -217,6 +272,9 @@ MobileMoveClassification classifyMobileReviewMove({
   required String mover,
   required String playedMove,
   double? alternateEvaluation,
+  double? afterExpectedScore,
+  double? alternateExpectedScore,
+  double? beforeExpectedScore,
   String? bestMove,
   bool isBook = false,
   bool isSacrifice = false,
@@ -224,25 +282,32 @@ MobileMoveClassification classifyMobileReviewMove({
   if (isBook) return MobileMoveClassification.book;
   if (legalMoves <= 1) return MobileMoveClassification.forced;
 
-  final before = mobileExpectedScore(beforeEvaluation, mover);
-  final after = mobileExpectedScore(afterEvaluation, mover);
+  final before =
+      beforeExpectedScore ?? mobileExpectedScore(beforeEvaluation, mover);
+  final after =
+      afterExpectedScore ?? mobileExpectedScore(afterEvaluation, mover);
   final loss = math.max(0, before - after);
   final isBest = bestMove != null && playedMove == bestMove;
 
-  if (isBest && alternateEvaluation != null) {
-    final alternative = mobileExpectedScore(alternateEvaluation, mover);
-    final uniqueness = math.max(0, after - alternative);
-    if (isSacrifice && loss <= 0.02 && uniqueness >= 0.12) {
+  if (isBest &&
+      (alternateExpectedScore != null || alternateEvaluation != null)) {
+    final alternative =
+        alternateExpectedScore ??
+        mobileExpectedScore(alternateEvaluation!, mover);
+    final uniqueness = math.max(0, before - alternative);
+    if (isSacrifice && loss <= 0.025 && uniqueness >= 0.1) {
       return MobileMoveClassification.brilliant;
     }
-    if (uniqueness >= 0.12) return MobileMoveClassification.great;
+    if (uniqueness >= 0.14) return MobileMoveClassification.great;
   }
   if (isBest) return MobileMoveClassification.best;
-  if (loss <= 0.015) return MobileMoveClassification.excellent;
-  if (loss <= 0.05) return MobileMoveClassification.good;
-  if (loss <= 0.12) return MobileMoveClassification.inaccuracy;
-  if (loss <= 0.25) return MobileMoveClassification.mistake;
-  if (before >= 0.7 && after >= 0.42) return MobileMoveClassification.miss;
+  if (loss <= 0.025) return MobileMoveClassification.excellent;
+  if (loss <= 0.075) return MobileMoveClassification.good;
+  if (loss <= 0.17) return MobileMoveClassification.inaccuracy;
+  if (before >= 0.72 && after >= 0.28 && after <= 0.62) {
+    return MobileMoveClassification.miss;
+  }
+  if (loss <= 0.3) return MobileMoveClassification.mistake;
   return MobileMoveClassification.blunder;
 }
 
@@ -283,6 +348,7 @@ MobilePositionReview parseMobileStockfishOutput(
     final multiPv = _readUciNumber(message, 'multipv') ?? 1;
     final cp = _readUciNumber(message, 'cp');
     final rawMate = _readUciNumber(message, 'mate');
+    final wdl = _readUciWdl(message);
     final tokens = message.split(RegExp(r'\s+'));
     final pvIndex = tokens.indexOf('pv');
     if (depth == null || pvIndex < 0 || (cp == null && rawMate == null)) {
@@ -301,6 +367,11 @@ MobilePositionReview parseMobileStockfishOutput(
       mate: mate,
       moves: tokens.sublist(pvIndex + 1),
       multiPv: multiPv,
+      whiteExpectedScore: wdl == null
+          ? null
+          : sideMultiplier == 1
+          ? wdl
+          : 1 - wdl,
     );
     final previous = latest[multiPv];
     if (previous == null || line.depth >= previous.depth) {
@@ -322,6 +393,7 @@ MobilePositionReview parseMobileStockfishOutput(
     evaluation: lines.first.evaluation,
     lines: lines,
     mate: lines.first.mate,
+    whiteExpectedScore: lines.first.whiteExpectedScore,
   );
 }
 
@@ -340,19 +412,20 @@ MobileGameReviewResult buildMobileGameReview({
     final after = positions[index + 1];
     final mover = game.fens[index].split(RegExp(r'\s+'))[1];
     final board = chess.Chess.fromFEN(game.fens[index]);
-    final loss = math
-        .max(
-          0,
-          mobileExpectedScore(before.evaluation, mover) -
-              mobileExpectedScore(after.evaluation, mover),
-        )
-        .toDouble();
+    final beforeExpected = _mobilePositionExpectedScore(before, mover);
+    final afterExpected = _mobilePositionExpectedScore(after, mover);
+    final loss = math.max(0, beforeExpected - afterExpected).toDouble();
     final classification = classifyMobileReviewMove(
       afterEvaluation: after.evaluation,
+      afterExpectedScore: afterExpected,
       alternateEvaluation: before.lines.length > 1
           ? before.lines[1].evaluation
           : null,
+      alternateExpectedScore: before.lines.length > 1
+          ? _mobileLineExpectedScore(before.lines[1], mover)
+          : null,
       beforeEvaluation: before.evaluation,
+      beforeExpectedScore: beforeExpected,
       bestMove: before.bestMove,
       isBook:
           game.initialFen == mobileStandardFen &&
@@ -479,6 +552,35 @@ int? _readUciNumber(String message, String key) {
   final index = tokens.indexOf(key);
   if (index < 0 || index + 1 >= tokens.length) return null;
   return int.tryParse(tokens[index + 1]);
+}
+
+double? _readUciWdl(String message) {
+  final tokens = message.split(RegExp(r'\s+'));
+  final index = tokens.indexOf('wdl');
+  if (index < 0 || index + 3 >= tokens.length) return null;
+  final wins = int.tryParse(tokens[index + 1]);
+  final draws = int.tryParse(tokens[index + 2]);
+  final losses = int.tryParse(tokens[index + 3]);
+  if (wins == null || draws == null || losses == null) return null;
+  final total = wins + draws + losses;
+  if (total <= 0) return null;
+  return (wins + draws / 2) / total;
+}
+
+double _mobilePositionExpectedScore(
+  MobilePositionReview position,
+  String mover,
+) {
+  final white =
+      position.whiteExpectedScore ??
+      mobileExpectedScore(position.evaluation, 'w');
+  return mover == 'w' ? white : 1 - white;
+}
+
+double _mobileLineExpectedScore(MobileEngineLine line, String mover) {
+  final white =
+      line.whiteExpectedScore ?? mobileExpectedScore(line.evaluation, 'w');
+  return mover == 'w' ? white : 1 - white;
 }
 
 extension _FirstOrNull<T> on List<T> {

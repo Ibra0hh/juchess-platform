@@ -10,11 +10,12 @@ class MobileReviewCancelled implements Exception {
 }
 
 class MobileStockfishReviewEngine {
-  MobileStockfishReviewEngine._(this._stockfish) {
+  MobileStockfishReviewEngine._(this._stockfish, this.preset) {
     _subscription = _stockfish.stdout.listen(_handleOutput);
   }
 
   final Stockfish _stockfish;
+  final MobileReviewEnginePreset preset;
   late final StreamSubscription<String> _subscription;
   Completer<List<String>>? _activeCompleter;
   bool Function(String line)? _isComplete;
@@ -22,27 +23,30 @@ class MobileStockfishReviewEngine {
   Timer? _timeout;
   bool _disposed = false;
 
-  static Future<MobileStockfishReviewEngine> create() async {
+  static Future<MobileStockfishReviewEngine> create({
+    MobileReviewEnginePreset? preset,
+  }) async {
+    final resolvedPreset =
+        preset ?? mobileReviewPresetFor(defaultMobileReviewStrength);
     final stockfish = await stockfishAsync();
-    final engine = MobileStockfishReviewEngine._(stockfish);
+    final engine = MobileStockfishReviewEngine._(stockfish, resolvedPreset);
     await engine._exchange(['uci'], (line) => line == 'uciok');
-    await engine._exchange(
-      [
-        'setoption name MultiPV value 2',
-        'setoption name Hash value 32',
-        'isready',
-      ],
-      (line) => line == 'readyok',
-    );
+    await engine._exchange([
+      'setoption name MultiPV value 2',
+      'setoption name Hash value ${resolvedPreset.hashMb}',
+      'setoption name UCI_ShowWDL value true',
+      'isready',
+    ], (line) => line == 'readyok');
     return engine;
   }
 
   Future<MobileGameReviewResult> review(
     MobileParsedReviewGame game, {
-    int depth = 11,
+    int? depth,
     bool Function()? isCancelled,
     void Function(int completed, int total)? onProgress,
   }) async {
+    final resolvedDepth = depth ?? preset.depth;
     await _exchange(['ucinewgame', 'isready'], (line) => line == 'readyok');
     final positions = <MobilePositionReview>[];
 
@@ -53,14 +57,14 @@ class MobileStockfishReviewEngine {
           game.initialFen,
           game.uciMoves.sublist(0, index),
           game.fens[index],
-          depth,
+          resolvedDepth,
         ),
       );
       onProgress?.call(index + 1, game.fens.length);
     }
 
     return buildMobileGameReview(
-      depth: depth,
+      depth: resolvedDepth,
       game: game,
       positions: positions,
     );
@@ -84,7 +88,7 @@ class MobileStockfishReviewEngine {
     final messages = await _exchange(
       [position, 'go depth $depth'],
       (line) => line.startsWith('bestmove '),
-      timeout: const Duration(seconds: 45),
+      timeout: Duration(seconds: depth * 4 < 45 ? 45 : depth * 4),
     );
     return parseMobileStockfishOutput(messages, fen);
   }
@@ -173,8 +177,18 @@ MobilePositionReview _terminalPosition(int winner) {
         mate: mate,
         moves: const [],
         multiPv: 1,
+        whiteExpectedScore: winner == 0
+            ? 0.5
+            : winner > 0
+            ? 1
+            : 0,
       ),
     ],
     mate: mate,
+    whiteExpectedScore: winner == 0
+        ? 0.5
+        : winner > 0
+        ? 1
+        : 0,
   );
 }

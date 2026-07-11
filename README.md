@@ -127,6 +127,7 @@ Appwrite project:
 
 ```powershell
 npm run migrate:procedure
+npm run migrate:profile-usernames
 ```
 
 The migration uses the current Appwrite CLI login, or `APPWRITE_API_KEY` when

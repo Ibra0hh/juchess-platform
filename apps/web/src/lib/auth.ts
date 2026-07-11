@@ -15,6 +15,8 @@ export type AuthProfile = Models.Row & {
   role?: ProfileRole
   status?: ProfileStatus
   avatarFileId?: string
+  chessComUsername?: string
+  lichessUsername?: string
 }
 
 export type AuthSession = {
@@ -174,6 +176,25 @@ export async function loadProfileByEmail(email: string): Promise<AuthProfile | n
 
 export async function loadPreviewProfileByEmail(email: string): Promise<AuthProfile | null> {
   return await loadProfileByEmail(email)
+}
+
+export async function saveExternalGameUsername(
+  profileId: string,
+  source: 'chess.com' | 'lichess',
+  username: string,
+) {
+  requireAppwriteReady()
+  const normalized = username.trim().toLowerCase()
+  if (!normalized) throw new Error('Enter a username before linking the account.')
+
+  return await tablesDB.updateRow<AuthProfile>({
+    databaseId: appwriteConfig.databaseId,
+    tableId: tableIds.profiles,
+    rowId: profileId,
+    data: {
+      [source === 'chess.com' ? 'chessComUsername' : 'lichessUsername']: normalized,
+    },
+  })
 }
 
 export async function ensureProfileForUser(user: Models.User): Promise<AuthProfile | null> {

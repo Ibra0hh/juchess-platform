@@ -26,7 +26,9 @@
         "rating": "integer|default:1200",
         "role": "enum:member,organizer,admin",
         "status": "enum:pending,active,suspended",
-        "avatarFileId": "string"
+        "avatarFileId": "string",
+        "chessComUsername": "string|unique",
+        "lichessUsername": "string|unique"
       }
     },
     "tournaments": {

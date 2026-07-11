@@ -12,6 +12,7 @@ import {
   formatAppwriteError,
   getCurrentSession,
   loadPreviewProfileByEmail,
+  saveExternalGameUsername,
   signInWithEmail,
   signOutCurrentUser,
   signUpWithEmail,
@@ -31,6 +32,10 @@ type AuthContextValue = {
   signIn: (input: SignInInput) => Promise<void>
   signUp: (input: SignUpInput) => Promise<void>
   signOut: () => Promise<void>
+  linkExternalGameUsername: (
+    source: 'chess.com' | 'lichess',
+    username: string,
+  ) => Promise<void>
 }
 
 type PreviewAuthSession = {
@@ -126,6 +131,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null)
   }, [previewSession])
 
+  const linkExternalGameUsername = useCallback(async (
+    source: 'chess.com' | 'lichess',
+    username: string,
+  ) => {
+    if (!profile) throw new Error('Sign in before linking a game account.')
+    const normalized = username.trim().toLowerCase()
+    if (!normalized) throw new Error('Enter a username before linking the account.')
+    const field = source === 'chess.com' ? 'chessComUsername' : 'lichessUsername'
+
+    if (previewSession || profile.$id.startsWith('preview-')) {
+      setProfile({ ...profile, [field]: normalized } as AuthProfile)
+      return
+    }
+
+    const updated = await saveExternalGameUsername(profile.$id, source, normalized)
+    setProfile(updated)
+  }, [previewSession, profile])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       ready: Boolean(previewSession) || appwriteReady,
@@ -133,12 +156,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       error,
+      linkExternalGameUsername,
       refresh,
       signIn,
       signUp,
       signOut,
     }),
-    [error, loading, previewSession, profile, refresh, signIn, signOut, signUp, user],
+    [error, linkExternalGameUsername, loading, previewSession, profile, refresh, signIn, signOut, signUp, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

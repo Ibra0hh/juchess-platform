@@ -13,6 +13,29 @@ export type ReviewClassification =
   | 'Blunder'
   | 'Forced'
 
+export type ReviewEngineStrength = 'quick' | 'balanced' | 'deep' | 'maximum'
+
+export type ReviewEnginePreset = {
+  depth: number
+  hashMb: number
+  id: ReviewEngineStrength
+  label: string
+}
+
+export const reviewEnginePresets: ReviewEnginePreset[] = [
+  { depth: 12, hashMb: 32, id: 'quick', label: 'Quick' },
+  { depth: 16, hashMb: 64, id: 'balanced', label: 'Balanced' },
+  { depth: 20, hashMb: 128, id: 'deep', label: 'Deep' },
+  { depth: 24, hashMb: 128, id: 'maximum', label: 'Maximum' },
+]
+
+export const defaultReviewEngineStrength: ReviewEngineStrength = 'balanced'
+
+export function getReviewEnginePreset(strength: ReviewEngineStrength) {
+  return reviewEnginePresets.find((preset) => preset.id === strength)
+    ?? reviewEnginePresets[1]
+}
+
 export type ParsedReviewGame = {
   fens: string[]
   headers: Record<string, string>
@@ -27,6 +50,7 @@ export type EngineLine = {
   mate?: number
   moves: string[]
   multiPv: number
+  whiteExpectedScore?: number
 }
 
 export type PositionReview = {
@@ -35,6 +59,7 @@ export type PositionReview = {
   evaluation: number
   lines: EngineLine[]
   mate?: number
+  whiteExpectedScore?: number
 }
 
 export type ReviewedMove = {
@@ -71,8 +96,11 @@ type ReviewOptions = {
 
 type ClassificationInput = {
   afterEvaluation: number
+  afterExpectedScore?: number
   alternateEvaluation?: number
+  alternateExpectedScore?: number
   beforeEvaluation: number
+  beforeExpectedScore?: number
   bestMove?: string
   isBook?: boolean
   isSacrifice?: boolean
@@ -146,8 +174,11 @@ export function moveAccuracyFromLoss(loss: number) {
 
 export function classifyReviewMove({
   afterEvaluation,
+  afterExpectedScore,
   alternateEvaluation,
+  alternateExpectedScore,
   beforeEvaluation,
+  beforeExpectedScore,
   bestMove,
   isBook = false,
   isSacrifice = false,
@@ -158,23 +189,23 @@ export function classifyReviewMove({
   if (isBook) return 'Book'
   if (legalMoves <= 1) return 'Forced'
 
-  const before = expectedScore(beforeEvaluation, mover)
-  const after = expectedScore(afterEvaluation, mover)
+  const before = beforeExpectedScore ?? expectedScore(beforeEvaluation, mover)
+  const after = afterExpectedScore ?? expectedScore(afterEvaluation, mover)
   const loss = Math.max(0, before - after)
   const isBest = Boolean(bestMove && playedMove === bestMove)
 
-  if (isBest && alternateEvaluation !== undefined) {
-    const alternative = expectedScore(alternateEvaluation, mover)
-    const uniqueness = Math.max(0, after - alternative)
-    if (isSacrifice && loss <= 0.02 && uniqueness >= 0.12) return 'Brilliant'
-    if (uniqueness >= 0.12) return 'Great'
+  if (isBest && (alternateExpectedScore !== undefined || alternateEvaluation !== undefined)) {
+    const alternative = alternateExpectedScore ?? expectedScore(alternateEvaluation as number, mover)
+    const uniqueness = Math.max(0, before - alternative)
+    if (isSacrifice && loss <= 0.025 && uniqueness >= 0.1) return 'Brilliant'
+    if (uniqueness >= 0.14) return 'Great'
   }
   if (isBest) return 'Best'
-  if (loss <= 0.015) return 'Excellent'
-  if (loss <= 0.05) return 'Good'
-  if (loss <= 0.12) return 'Inaccuracy'
-  if (loss <= 0.25) return 'Mistake'
-  if (before >= 0.7 && after >= 0.42) return 'Miss'
+  if (loss <= 0.025) return 'Excellent'
+  if (loss <= 0.075) return 'Good'
+  if (loss <= 0.17) return 'Inaccuracy'
+  if (before >= 0.72 && after >= 0.28 && after <= 0.62) return 'Miss'
+  if (loss <= 0.3) return 'Mistake'
   return 'Blunder'
 }
 
@@ -201,6 +232,7 @@ export function parseStockfishOutput(messages: string[], fen: string): PositionR
     const multiPv = readUciNumber(message, 'multipv') ?? 1
     const cp = readUciNumber(message, 'cp')
     const rawMate = readUciNumber(message, 'mate')
+    const wdl = readUciWdl(message)
     const pvIndex = message.split(/\s+/).indexOf('pv')
     if (depth === undefined || pvIndex < 0 || (cp === undefined && rawMate === undefined)) return
 
@@ -217,6 +249,9 @@ export function parseStockfishOutput(messages: string[], fen: string): PositionR
       mate,
       moves: tokens.slice(pvIndex + 1),
       multiPv,
+      whiteExpectedScore: wdl
+        ? sideMultiplier === 1 ? wdl.expectedScore : 1 - wdl.expectedScore
+        : undefined,
     }
     const previous = latest.get(multiPv)
     if (!previous || line.depth >= previous.depth) latest.set(multiPv, line)
@@ -231,6 +266,7 @@ export function parseStockfishOutput(messages: string[], fen: string): PositionR
     evaluation: lines[0].evaluation,
     lines,
     mate: lines[0].mate,
+    whiteExpectedScore: lines[0].whiteExpectedScore,
   }
 }
 
@@ -239,7 +275,12 @@ export class StockfishReviewEngine {
   private disposed = false
   private initialized = false
   private lineHandler: ((line: string) => void) | null = null
+  private readonly options: { hashMb?: number; multiPv?: number }
   private worker: Worker | null = null
+
+  constructor(options: { hashMb?: number; multiPv?: number } = {}) {
+    this.options = options
+  }
 
   async initialize() {
     if (this.initialized) return
@@ -259,8 +300,9 @@ export class StockfishReviewEngine {
 
     await this.exchange(['uci'], (line) => line === 'uciok')
     await this.exchange([
-      'setoption name MultiPV value 2',
-      'setoption name Hash value 32',
+      `setoption name MultiPV value ${this.options.multiPv ?? 2}`,
+      `setoption name Hash value ${this.options.hashMb ?? 64}`,
+      'setoption name UCI_ShowWDL value true',
       'isready',
     ], (line) => line === 'readyok')
     this.initialized = true
@@ -285,7 +327,7 @@ export class StockfishReviewEngine {
     const messages = await this.exchange(
       [position, `go depth ${depth}`],
       (line) => line.startsWith('bestmove '),
-      45_000,
+      Math.max(45_000, depth * 4_000),
     )
     return parseStockfishOutput(messages, fen)
   }
@@ -338,7 +380,7 @@ export class StockfishReviewEngine {
 export async function reviewGame(
   input: ReviewInput,
   engine: StockfishReviewEngine,
-  { depth = 11, onProgress, signal }: ReviewOptions = {},
+  { depth = getReviewEnginePreset(defaultReviewEngineStrength).depth, onProgress, signal }: ReviewOptions = {},
 ): Promise<GameReviewResult> {
   const parsed = parseReviewGame(input)
   const positions: PositionReview[] = []
@@ -360,14 +402,21 @@ export async function reviewGame(
     const after = positions[index + 1]
     const mover = parsed.fens[index].split(/\s+/)[1] as Color
     const board = new Chess(parsed.fens[index])
+    const beforeExpected = positionExpectedScore(before, mover)
+    const afterExpected = positionExpectedScore(after, mover)
     const loss = Math.max(
       0,
-      expectedScore(before.evaluation, mover) - expectedScore(after.evaluation, mover),
+      beforeExpected - afterExpected,
     )
     const classification = classifyReviewMove({
       afterEvaluation: after.evaluation,
+      afterExpectedScore: afterExpected,
       alternateEvaluation: before.lines[1]?.evaluation,
+      alternateExpectedScore: before.lines[1]
+        ? lineExpectedScore(before.lines[1], mover)
+        : undefined,
       beforeEvaluation: before.evaluation,
+      beforeExpectedScore: beforeExpected,
       bestMove: before.bestMove,
       isBook:
         parsed.initialFen === standardFen &&
@@ -462,13 +511,44 @@ function readUciNumber(message: string, key: string) {
   return Number.isFinite(value) ? value : undefined
 }
 
+function readUciWdl(message: string) {
+  const tokens = message.split(/\s+/)
+  const index = tokens.indexOf('wdl')
+  if (index < 0 || index + 3 >= tokens.length) return undefined
+  const wins = Number.parseInt(tokens[index + 1], 10)
+  const draws = Number.parseInt(tokens[index + 2], 10)
+  const losses = Number.parseInt(tokens[index + 3], 10)
+  if (![wins, draws, losses].every(Number.isFinite)) return undefined
+  const total = wins + draws + losses
+  if (total <= 0) return undefined
+  return { expectedScore: (wins + draws / 2) / total }
+}
+
+function positionExpectedScore(position: PositionReview, mover: Color) {
+  const white = position.whiteExpectedScore ?? expectedScore(position.evaluation, 'w')
+  return mover === 'w' ? white : 1 - white
+}
+
+function lineExpectedScore(line: EngineLine, mover: Color) {
+  const white = line.whiteExpectedScore ?? expectedScore(line.evaluation, 'w')
+  return mover === 'w' ? white : 1 - white
+}
+
 function terminalPosition(winner: -1 | 0 | 1): PositionReview {
   const evaluation = winner === 0 ? 0 : winner > 0 ? 100 : -100
   const mate = winner === 0 ? undefined : winner
   return {
     depth: 0,
     evaluation,
-    lines: [{ depth: 0, evaluation, mate, moves: [], multiPv: 1 }],
+    lines: [{
+      depth: 0,
+      evaluation,
+      mate,
+      moves: [],
+      multiPv: 1,
+      whiteExpectedScore: winner === 0 ? 0.5 : winner > 0 ? 1 : 0,
+    }],
     mate,
+    whiteExpectedScore: winner === 0 ? 0.5 : winner > 0 ? 1 : 0,
   }
 }

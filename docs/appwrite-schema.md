@@ -63,6 +63,8 @@ Fields:
 - `role` enum: `member`, `organizer`, `admin`.
 - `status` enum: `pending`, `active`, `suspended`.
 - `avatarFileId` string, optional.
+- `chessComUsername` string, optional, unique. Saved after a successful Chess.com import.
+- `lichessUsername` string, optional, unique. Saved after a successful Lichess import.
 
 Permissions:
 - Owner can read/update limited profile fields.

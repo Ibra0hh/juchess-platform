@@ -116,6 +116,8 @@ function ProfilePage() {
               <FactRow label="Losses" value={String(stats.losses)} />
               <FactRow label="Games as White" value={String(stats.asWhite)} />
               <FactRow label="Games as Black" value={String(stats.asBlack)} />
+              {profile?.chessComUsername ? <FactRow label="Chess.com" value={profile.chessComUsername} /> : null}
+              {profile?.lichessUsername ? <FactRow label="Lichess" value={profile.lichessUsername} /> : null}
             </div>
           </section>
 

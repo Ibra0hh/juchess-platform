@@ -512,6 +512,8 @@ class AppwriteService {
         'universityId': data['universityId']?.toString(),
         'phone': data['phone']?.toString(),
         'status': data['status']?.toString(),
+        'chessComUsername': data['chessComUsername']?.toString(),
+        'lichessUsername': data['lichessUsername']?.toString(),
       };
     } catch (_) {
       return <String, String?>{};
@@ -540,6 +542,8 @@ class AppwriteService {
         'universityId': data['universityId']?.toString(),
         'phone': data['phone']?.toString(),
         'status': data['status']?.toString(),
+        'chessComUsername': data['chessComUsername']?.toString(),
+        'lichessUsername': data['lichessUsername']?.toString(),
       };
     } catch (_) {
       return <String, String?>{};
@@ -600,6 +604,8 @@ class AppwriteService {
     required String password,
     String? universityId,
     String? phone,
+    String? chessComUsername,
+    String? lichessUsername,
   }) async {
     await assertAccessAllowed(
       email: email,
@@ -615,7 +621,13 @@ class AppwriteService {
     );
 
     await account.createEmailPasswordSession(email: email, password: password);
-    await _createProfile(user, universityId: universityId, phone: phone);
+    await _createProfile(
+      user,
+      universityId: universityId,
+      phone: phone,
+      chessComUsername: chessComUsername,
+      lichessUsername: lichessUsername,
+    );
     final currentUser = await account.get();
     await assertCurrentUserAllowed(currentUser);
     return currentUser;
@@ -627,6 +639,32 @@ class AppwriteService {
 
   Future<void> sendPasswordRecovery(String email) async {
     await account.createRecovery(email: email, url: AppConfig.recoveryUrl);
+  }
+
+  Future<void> saveExternalGameUsername({
+    required String profileId,
+    required MobileGameSource source,
+    required String username,
+  }) async {
+    if (source == MobileGameSource.tournament) return;
+    final normalized = username.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      throw const FormatException(
+        'Enter a username before linking the account.',
+      );
+    }
+
+    await tablesDB.updateRow(
+      databaseId: AppConfig.databaseId,
+      tableId: AppConfig.profilesTableId,
+      rowId: profileId,
+      data: {
+        (source == MobileGameSource.chessCom
+                ? 'chessComUsername'
+                : 'lichessUsername'):
+            normalized,
+      },
+    );
   }
 
   /// Registration writes go through the player-actions function. Clients cannot
@@ -976,6 +1014,8 @@ class AppwriteService {
     models.User user, {
     String? universityId,
     String? phone,
+    String? chessComUsername,
+    String? lichessUsername,
   }) async {
     try {
       await tablesDB.createRow(
@@ -990,6 +1030,10 @@ class AppwriteService {
             'universityId': universityId.trim(),
           if (normalizeJordanPhone(phone) != null)
             'phone': normalizeJordanPhone(phone),
+          if (chessComUsername != null && chessComUsername.trim().isNotEmpty)
+            'chessComUsername': chessComUsername.trim().toLowerCase(),
+          if (lichessUsername != null && lichessUsername.trim().isNotEmpty)
+            'lichessUsername': lichessUsername.trim().toLowerCase(),
           'rating': 1200,
           'role': 'member',
           'status': 'pending',
@@ -1401,6 +1445,8 @@ class AppState extends ChangeNotifier {
   String? userName = _initialPreviewUserName();
   String? userEmail = _initialPreviewEmail();
   String? profileId;
+  String? chessComUsername;
+  String? lichessUsername;
   String? error;
   List<TournamentSeed> tournamentItems = const [];
   Map<String, MyRegistrationInfo> myRegistrations = {};
@@ -1409,6 +1455,38 @@ class AppState extends ChangeNotifier {
 
   bool get appwriteReady => service.ready;
   bool get signedIn => userEmail != null;
+
+  String linkedExternalUsername(MobileGameSource source) {
+    return switch (source) {
+      MobileGameSource.chessCom => chessComUsername ?? '',
+      MobileGameSource.lichess => lichessUsername ?? '',
+      MobileGameSource.tournament => '',
+    };
+  }
+
+  Future<bool> linkExternalUsername(
+    MobileGameSource source,
+    String username,
+  ) async {
+    if (!signedIn || source == MobileGameSource.tournament) return false;
+    if (profileId == null && !await ensurePlayerProfile()) {
+      throw StateError('Your player profile is not ready yet.');
+    }
+
+    await service.saveExternalGameUsername(
+      profileId: profileId!,
+      source: source,
+      username: username,
+    );
+    final normalized = username.trim().toLowerCase();
+    if (source == MobileGameSource.chessCom) {
+      chessComUsername = normalized;
+    } else {
+      lichessUsername = normalized;
+    }
+    notifyListeners();
+    return true;
+  }
 
   List<TournamentSeed> get visibleTournaments {
     final filtered = tournamentItems
@@ -1458,7 +1536,7 @@ class AppState extends ChangeNotifier {
       if (service.ready && previewEmail != null) {
         final profile = await service.loadProfileIdentityByEmail(previewEmail);
         final displayName = profile['displayName'];
-        profileId = profile['profileId'];
+        _applyProfileIdentity(profile);
         if (displayName != null && displayName.isNotEmpty) {
           userName = displayName;
         }
@@ -1480,7 +1558,7 @@ class AppState extends ChangeNotifier {
       final user = await service.currentUser();
       final profile = await service.assertCurrentUserAllowed(user);
       final displayName = profile['displayName'];
-      profileId = profile['profileId'];
+      _applyProfileIdentity(profile);
       userName = displayName != null && displayName.isNotEmpty
           ? displayName
           : user.name.isNotEmpty
@@ -1500,6 +1578,8 @@ class AppState extends ChangeNotifier {
       userName = null;
       userEmail = null;
       profileId = null;
+      chessComUsername = null;
+      lichessUsername = null;
       error = caught is AppwriteException && caught.type != 'user_blocked'
           ? null
           : appwriteMessage(caught);
@@ -1533,7 +1613,7 @@ class AppState extends ChangeNotifier {
       final profile = await service.ensureProfileIdentity(user);
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
-      profileId = profile['profileId'];
+      _applyProfileIdentity(profile);
       if (profileId != null) {
         myRegistrations = await service.loadMyRegistrations(profileId!);
       }
@@ -1553,6 +1633,8 @@ class AppState extends ChangeNotifier {
     String password,
     String universityId,
     String phone,
+    String chessComUsername,
+    String lichessUsername,
   ) async {
     if (_isAdminPreview()) {
       userName = name.trim().isEmpty
@@ -1560,6 +1642,12 @@ class AppState extends ChangeNotifier {
           : name.trim();
       userEmail = email.trim().isEmpty ? _initialPreviewEmail() : email.trim();
       profileId = 'preview-profile';
+      this.chessComUsername = chessComUsername.trim().isEmpty
+          ? null
+          : chessComUsername.trim().toLowerCase();
+      this.lichessUsername = lichessUsername.trim().isEmpty
+          ? null
+          : lichessUsername.trim().toLowerCase();
       error = null;
       notifyListeners();
       return true;
@@ -1582,11 +1670,13 @@ class AppState extends ChangeNotifier {
         password: password,
         universityId: universityId,
         phone: phone,
+        chessComUsername: chessComUsername,
+        lichessUsername: lichessUsername,
       );
       final profile = await service.ensureProfileIdentity(user);
       userName = user.name.isNotEmpty ? user.name : user.email;
       userEmail = user.email;
-      profileId = profile['profileId'];
+      _applyProfileIdentity(profile);
       if (profileId != null) {
         myRegistrations = await service.loadMyRegistrations(profileId!);
       }
@@ -1640,6 +1730,8 @@ class AppState extends ChangeNotifier {
     userName = null;
     userEmail = null;
     profileId = null;
+    chessComUsername = null;
+    lichessUsername = null;
     myRegistrations = {};
     notifyListeners();
   }
@@ -1671,7 +1763,7 @@ class AppState extends ChangeNotifier {
           ? user.name
           : user.email;
       userEmail = user.email;
-      profileId = profile['profileId'];
+      _applyProfileIdentity(profile);
       if (profileId != null) {
         myRegistrations = await service.loadMyRegistrations(profileId!);
         error = null;
@@ -1688,6 +1780,12 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  void _applyProfileIdentity(Map<String, String?> profile) {
+    profileId = profile['profileId'];
+    chessComUsername = profile['chessComUsername']?.trim();
+    lichessUsername = profile['lichessUsername']?.trim();
   }
 
   Future<bool> registerForTournament(TournamentSeed event) async {
@@ -5750,6 +5848,28 @@ class ProfileScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Color(0x99111111), height: 1.45),
               ),
+              if (state.signedIn &&
+                  (state.chessComUsername != null ||
+                      state.lichessUsername != null)) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    if (state.chessComUsername != null)
+                      _LinkedGameAccount(
+                        label: 'Chess.com',
+                        username: state.chessComUsername!,
+                      ),
+                    if (state.lichessUsername != null)
+                      _LinkedGameAccount(
+                        label: 'Lichess',
+                        username: state.lichessUsername!,
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 18),
               PrototypeButton(
                 label: state.signedIn ? 'Sign out' : 'Sign in',
@@ -5787,6 +5907,33 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 18),
         ],
       ],
+    );
+  }
+}
+
+class _LinkedGameAccount extends StatelessWidget {
+  const _LinkedGameAccount({required this.label, required this.username});
+
+  final String label;
+  final String username;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xfff0f7e9),
+        border: Border.all(color: const Color(0x33477f32)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '$label · $username',
+        style: const TextStyle(
+          color: Color(0xff477f32),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
@@ -6610,6 +6757,8 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
   bool flipped = false;
   bool reviewStarted = false;
   int completed = 0;
+  int analysisRun = 0;
+  MobileReviewStrength strength = defaultMobileReviewStrength;
   late int moveIndex;
 
   @override
@@ -6622,34 +6771,65 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
   }
 
   Future<void> _runReview() async {
+    final run = ++analysisRun;
+    engine?.dispose();
+    engine = null;
+    if (mounted) {
+      setState(() {
+        review = null;
+        reviewStarted = false;
+        error = '';
+        completed = 0;
+        moveIndex = widget.game.moves.length - 1;
+      });
+    }
+
+    MobileStockfishReviewEngine? nextEngine;
     try {
-      final nextEngine = await MobileStockfishReviewEngine.create();
-      if (!mounted || cancelled) {
+      final preset = mobileReviewPresetFor(strength);
+      nextEngine = await MobileStockfishReviewEngine.create(preset: preset);
+      if (!mounted || cancelled || run != analysisRun) {
         nextEngine.dispose();
         return;
       }
       engine = nextEngine;
       final result = await nextEngine.review(
         widget.game,
-        depth: 11,
-        isCancelled: () => cancelled,
+        depth: preset.depth,
+        isCancelled: () => cancelled || run != analysisRun,
         onProgress: (value, _) {
-          if (mounted && !cancelled) setState(() => completed = value);
+          if (mounted && !cancelled && run == analysisRun) {
+            setState(() => completed = value);
+          }
         },
       );
-      if (mounted && !cancelled) setState(() => review = result);
+      if (mounted && !cancelled && run == analysisRun) {
+        setState(() => review = result);
+      }
     } on MobileReviewCancelled {
       return;
     } catch (exception) {
-      if (mounted && !cancelled) {
+      if (mounted && !cancelled && run == analysisRun) {
         setState(
           () => error = exception.toString().replaceFirst('Exception: ', ''),
         );
       }
     } finally {
-      engine?.dispose();
-      engine = null;
+      nextEngine?.dispose();
+      if (identical(engine, nextEngine)) engine = null;
     }
+  }
+
+  Future<void> _showEngineSettings() async {
+    final selected = await showModalBottomSheet<MobileReviewStrength>(
+      context: context,
+      backgroundColor: PrototypeColors.surface,
+      showDragHandle: true,
+      builder: (context) => _MobileEngineSettingsSheet(selected: strength),
+    );
+    if (!mounted || selected == null || selected == strength) return;
+    setState(() => strength = selected);
+    unawaited(_runReview());
   }
 
   @override
@@ -6665,6 +6845,11 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
     if (completedReview != null && !reviewStarted) {
       return PrototypeRouteScaffold(
         title: 'Game Review',
+        trailing: SquareIconButton(
+          icon: Icons.tune,
+          tooltip: 'Engine settings',
+          onTap: _showEngineSettings,
+        ),
         children: [
           const SizedBox(height: 14),
           _MobileReviewReadySummary(
@@ -6691,10 +6876,21 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
 
     return PrototypeRouteScaffold(
       title: 'Game Review',
-      trailing: SquareIconButton(
-        icon: Icons.flip,
-        tooltip: 'Flip board',
-        onTap: () => setState(() => flipped = !flipped),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SquareIconButton(
+            icon: Icons.tune,
+            tooltip: 'Engine settings',
+            onTap: _showEngineSettings,
+          ),
+          const SizedBox(width: 6),
+          SquareIconButton(
+            icon: Icons.flip,
+            tooltip: 'Flip board',
+            onTap: () => setState(() => flipped = !flipped),
+          ),
+        ],
       ),
       children: [
         const SizedBox(height: 14),
@@ -6783,10 +6979,10 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Stockfish review',
-                        style: TextStyle(
+                        'Stockfish 18 · ${mobileReviewPresetFor(strength).label}',
+                        style: const TextStyle(
                           color: PrototypeColors.black,
                           fontWeight: FontWeight.w900,
                         ),
@@ -6840,6 +7036,94 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
   }
 }
 
+class _MobileEngineSettingsSheet extends StatelessWidget {
+  const _MobileEngineSettingsSheet({required this.selected});
+
+  final MobileReviewStrength selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Engine',
+              style: TextStyle(
+                color: Color(0x99111111),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 3),
+            const SerifText('Stockfish 18', size: 21, weight: FontWeight.w700),
+            const SizedBox(height: 14),
+            for (final preset in mobileReviewEnginePresets) ...[
+              InkWell(
+                onTap: () => Navigator.of(context).pop(preset.strength),
+                borderRadius: BorderRadius.circular(7),
+                child: Container(
+                  height: 54,
+                  padding: const EdgeInsets.symmetric(horizontal: 13),
+                  decoration: BoxDecoration(
+                    color: preset.strength == selected
+                        ? const Color(0xfff4e8e9)
+                        : Colors.white,
+                    border: Border.all(
+                      color: preset.strength == selected
+                          ? PrototypeColors.burgundy
+                          : const Color(0x2a111111),
+                    ),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          preset.label,
+                          style: const TextStyle(
+                            color: PrototypeColors.black,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Depth ${preset.depth}',
+                        style: const TextStyle(
+                          color: Color(0x99111111),
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(
+                        preset.strength == selected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                        color: preset.strength == selected
+                            ? PrototypeColors.burgundy
+                            : const Color(0x66111111),
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 const _mobileSummaryClassifications = <MobileMoveClassification>[
   MobileMoveClassification.brilliant,
   MobileMoveClassification.great,
@@ -6886,6 +7170,15 @@ class _MobileReviewReadySummary extends StatelessWidget {
           const Text(
             'The engine is ready. Start the walkthrough to inspect every move.',
             style: TextStyle(color: Color(0x99111111), fontSize: 12.5),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Stockfish 18 · Depth ${review.depth}',
+            style: const TextStyle(
+              color: PrototypeColors.burgundy,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 14),
           _MobileEvaluationGraph(review: review),
@@ -7842,15 +8135,28 @@ class _PickGameScreenState extends State<PickGameScreen> {
   final usernameController = TextEditingController();
   List<MobileImportedGame> games = const [];
   String error = '';
+  String notice = '';
   bool loading = false;
   bool searched = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.source == MobileGameSource.tournament) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_load()));
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.source == MobileGameSource.tournament) {
+        unawaited(_load());
+        return;
+      }
+
+      final savedUsername = context
+          .read<AppState>()
+          .linkedExternalUsername(widget.source)
+          .trim();
+      if (savedUsername.isEmpty) return;
+      usernameController.text = savedUsername;
+      unawaited(_load());
+    });
   }
 
   @override
@@ -7861,24 +8167,37 @@ class _PickGameScreenState extends State<PickGameScreen> {
 
   Future<void> _load() async {
     if (loading) return;
+    final appState = context.read<AppState>();
     setState(() {
       error = '';
+      notice = '';
       loading = true;
     });
 
     try {
       List<MobileImportedGame> loaded;
+      var linkedNotice = '';
       if (widget.source == MobileGameSource.tournament) {
-        final state = context.read<AppState>();
-        loaded = await state.service.loadTournamentGameArchive();
+        loaded = await appState.service.loadTournamentGameArchive();
       } else {
-        loaded = await loadMobileExternalGames(
-          widget.source,
-          usernameController.text,
-        );
+        final username = usernameController.text.trim().toLowerCase();
+        loaded = await loadMobileExternalGames(widget.source, username);
+        try {
+          final linked = await appState.linkExternalUsername(
+            widget.source,
+            username,
+          );
+          if (linked) linkedNotice = '${widget.title} linked to your account.';
+        } catch (caught) {
+          linkedNotice =
+              'Games loaded, but the account could not be linked: ${caught.toString().replaceFirst('Exception: ', '')}';
+        }
       }
       if (!mounted) return;
-      setState(() => games = loaded);
+      setState(() {
+        games = loaded;
+        notice = linkedNotice;
+      });
     } catch (caught) {
       if (!mounted) return;
       setState(() => error = caught.toString().replaceFirst('Exception: ', ''));
@@ -7942,6 +8261,9 @@ class _PickGameScreenState extends State<PickGameScreen> {
                   autocorrect: false,
                   enableSuggestions: false,
                   keyboardType: TextInputType.text,
+                  onChanged: (_) {
+                    if (notice.isNotEmpty) setState(() => notice = '');
+                  },
                   onSubmitted: (_) => unawaited(_load()),
                   textCapitalization: TextCapitalization.none,
                   decoration: InputDecoration(
@@ -7954,6 +8276,17 @@ class _PickGameScreenState extends State<PickGameScreen> {
                     ),
                   ),
                 ),
+                if (notice.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    notice,
+                    style: const TextStyle(
+                      color: Color(0xff4d7f32),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 PrototypeButton(
                   label: loading ? 'Loading games...' : 'Search games',
@@ -11277,6 +11610,8 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       _passwordController.text,
       _universityController.text.trim(),
       _phoneController.text.trim(),
+      _chessComController.text.trim(),
+      _lichessController.text.trim(),
     );
 
     if (success && mounted) Navigator.of(context).pop();

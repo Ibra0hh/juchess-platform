@@ -16,13 +16,14 @@ void main() {
   test('UCI scores are normalized to White perspective', () {
     const fen = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
     final parsed = parseMobileStockfishOutput([
-      'info depth 11 multipv 1 score cp 42 nodes 100 pv g8f6',
-      'info depth 11 multipv 2 score cp 30 nodes 100 pv b8c6',
+      'info depth 11 multipv 1 score cp 42 wdl 700 200 100 nodes 100 pv g8f6',
+      'info depth 11 multipv 2 score cp 30 wdl 650 250 100 nodes 100 pv b8c6',
       'bestmove g8f6',
     ], fen);
 
     expect(parsed.evaluation, -0.42);
     expect(parsed.lines[1].evaluation, -0.3);
+    expect(parsed.whiteExpectedScore, closeTo(0.2, 0.0001));
     expect(parsed.bestMove, 'g8f6');
   });
 
@@ -73,6 +74,19 @@ void main() {
         playedMove: 'f3h4',
       ),
       MobileMoveClassification.brilliant,
+    );
+    expect(
+      classifyMobileReviewMove(
+        afterEvaluation: -0.5,
+        afterExpectedScore: 0.52,
+        beforeEvaluation: 0.8,
+        beforeExpectedScore: 0.58,
+        bestMove: 'g1f3',
+        legalMoves: 22,
+        mover: 'w',
+        playedMove: 'b1c3',
+      ),
+      MobileMoveClassification.good,
     );
   });
 
