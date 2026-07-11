@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { Square } from 'chess.js'
 import { FlipHorizontal2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -47,27 +48,45 @@ const sourceDefs: SourceDef[] = [
 ]
 
 const classificationColors: Record<ReviewClassification, string> = {
-  Brilliant: '#1f7a70',
-  Great: '#2a5db0',
-  Best: '#3f6b36',
-  Excellent: '#638a4f',
-  Good: '#77946a',
-  Inaccuracy: '#a98a3f',
-  Mistake: '#b0742a',
-  Blunder: '#7a2431',
-  Forced: '#8a7b5c',
+  Brilliant: '#1baca6',
+  Great: '#5c8bb0',
+  Book: '#c79a73',
+  Best: '#81b64c',
+  Excellent: '#69a83f',
+  Good: '#8aaa79',
+  Inaccuracy: '#e6b93f',
+  Mistake: '#ef8b4c',
+  Miss: '#f36f68',
+  Blunder: '#ef4035',
+  Forced: '#7d8790',
+}
+
+const classificationSymbols: Record<ReviewClassification, string> = {
+  Brilliant: '!!',
+  Great: '!',
+  Book: '▤',
+  Best: '★',
+  Excellent: '✓+',
+  Good: '✓',
+  Inaccuracy: '?!',
+  Mistake: '?',
+  Miss: '×',
+  Blunder: '??',
+  Forced: '=',
 }
 
 const classificationOrder: ReviewClassification[] = [
   'Brilliant',
   'Great',
+  'Book',
   'Best',
   'Excellent',
   'Good',
-  'Forced',
   'Inaccuracy',
   'Mistake',
+  'Miss',
   'Blunder',
+  'Forced',
 ]
 
 function GamesPage() {
@@ -95,10 +114,15 @@ function GamesPage() {
   const [ran, setRan] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [review, setReview] = useState<GameReviewResult | null>(null)
+  const [reviewStarted, setReviewStarted] = useState(false)
   const [reviewError, setReviewError] = useState('')
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewProgress, setReviewProgress] = useState({ completed: 0, total: 0 })
   const [workspaceError, setWorkspaceError] = useState('')
+
+  useEffect(() => {
+    setReviewStarted(false)
+  }, [game?.key])
 
   useEffect(() => {
     const gameId = queryGameId
@@ -246,7 +270,7 @@ function GamesPage() {
   }, [game, step])
 
   useEffect(() => {
-    if (step !== 'review' || !game) return
+    if (step !== 'review' || !game || !reviewStarted) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'ArrowLeft') {
@@ -259,7 +283,7 @@ function GamesPage() {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [game, step])
+  }, [game, reviewStarted, step])
 
   const sourceLabel = source ? sourceName(source) : 'Tournament Games'
   const visiblePool = useMemo(() => {
@@ -316,6 +340,14 @@ function GamesPage() {
   const evalArea = buildEvalArea(reviewEvals)
   const evalCursorX = buildEvalCursor(reviewEvals, moveIdx)
   const selectedReviewMove = review?.moves[moveIdx]
+  const reviewSquareBadge = reviewStarted && selectedReviewMove
+    ? {
+        color: classificationColors[selectedReviewMove.classification],
+        label: `${selectedReviewMove.classification} move ${selectedReviewMove.san}`,
+        square: selectedReviewMove.uci.slice(2, 4) as Square,
+        symbol: classificationSymbols[selectedReviewMove.classification],
+      }
+    : undefined
   const workspaceRows = buildWorkspaceRows(workspaceMoves)
 
   const openSource = (nextSource: GameSource) => {
@@ -438,13 +470,14 @@ function GamesPage() {
                 interactive={inWorkspace}
                 moves={boardMoves}
                 onChange={inWorkspace ? updateWorkspaceBoard : undefined}
+                squareBadge={reviewSquareBadge}
               />
             </div>
 
             <PlayerBar {...bottomPlayer} edge="bottom" />
           </div>
 
-          {inReview && game ? (
+          {inReview && game && reviewStarted ? (
             game.moves.length > 0 ? (
               <div className="move-controls" aria-label="Move controls">
                 <button type="button" aria-label="Go to start" onClick={() => setMoveIdx(0)}>
@@ -568,11 +601,16 @@ function GamesPage() {
               progress={reviewProgress}
               review={review}
               selectedMove={selectedReviewMove}
+              started={reviewStarted}
               onExit={() => {
                 setStep('source')
                 setGame(null)
                 setSelectedKey(null)
                 setSource(null)
+              }}
+              onStart={() => {
+                setMoveIdx(0)
+                setReviewStarted(true)
               }}
             />
           ) : null}
@@ -824,9 +862,11 @@ function ReviewPanel({
   loading,
   moveRows,
   onExit,
+  onStart,
   progress,
   review,
   selectedMove,
+  started,
 }: {
   classCounts: ReturnType<typeof buildClassCounts>
   error: string
@@ -836,19 +876,36 @@ function ReviewPanel({
   loading: boolean
   moveRows: ReturnType<typeof buildMoveRows>
   onExit: () => void
+  onStart: () => void
   progress: { completed: number; total: number }
   review: GameReviewResult | null
   selectedMove?: ReviewedMove
+  started: boolean
 }) {
   const progressPercent = progress.total
     ? Math.round(progress.completed / progress.total * 100)
     : 0
+  const selectedColor = selectedMove ? classificationColors[selectedMove.classification] : '#7d8790'
+  const moveListRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!started) return
+    const container = moveListRef.current
+    const selected = container?.querySelector<HTMLButtonElement>('button.selected')
+    if (!container || !selected) return
+    const top = selected.offsetTop
+    const bottom = top + selected.offsetHeight
+    if (top < container.scrollTop) container.scrollTop = top
+    else if (bottom > container.scrollTop + container.clientHeight) {
+      container.scrollTop = bottom - container.clientHeight
+    }
+  }, [selectedMove?.uci, started])
 
   return (
     <>
-      <section className="rail-panel review-panel">
+      <section className="rail-panel review-panel" data-review-state={started ? 'walkthrough' : 'summary'}>
         <div className="rail-heading">
-          <span>Game review</span>
+          <span>{started ? 'Move review' : 'Game review'}</span>
           <button type="button" onClick={onExit}>
             New review
           </button>
@@ -866,15 +923,19 @@ function ReviewPanel({
         {error ? <p className="review-error" role="alert">{error}</p> : null}
         {review ? (
           <>
-            <svg viewBox="0 0 300 80" className="eval-graph" preserveAspectRatio="none" aria-label="Evaluation graph">
-              <path d={evalArea} />
-              <line x1="0" y1="40" x2="300" y2="40" />
-              <line className="cursor" x1={evalCursorX} y1="0" x2={evalCursorX} y2="80" />
-            </svg>
-            {selectedMove ? (
-              <div className="review-move-detail">
+            <ReviewGraph
+              area={evalArea}
+              cursorX={evalCursorX}
+              review={review}
+              showCursor={started}
+            />
+            {started && selectedMove ? (
+              <div className="review-move-detail" style={{ borderColor: selectedColor }}>
                 <div>
-                  <span>{selectedMove.classification}</span>
+                  <span>
+                    <ReviewClassificationBadge classification={selectedMove.classification} />
+                    {reviewFeedback(selectedMove)}
+                  </span>
                   <strong>{formatEvaluation(selectedMove.evaluation)}</strong>
                 </div>
                 <p>
@@ -884,53 +945,111 @@ function ReviewPanel({
                 <small>{selectedMove.bestLine.slice(0, 8).join(' ') || 'Game over'}</small>
               </div>
             ) : null}
-            <div className="accuracy-grid">
-              <div>
-                <span>White accuracy</span>
-                <strong>{review.whiteAccuracy.toFixed(1)}%</strong>
-              </div>
-              <div>
-                <span>Black accuracy</span>
-                <strong>{review.blackAccuracy.toFixed(1)}%</strong>
-              </div>
-            </div>
-            <div className="class-counts">
-              {classCounts.map((count) => (
-                <div key={count.label}>
-                  <span style={{ color: count.color }}>{count.label}</span>
-                  <em>{count.white}</em>
-                  <em>{count.black}</em>
-                  <i>
-                    <b style={{ background: count.color, width: `${count.percent}%` }} />
-                  </i>
+            {!started ? (
+              <>
+                <div className="review-ready-players">
+                  <div>
+                    <span>White</span>
+                    <strong>{game.white}</strong>
+                    <em>{review.whiteAccuracy.toFixed(1)}</em>
+                  </div>
+                  <div>
+                    <span>Black</span>
+                    <strong>{game.black}</strong>
+                    <em>{review.blackAccuracy.toFixed(1)}</em>
+                  </div>
                 </div>
-              ))}
-            </div>
+                <div className="class-count-head" aria-hidden="true">
+                  <span>Move quality</span>
+                  <em>White</em>
+                  <i />
+                  <em>Black</em>
+                </div>
+                <div className="class-counts">
+                  {classCounts.map((count) => (
+                    <div key={count.label}>
+                      <span>{count.label}</span>
+                      <em style={{ color: count.color }}>{count.white}</em>
+                      <ReviewClassificationBadge classification={count.label} compact />
+                      <em style={{ color: count.color }}>{count.black}</em>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" className="review-start-button" onClick={onStart}>
+                  Start Review
+                </button>
+              </>
+            ) : null}
           </>
         ) : null}
       </section>
 
-      <section className="moves-panel">
-        <h2>Moves - {game.opening}</h2>
-        <div className="move-list-scroll">
-          {moveRows.map((row) => (
-            <div className="move-row" key={row.number}>
-              <span>{row.number}.</span>
-              <button type="button" className={row.whiteSelected ? 'selected' : undefined} onClick={row.onWhite}>
-                <strong>{row.whiteMove}</strong>
-                <em style={{ color: row.whiteColor }}>{row.whiteTag}</em>
-              </button>
-              {row.blackMove ? (
-                <button type="button" className={row.blackSelected ? 'selected' : undefined} onClick={row.onBlack}>
-                  <strong>{row.blackMove}</strong>
-                  <em style={{ color: row.blackColor }}>{row.blackTag}</em>
+      {review && started ? (
+        <section className="moves-panel">
+          <h2>Moves - {game.opening}</h2>
+          <div className="move-list-scroll" ref={moveListRef}>
+            {moveRows.map((row) => (
+              <div className="move-row" key={row.number}>
+                <span>{row.number}.</span>
+                <button type="button" className={row.whiteSelected ? 'selected' : undefined} onClick={row.onWhite}>
+                  <strong>{row.whiteMove}</strong>
+                  {row.whiteClass ? <ReviewClassificationBadge classification={row.whiteClass} compact /> : null}
                 </button>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </section>
+                {row.blackMove ? (
+                  <button type="button" className={row.blackSelected ? 'selected' : undefined} onClick={row.onBlack}>
+                    <strong>{row.blackMove}</strong>
+                    {row.blackClass ? <ReviewClassificationBadge classification={row.blackClass} compact /> : null}
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
+  )
+}
+
+function ReviewGraph({
+  area,
+  cursorX,
+  review,
+  showCursor,
+}: {
+  area: string
+  cursorX: number
+  review: GameReviewResult
+  showCursor: boolean
+}) {
+  const dots = buildEvalDots(review)
+  return (
+    <svg viewBox="0 0 300 80" className="eval-graph" preserveAspectRatio="none" aria-label="Evaluation graph">
+      <path d={area} />
+      <line x1="0" y1="40" x2="300" y2="40" />
+      {dots.map((dot) => (
+        <circle cx={dot.x} cy={dot.y} fill={dot.color} key={dot.key} r="3.2" />
+      ))}
+      {showCursor ? <line className="cursor" x1={cursorX} y1="0" x2={cursorX} y2="80" /> : null}
+    </svg>
+  )
+}
+
+function ReviewClassificationBadge({
+  classification,
+  compact = false,
+}: {
+  classification: ReviewClassification
+  compact?: boolean
+}) {
+  return (
+    <i
+      aria-label={classification}
+      className={compact ? 'review-classification-badge compact' : 'review-classification-badge'}
+      style={{ backgroundColor: classificationColors[classification] }}
+      title={classification}
+    >
+      {classificationSymbols[classification]}
+    </i>
   )
 }
 
@@ -1080,8 +1199,35 @@ function buildEvalCursor(evals: number[], moveIdx: number) {
   return (Math.min(moveIdx, evals.length - 1) / maxIndex) * 300
 }
 
+function buildEvalDots(review: GameReviewResult) {
+  const maxIndex = Math.max(1, review.moves.length - 1)
+  return review.moves.map((move, index) => ({
+    color: classificationColors[move.classification],
+    key: `${index}-${move.uci}`,
+    x: (index / maxIndex) * 300,
+    y: 40 - Math.max(-38, Math.min(38, move.evaluation * 6.5)),
+  }))
+}
+
+function reviewFeedback(move: ReviewedMove) {
+  const messages: Record<ReviewClassification, string> = {
+    Brilliant: `${move.san} is brilliant`,
+    Great: `${move.san} is a great move`,
+    Book: `${move.san} follows opening theory`,
+    Best: `${move.san} is the best move`,
+    Excellent: `${move.san} is excellent`,
+    Good: `${move.san} is a good move`,
+    Inaccuracy: `${move.san} is an inaccuracy`,
+    Mistake: `${move.san} is a mistake`,
+    Miss: `${move.san} misses a strong opportunity`,
+    Blunder: `${move.san} is a blunder`,
+    Forced: `${move.san} was the only move`,
+  }
+  return messages[move.classification]
+}
+
 function buildClassCounts(review: GameReviewResult) {
-  return classificationOrder.map((label) => {
+  const counts = classificationOrder.map((label) => {
     let white = 0
     let black = 0
 
@@ -1099,9 +1245,10 @@ function buildClassCounts(review: GameReviewResult) {
       white,
       black,
       color: classificationColors[label],
-      percent: review.moves.length ? (white + black) / review.moves.length * 100 : 0,
     }
-  }).filter((count) => count.white + count.black > 0)
+  })
+
+  return counts.filter((count) => count.label !== 'Forced' || count.white + count.black > 0)
 }
 
 function buildMoveRows(
@@ -1119,13 +1266,11 @@ function buildMoveRows(
     rows.push({
       number: index / 2 + 1,
       whiteMove: game.moves[index],
-      whiteTag: whiteClass ?? '',
-      whiteColor: whiteClass ? classificationColors[whiteClass] : '#8a7b5c',
+      whiteClass,
       whiteSelected: moveIdx === index,
       onWhite: () => setMoveIdx(index),
       blackMove: game.moves[index + 1] || '',
-      blackTag: blackClass ?? '',
-      blackColor: blackClass ? classificationColors[blackClass] : '#8a7b5c',
+      blackClass,
       blackSelected: moveIdx === index + 1,
       onBlack: () => setMoveIdx(index + 1),
     })

@@ -6608,6 +6608,7 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
   String error = '';
   bool cancelled = false;
   bool flipped = false;
+  bool reviewStarted = false;
   int completed = 0;
   late int moveIndex;
 
@@ -6660,6 +6661,26 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
 
   @override
   Widget build(BuildContext context) {
+    final completedReview = review;
+    if (completedReview != null && !reviewStarted) {
+      return PrototypeRouteScaffold(
+        title: 'Game Review',
+        children: [
+          const SizedBox(height: 14),
+          _MobileReviewReadySummary(
+            black: widget.black,
+            onStart: () => setState(() {
+              moveIndex = 0;
+              reviewStarted = true;
+            }),
+            review: completedReview,
+            white: widget.white,
+          ),
+          const SizedBox(height: 18),
+        ],
+      );
+    }
+
     final shownMoves = widget.game.moves.sublist(0, moveIndex + 1);
     final boardSummary = _summarizeMobileBoard(shownMoves);
     final topColor = flipped ? 'white' : 'black';
@@ -6693,6 +6714,8 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
                 moves: shownMoves,
                 onChanged: (_, _) {},
                 readOnly: true,
+                reviewClassification: selected?.classification,
+                reviewSquare: selected?.uci.substring(2, 4),
               ),
               TournamentBoardPlayerBar(
                 capturedPieces: boardSummary.capturedBy(bottomColor),
@@ -6817,6 +6840,298 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
   }
 }
 
+const _mobileSummaryClassifications = <MobileMoveClassification>[
+  MobileMoveClassification.brilliant,
+  MobileMoveClassification.great,
+  MobileMoveClassification.book,
+  MobileMoveClassification.best,
+  MobileMoveClassification.excellent,
+  MobileMoveClassification.good,
+  MobileMoveClassification.inaccuracy,
+  MobileMoveClassification.mistake,
+  MobileMoveClassification.miss,
+  MobileMoveClassification.blunder,
+];
+
+class _MobileReviewReadySummary extends StatelessWidget {
+  const _MobileReviewReadySummary({
+    required this.black,
+    required this.onStart,
+    required this.review,
+    required this.white,
+  });
+
+  final String black;
+  final VoidCallback onStart;
+  final MobileGameReviewResult review;
+  final String white;
+
+  @override
+  Widget build(BuildContext context) {
+    final classifications = [..._mobileSummaryClassifications];
+    if (review.moves.any(
+      (move) => move.classification == MobileMoveClassification.forced,
+    )) {
+      classifications.add(MobileMoveClassification.forced);
+    }
+
+    return PrototypeCard(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SerifText('Review complete', size: 22, weight: FontWeight.w700),
+          const SizedBox(height: 4),
+          const Text(
+            'The engine is ready. Start the walkthrough to inspect every move.',
+            style: TextStyle(color: Color(0x99111111), fontSize: 12.5),
+          ),
+          const SizedBox(height: 14),
+          _MobileEvaluationGraph(review: review),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _MobileAccuracyMetric(
+                  dark: false,
+                  label: 'White - $white',
+                  value: review.whiteAccuracy,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MobileAccuracyMetric(
+                  dark: true,
+                  label: 'Black - $black',
+                  value: review.blackAccuracy,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Move quality',
+                  style: TextStyle(
+                    color: Color(0x99111111),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 34,
+                child: Text(
+                  'White',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0x77111111), fontSize: 8.5),
+                ),
+              ),
+              SizedBox(width: 30),
+              SizedBox(
+                width: 34,
+                child: Text(
+                  'Black',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0x77111111), fontSize: 8.5),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 12),
+          for (final classification in classifications)
+            _MobileClassificationCountRow(
+              classification: classification,
+              review: review,
+            ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 48,
+            child: FilledButton.icon(
+              onPressed: onStart,
+              icon: const Icon(Icons.play_arrow_rounded, size: 22),
+              label: const Text('Start Review'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xff79b64b),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileClassificationCountRow extends StatelessWidget {
+  const _MobileClassificationCountRow({
+    required this.classification,
+    required this.review,
+  });
+
+  final MobileMoveClassification classification;
+  final MobileGameReviewResult review;
+
+  @override
+  Widget build(BuildContext context) {
+    var white = 0;
+    var black = 0;
+    for (var index = 0; index < review.moves.length; index++) {
+      if (review.moves[index].classification != classification) continue;
+      if (index.isEven) {
+        white += 1;
+      } else {
+        black += 1;
+      }
+    }
+    final color = _mobileClassificationColor(classification);
+
+    return SizedBox(
+      height: 30,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              mobileClassificationLabel(classification),
+              style: const TextStyle(
+                color: PrototypeColors.black,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 34,
+            child: Text(
+              '$white',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: color, fontWeight: FontWeight.w900),
+            ),
+          ),
+          _MobileClassificationBadge(classification: classification, size: 24),
+          SizedBox(
+            width: 34,
+            child: Text(
+              '$black',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: color, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileEvaluationGraph extends StatelessWidget {
+  const _MobileEvaluationGraph({required this.review, this.selectedIndex});
+
+  final MobileGameReviewResult review;
+  final int? selectedIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 86,
+      child: CustomPaint(
+        painter: _MobileEvaluationGraphPainter(
+          review: review,
+          selectedIndex: selectedIndex,
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileEvaluationGraphPainter extends CustomPainter {
+  const _MobileEvaluationGraphPainter({
+    required this.review,
+    required this.selectedIndex,
+  });
+
+  final MobileGameReviewResult review;
+  final int? selectedIndex;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bounds = Offset.zero & size;
+    final clip = RRect.fromRectAndRadius(bounds, const Radius.circular(6));
+    canvas.save();
+    canvas.clipRRect(clip);
+    canvas.drawRect(bounds, Paint()..color = PrototypeColors.black);
+
+    final moves = review.moves;
+    if (moves.isNotEmpty) {
+      final lastIndex = math.max(1, moves.length - 1);
+      final path = Path()..moveTo(0, size.height / 2);
+      for (var index = 0; index < moves.length; index++) {
+        final x = index / lastIndex * size.width;
+        final score = moves[index].evaluation.clamp(-6.0, 6.0);
+        final y = size.height / 2 - score / 6 * (size.height / 2 - 5);
+        path.lineTo(x, y);
+      }
+      path
+        ..lineTo(size.width, size.height)
+        ..lineTo(0, size.height)
+        ..close();
+      canvas.drawPath(path, Paint()..color = const Color(0xfff6f0e0));
+
+      final centerPaint = Paint()
+        ..color = const Color(0x99a98a3f)
+        ..strokeWidth = 1;
+      canvas.drawLine(
+        Offset(0, size.height / 2),
+        Offset(size.width, size.height / 2),
+        centerPaint,
+      );
+
+      for (var index = 0; index < moves.length; index++) {
+        final x = index / lastIndex * size.width;
+        final score = moves[index].evaluation.clamp(-6.0, 6.0);
+        final y = size.height / 2 - score / 6 * (size.height / 2 - 5);
+        canvas.drawCircle(Offset(x, y), 3.6, Paint()..color = Colors.white);
+        canvas.drawCircle(
+          Offset(x, y),
+          2.6,
+          Paint()
+            ..color = _mobileClassificationColor(moves[index].classification),
+        );
+      }
+
+      final activeIndex = selectedIndex;
+      if (activeIndex != null &&
+          activeIndex >= 0 &&
+          activeIndex < moves.length) {
+        final x = activeIndex / lastIndex * size.width;
+        canvas.drawLine(
+          Offset(x, 0),
+          Offset(x, size.height),
+          Paint()
+            ..color = PrototypeColors.burgundy
+            ..strokeWidth = 1.5,
+        );
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _MobileEvaluationGraphPainter oldDelegate) {
+    return oldDelegate.review != review ||
+        oldDelegate.selectedIndex != selectedIndex;
+  }
+}
+
 class _ReviewNavButton extends StatelessWidget {
   const _ReviewNavButton({
     required this.icon,
@@ -6853,90 +7168,67 @@ class _MobileReviewSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PrototypeCard(
+    final color = _mobileClassificationColor(selected.classification);
+    final selectedIndex = review.moves.indexOf(selected);
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: PrototypeColors.black,
+        border: Border.all(color: color, width: 2),
+        borderRadius: BorderRadius.circular(7),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: _MobileAccuracyMetric(
-                  label: 'White accuracy',
-                  value: review.whiteAccuracy,
-                  dark: false,
-                ),
+              _MobileClassificationBadge(
+                classification: selected.classification,
+                size: 30,
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _MobileAccuracyMetric(
-                  label: 'Black accuracy',
-                  value: review.blackAccuracy,
-                  dark: true,
+                child: Text(
+                  _mobileReviewFeedback(selected),
+                  style: const TextStyle(
+                    color: PrototypeColors.cream,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                _mobileEvaluationLabel(selected.evaluation),
+                style: const TextStyle(
+                  color: PrototypeColors.cream,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(11),
-            decoration: BoxDecoration(
-              color: PrototypeColors.black,
-              borderRadius: BorderRadius.circular(7),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        mobileClassificationLabel(selected.classification),
-                        style: TextStyle(
-                          color: _mobileClassificationColor(
-                            selected.classification,
-                          ),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      _mobileEvaluationLabel(selected.evaluation),
-                      style: const TextStyle(
-                        color: PrototypeColors.cream,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Played ${selected.san}${selected.bestMoveSan == null ? '' : '  ·  Best ${selected.bestMoveSan}'}',
-                  style: const TextStyle(
-                    color: Color(0xdff5efe3),
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  selected.bestLine.isEmpty
-                      ? 'Game over'
-                      : selected.bestLine.take(8).join(' '),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0x99f5efe3),
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    height: 1.4,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 7),
+          Text(
+            'Played ${selected.san}${selected.bestMoveSan == null ? '' : '  ·  Best ${selected.bestMoveSan}'}',
+            style: const TextStyle(color: Color(0xdff5efe3), fontSize: 12),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            selected.bestLine.isEmpty
+                ? 'Game over'
+                : selected.bestLine.take(8).join(' '),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0x99f5efe3),
+              fontFamily: 'monospace',
+              fontSize: 11,
+              height: 1.4,
             ),
           ),
+          const SizedBox(height: 10),
+          _MobileEvaluationGraph(review: review, selectedIndex: selectedIndex),
         ],
       ),
     );
@@ -6990,7 +7282,7 @@ class _MobileAccuracyMetric extends StatelessWidget {
   }
 }
 
-class _MobileReviewMoves extends StatelessWidget {
+class _MobileReviewMoves extends StatefulWidget {
   const _MobileReviewMoves({
     required this.currentIndex,
     required this.game,
@@ -7004,7 +7296,49 @@ class _MobileReviewMoves extends StatelessWidget {
   final MobileGameReviewResult? review;
 
   @override
+  State<_MobileReviewMoves> createState() => _MobileReviewMovesState();
+}
+
+class _MobileReviewMovesState extends State<_MobileReviewMoves> {
+  final controller = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _keepSelectedVisible();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MobileReviewMoves oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentIndex != widget.currentIndex ||
+        oldWidget.game.moves.length != widget.game.moves.length) {
+      _keepSelectedVisible();
+    }
+  }
+
+  void _keepSelectedVisible() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !controller.hasClients) return;
+      final rowOffset = (widget.currentIndex ~/ 2) * 38.0;
+      final target = (rowOffset - 76).clamp(
+        0.0,
+        controller.position.maxScrollExtent,
+      );
+      controller.jumpTo(target);
+    });
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final rowCount = (widget.game.moves.length + 1) ~/ 2;
+    final listHeight = math.min(280.0, math.max(38.0, rowCount * 38.0));
     return PrototypeCard(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -7019,43 +7353,56 @@ class _MobileReviewMoves extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          for (var index = 0; index < game.moves.length; index += 2)
-            Row(
-              children: [
-                SizedBox(
-                  width: 28,
-                  child: Text(
-                    '${index ~/ 2 + 1}.',
-                    style: const TextStyle(
-                      color: Color(0x77111111),
-                      fontFamily: 'monospace',
-                      fontSize: 11,
-                    ),
+          SizedBox(
+            height: listHeight,
+            child: ListView.builder(
+              controller: controller,
+              itemCount: rowCount,
+              padding: EdgeInsets.zero,
+              itemBuilder: (context, rowIndex) {
+                final index = rowIndex * 2;
+                return SizedBox(
+                  height: 38,
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          '${rowIndex + 1}.',
+                          style: const TextStyle(
+                            color: Color(0x77111111),
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: _MobileReviewMoveButton(
+                          index: index,
+                          move: widget.game.moves[index],
+                          reviewedMove: widget.review?.moves[index],
+                          selected: widget.currentIndex == index,
+                          onTap: () => widget.onSelect(index),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: index + 1 < widget.game.moves.length
+                            ? _MobileReviewMoveButton(
+                                index: index + 1,
+                                move: widget.game.moves[index + 1],
+                                reviewedMove: widget.review?.moves[index + 1],
+                                selected: widget.currentIndex == index + 1,
+                                onTap: () => widget.onSelect(index + 1),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
                   ),
-                ),
-                Expanded(
-                  child: _MobileReviewMoveButton(
-                    index: index,
-                    move: game.moves[index],
-                    reviewedMove: review?.moves[index],
-                    selected: currentIndex == index,
-                    onTap: () => onSelect(index),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: index + 1 < game.moves.length
-                      ? _MobileReviewMoveButton(
-                          index: index + 1,
-                          move: game.moves[index + 1],
-                          reviewedMove: review?.moves[index + 1],
-                          selected: currentIndex == index + 1,
-                          onTap: () => onSelect(index + 1),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
+                );
+              },
             ),
+          ),
         ],
       ),
     );
@@ -7105,13 +7452,9 @@ class _MobileReviewMoveButton extends StatelessWidget {
               ),
             ),
             if (classification != null)
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: _mobileClassificationColor(classification),
-                  shape: BoxShape.circle,
-                ),
+              _MobileClassificationBadge(
+                classification: classification,
+                size: 20,
               ),
           ],
         ),
@@ -7120,17 +7463,101 @@ class _MobileReviewMoveButton extends StatelessWidget {
   }
 }
 
+class _MobileClassificationBadge extends StatelessWidget {
+  const _MobileClassificationBadge({
+    required this.classification,
+    this.size = 22,
+  });
+
+  final MobileMoveClassification classification;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: mobileClassificationLabel(classification),
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: _mobileClassificationColor(classification),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.94),
+            width: size <= 20 ? 1.3 : 1.7,
+          ),
+          shape: BoxShape.circle,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x44111111),
+              blurRadius: 5,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ExcludeSemantics(
+          child: Text(
+            _mobileClassificationSymbol(classification),
+            maxLines: 1,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: size <= 20 ? 8 : 9.5,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 Color _mobileClassificationColor(MobileMoveClassification classification) {
   return switch (classification) {
-    MobileMoveClassification.brilliant => const Color(0xff1f7a70),
-    MobileMoveClassification.great => const Color(0xff2a5db0),
-    MobileMoveClassification.best => const Color(0xff3f6b36),
-    MobileMoveClassification.excellent => const Color(0xff638a4f),
-    MobileMoveClassification.good => const Color(0xff77946a),
-    MobileMoveClassification.inaccuracy => const Color(0xffa98a3f),
-    MobileMoveClassification.mistake => const Color(0xffb0742a),
-    MobileMoveClassification.blunder => PrototypeColors.burgundy,
-    MobileMoveClassification.forced => const Color(0xff8a7b5c),
+    MobileMoveClassification.brilliant => const Color(0xff1baca6),
+    MobileMoveClassification.great => const Color(0xff5c8bb0),
+    MobileMoveClassification.book => const Color(0xffc79a73),
+    MobileMoveClassification.best => const Color(0xff81b64c),
+    MobileMoveClassification.excellent => const Color(0xff69a83f),
+    MobileMoveClassification.good => const Color(0xff8aaa79),
+    MobileMoveClassification.inaccuracy => const Color(0xffe6b93f),
+    MobileMoveClassification.mistake => const Color(0xffef8b4c),
+    MobileMoveClassification.miss => const Color(0xfff36f68),
+    MobileMoveClassification.blunder => const Color(0xffef4035),
+    MobileMoveClassification.forced => const Color(0xff7d8790),
+  };
+}
+
+String _mobileClassificationSymbol(MobileMoveClassification classification) {
+  return switch (classification) {
+    MobileMoveClassification.brilliant => '!!',
+    MobileMoveClassification.great => '!',
+    MobileMoveClassification.book => '▤',
+    MobileMoveClassification.best => '★',
+    MobileMoveClassification.excellent => '✓+',
+    MobileMoveClassification.good => '✓',
+    MobileMoveClassification.inaccuracy => '?!',
+    MobileMoveClassification.mistake => '?',
+    MobileMoveClassification.miss => '×',
+    MobileMoveClassification.blunder => '??',
+    MobileMoveClassification.forced => '=',
+  };
+}
+
+String _mobileReviewFeedback(MobileReviewedMove move) {
+  return switch (move.classification) {
+    MobileMoveClassification.brilliant => '${move.san} is brilliant',
+    MobileMoveClassification.great => '${move.san} is a great move',
+    MobileMoveClassification.book => '${move.san} follows opening theory',
+    MobileMoveClassification.best => '${move.san} is the best move',
+    MobileMoveClassification.excellent => '${move.san} is excellent',
+    MobileMoveClassification.good => '${move.san} is a good move',
+    MobileMoveClassification.inaccuracy => '${move.san} is an inaccuracy',
+    MobileMoveClassification.mistake => '${move.san} is a mistake',
+    MobileMoveClassification.miss => '${move.san} misses a strong opportunity',
+    MobileMoveClassification.blunder => '${move.san} is a blunder',
+    MobileMoveClassification.forced => '${move.san} was the only move',
   };
 }
 
@@ -8048,6 +8475,8 @@ class PrototypeChessBoard extends StatefulWidget {
     required this.onChanged,
     this.evaluation,
     this.readOnly = false,
+    this.reviewClassification,
+    this.reviewSquare,
     this.showEvaluation = true,
     super.key,
   });
@@ -8057,6 +8486,8 @@ class PrototypeChessBoard extends StatefulWidget {
   final void Function(List<String> moves, String result) onChanged;
   final double? evaluation;
   final bool readOnly;
+  final MobileMoveClassification? reviewClassification;
+  final String? reviewSquare;
   final bool showEvaluation;
 
   @override
@@ -8289,6 +8720,19 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
                                   ),
                                 if (piece != null)
                                   _MobileChessPiece(piece: piece),
+                                if (widget.reviewClassification != null &&
+                                    widget.reviewSquare == square)
+                                  Positioned(
+                                    top: 3,
+                                    right: 3,
+                                    child: IgnorePointer(
+                                      child: _MobileClassificationBadge(
+                                        classification:
+                                            widget.reviewClassification!,
+                                        size: 19,
+                                      ),
+                                    ),
+                                  ),
                                 if (col == 0)
                                   Positioned(
                                     top: 4,

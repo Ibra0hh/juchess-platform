@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   classifyReviewMove,
   expectedScore,
+  isOpeningBookMove,
   moveAccuracyFromLoss,
   parseReviewGame,
   parseStockfishOutput,
@@ -51,6 +52,32 @@ test('classifies exact engine choices and large expected-score losses', () => {
     mover: 'w',
     playedMove: 'f2f3',
   }), 'Blunder')
+
+  assert.equal(classifyReviewMove({
+    afterEvaluation: 0.1,
+    beforeEvaluation: 2,
+    bestMove: 'd1h5',
+    legalMoves: 24,
+    mover: 'w',
+    playedMove: 'a2a3',
+  }), 'Miss')
+
+  assert.equal(classifyReviewMove({
+    afterEvaluation: 1.2,
+    alternateEvaluation: -1,
+    beforeEvaluation: 1.1,
+    bestMove: 'f3h4',
+    isSacrifice: true,
+    legalMoves: 28,
+    mover: 'w',
+    playedMove: 'f3h4',
+  }), 'Brilliant')
+})
+
+test('recognizes established opening-book sequences', () => {
+  const ruyLopez = ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5']
+  assert.equal(isOpeningBookMove(ruyLopez, 4), true)
+  assert.equal(isOpeningBookMove(['h2h4'], 0), false)
 })
 
 test('accuracy and expected-score helpers stay bounded', () => {

@@ -14,8 +14,7 @@ void main() {
   });
 
   test('UCI scores are normalized to White perspective', () {
-    const fen =
-        'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
+    const fen = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
     final parsed = parseMobileStockfishOutput([
       'info depth 11 multipv 1 score cp 42 nodes 100 pv g8f6',
       'info depth 11 multipv 2 score cp 30 nodes 100 pv b8c6',
@@ -51,5 +50,37 @@ void main() {
       ),
       MobileMoveClassification.blunder,
     );
+    expect(
+      classifyMobileReviewMove(
+        afterEvaluation: 0.1,
+        beforeEvaluation: 2,
+        bestMove: 'd1h5',
+        legalMoves: 24,
+        mover: 'w',
+        playedMove: 'a2a3',
+      ),
+      MobileMoveClassification.miss,
+    );
+    expect(
+      classifyMobileReviewMove(
+        afterEvaluation: 1.2,
+        alternateEvaluation: -1,
+        beforeEvaluation: 1.1,
+        bestMove: 'f3h4',
+        isSacrifice: true,
+        legalMoves: 28,
+        mover: 'w',
+        playedMove: 'f3h4',
+      ),
+      MobileMoveClassification.brilliant,
+    );
+  });
+
+  test('opening-book sequences are recognized', () {
+    expect(
+      isMobileOpeningBookMove(['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5'], 4),
+      isTrue,
+    );
+    expect(isMobileOpeningBookMove(['h2h4'], 0), isFalse);
   });
 }

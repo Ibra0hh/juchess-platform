@@ -180,6 +180,29 @@
   transform: none;
 }
 
+.ju-review-square-badge {
+  position: absolute;
+  top: 4%;
+  right: 4%;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  width: 30%;
+  min-width: 17px;
+  max-width: 25px;
+  aspect-ratio: 1;
+  border: 2px solid rgba(255, 255, 255, 0.94);
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(17, 17, 17, 0.36);
+  color: #ffffff;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: clamp(8px, 2.3cqw, 12px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .ju-rank-label,
 .ju-file-label {
   position: absolute;

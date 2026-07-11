@@ -8,14 +8,36 @@ const mobileStandardFen =
 enum MobileMoveClassification {
   brilliant,
   great,
+  book,
   best,
   excellent,
   good,
   inaccuracy,
   mistake,
+  miss,
   blunder,
   forced,
 }
+
+const _mobileOpeningBookLines = <List<String>>[
+  ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5', 'a7a6', 'b5a4', 'g8f6'],
+  ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'g8f6', 'd2d3', 'f8c5'],
+  ['e2e4', 'c7c5', 'g1f3', 'd7d6', 'd2d4', 'c5d4', 'f3d4', 'g8f6'],
+  ['e2e4', 'c7c5', 'g1f3', 'b8c6', 'd2d4', 'c5d4', 'f3d4', 'g7g6'],
+  ['e2e4', 'c7c6', 'd2d4', 'd7d5', 'b1c3', 'd5e4', 'c3e4', 'c8f5'],
+  ['e2e4', 'e7e6', 'd2d4', 'd7d5', 'b1c3', 'g8f6', 'e4e5', 'f6d7'],
+  ['e2e4', 'd7d6', 'd2d4', 'g8f6', 'b1c3', 'g7g6'],
+  ['e2e4', 'g8f6', 'e4e5', 'f6d5', 'd2d4', 'd7d6'],
+  ['e2e4', 'e7e5', 'b1c3', 'g8f6', 'f2f4', 'd7d5'],
+  ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'd2d4', 'e5d4', 'f3d4'],
+  ['d2d4', 'd7d5', 'c2c4', 'e7e6', 'b1c3', 'g8f6', 'c1g5'],
+  ['d2d4', 'd7d5', 'c2c4', 'd5c4', 'g1f3', 'g8f6', 'e2e3'],
+  ['d2d4', 'g8f6', 'c2c4', 'g7g6', 'b1c3', 'f8g7', 'e2e4', 'd7d6'],
+  ['d2d4', 'g8f6', 'c2c4', 'e7e6', 'b1c3', 'f8b4', 'e2e3'],
+  ['d2d4', 'd7d5', 'g1f3', 'g8f6', 'c1f4', 'c7c5', 'e2e3'],
+  ['c2c4', 'e7e5', 'b1c3', 'g8f6', 'g2g3', 'd7d5'],
+  ['g1f3', 'd7d5', 'g2g3', 'g8f6', 'f1g2', 'g7g6'],
+];
 
 class MobileParsedReviewGame {
   const MobileParsedReviewGame({
@@ -41,7 +63,9 @@ class MobileParsedReviewGame {
       loaded = false;
     }
     if (!loaded) {
-      throw const FormatException('The PGN contains an invalid or illegal move.');
+      throw const FormatException(
+        'The PGN contains an invalid or illegal move.',
+      );
     }
     return MobileParsedReviewGame._fromGame(game);
   }
@@ -64,7 +88,9 @@ class MobileParsedReviewGame {
   factory MobileParsedReviewGame._fromGame(chess.Chess game) {
     final states = List<chess.State>.from(game.history);
     if (states.isEmpty) {
-      throw const FormatException('The game does not contain any moves to review.');
+      throw const FormatException(
+        'The game does not contain any moves to review.',
+      );
     }
 
     final verbose = game.getHistory({'verbose': true}).cast<Map>();
@@ -192,7 +218,10 @@ MobileMoveClassification classifyMobileReviewMove({
   required String playedMove,
   double? alternateEvaluation,
   String? bestMove,
+  bool isBook = false,
+  bool isSacrifice = false,
 }) {
+  if (isBook) return MobileMoveClassification.book;
   if (legalMoves <= 1) return MobileMoveClassification.forced;
 
   final before = mobileExpectedScore(beforeEvaluation, mover);
@@ -202,14 +231,32 @@ MobileMoveClassification classifyMobileReviewMove({
 
   if (isBest && alternateEvaluation != null) {
     final alternative = mobileExpectedScore(alternateEvaluation, mover);
-    if (before - alternative >= 0.12) return MobileMoveClassification.great;
+    final uniqueness = math.max(0, after - alternative);
+    if (isSacrifice && loss <= 0.02 && uniqueness >= 0.12) {
+      return MobileMoveClassification.brilliant;
+    }
+    if (uniqueness >= 0.12) return MobileMoveClassification.great;
   }
   if (isBest) return MobileMoveClassification.best;
   if (loss <= 0.015) return MobileMoveClassification.excellent;
   if (loss <= 0.05) return MobileMoveClassification.good;
   if (loss <= 0.12) return MobileMoveClassification.inaccuracy;
   if (loss <= 0.25) return MobileMoveClassification.mistake;
+  if (before >= 0.7 && after >= 0.42) return MobileMoveClassification.miss;
   return MobileMoveClassification.blunder;
+}
+
+bool isMobileOpeningBookMove(List<String> moves, int index) {
+  if (index < 0 || index >= 10 || index >= moves.length) return false;
+  final prefix = moves.sublist(0, index + 1);
+  return _mobileOpeningBookLines.any((line) {
+    for (var moveIndex = 0; moveIndex < prefix.length; moveIndex++) {
+      if (moveIndex >= line.length || line[moveIndex] != prefix[moveIndex]) {
+        return false;
+      }
+    }
+    return true;
+  });
 }
 
 MobilePositionReview parseMobileStockfishOutput(
@@ -256,7 +303,9 @@ MobilePositionReview parseMobileStockfishOutput(
       multiPv: multiPv,
     );
     final previous = latest[multiPv];
-    if (previous == null || line.depth >= previous.depth) latest[multiPv] = line;
+    if (previous == null || line.depth >= previous.depth) {
+      latest[multiPv] = line;
+    }
   }
 
   final lines = latest.values.toList()
@@ -291,11 +340,13 @@ MobileGameReviewResult buildMobileGameReview({
     final after = positions[index + 1];
     final mover = game.fens[index].split(RegExp(r'\s+'))[1];
     final board = chess.Chess.fromFEN(game.fens[index]);
-    final loss = math.max(
-      0,
-      mobileExpectedScore(before.evaluation, mover) -
-          mobileExpectedScore(after.evaluation, mover),
-    ).toDouble();
+    final loss = math
+        .max(
+          0,
+          mobileExpectedScore(before.evaluation, mover) -
+              mobileExpectedScore(after.evaluation, mover),
+        )
+        .toDouble();
     final classification = classifyMobileReviewMove(
       afterEvaluation: after.evaluation,
       alternateEvaluation: before.lines.length > 1
@@ -303,6 +354,13 @@ MobileGameReviewResult buildMobileGameReview({
           : null,
       beforeEvaluation: before.evaluation,
       bestMove: before.bestMove,
+      isBook:
+          game.initialFen == mobileStandardFen &&
+          isMobileOpeningBookMove(game.uciMoves, index),
+      isSacrifice: _isMobilePotentialSacrifice(
+        game.fens[index],
+        game.uciMoves[index],
+      ),
       legalMoves: board.moves().length,
       mover: mover,
       playedMove: game.uciMoves[index],
@@ -318,7 +376,9 @@ MobileGameReviewResult buildMobileGameReview({
         bestMove: before.bestMove,
         bestMoveSan: before.bestMove == null
             ? null
-            : mobileUciLineAsSan(game.fens[index], [before.bestMove!]).firstOrNull,
+            : mobileUciLineAsSan(game.fens[index], [
+                before.bestMove!,
+              ]).firstOrNull,
         classification: classification,
         evaluation: after.evaluation,
         loss: loss * 100,
@@ -360,13 +420,48 @@ String mobileClassificationLabel(MobileMoveClassification classification) {
   return switch (classification) {
     MobileMoveClassification.brilliant => 'Brilliant',
     MobileMoveClassification.great => 'Great',
+    MobileMoveClassification.book => 'Book',
     MobileMoveClassification.best => 'Best',
     MobileMoveClassification.excellent => 'Excellent',
     MobileMoveClassification.good => 'Good',
     MobileMoveClassification.inaccuracy => 'Inaccuracy',
     MobileMoveClassification.mistake => 'Mistake',
+    MobileMoveClassification.miss => 'Miss',
     MobileMoveClassification.blunder => 'Blunder',
     MobileMoveClassification.forced => 'Forced',
+  };
+}
+
+bool _isMobilePotentialSacrifice(String fen, String uci) {
+  if (uci.length < 4) return false;
+  final game = chess.Chess.fromFEN(fen);
+  final from = uci.substring(0, 2);
+  final to = uci.substring(2, 4);
+  final movingPiece = game.get(from);
+  final capturedPiece = game.get(to);
+  if (movingPiece == null) return false;
+
+  final request = <String, String>{'from': from, 'to': to};
+  if (uci.length > 4) request['promotion'] = uci.substring(4, 5);
+  if (!game.move(request)) return false;
+
+  final exposed = game
+      .moves({'verbose': true})
+      .cast<Map>()
+      .any((move) => move['to']?.toString() == to);
+  return exposed &&
+      _mobileReviewPieceValue(movingPiece.type) -
+              _mobileReviewPieceValue(capturedPiece?.type) >=
+          2;
+}
+
+int _mobileReviewPieceValue(chess.PieceType? type) {
+  return switch (type) {
+    chess.PieceType.QUEEN => 9,
+    chess.PieceType.ROOK => 5,
+    chess.PieceType.BISHOP || chess.PieceType.KNIGHT => 3,
+    chess.PieceType.PAWN => 1,
+    _ => 0,
   };
 }
 

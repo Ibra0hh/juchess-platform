@@ -45,6 +45,12 @@ type JuChessBoardProps = {
   moves?: string[]
   onChange?: (state: JuChessBoardChange) => void
   showEvaluation?: boolean
+  squareBadge?: {
+    color: string
+    label: string
+    square: Square
+    symbol: string
+  }
 }
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
@@ -67,6 +73,7 @@ export function JuChessBoard({
   moves = [],
   onChange,
   showEvaluation = true,
+  squareBadge,
 }: JuChessBoardProps) {
   const game = useMemo(() => buildChessGame(fen, moves), [fen, moves])
   const markerId = `ju-arrow-${useId().replaceAll(':', '')}`
@@ -205,11 +212,12 @@ export function JuChessBoard({
           const target = legalTargets.has(square.key)
           const check = checkSquare === square.key
           const marked = annotationsEnabled && markedSquares.has(square.key)
+          const badge = squareBadge?.square === square.key ? squareBadge : null
           return (
             <button
               type="button"
               aria-disabled={!interactive}
-              aria-label={`Square ${square.key}${marked ? ', marked red' : ''}`}
+              aria-label={`Square ${square.key}${marked ? ', marked red' : ''}${badge ? `, ${badge.label}` : ''}`}
               className={[
                 'ju-chess-square',
                 square.dark ? 'dark' : 'light',
@@ -227,6 +235,16 @@ export function JuChessBoard({
             >
               {marked ? <span className="ju-square-mark" aria-hidden="true" /> : null}
               {square.piece ? <PieceGlyph color={square.piece.color} type={square.piece.type} /> : null}
+              {badge ? (
+                <span
+                  aria-label={badge.label}
+                  className="ju-review-square-badge"
+                  role="img"
+                  style={{ backgroundColor: badge.color }}
+                >
+                  {badge.symbol}
+                </span>
+              ) : null}
               {square.rankLabel ? <span className="ju-rank-label" aria-hidden="true">{square.rankLabel}</span> : null}
               {square.fileLabel ? <span className="ju-file-label" aria-hidden="true">{square.fileLabel}</span> : null}
             </button>
