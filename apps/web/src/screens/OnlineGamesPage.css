@@ -108,6 +108,17 @@
   font-size: 11.5px;
 }
 
+.online-board-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.online-board-head-actions button[aria-label="Flip board"] {
+  width: 34px;
+  padding: 0;
+}
+
 .online-board-head button,
 .online-board-controls button {
   display: inline-flex;
@@ -137,21 +148,27 @@
   align-items: center;
   gap: 9px;
   width: min(100%, 580px);
-  min-height: 42px;
+  min-height: 50px;
   margin: 0 auto;
   border: 1px solid rgba(17, 17, 17, 0.16);
   padding: 0 11px;
 }
 
-.online-player-strip.black {
+.online-player-strip.top {
   border-bottom: 0;
   border-radius: 7px 7px 0 0;
+}
+
+.online-player-strip.bottom {
+  border-top: 0;
+  border-radius: 0 0 7px 7px;
+}
+
+.online-player-strip.black {
   background: #e7e2d8;
 }
 
 .online-player-strip.white {
-  border-top: 0;
-  border-radius: 0 0 7px 7px;
   background: #fff;
 }
 
@@ -172,7 +189,12 @@
   color: #fff;
 }
 
-.online-player-strip strong {
+.online-player-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.online-player-copy strong {
   min-width: 0;
   overflow: hidden;
   color: #111111;

@@ -788,9 +788,35 @@
   padding: 9px 11px;
 }
 
+.board-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.board-title-actions button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  border-radius: 6px;
+  background: #fffdf8;
+  color: #111111;
+  cursor: pointer;
+}
+
+.board-title-actions button:hover {
+  border-color: var(--wine);
+  color: var(--wine);
+}
+
+.board-title-actions button svg {
+  width: 17px;
+  height: 17px;
+}
+
 .board-player-frame {
-  --eval-width: 18px;
-  --board-gap: 12px;
   display: flex;
   align-self: center;
   flex-direction: column;
@@ -800,20 +826,25 @@
 }
 
 .board-player-frame .player-bar {
-  width: calc(100% - var(--eval-width) - var(--board-gap));
-  margin-left: calc(var(--eval-width) + var(--board-gap));
+  width: 100%;
   border: 1px solid rgba(17, 17, 17, 0.16);
 }
 
-.board-player-frame .player-bar.black {
+.board-player-frame .player-bar.top {
   border-bottom: 0;
   border-radius: 8px 8px 0 0;
+}
+
+.board-player-frame .player-bar.bottom {
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+.board-player-frame .player-bar.black {
   background: #ece8df;
 }
 
 .board-player-frame .player-bar.white {
-  border-top: 0;
-  border-radius: 0 0 8px 8px;
   background: #fff;
 }
 
@@ -829,6 +860,7 @@
 .player-bar-person > div {
   display: grid;
   min-width: 0;
+  min-height: 40px;
 }
 
 .player-bar-person small {
@@ -881,44 +913,18 @@
 }
 
 .board-wrap {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  gap: var(--board-gap);
+  display: block;
   min-width: 0;
 }
 
 .games-ju-board {
-  --games-board-size: min(
-    calc(100% - var(--eval-width) - var(--board-gap)),
-    560px,
-    calc(100dvh - 250px)
-  );
-  flex: 0 0 var(--games-board-size);
-  width: var(--games-board-size);
+  width: 100%;
   min-width: 240px;
-  max-width: var(--games-board-size);
+  max-width: 100%;
 }
 
 .board-player-frame .games-ju-board .ju-chess-board {
   border-radius: 0;
-}
-
-.eval-bar {
-  width: var(--eval-width);
-  display: flex;
-  align-items: end;
-  flex: none;
-  overflow: hidden;
-  background: #111111;
-  border: 1px solid rgba(17, 17, 17, 0.25);
-  border-radius: 5px;
-}
-
-.eval-bar span {
-  width: 100%;
-  background: #f6f0e0;
-  transition: height 0.4s ease;
 }
 
 .chess-board {

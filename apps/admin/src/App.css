@@ -2630,7 +2630,7 @@ button {
 
 .live-board-layout {
   display: grid;
-  grid-template-columns: minmax(300px, 430px) minmax(280px, 1fr);
+  grid-template-columns: minmax(360px, 556px) minmax(280px, 1fr);
   gap: 20px;
   padding: 20px;
 }
@@ -2650,6 +2650,7 @@ button {
 .board-player-bar > div {
   display: grid;
   min-width: 0;
+  min-height: 40px;
 }
 
 .board-player-bar small {
@@ -2674,26 +2675,36 @@ button {
   padding: 4px 0;
 }
 
+.board-player-bar.compact > div {
+  min-height: 36px;
+}
+
 .live-board-area > .board-player-bar {
-  width: min(100%, 520px);
+  width: min(100%, 556px);
   border: 1px solid rgba(17, 17, 17, 0.16);
   padding: 9px 11px;
 }
 
-.live-board-area > .board-player-bar.black {
+.live-board-area > .board-player-bar.top {
   border-bottom: 0;
   border-radius: 8px 8px 0 0;
+}
+
+.live-board-area > .board-player-bar.bottom {
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+.live-board-area > .board-player-bar.black {
   background: #ece8df;
 }
 
 .live-board-area > .board-player-bar.white {
-  border-top: 0;
-  border-radius: 0 0 8px 8px;
   background: #fff;
 }
 
 .live-board-area > .ju-chess-board-shell {
-  width: min(100%, 520px);
+  width: min(100%, 556px);
 }
 
 .live-board-area > .ju-chess-board-shell .ju-chess-board {
@@ -2735,12 +2746,40 @@ button {
   font-weight: 900;
 }
 
+.live-board-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.live-board-status button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #ded6c8;
+  border-radius: 7px;
+  background: #fff;
+  color: #111111;
+  cursor: pointer;
+}
+
+.live-board-status button:hover {
+  border-color: #7d2434;
+  color: #7d2434;
+}
+
+.live-board-status button svg {
+  width: 17px;
+  height: 17px;
+}
+
 .live-replay-controls {
   display: grid;
   grid-template-columns: repeat(2, 36px) minmax(72px, auto) repeat(2, 36px);
   align-items: center;
   justify-content: center;
-  width: min(100%, 520px);
+  width: min(100%, 556px);
   gap: 7px;
   margin-top: 10px;
 }

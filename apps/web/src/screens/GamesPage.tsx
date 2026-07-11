@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { FlipHorizontal2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
-import { JuChessBoard, type JuChessBoardChange } from '../components/JuChessBoard'
+import {
+  JuCapturedPieces,
+  JuChessBoard,
+  type JuChessBoardChange,
+} from '../components/JuChessBoard'
+import { getJuChessBoardSummary, type JuCapturedPiece } from '../components/JuChessRules'
 import SiteHeader from '../components/SiteHeader'
 import {
   findSampleGame,
@@ -63,6 +69,7 @@ function GamesPage() {
   const [workspaceResult, setWorkspaceResult] = useState('Live')
   const [saved, setSaved] = useState(false)
   const [ran, setRan] = useState(false)
+  const [flipped, setFlipped] = useState(false)
 
   useEffect(() => {
     const gameId = queryGameId
@@ -200,12 +207,31 @@ function GamesPage() {
   const workspaceGame = workspaceLoaded ? game || sampleGamesBySource['chess.com'][0] : null
   const boardGame = inReview ? game : inWorkspace ? workspaceGame : null
   const evalNow = getCurrentEval(boardGame, inWorkspace, workspaceLoaded, moveIdx)
-  const evalPct = Math.max(6, Math.min(94, 50 + evalNow * 7))
   const boardMoves = inReview && game
     ? game.moves.slice(0, moveIdx + 1)
     : inWorkspace
       ? workspaceMoves
       : []
+  const boardFen = boardMoves.length ? undefined : boardGame?.fen || startFen
+  const boardSummary = getJuChessBoardSummary(boardFen, boardMoves)
+  const playerData = {
+    black: {
+      badge: inWorkspace ? workspaceResult : boardGame ? boardGame.result : '',
+      captured: boardSummary.captured.black,
+      color: 'black' as const,
+      name: boardGame?.black || 'Black',
+      rating: boardGame?.bRating,
+    },
+    white: {
+      badge: '',
+      captured: boardSummary.captured.white,
+      color: 'white' as const,
+      name: boardGame?.white || 'White',
+      rating: boardGame?.wRating,
+    },
+  }
+  const topPlayer = flipped ? playerData.white : playerData.black
+  const bottomPlayer = flipped ? playerData.black : playerData.white
   const reviewRows = game ? buildMoveRows(game, moveIdx, setMoveIdx) : []
   const classCounts = game ? buildClassCounts(game) : []
   const evalArea = game ? buildEvalArea(game.evals) : ''
@@ -265,36 +291,30 @@ function GamesPage() {
         <section className="board-column" aria-label="Board area">
           <div className="board-title-row">
             <h1>{inReview ? 'Game review' : inWorkspace ? 'Analysis board' : isReviewMode ? 'Review room' : 'Analysis room'}</h1>
-            <span>{boardGame ? boardGame.round || boardGame.date : 'Standard position'}</span>
+            <div className="board-title-actions">
+              <span>{boardGame ? boardGame.round || boardGame.date : 'Standard position'}</span>
+              <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
+                <FlipHorizontal2 aria-hidden="true" />
+              </button>
+            </div>
           </div>
 
           <div className="board-player-frame">
-            <PlayerBar
-              color="black"
-              name={boardGame?.black || 'Black'}
-              rating={boardGame?.bRating}
-              badge={inWorkspace ? workspaceResult : boardGame ? boardGame.result : ''}
-            />
+            <PlayerBar {...topPlayer} edge="top" />
 
             <div className="board-wrap">
-              <div className="eval-bar" title="Engine evaluation">
-                <span style={{ height: `${evalPct}%` }} />
-              </div>
               <JuChessBoard
                 className="games-ju-board"
-                fen={boardMoves.length ? undefined : boardGame?.fen || startFen}
+                evaluation={evalNow}
+                fen={boardFen}
+                flipped={flipped}
                 interactive={inWorkspace}
                 moves={boardMoves}
                 onChange={inWorkspace ? updateWorkspaceBoard : undefined}
               />
             </div>
 
-            <PlayerBar
-              color="white"
-              name={boardGame?.white || 'White'}
-              rating={boardGame?.wRating}
-              badge={`${evalNow >= 0 ? '+' : ''}${evalNow.toFixed(1)}`}
-            />
+            <PlayerBar {...bottomPlayer} edge="bottom" />
           </div>
 
           {inReview && game ? (
@@ -470,22 +490,27 @@ function GamesPage() {
 
 function PlayerBar({
   badge,
+  captured,
   color,
+  edge,
   name,
   rating,
 }: {
   badge: string
+  captured: JuCapturedPiece[]
   color: 'black' | 'white'
+  edge: 'bottom' | 'top'
   name: string
   rating?: number
 }) {
   return (
-    <div className={`player-bar ${color}`} aria-label={`${color === 'white' ? 'White' : 'Black'} player: ${name}`}>
+    <div className={`player-bar ${color} ${edge}`} aria-label={`${color === 'white' ? 'White' : 'Black'} player: ${name}`}>
       <div className="player-bar-person">
         <i className={color} aria-hidden="true" />
         <div>
           <small>{color}</small>
           <b>{name}</b>
+          <JuCapturedPieces pieces={captured} />
         </div>
         {rating ? <em>{rating}</em> : null}
       </div>

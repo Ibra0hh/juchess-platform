@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Radio, RotateCcw, Trophy, Undo2, Users } from 'lucide-react'
+import { FlipHorizontal2, Radio, RotateCcw, Trophy, Undo2, Users } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { JuChessBoard, type JuChessBoardChange } from '../components/JuChessBoard'
+import {
+  JuCapturedPieces,
+  JuChessBoard,
+  type JuChessBoardChange,
+} from '../components/JuChessBoard'
+import { getJuChessBoardSummary, type JuCapturedPiece } from '../components/JuChessRules'
 import SiteHeader from '../components/SiteHeader'
 import {
   loadTournamentGame,
@@ -27,6 +32,7 @@ function OnlineGamesPage() {
   const [boardMoves, setBoardMoves] = useState<string[]>([])
   const [boardResult, setBoardResult] = useState('Live')
   const [gameLoading, setGameLoading] = useState(Boolean(requestedGameId))
+  const [flipped, setFlipped] = useState(false)
 
   const openTournamentGame = useCallback(async (gameId: string, updateUrl = true) => {
     setGameLoading(true)
@@ -99,6 +105,16 @@ function OnlineGamesPage() {
   }
 
   const watchingTournament = Boolean(selectedGame)
+  const boardSummary = useMemo(() => getJuChessBoardSummary(undefined, boardMoves), [boardMoves])
+  const topSide = flipped ? 'white' : 'black'
+  const bottomSide = flipped ? 'black' : 'white'
+
+  const playerFor = (side: 'white' | 'black') => ({
+    captured: boardSummary.captured[side],
+    name: side === 'white' ? selectedGame?.white ?? 'White' : selectedGame?.black ?? 'Black',
+    rating: side === 'white' ? selectedGame?.wRating : selectedGame?.bRating,
+    side,
+  })
 
   return (
     <div className="club-screen online-games-screen" data-screen-label="Games">
@@ -123,19 +139,25 @@ function OnlineGamesPage() {
                 <strong>{watchingTournament ? 'Tournament board' : 'Play on the board'}</strong>
                 <span>{gameLoading ? 'Loading game...' : watchingTournament ? 'Live moves update automatically' : 'Legal chess movement enabled'}</span>
               </div>
-              {watchingTournament ? (
-                <button type="button" onClick={startFreeBoard}>Free board</button>
-              ) : null}
+              <div className="online-board-head-actions">
+                <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
+                  <FlipHorizontal2 size={17} aria-hidden="true" />
+                </button>
+                {watchingTournament ? (
+                  <button type="button" onClick={startFreeBoard}>Free board</button>
+                ) : null}
+              </div>
             </div>
 
-            <PlayerStrip side="black" name={selectedGame?.black ?? 'Black'} rating={selectedGame?.bRating} />
+            <PlayerStrip {...playerFor(topSide)} edge="top" />
             <JuChessBoard
               className="online-ju-board"
+              flipped={flipped}
               interactive={!watchingTournament}
               moves={boardMoves}
               onChange={watchingTournament ? undefined : updateBoard}
             />
-            <PlayerStrip side="white" name={selectedGame?.white ?? 'White'} rating={selectedGame?.wRating} />
+            <PlayerStrip {...playerFor(bottomSide)} edge="bottom" />
 
             <div className="online-board-controls">
               <button type="button" disabled={watchingTournament || !boardMoves.length} onClick={undoMove}>
@@ -208,11 +230,26 @@ function OnlineGamesPage() {
   )
 }
 
-function PlayerStrip({ name, rating, side }: { name: string; rating?: number; side: 'white' | 'black' }) {
+function PlayerStrip({
+  captured,
+  edge,
+  name,
+  rating,
+  side,
+}: {
+  captured: JuCapturedPiece[]
+  edge: 'bottom' | 'top'
+  name: string
+  rating?: number
+  side: 'white' | 'black'
+}) {
   return (
-    <div className={`online-player-strip ${side}`}>
+    <div className={`online-player-strip ${side} ${edge}`}>
       <span>{side === 'white' ? 'W' : 'B'}</span>
-      <strong>{name}</strong>
+      <div className="online-player-copy">
+        <strong>{name}</strong>
+        <JuCapturedPieces pieces={captured} />
+      </div>
       <small>{rating ?? 'Unrated'}</small>
     </div>
   )

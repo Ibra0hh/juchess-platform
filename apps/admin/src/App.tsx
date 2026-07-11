@@ -1,8 +1,19 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Download, Image as ImageIcon, Plus, Search, Trash2, Upload, Video, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
-import { JuChessBoard, type JuChessBoardChange } from './components/JuChessBoard'
-import { buildChessGame, deriveResult, parseChessPgn, pgnFromMoves } from './components/JuChessRules'
+import {
+  JuCapturedPieces,
+  JuChessBoard,
+  type JuChessBoardChange,
+} from './components/JuChessBoard'
+import {
+  buildChessGame,
+  deriveResult,
+  getJuChessBoardSummary,
+  parseChessPgn,
+  pgnFromMoves,
+  type JuCapturedPiece,
+} from './components/JuChessRules'
 import { appwriteReady } from './lib/appwrite'
 import {
   advanceTournamentRound,
@@ -3268,6 +3279,7 @@ function LiveTournamentBoard({
   const [syncingBoards, setSyncingBoards] = useState<Record<string, boolean>>({})
   const syncQueues = useRef<Record<string, Promise<void>>>({})
   const [saving, setSaving] = useState(false)
+  const [flipped, setFlipped] = useState(false)
   const pairing = boards.find((board) => board.boardKey === selectedBoardKey) ?? boards[0]
   const boardState = pairing ? boardStates[pairing.boardKey] ?? initialLiveBoardState(pairing) : EMPTY_LIVE_BOARD_STATE
   const pgnDraft = pairing ? pgnDrafts[pairing.boardKey] ?? pairing.pgn ?? '' : ''
@@ -3278,6 +3290,16 @@ function LiveTournamentBoard({
     : 0
   const viewingHistory = viewPosition < boardState.moves.length
   const displayedMoves = boardState.moves.slice(0, viewPosition)
+  const boardSummary = useMemo(
+    () => getJuChessBoardSummary(undefined, boardState.moves.slice(0, viewPosition)),
+    [boardState.moves, viewPosition],
+  )
+  const topColor: 'black' | 'white' = flipped ? 'white' : 'black'
+  const bottomColor: 'black' | 'white' = flipped ? 'black' : 'white'
+
+  const playerName = (color: 'black' | 'white') => (
+    color === 'white' ? pairing?.white ?? 'White player' : pairing?.black ?? 'Black player'
+  )
 
   function updateCurrentBoard(nextState: LiveBoardState) {
     if (!pairing) return
@@ -3426,23 +3448,39 @@ function LiveTournamentBoard({
                 ))}
               </select>
             </label>
-            <span className="live-turn">
-              {viewingHistory
-                ? `Move ${viewPosition} of ${boardState.moves.length}`
-                : pairing?.completed
-                ? `Recorded ${pairing.result}`
-                : boardState.moves.length % 2 === 0
-                ? 'White to move'
-                : 'Black to move'}
-            </span>
+            <div className="live-board-status">
+              <span className="live-turn">
+                {viewingHistory
+                  ? `Move ${viewPosition} of ${boardState.moves.length}`
+                  : pairing?.completed
+                  ? `Recorded ${pairing.result}`
+                  : boardState.moves.length % 2 === 0
+                  ? 'White to move'
+                  : 'Black to move'}
+              </span>
+              <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
+                <FlipHorizontal2 aria-hidden="true" />
+              </button>
+            </div>
           </div>
-          <BoardPlayerBar color="black" name={pairing?.black ?? 'Black player'} />
+          <BoardPlayerBar
+            captured={boardSummary.captured[topColor]}
+            color={topColor}
+            edge="top"
+            name={playerName(topColor)}
+          />
           <JuChessBoard
+            flipped={flipped}
             interactive={Boolean(pairing && !viewingHistory && (!pairing.completed || allowCompletedCorrections))}
             moves={displayedMoves}
             onChange={handleBoardChange}
           />
-          <BoardPlayerBar color="white" name={pairing?.white ?? 'White player'} />
+          <BoardPlayerBar
+            captured={boardSummary.captured[bottomColor]}
+            color={bottomColor}
+            edge="bottom"
+            name={playerName(bottomColor)}
+          />
           <div className="live-replay-controls" role="group" aria-label="Move history navigation">
             <button
               type="button"
@@ -3486,8 +3524,8 @@ function LiveTournamentBoard({
         <aside className="live-game-side">
           <div className="live-match-card">
             <span>Current match</span>
-            <BoardPlayerBar color="white" name={pairing?.white ?? 'No active board'} compact />
-            <BoardPlayerBar color="black" name={pairing?.black ?? 'Select a live match'} compact />
+            <BoardPlayerBar captured={boardSummary.captured.white} color="white" name={pairing?.white ?? 'No active board'} compact />
+            <BoardPlayerBar captured={boardSummary.captured.black} color="black" name={pairing?.black ?? 'Select a live match'} compact />
           </div>
           <div className="result-control">
             <span>Result</span>
@@ -3552,23 +3590,28 @@ function LiveTournamentBoard({
 }
 
 function BoardPlayerBar({
+  captured = [],
   color,
   compact = false,
+  edge,
   name,
 }: {
+  captured?: JuCapturedPiece[]
   color: 'black' | 'white'
   compact?: boolean
+  edge?: 'bottom' | 'top'
   name: string
 }) {
   return (
     <div
       aria-label={`${color === 'white' ? 'White' : 'Black'} player: ${name}`}
-      className={`board-player-bar ${color} ${compact ? 'compact' : ''}`}
+      className={`board-player-bar ${color} ${edge ?? ''} ${compact ? 'compact' : ''}`}
     >
       <span className={`chess-color-chip ${color}`}>{color === 'white' ? 'W' : 'B'}</span>
       <div>
         <small>{color}</small>
         <strong>{name}</strong>
+        <JuCapturedPieces pieces={captured} />
       </div>
     </div>
   )

@@ -1,4 +1,26 @@
-import { Chess } from 'chess.js'
+import { Chess, type Color, type PieceSymbol } from 'chess.js'
+
+export type JuCapturedPiece = {
+  color: Color
+  type: PieceSymbol
+}
+
+export type JuChessBoardSummary = {
+  captured: {
+    black: JuCapturedPiece[]
+    white: JuCapturedPiece[]
+  }
+  materialEvaluation: number
+}
+
+const PIECE_VALUES: Record<PieceSymbol, number> = {
+  b: 3,
+  k: 0,
+  n: 3,
+  p: 1,
+  q: 9,
+  r: 5,
+}
 
 export function buildChessGame(fen?: string, moves: string[] = []) {
   const game = createChessGame(fen)
@@ -36,4 +58,35 @@ export function deriveResult(game: Chess) {
   if (game.isCheckmate()) return game.turn() === 'w' ? '0-1' : '1-0'
   if (game.isDraw()) return '1/2-1/2'
   return 'Live'
+}
+
+export function getJuChessBoardSummary(fen?: string, moves: string[] = []): JuChessBoardSummary {
+  const game = buildChessGame(fen, moves)
+  const captured: JuChessBoardSummary['captured'] = { black: [], white: [] }
+
+  game.history({ verbose: true }).forEach((move) => {
+    if (!move.captured) return
+    const capturer = move.color === 'w' ? 'white' : 'black'
+    captured[capturer].push({
+      color: move.color === 'w' ? 'b' : 'w',
+      type: move.captured,
+    })
+  })
+
+  const sortByValue = (left: JuCapturedPiece, right: JuCapturedPiece) => PIECE_VALUES[right.type] - PIECE_VALUES[left.type]
+  captured.white.sort(sortByValue)
+  captured.black.sort(sortByValue)
+
+  return { captured, materialEvaluation: getMaterialEvaluation(game) }
+}
+
+export function getMaterialEvaluation(game: Chess) {
+  let score = 0
+  game.board().forEach((rank) => {
+    rank.forEach((piece) => {
+      if (!piece) return
+      score += PIECE_VALUES[piece.type] * (piece.color === 'w' ? 1 : -1)
+    })
+  })
+  return score
 }
