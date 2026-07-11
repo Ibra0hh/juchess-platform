@@ -86,6 +86,7 @@ Fields:
 - `startsAt` datetime, optional.
 - `endsAt` datetime, optional.
 - `playMode` enum: `inPerson`, `online`; defaults to `inPerson`.
+- `onlinePlatform` enum: `chessCom`, `lichess`, `juchess`, optional. Required by the admin function when `playMode` is `online`. `juchess` means the game is played inside JuChess rather than linked to an external room.
 - `location` string, optional.
 - `capacity` integer, optional.
 - `description` string, optional.
@@ -127,6 +128,10 @@ Fields:
 - `status` enum: `scheduled`, `live`, `completed`, `forfeit`.
 - `result` enum: `1-0`, `0-1`, `1/2-1/2`, `*`.
 - `pgn` text, optional. The admin function enforces a 50,000-character limit.
+- `moveVersion` integer, default `0`. Incremented after every authoritative JuChess-hosted move.
+- `lastMoveAt` datetime, optional. Timestamp of the last accepted hosted move.
+- `whiteTimeMs` and `blackTimeMs` integers, optional. Remaining server-owned clock time for hosted games.
+- `turnStartedAt` datetime, optional. Start of the currently running hosted turn.
 - `procedureWave` integer, optional. Planned batch within the round.
 - `physicalBoard` integer, optional. Venue board assigned by the Procedure scheduler.
 - `queuePosition` integer, optional. Stable per-round procedure order.

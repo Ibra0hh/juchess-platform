@@ -4,6 +4,7 @@ import { tableIds, type TournamentStatus } from './juchess'
 
 export type AdminRole = 'superAdmin' | 'admin' | 'organizer'
 export type AdminStatus = 'active' | 'suspended'
+export type OnlineTournamentPlatform = 'chessCom' | 'lichess' | 'juchess'
 
 const tournamentAssetsBucketId = 'tournament-assets'
 const tournamentMediaPrefix = 'ju-media'
@@ -50,6 +51,7 @@ type AppwriteTournamentRow = Models.Row & {
   startsAt?: string
   endsAt?: string
   playMode?: 'inPerson' | 'online'
+  onlinePlatform?: OnlineTournamentPlatform
   location?: string
   capacity?: number
   description?: string
@@ -130,6 +132,7 @@ export type AdminTournament = {
   currentRound?: number
   startsAt?: string
   playMode: 'inPerson' | 'online'
+  onlinePlatform?: OnlineTournamentPlatform
   location?: string
   description?: string
   publishedGames: number
@@ -205,6 +208,7 @@ export type TournamentInput = {
   startsAt?: string
   endsAt?: string
   playMode?: 'inPerson' | 'online'
+  onlinePlatform?: OnlineTournamentPlatform
   location?: string
   capacity?: number
   description?: string
@@ -1019,6 +1023,7 @@ function mapTournament(
     currentRound: row.currentRound,
     startsAt: row.startsAt,
     playMode: row.playMode === 'online' ? 'online' : 'inPerson',
+    onlinePlatform: normalizeOnlinePlatform(row.onlinePlatform),
     location: row.location,
     description: row.description,
     publishedGames: games.length,
@@ -1034,6 +1039,10 @@ function normalizeTournamentFormat(format: string) {
   if (/^round[-\s]?robin$/i.test(value)) return 'Round robin'
   if (/^double\s+round[-\s]?robin$/i.test(value)) return 'Double round robin'
   return value
+}
+
+function normalizeOnlinePlatform(value?: string): OnlineTournamentPlatform | undefined {
+  return value === 'chessCom' || value === 'lichess' || value === 'juchess' ? value : undefined
 }
 
 function formatRouteId(format: string) {

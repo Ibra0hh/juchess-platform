@@ -117,6 +117,10 @@ class AppConfig {
     'APPWRITE_PLAYER_FUNCTION_ID',
     defaultValue: 'player-actions',
   );
+  static const adminFunctionId = String.fromEnvironment(
+    'APPWRITE_ADMIN_FUNCTION_ID',
+    defaultValue: 'admin-actions',
+  );
   static const recoveryUrl = String.fromEnvironment(
     'APPWRITE_RECOVERY_URL',
     defaultValue: 'https://juchess.ju.edu.jo/reset-password',
@@ -713,6 +717,43 @@ class AppwriteService {
     return payload;
   }
 
+  Future<Map<String, dynamic>> _runHostedGameAction(
+    String path, {
+    Map<String, dynamic> body = const {},
+  }) async {
+    final execution = await functions.createExecution(
+      functionId: AppConfig.adminFunctionId,
+      body: jsonEncode(body),
+      xasync: false,
+      path: path,
+      method: enums.ExecutionMethod.pOST,
+      headers: {'content-type': 'application/json'},
+    );
+    final decoded = jsonDecode(execution.responseBody);
+    if (decoded is! Map<String, dynamic>) {
+      throw AppwriteException('The JuChess game server returned an unreadable response.');
+    }
+    if (execution.responseStatusCode >= 400 || decoded['ok'] == false) {
+      throw AppwriteException(decoded['error']?.toString() ?? 'The game server rejected this action.');
+    }
+    return decoded;
+  }
+
+  Future<Map<String, dynamic>> submitHostedTournamentMove({
+    required String gameId,
+    required String san,
+    required int expectedVersion,
+  }) {
+    return _runHostedGameAction(
+      '/player/games/$gameId/move',
+      body: {'san': san, 'expectedVersion': expectedVersion},
+    );
+  }
+
+  Future<void> resignHostedTournamentGame(String gameId) async {
+    await _runHostedGameAction('/player/games/$gameId/resign');
+  }
+
   Future<void> registerForTournament({
     required String tournamentRowId,
     required String profileId,
@@ -869,15 +910,36 @@ class AppwriteService {
         rowId: gameId,
       );
       final data = row.data;
+      final tournamentId = data['tournamentId']?.toString();
+      models.Row? tournament;
+      if (tournamentId != null) {
+        try {
+          tournament = await tablesDB.getRow(
+            databaseId: AppConfig.databaseId,
+            tableId: AppConfig.tournamentsTableId,
+            rowId: tournamentId,
+          );
+        } catch (_) {}
+      }
       final status = data['status']?.toString() ?? 'scheduled';
       final storedResult = data['result']?.toString();
       return TournamentLiveGameState(
+        blackProfileId: data['blackProfileId']?.toString(),
+        blackTimeMs: _asInt(data['blackTimeMs']),
+        lastMoveAt: data['lastMoveAt']?.toString(),
+        moveVersion: _asInt(data['moveVersion']) ?? 0,
+        onlinePlatform: tournament?.data['onlinePlatform']?.toString(),
         pgn: data['pgn']?.toString(),
         result: status == 'live'
             ? 'live'
             : storedResult == null || storedResult == '*'
             ? '-'
             : storedResult,
+        status: status,
+        tournamentStatus: tournament?.data['status']?.toString(),
+        turnStartedAt: data['turnStartedAt']?.toString(),
+        whiteProfileId: data['whiteProfileId']?.toString(),
+        whiteTimeMs: _asInt(data['whiteTimeMs']),
       );
     } catch (_) {
       return null;
@@ -1105,7 +1167,11 @@ class AppwriteService {
         ? registeredPlayers.length
         : cloudData.playerCountsByTournament[row.$id] ?? 0;
     final displayedPlayers = players;
-    final location = data['location']?.toString() ?? 'University of Jordan';
+    final playMode = data['playMode']?.toString() == 'online' ? 'online' : 'inPerson';
+    final onlinePlatform = data['onlinePlatform']?.toString();
+    final location = playMode == 'online'
+        ? _onlinePlatformLabel(onlinePlatform)
+        : data['location']?.toString() ?? 'University of Jordan';
     final startsAt = data['startsAt']?.toString();
 
     return TournamentSeed(
@@ -1130,6 +1196,8 @@ class AppwriteService {
       roundsTotal: roundsTotal,
       currentRound: currentRound,
       location: location,
+      playMode: playMode,
+      onlinePlatform: onlinePlatform,
       description:
           data['description']?.toString() ??
           'Tournament details will be published by the club organizers.',
@@ -1144,10 +1212,33 @@ class AppwriteService {
 }
 
 class TournamentLiveGameState {
-  const TournamentLiveGameState({required this.result, this.pgn});
+  const TournamentLiveGameState({
+    required this.result,
+    required this.status,
+    this.blackProfileId,
+    this.blackTimeMs,
+    this.lastMoveAt,
+    this.moveVersion = 0,
+    this.onlinePlatform,
+    this.pgn,
+    this.tournamentStatus,
+    this.turnStartedAt,
+    this.whiteProfileId,
+    this.whiteTimeMs,
+  });
 
   final String result;
+  final String status;
+  final String? blackProfileId;
+  final int? blackTimeMs;
+  final String? lastMoveAt;
+  final int moveVersion;
+  final String? onlinePlatform;
   final String? pgn;
+  final String? tournamentStatus;
+  final String? turnStartedAt;
+  final String? whiteProfileId;
+  final int? whiteTimeMs;
 }
 
 class MyRegistrationInfo {
@@ -1316,7 +1407,14 @@ Map<String, List<RoundSeed>> _groupPublishedRounds(
           ? '-'
           : result,
       gameId: row.$id,
+      blackProfileId: blackProfileId,
+      blackTimeMs: _asInt(data['blackTimeMs']),
+      moveVersion: _asInt(data['moveVersion']) ?? 0,
       pgn: data['pgn']?.toString(),
+      status: status ?? 'scheduled',
+      turnStartedAt: data['turnStartedAt']?.toString(),
+      whiteProfileId: whiteProfileId,
+      whiteTimeMs: _asInt(data['whiteTimeMs']),
     );
     groups.putIfAbsent(tournamentId, () => {});
     groups[tournamentId]!.putIfAbsent(round, () => []).add((
@@ -8622,9 +8720,21 @@ class TournamentGameDetailScreen extends StatefulWidget {
 class _TournamentGameDetailScreenState
     extends State<TournamentGameDetailScreen> {
   Timer? _liveRefreshTimer;
+  Timer? _clockTimer;
   bool _refreshing = false;
+  bool _movePending = false;
   late List<String> moves;
   late String currentResult;
+  late String currentStatus;
+  late int moveVersion;
+  String? whiteProfileId;
+  String? blackProfileId;
+  String? onlinePlatform;
+  String? tournamentStatus;
+  int? whiteTimeMs;
+  int? blackTimeMs;
+  String? turnStartedAt;
+  String? message;
   bool flipped = false;
 
   @override
@@ -8632,21 +8742,32 @@ class _TournamentGameDetailScreenState
     super.initState();
     moves = _parseStoredMoves(widget.match.pgn);
     currentResult = widget.match.result;
+    currentStatus = widget.match.status;
+    moveVersion = widget.match.moveVersion;
+    whiteProfileId = widget.match.whiteProfileId;
+    blackProfileId = widget.match.blackProfileId;
+    whiteTimeMs = widget.match.whiteTimeMs;
+    blackTimeMs = widget.match.blackTimeMs;
+    turnStartedAt = widget.match.turnStartedAt;
 
-    if (widget.match.gameId != null && currentResult == 'live') {
+    if (widget.match.gameId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_refreshLiveGame());
       });
       _liveRefreshTimer = Timer.periodic(
-        const Duration(seconds: 3),
+        const Duration(milliseconds: 1200),
         (_) => unawaited(_refreshLiveGame()),
       );
+      _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted && currentStatus == 'live' && turnStartedAt != null) setState(() {});
+      });
     }
   }
 
   @override
   void dispose() {
     _liveRefreshTimer?.cancel();
+    _clockTimer?.cancel();
     super.dispose();
   }
 
@@ -8661,23 +8782,97 @@ class _TournamentGameDetailScreenState
       if (!mounted || liveGame == null) return;
 
       final refreshedMoves = _parseStoredMoves(liveGame.pgn);
-      if (refreshedMoves.join(' ') != moves.join(' ') ||
-          liveGame.result != currentResult) {
-        setState(() {
-          moves = refreshedMoves;
-          currentResult = liveGame.result;
-        });
-      }
-      if (liveGame.result != 'live') {
+      setState(() {
+        moves = refreshedMoves;
+        currentResult = liveGame.result;
+        currentStatus = liveGame.status;
+        moveVersion = liveGame.moveVersion;
+        whiteProfileId = liveGame.whiteProfileId;
+        blackProfileId = liveGame.blackProfileId;
+        onlinePlatform = liveGame.onlinePlatform;
+        tournamentStatus = liveGame.tournamentStatus;
+        whiteTimeMs = liveGame.whiteTimeMs;
+        blackTimeMs = liveGame.blackTimeMs;
+        turnStartedAt = liveGame.turnStartedAt;
+      });
+      if (liveGame.status != 'live' && liveGame.status != 'scheduled') {
         _liveRefreshTimer?.cancel();
+        _clockTimer?.cancel();
       }
     } finally {
       _refreshing = false;
     }
   }
 
+  Future<void> _submitMove(List<String> nextMoves, String _) async {
+    final gameId = widget.match.gameId;
+    if (gameId == null || _movePending || nextMoves.isEmpty) return;
+    setState(() {
+      _movePending = true;
+      message = 'Submitting move...';
+    });
+    try {
+      final response = await context.read<AppState>().service.submitHostedTournamentMove(
+        gameId: gameId,
+        san: nextMoves.last,
+        expectedVersion: moveVersion,
+      );
+      if (!mounted) return;
+      setState(() {
+        message = response['requiresTiebreak'] == true
+            ? 'Draw recorded. The organizer must resolve the knockout tiebreak.'
+            : null;
+      });
+    } catch (error) {
+      if (mounted) setState(() => message = appwriteMessage(error));
+    } finally {
+      await _refreshLiveGame();
+      if (mounted) setState(() => _movePending = false);
+    }
+  }
+
+  Future<void> _resign() async {
+    final gameId = widget.match.gameId;
+    if (gameId == null || _movePending) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Resign game?'),
+        content: const Text('This result cannot be undone by a player.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resign')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _movePending = true);
+    try {
+      await context.read<AppState>().service.resignHostedTournamentGame(gameId);
+      if (mounted) setState(() => message = 'Game resigned.');
+    } catch (error) {
+      if (mounted) setState(() => message = appwriteMessage(error));
+    } finally {
+      await _refreshLiveGame();
+      if (mounted) setState(() => _movePending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    final profileId = appState.profileId;
+    final assignedColor = whiteProfileId == profileId
+        ? 'white'
+        : blackProfileId == profileId
+        ? 'black'
+        : null;
+    final turnColor = moves.length.isEven ? 'white' : 'black';
+    final assignedParticipant = onlinePlatform == 'juchess' &&
+        tournamentStatus == 'active' &&
+        assignedColor != null &&
+        (currentStatus == 'scheduled' || currentStatus == 'live');
+    final canMove = assignedParticipant && assignedColor == turnColor && !_movePending;
     final result = currentResult == '-'
         ? 'Scheduled'
         : currentResult == 'live'
@@ -8738,13 +8933,21 @@ class _TournamentGameDetailScreenState
                 color: flipped ? 'white' : 'black',
                 edge: 'top',
                 name: flipped ? widget.match.white : widget.match.black,
+                clock: _mobileHostedClockLabel(
+                  side: flipped ? 'white' : 'black',
+                  turn: turnColor,
+                  status: currentStatus,
+                  turnStartedAt: turnStartedAt,
+                  whiteTimeMs: whiteTimeMs,
+                  blackTimeMs: blackTimeMs,
+                ),
               ),
               PrototypeChessBoard(
                 flipped: flipped,
                 moves: moves,
-                readOnly: true,
+                readOnly: !canMove,
                 showEvaluation: false,
-                onChanged: (_, _) {},
+                onChanged: _submitMove,
               ),
               TournamentBoardPlayerBar(
                 capturedPieces: boardSummary.capturedBy(
@@ -8753,7 +8956,36 @@ class _TournamentGameDetailScreenState
                 color: flipped ? 'black' : 'white',
                 edge: 'bottom',
                 name: flipped ? widget.match.black : widget.match.white,
+                clock: _mobileHostedClockLabel(
+                  side: flipped ? 'black' : 'white',
+                  turn: turnColor,
+                  status: currentStatus,
+                  turnStartedAt: turnStartedAt,
+                  whiteTimeMs: whiteTimeMs,
+                  blackTimeMs: blackTimeMs,
+                ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                _movePending
+                    ? 'Saving move...'
+                    : assignedParticipant
+                    ? canMove
+                        ? 'Your turn'
+                        : 'Opponent to move'
+                    : onlinePlatform == 'juchess'
+                    ? 'Watching live tournament board'
+                    : 'Tournament board',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+              ),
+              if (message != null) ...[
+                const SizedBox(height: 6),
+                Text(message!, textAlign: TextAlign.center, style: const TextStyle(color: PrototypeColors.burgundy, fontSize: 12, fontWeight: FontWeight.w700)),
+              ],
+              if (assignedParticipant) ...[
+                const SizedBox(height: 8),
+                TextButton(onPressed: _movePending ? null : _resign, child: const Text('Resign game')),
+              ],
             ],
           ),
         ),
@@ -8823,6 +9055,7 @@ class _TournamentGameDetailScreenState
 class TournamentBoardPlayerBar extends StatelessWidget {
   const TournamentBoardPlayerBar({
     this.capturedPieces = const [],
+    this.clock,
     required this.color,
     required this.edge,
     required this.name,
@@ -8830,6 +9063,7 @@ class TournamentBoardPlayerBar extends StatelessWidget {
   });
 
   final List<chess.Piece> capturedPieces;
+  final String? clock;
   final String color;
   final String edge;
   final String name;
@@ -8886,10 +9120,41 @@ class TournamentBoardPlayerBar extends StatelessWidget {
               ],
             ),
           ),
+          if (clock != null)
+            Text(
+              clock!,
+              style: const TextStyle(
+                color: PrototypeColors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
         ],
       ),
     );
   }
+}
+
+String? _mobileHostedClockLabel({
+  required String side,
+  required String turn,
+  required String status,
+  required String? turnStartedAt,
+  required int? whiteTimeMs,
+  required int? blackTimeMs,
+}) {
+  final stored = side == 'white' ? whiteTimeMs : blackTimeMs;
+  if (stored == null) return null;
+  final runningSince = status == 'live' && side == turn && turnStartedAt != null
+      ? DateTime.tryParse(turnStartedAt)?.millisecondsSinceEpoch
+      : null;
+  final remaining = runningSince == null
+      ? stored
+      : math.max(0, stored - (DateTime.now().millisecondsSinceEpoch - runningSince));
+  final totalSeconds = (remaining / 1000).ceil();
+  final minutes = totalSeconds ~/ 60;
+  final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
 }
 
 class AnalysisBoardScreen extends StatefulWidget {
@@ -12702,6 +12967,8 @@ class TournamentSeed {
     required this.timeControl,
     required this.players,
     required this.location,
+    this.playMode = 'inPerson',
+    this.onlinePlatform,
     required this.description,
     this.capacity,
     this.roundsTotal,
@@ -12727,6 +12994,8 @@ class TournamentSeed {
   final int? roundsTotal;
   final int? currentRound;
   final String location;
+  final String playMode;
+  final String? onlinePlatform;
   final String description;
   final String? startsAt;
   final String status;
@@ -12747,6 +13016,13 @@ class TournamentSeed {
     if (total != null) return '$total rounds';
     return this.current;
   }
+}
+
+String _onlinePlatformLabel(String? value) {
+  if (value == 'chessCom') return 'Chess.com';
+  if (value == 'lichess') return 'Lichess';
+  if (value == 'juchess') return 'JuChess';
+  return 'Online';
 }
 
 class TournamentMediaSeed {
@@ -12830,18 +13106,32 @@ class MatchSeed {
     this.black,
     this.result, {
     this.gameId,
+    this.blackProfileId,
+    this.blackTimeMs,
     this.matchNumber,
+    this.moveVersion = 0,
     this.nextIndex,
     this.pgn,
+    this.status = 'scheduled',
+    this.turnStartedAt,
+    this.whiteProfileId,
+    this.whiteTimeMs,
   });
 
   final String white;
   final String black;
   final String result;
   final String? gameId;
+  final String? blackProfileId;
+  final int? blackTimeMs;
   final int? matchNumber;
+  final int moveVersion;
   final int? nextIndex;
   final String? pgn;
+  final String status;
+  final String? turnStartedAt;
+  final String? whiteProfileId;
+  final int? whiteTimeMs;
 }
 
 class SavedAnalysisSeed {

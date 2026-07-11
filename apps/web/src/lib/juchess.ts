@@ -5,6 +5,7 @@ const tournamentAssetsBucketId = 'tournament-assets'
 const tournamentMediaPrefix = 'ju-media'
 
 export type TournamentStatus = 'Active' | 'Upcoming' | 'Completed'
+export type OnlineTournamentPlatform = 'chessCom' | 'lichess' | 'juchess'
 
 export type Tournament = {
   rowId?: string
@@ -13,6 +14,7 @@ export type Tournament = {
   status: TournamentStatus
   date: string
   playMode: 'inPerson' | 'online'
+  onlinePlatform?: OnlineTournamentPlatform
   location: string
   format: string
   timeControl: string
@@ -49,6 +51,7 @@ type AppwriteTournamentRow = Models.Row & {
   startsAt?: string
   endsAt?: string
   playMode?: 'inPerson' | 'online'
+  onlinePlatform?: OnlineTournamentPlatform
   location?: string
   capacity?: number
   description?: string
@@ -79,6 +82,11 @@ type AppwriteGameRow = Models.Row & {
   status?: 'scheduled' | 'live' | 'completed' | 'forfeit'
   result?: '1-0' | '0-1' | '1/2-1/2' | '*'
   pgn?: string
+  moveVersion?: number
+  lastMoveAt?: string
+  whiteTimeMs?: number
+  blackTimeMs?: number
+  turnStartedAt?: string
   startedAt?: string
   finishedAt?: string
 }
@@ -108,6 +116,11 @@ export type TournamentGame = {
   status: 'scheduled' | 'live' | 'completed' | 'forfeit'
   result: '1-0' | '0-1' | '1/2-1/2' | '*'
   pgn?: string
+  moveVersion: number
+  lastMoveAt?: string
+  whiteTimeMs?: number
+  blackTimeMs?: number
+  turnStartedAt?: string
   startedAt?: string
   finishedAt?: string
 }
@@ -183,6 +196,14 @@ export type SampleGame = {
   moves: string[]
   pgn?: string
   live?: boolean
+  status?: 'scheduled' | 'live' | 'completed' | 'forfeit'
+  moveVersion?: number
+  lastMoveAt?: string
+  whiteTimeMs?: number
+  blackTimeMs?: number
+  turnStartedAt?: string
+  onlinePlatform?: OnlineTournamentPlatform
+  tournamentStatus?: TournamentStatus
   tournamentId?: string
   tournamentName?: string
 }
@@ -508,12 +529,23 @@ export async function loadTournamentGame(gameId: string | null | undefined): Pro
       tableId: tableIds.games,
       rowId: gameId,
     })
-    if (row.status === 'scheduled' || row.blackProfileId === 'system_bye') return null
-    const [profiles, tournamentNames] = await Promise.all([
+    if (row.blackProfileId === 'system_bye') return null
+    const [profiles, tournamentNames, tournament] = await Promise.all([
       loadProfilesForGame(row),
       loadTournamentNames(row.tournamentId ? [row.tournamentId] : []),
+      row.tournamentId ? tablesDB.getRow<AppwriteTournamentRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.tournaments,
+        rowId: row.tournamentId,
+      }).catch(() => null) : Promise.resolve(null),
     ])
-    return appwriteGameToSampleGame(row, profiles, tournamentNames)
+    const game = appwriteGameToSampleGame(row, profiles, tournamentNames)
+    if (!game) return null
+    return {
+      ...game,
+      onlinePlatform: normalizeOnlinePlatform(tournament?.onlinePlatform),
+      tournamentStatus: mapStatus(tournament?.status) ?? undefined,
+    }
   } catch (error) {
     console.warn('JuChess cloud game read failed.', error)
     return null
@@ -667,6 +699,12 @@ function appwriteGameToSampleGame(
     moves,
     pgn: row.pgn,
     live: row.status === 'live',
+    status: row.status ?? 'scheduled',
+    moveVersion: Math.max(0, row.moveVersion ?? 0),
+    lastMoveAt: row.lastMoveAt,
+    whiteTimeMs: row.whiteTimeMs,
+    blackTimeMs: row.blackTimeMs,
+    turnStartedAt: row.turnStartedAt,
     tournamentId: row.tournamentId,
     tournamentName,
   }
@@ -942,6 +980,11 @@ function groupPublishedGames(rows: AppwriteGameRow[], profiles: Map<string, Memb
       status: row.status ?? 'scheduled',
       result: row.result ?? '*',
       pgn: row.pgn,
+      moveVersion: Math.max(0, row.moveVersion ?? 0),
+      lastMoveAt: row.lastMoveAt,
+      whiteTimeMs: row.whiteTimeMs,
+      blackTimeMs: row.blackTimeMs,
+      turnStartedAt: row.turnStartedAt,
       startedAt: row.startedAt,
       finishedAt: row.finishedAt,
     })
@@ -976,7 +1019,10 @@ function mapAppwriteTournament(
     status,
     date: formatDateRange(row.startsAt, row.endsAt),
     playMode: row.playMode === 'online' ? 'online' : 'inPerson',
-    location: row.location || 'University of Jordan',
+    onlinePlatform: normalizeOnlinePlatform(row.onlinePlatform),
+    location: row.playMode === 'online'
+      ? onlinePlatformLabel(normalizeOnlinePlatform(row.onlinePlatform))
+      : row.location || 'University of Jordan',
     format,
     timeControl: row.timeControl,
     participants: participantCounts.get(row.$id) ?? 0,
@@ -990,6 +1036,17 @@ function mapAppwriteTournament(
     bracketSnapshot: parsePublishedBracketSnapshot(row.bracketSnapshot),
     media: mediaByTournament.get(row.$id) ?? [],
   }
+}
+
+function normalizeOnlinePlatform(value?: string): OnlineTournamentPlatform | undefined {
+  return value === 'chessCom' || value === 'lichess' || value === 'juchess' ? value : undefined
+}
+
+function onlinePlatformLabel(value?: OnlineTournamentPlatform) {
+  if (value === 'chessCom') return 'Chess.com'
+  if (value === 'lichess') return 'Lichess'
+  if (value === 'juchess') return 'JuChess'
+  return 'Online'
 }
 
 function parsePublishedBracketSnapshot(value?: string): PublishedBracketSnapshot | undefined {

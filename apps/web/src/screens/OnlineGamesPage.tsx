@@ -8,6 +8,7 @@ import {
 } from '../components/JuChessBoard'
 import { getJuChessBoardSummary, type JuCapturedPiece } from '../components/JuChessRules'
 import SiteHeader from '../components/SiteHeader'
+import { useAuth } from '../context/AuthContext'
 import {
   loadTournamentGame,
   loadTournaments,
@@ -19,6 +20,7 @@ import {
   clearOnlineTournamentPlayLock,
   setOnlineTournamentPlayLock,
 } from '../lib/onlineTournamentPlayLock'
+import { resignHostedTournamentGame, submitHostedTournamentMove } from '../lib/onlineTournament'
 import './OnlineGamesPage.css'
 
 type TournamentGameChoice = {
@@ -27,6 +29,7 @@ type TournamentGameChoice = {
 }
 
 function OnlineGamesPage() {
+  const { profile } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedGameId = searchParams.get('game')
   const [tournaments, setTournaments] = useState<Tournament[]>([])
@@ -37,6 +40,9 @@ function OnlineGamesPage() {
   const [boardResult, setBoardResult] = useState('Live')
   const [gameLoading, setGameLoading] = useState(Boolean(requestedGameId))
   const [flipped, setFlipped] = useState(false)
+  const [movePending, setMovePending] = useState(false)
+  const [message, setMessage] = useState('')
+  const [, setClockTick] = useState(0)
 
   const openTournamentGame = useCallback(async (gameId: string, updateUrl = true) => {
     setGameLoading(true)
@@ -47,8 +53,6 @@ function OnlineGamesPage() {
       setBoardMoves(game.moves)
       setBoardResult(game.result)
       if (updateUrl) setSearchParams({ game: gameId })
-      if (game.live) setOnlineTournamentPlayLock(gameId)
-      else clearOnlineTournamentPlayLock(gameId)
     } else {
       clearOnlineTournamentPlayLock(gameId)
     }
@@ -68,13 +72,20 @@ function OnlineGamesPage() {
   }, [])
 
   const activeTournaments = useMemo(
-    () => tournaments.filter((tournament) => tournament.status === 'Active' && tournament.playMode === 'online'),
+    () => tournaments.filter((tournament) => (
+      tournament.status === 'Active'
+      && tournament.playMode === 'online'
+      && tournament.onlinePlatform === 'juchess'
+    )),
     [tournaments],
   )
   const gameChoices = useMemo<TournamentGameChoice[]>(() => (
     activeTournaments.flatMap((tournament) => (
       (tournament.publishedGames ?? [])
-        .filter((game) => game.status === 'live')
+        .filter((game) => (
+          (game.status === 'scheduled' || game.status === 'live')
+          && (!tournament.currentRound || game.round === tournament.currentRound)
+        ))
         .map((game) => ({ game, tournament }))
     ))
   ), [activeTournaments])
@@ -85,13 +96,19 @@ function OnlineGamesPage() {
   }, [openTournamentGame, requestedGameId])
 
   useEffect(() => {
-    if (!selectedGameId || !selectedGame?.live) return
+    if (!selectedGameId || (selectedGame?.status !== 'scheduled' && selectedGame?.status !== 'live')) return
 
     const timer = window.setInterval(() => {
       void openTournamentGame(selectedGameId, false)
-    }, 3000)
+    }, 1200)
     return () => window.clearInterval(timer)
-  }, [openTournamentGame, selectedGame?.live, selectedGameId])
+  }, [openTournamentGame, selectedGame?.status, selectedGameId])
+
+  useEffect(() => {
+    if (!selectedGame?.live || !selectedGame.turnStartedAt) return
+    const timer = window.setInterval(() => setClockTick((value) => value + 1), 1000)
+    return () => window.clearInterval(timer)
+  }, [selectedGame?.live, selectedGame?.turnStartedAt])
 
   function startFreeBoard() {
     clearOnlineTournamentPlayLock()
@@ -102,9 +119,38 @@ function OnlineGamesPage() {
     setSearchParams({})
   }
 
-  function updateBoard(state: JuChessBoardChange) {
-    setBoardMoves(state.moves)
-    setBoardResult(state.result)
+  async function updateBoard(state: JuChessBoardChange) {
+    if (!selectedGameId || !selectedGame || movePending || !state.lastMove) return
+    setMovePending(true)
+    setMessage('Submitting move...')
+    try {
+      const response = await submitHostedTournamentMove(
+        selectedGameId,
+        state.lastMove,
+        selectedGame.moveVersion ?? 0,
+      )
+      setMessage(response.requiresTiebreak ? 'Draw recorded. The organizer must resolve the knockout tiebreak.' : '')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'The game server rejected this move.')
+    } finally {
+      await openTournamentGame(selectedGameId, false)
+      setMovePending(false)
+    }
+  }
+
+  async function resignGame() {
+    if (!selectedGameId || !assignedParticipant || movePending) return
+    if (!window.confirm('Resign this tournament game? This cannot be undone.')) return
+    setMovePending(true)
+    try {
+      await resignHostedTournamentGame(selectedGameId)
+      setMessage('Game resigned.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not resign this game.')
+    } finally {
+      await openTournamentGame(selectedGameId, false)
+      setMovePending(false)
+    }
   }
 
   function undoMove() {
@@ -114,13 +160,28 @@ function OnlineGamesPage() {
   }
 
   const watchingTournament = Boolean(selectedGame)
-  const playingOnlineTournament = Boolean(selectedGame?.live)
+  const profileId = profile?.$id
+  const assignedColor = selectedGame?.whiteProfileId === profileId
+    ? 'white'
+    : selectedGame?.blackProfileId === profileId
+    ? 'black'
+    : null
+  const turnColor = boardMoves.length % 2 === 0 ? 'white' : 'black'
+  const assignedParticipant = Boolean(assignedColor && selectedGame && (selectedGame.status === 'scheduled' || selectedGame.status === 'live'))
+  const canMove = Boolean(assignedParticipant && assignedColor === turnColor && !movePending)
+  const playingOnlineTournament = assignedParticipant
+
+  useEffect(() => {
+    if (assignedParticipant && selectedGameId) setOnlineTournamentPlayLock(selectedGameId)
+    else if (selectedGameId) clearOnlineTournamentPlayLock(selectedGameId)
+  }, [assignedParticipant, selectedGameId])
   const boardSummary = useMemo(() => getJuChessBoardSummary(undefined, boardMoves), [boardMoves])
   const topSide = flipped ? 'white' : 'black'
   const bottomSide = flipped ? 'black' : 'white'
 
   const playerFor = (side: 'white' | 'black') => ({
     captured: boardSummary.captured[side],
+    clock: hostedClockLabel(selectedGame, side, turnColor),
     name: side === 'white' ? selectedGame?.white ?? 'White' : selectedGame?.black ?? 'Black',
     rating: side === 'white' ? selectedGame?.wRating : selectedGame?.bRating,
     side,
@@ -164,9 +225,12 @@ function OnlineGamesPage() {
               annotationsEnabled={!playingOnlineTournament}
               className="online-ju-board"
               flipped={flipped}
-              interactive={!watchingTournament}
+              interactive={watchingTournament ? canMove : true}
               moves={boardMoves}
-              onChange={watchingTournament ? undefined : updateBoard}
+              onChange={watchingTournament ? updateBoard : (state) => {
+                setBoardMoves(state.moves)
+                setBoardResult(state.result)
+              }}
               showEvaluation={false}
             />
             <PlayerStrip {...playerFor(bottomSide)} edge="bottom" />
@@ -176,12 +240,16 @@ function OnlineGamesPage() {
                 <Undo2 size={16} aria-hidden="true" />
                 Undo
               </button>
-              <span>{boardMoves.length} moves · {boardResult}</span>
+              <span>{movePending ? 'Saving move...' : assignedParticipant ? canMove ? 'Your turn' : 'Opponent to move' : `${boardMoves.length} moves · ${boardResult}`}</span>
+              {assignedParticipant ? (
+                <button type="button" disabled={movePending} onClick={() => void resignGame()}>Resign</button>
+              ) : null}
               <button type="button" disabled={watchingTournament && gameLoading} onClick={startFreeBoard}>
                 <RotateCcw size={16} aria-hidden="true" />
                 New game
               </button>
             </div>
+            {message ? <p className="online-game-message" role="status">{message}</p> : null}
           </section>
 
           <aside className="online-tournament-panel" aria-labelledby="play-online-title">
@@ -222,7 +290,7 @@ function OnlineGamesPage() {
                           >
                             <span className={game.status === 'live' ? 'live-dot' : undefined} />
                             <strong>{game.white.name} vs {game.black.name}</strong>
-                            <small>Board {game.board}</small>
+                            <small>{game.status === 'live' ? 'Live' : 'Ready'} · Board {game.board}</small>
                           </button>
                         ))}
                       </div>
@@ -244,12 +312,14 @@ function OnlineGamesPage() {
 
 function PlayerStrip({
   captured,
+  clock,
   edge,
   name,
   rating,
   side,
 }: {
   captured: JuCapturedPiece[]
+  clock?: string
   edge: 'bottom' | 'top'
   name: string
   rating?: number
@@ -262,9 +332,20 @@ function PlayerStrip({
         <strong>{name}</strong>
         <JuCapturedPieces pieces={captured} />
       </div>
-      <small>{rating ?? 'Unrated'}</small>
+      <small>{clock ? `${clock} · ` : ''}{rating ?? 'Unrated'}</small>
     </div>
   )
+}
+
+function hostedClockLabel(game: SampleGame | null, side: 'white' | 'black', turn: 'white' | 'black') {
+  const stored = side === 'white' ? game?.whiteTimeMs : game?.blackTimeMs
+  if (stored === undefined) return undefined
+  const runningSince = game?.live && side === turn && game.turnStartedAt ? Date.parse(game.turnStartedAt) : Number.NaN
+  const remaining = Number.isFinite(runningSince) ? Math.max(0, stored - (Date.now() - runningSince)) : stored
+  const totalSeconds = Math.ceil(remaining / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = String(totalSeconds % 60).padStart(2, '0')
+  return `${minutes}:${seconds}`
 }
 
 export default OnlineGamesPage

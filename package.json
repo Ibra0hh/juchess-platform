@@ -16,6 +16,7 @@
     "build:pages": "node scripts/build-pages.mjs",
     "seed:appwrite-demo": "node scripts/seed-appwrite-demo-data.mjs",
     "migrate:procedure": "powershell -ExecutionPolicy Bypass -File scripts/migrate-procedure-schema.ps1",
+    "migrate:online-tournaments": "powershell -ExecutionPolicy Bypass -File scripts/migrate-online-tournament-schema.ps1",
     "migrate:profile-usernames": "powershell -ExecutionPolicy Bypass -File scripts/migrate-profile-game-usernames.ps1",
     "lint:web": "npm --workspace apps/web run lint",
     "lint:admin": "npm --workspace apps/admin run lint",

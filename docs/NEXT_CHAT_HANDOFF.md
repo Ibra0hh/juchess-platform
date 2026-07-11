@@ -2,6 +2,36 @@
 
 Read this file first when continuing the JuChess project in a new Codex chat.
 
+## July 12, 2026: JuChess-Hosted Online Tournaments
+
+- Admin tournament creation now stores `playMode` plus one explicit online
+  platform: `chessCom`, `lichess`, or `juchess`.
+- Only `juchess` means games are played inside this product. Chess.com and
+  Lichess remain external tournament platforms.
+- JuChess-hosted tournaments use published rounds/brackets and do not expose a
+  Procedure tab. Procedure remains for physical venue boards.
+- Signed-in players play only the game row where their profile is assigned as
+  White or Black. The server validates side to move and legality with
+  `chess.js`; spectators receive the same public game row but cannot move.
+- Authoritative moves are handled by `admin-actions` routes
+  `POST /player/games/:id/move` and `POST /player/games/:id/resign`. The
+  function is executable by signed-in users, but every admin route still
+  passes `requireAdminActor`.
+- Game rows now carry `moveVersion`, `lastMoveAt`, `whiteTimeMs`,
+  `blackTimeMs`, and `turnStartedAt`. Clients submit an expected revision and
+  poll the canonical row every 1.2-1.5 seconds.
+- Checkmate, stalemate, automatic draws, resignation, standings, and next-round
+  advancement reuse the existing server tournament engine. A drawn knockout
+  position is saved live and flagged for organizer tiebreak resolution because
+  knockout advancement requires a winner.
+- Live schema migration: `scripts/migrate-online-tournament-schema.ps1`.
+- Live Appwrite deployment `6a52c1c711c2292c877f` was ready and activated on
+  July 12, 2026.
+- Verification at implementation time: 47 backend tests, 14 web review tests,
+  18 Flutter tests, Flutter analyze, web build, admin build, function syntax,
+  desktop browser render, legal free-board interaction, and 390x844 responsive
+  render all passed.
+
 ## Core Rule
 
 The prototypes are the design source of truth. Do not invent a new UI.

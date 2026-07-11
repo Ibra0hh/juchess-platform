@@ -5,6 +5,7 @@ export const appwriteConfig = {
   projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID ?? '',
   databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID ?? '',
   accessGuardFunctionId: import.meta.env.VITE_APPWRITE_ACCESS_GUARD_FUNCTION_ID ?? 'access-guards',
+  adminFunctionId: import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions',
   playerFunctionId: import.meta.env.VITE_APPWRITE_PLAYER_FUNCTION_ID ?? 'player-actions',
 }
 

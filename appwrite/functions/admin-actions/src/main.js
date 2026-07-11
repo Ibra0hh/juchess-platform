@@ -1,4 +1,5 @@
 import { Account, Client, ID, Permission, Query, Role, TablesDB, Teams, Users } from 'node-appwrite';
+import { Chess } from 'chess.js';
 
 const tableIds = {
   adminProfiles: 'admin_profiles',
@@ -1129,6 +1130,44 @@ function validateTournamentPlayMode(playMode) {
   return playMode;
 }
 
+function validateTournamentOnlinePlatform(playMode, onlinePlatform) {
+  if (playMode !== 'online') return undefined;
+  if (!['chessCom', 'lichess', 'juchess'].includes(onlinePlatform)) {
+    throw new HttpError(400, 'Choose Chess.com, Lichess, or JuChess for an online tournament.');
+  }
+  return onlinePlatform;
+}
+
+function isJuChessHostedTournament(tournament) {
+  return tournament.playMode === 'online' && tournament.onlinePlatform === 'juchess';
+}
+
+function parseHostedTimeControl(value) {
+  const match = String(value ?? '').match(/(\d+)\s*\+\s*(\d+)/);
+  const minutes = Math.max(1, Math.min(1440, Number(match?.[1]) || 10));
+  const incrementSeconds = Math.max(0, Math.min(3600, Number(match?.[2]) || 0));
+  return { initialMs: minutes * 60 * 1000, incrementMs: incrementSeconds * 1000 };
+}
+
+function hostedResultFor(game) {
+  if (!game.isGameOver()) return '*';
+  if (game.isCheckmate()) return game.turn() === 'w' ? '0-1' : '1-0';
+  return '1/2-1/2';
+}
+
+function hostedClockForMove(row, tournament, turn, nowMs) {
+  const control = parseHostedTimeControl(tournament.timeControl);
+  const clocks = {
+    whiteTimeMs: Math.max(0, Number(row.whiteTimeMs ?? control.initialMs)),
+    blackTimeMs: Math.max(0, Number(row.blackTimeMs ?? control.initialMs)),
+  };
+  const runningSince = row.status === 'live' ? Date.parse(row.turnStartedAt || '') : Number.NaN;
+  const elapsed = Number.isFinite(runningSince) ? Math.max(0, nowMs - runningSince) : 0;
+  const key = turn === 'w' ? 'whiteTimeMs' : 'blackTimeMs';
+  clocks[key] = Math.max(0, clocks[key] - elapsed);
+  return { ...clocks, incrementMs: control.incrementMs, moverClockKey: key };
+}
+
 function multiStageStageOneRounds(tournament, qualifierCount) {
   const knockoutRounds = Math.ceil(Math.log2(Math.max(2, qualifierCount)));
   const declared = Number(tournament.roundsTotal) || 0;
@@ -1882,6 +1921,9 @@ async function configureTournamentProcedure(tablesDB, databaseId, tournamentId, 
   if (tournament.status !== 'active') {
     throw new HttpError(409, 'The procedure plan can be configured only while the tournament is active.');
   }
+  if (isJuChessHostedTournament(tournament)) {
+    throw new HttpError(409, 'JuChess online tournaments run directly from their published rounds and do not use physical-board procedure.');
+  }
   const physicalBoards = normalizePhysicalBoards(requestedBoards);
   const previousBoards = normalizePhysicalBoards(tournament.physicalBoards);
   const games = await listRowsByTournament(tablesDB, databaseId, tableIds.games, tournamentId);
@@ -1957,6 +1999,9 @@ async function startProcedureGame(tablesDB, databaseId, gameId, requestedBoard) 
   });
   if (tournament.status !== 'active') {
     throw new HttpError(409, 'The tournament must be active before a game can start.');
+  }
+  if (isJuChessHostedTournament(tournament)) {
+    throw new HttpError(409, 'JuChess online games start when an assigned player makes the first move.');
   }
   const currentRound = Number(tournament.currentRound) || 1;
   if (Number(game.round) !== currentRound) {
@@ -2097,6 +2142,149 @@ async function submitGameResult(tablesDB, databaseId, gameId, body) {
   return row;
 }
 
+async function loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile) {
+  let game;
+  try {
+    game = await tablesDB.getRow({ databaseId, tableId: tableIds.games, rowId: gameId });
+  } catch {
+    throw new HttpError(404, 'That tournament game does not exist.');
+  }
+  const tournament = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.tournaments,
+    rowId: game.tournamentId,
+  });
+  if (!isJuChessHostedTournament(tournament)) {
+    throw new HttpError(409, 'This game is not hosted on JuChess.');
+  }
+  if (tournament.status !== 'active') {
+    throw new HttpError(409, 'This tournament is not live.');
+  }
+  if (game.blackProfileId === SYSTEM_BYE_PROFILE_ID) {
+    throw new HttpError(409, 'A bye does not have an online board.');
+  }
+  if (game.whiteProfileId !== profile.$id && game.blackProfileId !== profile.$id) {
+    throw new HttpError(403, 'Only the two assigned players can play this board.');
+  }
+  if (game.status !== 'scheduled' && game.status !== 'live') {
+    throw new HttpError(409, 'This game is already finished.');
+  }
+  return { game, tournament };
+}
+
+function loadHostedChessGame(pgn) {
+  const chess = new Chess();
+  const value = String(pgn ?? '').trim();
+  if (!value) return chess;
+  try {
+    chess.loadPgn(value);
+    return chess;
+  } catch {
+    throw new HttpError(409, 'The saved game record is invalid. Ask an organizer to repair its PGN.');
+  }
+}
+
+async function finishHostedGame(tablesDB, databaseId, game, result, data = {}) {
+  await assertResultAllowed(tablesDB, databaseId, game, result);
+  const row = await tablesDB.updateRow({
+    databaseId,
+    tableId: tableIds.games,
+    rowId: game.$id,
+    data: cleanObject({
+      ...data,
+      status: 'completed',
+      result,
+      startedAt: game.startedAt || new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      turnStartedAt: null,
+    }),
+  });
+  await recalculateStandings(tablesDB, databaseId, row.tournamentId);
+  await advanceTournamentIfReady(tablesDB, databaseId, row.tournamentId, row.round);
+  return row;
+}
+
+async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, profile) {
+  const { game: row, tournament } = await loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile);
+  const currentVersion = Math.max(0, Number(row.moveVersion) || 0);
+  const expectedVersion = Number(body.expectedVersion);
+  if (!Number.isInteger(expectedVersion) || expectedVersion !== currentVersion) {
+    throw new HttpError(409, 'The board changed on another device. The latest position has been loaded.');
+  }
+
+  const chess = loadHostedChessGame(row.pgn);
+  const playerColor = row.whiteProfileId === profile.$id ? 'w' : 'b';
+  if (chess.turn() !== playerColor) {
+    throw new HttpError(409, 'It is not your turn.');
+  }
+
+  const now = new Date();
+  const clock = hostedClockForMove(row, tournament, chess.turn(), now.getTime());
+  if (clock[clock.moverClockKey] <= 0) {
+    const timeoutResult = chess.turn() === 'w' ? '0-1' : '1-0';
+    const timedOut = await finishHostedGame(tablesDB, databaseId, row, timeoutResult, {
+      whiteTimeMs: clock.whiteTimeMs,
+      blackTimeMs: clock.blackTimeMs,
+    });
+    throw new HttpError(409, `Time expired. ${timeoutResult} has been recorded for this game.`, timedOut);
+  }
+
+  const san = String(body.san ?? '').trim();
+  if (!san || san.length > 32) throw new HttpError(400, 'A legal chess move is required.');
+  let move;
+  try {
+    move = chess.move(san);
+  } catch {
+    move = null;
+  }
+  if (!move) throw new HttpError(400, 'That move is not legal in the current position.');
+
+  clock[clock.moverClockKey] += clock.incrementMs;
+  const result = hostedResultFor(chess);
+  const pgn = chess.pgn();
+  const moveData = {
+    pgn,
+    moveVersion: currentVersion + 1,
+    lastMoveAt: now.toISOString(),
+    startedAt: row.startedAt || now.toISOString(),
+    whiteTimeMs: Math.round(clock.whiteTimeMs),
+    blackTimeMs: Math.round(clock.blackTimeMs),
+  };
+
+  if (result !== '*') {
+    if (result === '1/2-1/2' && knockoutRoundForGame(tournament, row)) {
+      const saved = await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.games,
+        rowId: row.$id,
+        data: { ...moveData, status: 'live', result: '*', turnStartedAt: null },
+      });
+      return { row: saved, move: move.san, requiresTiebreak: true };
+    }
+    const finished = await finishHostedGame(tablesDB, databaseId, row, result, moveData);
+    return { row: finished, move: move.san, requiresTiebreak: false };
+  }
+
+  const updated = await tablesDB.updateRow({
+    databaseId,
+    tableId: tableIds.games,
+    rowId: row.$id,
+    data: {
+      ...moveData,
+      status: 'live',
+      result: '*',
+      turnStartedAt: now.toISOString(),
+    },
+  });
+  return { row: updated, move: move.san, requiresTiebreak: false };
+}
+
+async function resignHostedTournamentGame(tablesDB, databaseId, gameId, profile) {
+  const { game } = await loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile);
+  const result = game.whiteProfileId === profile.$id ? '0-1' : '1-0';
+  return await finishHostedGame(tablesDB, databaseId, game, result);
+}
+
 async function findTournamentGameByBoard(tablesDB, databaseId, tournamentId, round, board) {
   const response = await tablesDB.listRows({
     databaseId,
@@ -2182,10 +2370,10 @@ async function loadAdminProfile(tablesDB, databaseId, accountId) {
   return response.rows[0] ?? null;
 }
 
-async function getAuthenticatedAccountId(req) {
+async function getAuthenticatedAccountId(req, authMessage = 'Admin session is required.') {
   const jwt = req.headers['juchess-admin-jwt'] || req.headers['x-appwrite-user-jwt'];
   if (!jwt) {
-    throw new HttpError(401, 'Admin session is required.');
+    throw new HttpError(401, authMessage);
   }
 
   const userClient = new Client()
@@ -2198,8 +2386,22 @@ async function getAuthenticatedAccountId(req) {
     const user = await account.get();
     return user.$id;
   } catch {
-    throw new HttpError(401, 'Admin session is required.');
+    throw new HttpError(401, authMessage);
   }
+}
+
+async function requirePlayerActor(req, tablesDB, databaseId) {
+  const accountId = await getAuthenticatedAccountId(req, 'Sign in to play this tournament game.');
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.profiles,
+    queries: [Query.equal('accountId', accountId), Query.limit(1)],
+    total: false,
+  });
+  const profile = response.rows[0];
+  if (!profile) throw new HttpError(403, 'No JuChess player profile exists for this account.');
+  if (profile.status === 'suspended') throw new HttpError(403, 'This player account is suspended.');
+  return profile;
 }
 
 async function requireAdminActor(req, tablesDB, databaseId) {
@@ -2263,6 +2465,8 @@ export default async ({ req, res, log, error }) => {
         'POST /tournaments/:id/games/result',
         'POST /tournaments/:id/rounds/next',
         'POST /tournaments/:id/procedure/configure',
+        'POST /player/games/:id/move',
+        'POST /player/games/:id/resign',
         'POST /profiles/lookup',
         'DELETE /players',
         'GET /admin/session',
@@ -2288,6 +2492,18 @@ export default async ({ req, res, log, error }) => {
   }
 
   try {
+    if (method === 'POST' && segments[0] === 'player' && segments[1] === 'games' && segments[2] && segments[3] === 'move') {
+      const player = await requirePlayerActor(req, tablesDB, databaseId);
+      const outcome = await submitHostedTournamentMove(tablesDB, databaseId, segments[2], body, player);
+      return res.json({ ok: true, action: 'submitHostedTournamentMove', ...outcome });
+    }
+
+    if (method === 'POST' && segments[0] === 'player' && segments[1] === 'games' && segments[2] && segments[3] === 'resign') {
+      const player = await requirePlayerActor(req, tablesDB, databaseId);
+      const row = await resignHostedTournamentGame(tablesDB, databaseId, segments[2], player);
+      return res.json({ ok: true, action: 'resignHostedTournamentGame', row });
+    }
+
     const actor = await requireAdminActor(req, tablesDB, databaseId);
 
     if (method === 'DELETE' && segments[0] === 'players' && segments.length === 1) {
@@ -2643,6 +2859,7 @@ export default async ({ req, res, log, error }) => {
       }
       const roundsTotal = validateTournamentRoundCount(body.format, body.roundsTotal);
       const playMode = validateTournamentPlayMode(body.playMode ?? 'inPerson');
+      const onlinePlatform = validateTournamentOnlinePlatform(playMode, body.onlinePlatform);
 
       const row = await tablesDB.createRow({
         databaseId,
@@ -2659,6 +2876,7 @@ export default async ({ req, res, log, error }) => {
           startsAt: body.startsAt,
           endsAt: body.endsAt,
           playMode,
+          onlinePlatform,
           location: body.location,
           capacity: body.capacity,
           description: body.description,
@@ -2678,6 +2896,9 @@ export default async ({ req, res, log, error }) => {
         tableId: tableIds.tournaments,
         rowId: segments[1],
       });
+      const onlinePlatform = body.playMode === undefined && body.onlinePlatform === undefined
+        ? undefined
+        : validateTournamentOnlinePlatform(playMode ?? currentTournament.playMode, body.onlinePlatform ?? currentTournament.onlinePlatform);
       assertTournamentStatusTransition(currentTournament.status, body.status);
       const activation = body.status === 'active'
         ? await startTournamentIfNeeded(tablesDB, databaseId, segments[1], body, currentTournament)
@@ -2696,6 +2917,7 @@ export default async ({ req, res, log, error }) => {
           startsAt: body.startsAt,
           endsAt: body.endsAt,
           playMode,
+          onlinePlatform,
           location: body.location,
           capacity: body.capacity,
           description: body.description,

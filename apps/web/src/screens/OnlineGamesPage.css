@@ -235,6 +235,14 @@
   opacity: 0.4;
 }
 
+.online-game-message {
+  margin: 10px 0 0;
+  color: #7a2431;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .online-tournament-panel {
   padding-bottom: 16px;
 }

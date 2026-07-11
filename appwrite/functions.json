@@ -8,7 +8,8 @@
     "commands": "npm install",
     "execute": [
       "team:admin_super_admins",
-      "team:admin_staff"
+      "team:admin_staff",
+      "users"
     ],
     "events": [],
     "schedule": "",

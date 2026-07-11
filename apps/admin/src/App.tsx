@@ -278,6 +278,7 @@ function createInitialTournamentForm(): TournamentInput {
     roundsTotal: 5,
     capacity: 16,
     playMode: 'inPerson',
+    onlinePlatform: undefined,
     location: '',
   }
 }
@@ -928,7 +929,8 @@ function TournamentsScreen({
   const createEnabled = tab === 'draft'
   const swissRoundsValid = form.format !== 'Swiss'
     || (Number.isInteger(form.roundsTotal) && Number(form.roundsTotal) >= 1 && Number(form.roundsTotal) <= 50)
-  const canSaveDraft = Boolean(form.name.trim() && form.format.trim()) && swissRoundsValid && !submitting
+  const onlinePlatformValid = form.playMode !== 'online' || Boolean(form.onlinePlatform)
+  const canSaveDraft = Boolean(form.name.trim() && form.format.trim()) && swissRoundsValid && onlinePlatformValid && !submitting
   const isEditing = Boolean(editingTournament)
   const showRegistrationQueue = tab === 'upcoming' && !managedTournament
   const selectedTournamentRowId = showRegistrationQueue ? selectedTournament?.rowId : undefined
@@ -956,6 +958,12 @@ function TournamentsScreen({
   useEffect(() => {
     setManageTournamentKey('')
   }, [tab])
+
+  useEffect(() => {
+    if (!managedTournament || managedTournament.status !== 'active' || managedTournament.onlinePlatform !== 'juchess') return
+    const timer = window.setInterval(() => void onChanged(), 1500)
+    return () => window.clearInterval(timer)
+  }, [managedTournament, onChanged])
 
   useEffect(() => {
     let alive = true
@@ -1116,6 +1124,10 @@ function TournamentsScreen({
 
     if (format === 'Swiss' && !swissRoundsValid) {
       setMessage('Choose a Swiss round count between 1 and 50.')
+      return
+    }
+    if (form.playMode === 'online' && !form.onlinePlatform) {
+      setMessage('Choose Chess.com, Lichess, or JuChess for this online tournament.')
       return
     }
 
@@ -1565,7 +1577,10 @@ function TournamentsScreen({
                         type="button"
                         className={form.playMode !== 'online' ? 'active' : undefined}
                         aria-pressed={form.playMode !== 'online'}
-                        onClick={() => update('playMode', 'inPerson')}
+                        onClick={() => {
+                          update('playMode', 'inPerson')
+                          update('onlinePlatform', undefined)
+                        }}
                       >
                         In person
                       </button>
@@ -1573,21 +1588,47 @@ function TournamentsScreen({
                         type="button"
                         className={form.playMode === 'online' ? 'active' : undefined}
                         aria-pressed={form.playMode === 'online'}
-                        onClick={() => update('playMode', 'online')}
+                        onClick={() => {
+                          update('playMode', 'online')
+                          if (!form.onlinePlatform) update('onlinePlatform', 'juchess')
+                        }}
                       >
                         Online
                       </button>
                     </div>
                   </div>
                   <label>Number of players<input type="number" min={2} value={form.capacity ?? ''} onChange={(event) => update('capacity', Number(event.target.value))} /></label>
-                  <label>
-                    {form.playMode === 'online' ? 'Online platform / room' : 'Venue'}
-                    <input
-                      value={form.location ?? ''}
-                      onChange={(event) => update('location', event.target.value)}
-                      placeholder={form.playMode === 'online' ? 'Type platform or room...' : 'Type venue...'}
-                    />
-                  </label>
+                  {form.playMode === 'online' ? (
+                    <div className="create-field wide">
+                      <span>Online platform</span>
+                      <div className="create-chip-row online-platform-row" role="group" aria-label="Online tournament platform">
+                        {([
+                          ['chessCom', 'Chess.com'],
+                          ['lichess', 'Lichess'],
+                          ['juchess', 'JuChess'],
+                        ] as const).map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            className={form.onlinePlatform === value ? 'active' : undefined}
+                            aria-pressed={form.onlinePlatform === value}
+                            onClick={() => update('onlinePlatform', value)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <label>
+                      Venue
+                      <input
+                        value={form.location ?? ''}
+                        onChange={(event) => update('location', event.target.value)}
+                        placeholder="Type venue..."
+                      />
+                    </label>
+                  )}
                   <div className="create-field wide">
                     <span>Start date / time</span>
                     <div className="date-time-picker-control">
@@ -1814,7 +1855,7 @@ function TournamentTable({
           {rows.map((item) => (
             <tr key={tournamentKey(item)}>
               <td><strong>{item.name}</strong></td>
-              <td>{item.location || 'Not set'}</td>
+              <td>{item.playMode === 'online' ? onlinePlatformLabel(item.onlinePlatform) : item.location || 'Not set'}</td>
               <td><span className="tag">{item.format}</span></td>
               <td><b>{item.timeControl}</b></td>
               <td className="mono center">{item.players}/{item.capacity || 'open'}</td>
@@ -2116,8 +2157,9 @@ function TournamentManageView({
   const knockout = isKnockoutTournament(tournament)
   const multiStage = isMultiStageTournament(tournament)
   const roundRobin = isRoundRobinTournament(tournament)
+  const hostedOnline = tournament.playMode === 'online' && tournament.onlinePlatform === 'juchess'
   const playStage = knockout ? 'bracket' : 'rounds'
-  const procedureAvailable = tournament.status === 'active' || tournament.status === 'completed'
+  const procedureAvailable = !hostedOnline && (tournament.status === 'active' || tournament.status === 'completed')
   const manageStages = multiStage
     ? [
         { key: 'participants', label: 'Participants' },
@@ -2550,6 +2592,7 @@ function TournamentManageView({
                 onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
+                readOnly={hostedOnline}
               />
             ) : null}
           </>
@@ -2579,6 +2622,7 @@ function TournamentManageView({
                 onSaveGame={saveLiveBoardResult}
                 panelRef={liveBoardRef}
                 selectedBoardKey={selectedBoardKey}
+                readOnly={hostedOnline}
               />
             ) : null}
           </>
@@ -3262,6 +3306,7 @@ function LiveTournamentBoard({
   onSyncMoves,
   onSaveGame,
   panelRef,
+  readOnly = false,
   selectedBoardKey,
 }: {
   allowCompletedCorrections?: boolean
@@ -3271,6 +3316,7 @@ function LiveTournamentBoard({
   onSyncMoves: (board: LiveBoardOption, pgn: string) => Promise<void>
   onSaveGame: (board: LiveBoardOption, state: LiveBoardState) => Promise<void>
   panelRef: RefObject<HTMLElement | null>
+  readOnly?: boolean
   selectedBoardKey: string
 }) {
   const [boardStates, setBoardStates] = useState<Record<string, LiveBoardState>>({})
@@ -3296,6 +3342,12 @@ function LiveTournamentBoard({
   )
   const topColor: 'black' | 'white' = flipped ? 'white' : 'black'
   const bottomColor: 'black' | 'white' = flipped ? 'black' : 'white'
+
+  useEffect(() => {
+    if (!readOnly) return
+    setBoardStates(Object.fromEntries(boards.map((board) => [board.boardKey, initialLiveBoardState(board)])))
+    setPgnDrafts(Object.fromEntries(boards.map((board) => [board.boardKey, board.pgn ?? ''])))
+  }, [boards, readOnly])
 
   const playerName = (color: 'black' | 'white') => (
     color === 'white' ? pairing?.white ?? 'White player' : pairing?.black ?? 'Black player'
@@ -3432,7 +3484,7 @@ function LiveTournamentBoard({
   return (
     <section className="live-board-panel" ref={panelRef}>
       <div className="manage-panel-head">
-        <strong>Digital board and result entry</strong>
+        <strong>{readOnly ? 'Live online board' : 'Digital board and result entry'}</strong>
         <span>{pairing ? pairing.boardLabel : 'No board selected'}</span>
       </div>
       <div className="live-board-layout">
@@ -3472,7 +3524,7 @@ function LiveTournamentBoard({
           <JuChessBoard
             annotationsEnabled={false}
             flipped={flipped}
-            interactive={Boolean(pairing && !viewingHistory && (!pairing.completed || allowCompletedCorrections))}
+            interactive={!readOnly && Boolean(pairing && !viewingHistory && (!pairing.completed || allowCompletedCorrections))}
             moves={displayedMoves}
             onChange={handleBoardChange}
             showEvaluation={false}
@@ -3541,7 +3593,7 @@ function LiveTournamentBoard({
                 <button
                   type="button"
                   className={boardState.result === value ? 'active' : undefined}
-                  disabled={!pairing || viewingHistory || Boolean(pairing.completed && (!allowCompletedCorrections || value === 'Live'))}
+                  disabled={readOnly || !pairing || viewingHistory || Boolean(pairing.completed && (!allowCompletedCorrections || value === 'Live'))}
                   onClick={() => recordResult(value)}
                   key={value}
                 >
@@ -3575,13 +3627,14 @@ function LiveTournamentBoard({
               placeholder="Paste PGN here, or enter moves on the board"
               value={pgnDraft}
               onChange={(event) => updatePgnDraft(event.target.value)}
+              readOnly={readOnly}
             />
-            <button type="button" className="mini-button ghost" disabled={!pairing || !pgnDraft.trim() || viewingHistory || syncing} onClick={importPgn}>Import PGN</button>
+            <button type="button" className="mini-button ghost" disabled={readOnly || !pairing || !pgnDraft.trim() || viewingHistory || syncing} onClick={importPgn}>Import PGN</button>
           </div>
           <div className="live-board-actions">
-            <button type="button" className="mini-button ghost" onClick={undoMove} disabled={!boardState.moves.length || viewingHistory}>Undo move</button>
-            <button type="button" className="mini-button ghost" onClick={resetGame} disabled={!pairing || viewingHistory}>Reset</button>
-            <button type="button" className="mini-button dark" disabled={!pairing || saving || syncing || viewingHistory} onClick={saveBoard}>
+            <button type="button" className="mini-button ghost" onClick={undoMove} disabled={readOnly || !boardState.moves.length || viewingHistory}>Undo move</button>
+            <button type="button" className="mini-button ghost" onClick={resetGame} disabled={readOnly || !pairing || viewingHistory}>Reset</button>
+            <button type="button" className="mini-button dark" disabled={readOnly || !pairing || saving || syncing || viewingHistory} onClick={saveBoard}>
               {saving ? 'Saving...' : pairing?.completed ? allowCompletedCorrections ? 'Save corrections' : 'Save PGN' : boardState.moves.length ? 'Save result + PGN' : 'Save result without PGN'}
             </button>
           </div>
@@ -5905,6 +5958,7 @@ function tournamentToEditForm(item: AdminTournament): TournamentInput {
     roundsTotal: item.roundsTotal,
     capacity: item.capacity || undefined,
     playMode: item.playMode,
+    onlinePlatform: item.onlinePlatform,
     location: item.location ?? '',
     description: item.description ?? '',
     startsAt: item.startsAt,
@@ -5913,6 +5967,13 @@ function tournamentToEditForm(item: AdminTournament): TournamentInput {
 
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function onlinePlatformLabel(value?: AdminTournament['onlinePlatform']) {
+  if (value === 'chessCom') return 'Chess.com'
+  if (value === 'lichess') return 'Lichess'
+  if (value === 'juchess') return 'JuChess'
+  return 'Online'
 }
 
 function tabDescription(tab: TournamentTab) {

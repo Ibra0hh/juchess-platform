@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
+import { Chess } from 'chess.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -33,6 +34,11 @@ const EXPORTED = [
   'swissRoundsTotal',
   'validateTournamentRoundCount',
   'validateTournamentPlayMode',
+  'validateTournamentOnlinePlatform',
+  'isJuChessHostedTournament',
+  'parseHostedTimeControl',
+  'hostedResultFor',
+  'hostedClockForMove',
   'multiStageStageOneRounds',
   'isGameDecided',
   'decisiveWinnerProfileId',
@@ -46,6 +52,7 @@ const EXPORTED = [
   'startProcedureGame',
   'updateGamePgn',
   'submitGameResult',
+  'submitHostedTournamentMove',
   'isDeletableTournamentStatus',
   'assertTournamentStatusTransition',
   'deleteTournamentRows',
@@ -66,8 +73,13 @@ function loadEngine() {
   const source = readFileSync(join(here, '..', 'src', 'main.js'), 'utf8')
   const importLine = source.split('\n')[0]
   assert.match(importLine, /^import .* from 'node-appwrite';$/, 'expected the SDK import on line 1')
+  const chessImport = "import { Chess } from 'chess.js';"
+  const chessModule = pathToFileURL(join(here, '..', 'node_modules', 'chess.js', 'dist', 'esm', 'chess.js')).href
 
-  const rewritten = source.replace(importLine, SDK_STUB) + `\nexport { ${EXPORTED.join(', ')} };\n`
+  const rewritten = source
+    .replace(importLine, SDK_STUB)
+    .replace(chessImport, `import { Chess } from '${chessModule}';`)
+    + `\nexport { ${EXPORTED.join(', ')} };\n`
   const file = join(mkdtempSync(join(tmpdir(), 'juchess-engine-')), 'engine.mjs')
   writeFileSync(file, rewritten)
   return import(pathToFileURL(file).href)
@@ -796,6 +808,98 @@ test('tournament mode accepts only in-person or online play', () => {
   assert.throws(
     () => engine.validateTournamentPlayMode('hybrid'),
     /must be inPerson or online/,
+  )
+})
+
+test('online tournaments require one supported platform', () => {
+  assert.equal(engine.validateTournamentOnlinePlatform('online', 'juchess'), 'juchess')
+  assert.equal(engine.validateTournamentOnlinePlatform('online', 'chessCom'), 'chessCom')
+  assert.equal(engine.validateTournamentOnlinePlatform('inPerson', undefined), undefined)
+  assert.equal(engine.isJuChessHostedTournament({ playMode: 'online', onlinePlatform: 'juchess' }), true)
+  assert.equal(engine.isJuChessHostedTournament({ playMode: 'online', onlinePlatform: 'lichess' }), false)
+  assert.throws(
+    () => engine.validateTournamentOnlinePlatform('online', 'other'),
+    /Choose Chess.com, Lichess, or JuChess/,
+  )
+})
+
+test('hosted clock deducts only the running side and preserves the increment', () => {
+  const control = engine.parseHostedTimeControl('5+3 Blitz')
+  assert.deepEqual(control, { initialMs: 300000, incrementMs: 3000 })
+  const clock = engine.hostedClockForMove({
+    status: 'live',
+    whiteTimeMs: 280000,
+    blackTimeMs: 290000,
+    turnStartedAt: '2026-07-12T10:00:00.000Z',
+  }, { timeControl: '5+3 Blitz' }, 'w', Date.parse('2026-07-12T10:00:04.500Z'))
+  assert.equal(clock.whiteTimeMs, 275500)
+  assert.equal(clock.blackTimeMs, 290000)
+  assert.equal(clock.incrementMs, 3000)
+  assert.equal(clock.moverClockKey, 'whiteTimeMs')
+})
+
+test('hosted chess derives decisive and drawn terminal results', () => {
+  const mate = new Chess()
+  mate.move('f3')
+  mate.move('e5')
+  mate.move('g4')
+  mate.move('Qh4#')
+  assert.equal(engine.hostedResultFor(mate), '0-1')
+
+  const draw = new Chess('7k/5Q2/7K/8/8/8/8/8 b - - 0 1')
+  assert.equal(draw.isStalemate(), true)
+  assert.equal(engine.hostedResultFor(draw), '1/2-1/2')
+})
+
+test('hosted move accepts only the assigned side and advances the canonical revision', async () => {
+  const game = {
+    $id: 'g1',
+    tournamentId: 't1',
+    whiteProfileId: 'white',
+    blackProfileId: 'black',
+    status: 'scheduled',
+    result: '*',
+    moveVersion: 0,
+    round: 1,
+  }
+  const tournament = {
+    $id: 't1',
+    status: 'active',
+    playMode: 'online',
+    onlinePlatform: 'juchess',
+    timeControl: '5+3 Blitz',
+    format: 'Swiss',
+  }
+  let updated
+  const tablesDB = {
+    getRow: async ({ tableId }) => tableId === 'games' ? game : tournament,
+    updateRow: async ({ data }) => {
+      updated = { ...game, ...data }
+      return updated
+    },
+  }
+
+  const outcome = await engine.submitHostedTournamentMove(
+    tablesDB,
+    'juchess',
+    'g1',
+    { san: 'e4', expectedVersion: 0 },
+    { $id: 'white' },
+  )
+  assert.equal(outcome.move, 'e4')
+  assert.equal(outcome.row.status, 'live')
+  assert.equal(outcome.row.moveVersion, 1)
+  assert.match(outcome.row.pgn, /1\. e4/)
+  assert.equal(outcome.row.whiteTimeMs, 303000)
+  assert.equal(outcome.row.blackTimeMs, 300000)
+
+  await assert.rejects(
+    () => engine.submitHostedTournamentMove(tablesDB, 'juchess', 'g1', { san: 'e4', expectedVersion: 0 }, { $id: 'black' }),
+    (error) => error.statusCode === 409 && /not your turn/i.test(error.message),
+  )
+  await assert.rejects(
+    () => engine.submitHostedTournamentMove(tablesDB, 'juchess', 'g1', { san: 'e4', expectedVersion: 1 }, { $id: 'spectator' }),
+    (error) => error.statusCode === 403 && /assigned players/i.test(error.message),
   )
 })
 
