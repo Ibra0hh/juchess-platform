@@ -20,6 +20,7 @@ import {
 } from '../lib/juchess'
 import {
   analyzePosition,
+  estimateGameRating,
   parseReviewGame,
   reviewGame,
   reviewGameIdentity,
@@ -1215,6 +1216,26 @@ function ReviewPanel({
                       <em style={{ color: count.color }}>{count.white}</em>
                       <ReviewClassificationBadge classification={count.label} compact />
                       <em style={{ color: count.color }}>{count.black}</em>
+                    </div>
+                  ))}
+                </div>
+                <div className="review-phase-breakdown">
+                  <div className="game-rating-row">
+                    <span>Game rating</span>
+                    <strong>{estimateGameRating(review.whiteAccuracy, game.wRating)}</strong>
+                    <i aria-hidden="true" />
+                    <strong>{estimateGameRating(review.blackAccuracy, game.bRating)}</strong>
+                  </div>
+                  {review.phases.map((phase) => (
+                    <div className="phase-grade-row" key={phase.name}>
+                      <span>{phase.name}</span>
+                      {phase.white ? (
+                        <ReviewClassificationBadge classification={phase.white.classification} compact />
+                      ) : <em aria-label={`White did not reach the ${phase.name.toLowerCase()}`}>-</em>}
+                      <i aria-hidden="true" />
+                      {phase.black ? (
+                        <ReviewClassificationBadge classification={phase.black.classification} compact />
+                      ) : <em aria-label={`Black did not reach the ${phase.name.toLowerCase()}`}>-</em>}
                     </div>
                   ))}
                 </div>

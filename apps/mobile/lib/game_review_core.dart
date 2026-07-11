@@ -272,6 +272,7 @@ class MobileGameReviewResult {
     required this.blackAccuracy,
     required this.depth,
     required this.moves,
+    required this.phases,
     required this.positions,
     required this.whiteAccuracy,
   });
@@ -279,8 +280,33 @@ class MobileGameReviewResult {
   final double blackAccuracy;
   final int depth;
   final List<MobileReviewedMove> moves;
+  final List<MobileReviewPhaseSummary> phases;
   final List<MobilePositionReview> positions;
   final double whiteAccuracy;
+}
+
+class MobileReviewPhaseGrade {
+  const MobileReviewPhaseGrade({
+    required this.accuracy,
+    required this.classification,
+    required this.moveCount,
+  });
+
+  final double accuracy;
+  final MobileMoveClassification classification;
+  final int moveCount;
+}
+
+class MobileReviewPhaseSummary {
+  const MobileReviewPhaseSummary({
+    required this.black,
+    required this.name,
+    required this.white,
+  });
+
+  final MobileReviewPhaseGrade? black;
+  final String name;
+  final MobileReviewPhaseGrade? white;
 }
 
 double mobileExpectedScore(double evaluation, String color) {
@@ -291,6 +317,29 @@ double mobileExpectedScore(double evaluation, String color) {
 
 double mobileMoveAccuracyFromLoss(double loss) {
   return (100 * math.exp(-3.5 * math.max(0, loss))).clamp(0.0, 100.0);
+}
+
+int mobileEstimatedGameRating(double accuracy, [int? publishedRating]) {
+  final reference = publishedRating != null && publishedRating > 0
+      ? publishedRating
+      : 1200;
+  final expectedAccuracy = (58 + (reference - 600) / 45).clamp(55, 92);
+  final estimate = reference + (accuracy.clamp(0, 100) - expectedAccuracy) * 18;
+  return (estimate.clamp(100, 3200) / 50).round() * 50;
+}
+
+MobileMoveClassification mobilePhaseClassificationForAccuracy(double accuracy) {
+  if (accuracy >= 92) return MobileMoveClassification.excellent;
+  if (accuracy >= 80) return MobileMoveClassification.good;
+  if (accuracy >= 65) return MobileMoveClassification.inaccuracy;
+  if (accuracy >= 45) return MobileMoveClassification.mistake;
+  return MobileMoveClassification.blunder;
+}
+
+String mobileReviewPhaseForPosition(int moveIndex, String fen) {
+  if (moveIndex < 10) return 'Opening';
+  if (moveIndex >= 20 && _isMobileEndgamePosition(fen)) return 'Endgame';
+  return 'Middlegame';
 }
 
 MobileMoveClassification classifyMobileReviewMove({
@@ -493,9 +542,69 @@ MobileGameReviewResult buildMobileGameReview({
     blackAccuracy: _playerAccuracy(reviewedMoves, 1),
     depth: depth,
     moves: reviewedMoves,
+    phases: buildMobileReviewPhaseSummary(reviewedMoves, game.fens),
     positions: positions,
     whiteAccuracy: _playerAccuracy(reviewedMoves, 0),
   );
+}
+
+List<MobileReviewPhaseSummary> buildMobileReviewPhaseSummary(
+  List<MobileReviewedMove> moves,
+  List<String> fens,
+) {
+  return const ['Opening', 'Middlegame', 'Endgame']
+      .map(
+        (name) => MobileReviewPhaseSummary(
+          black: _buildMobilePhaseGrade(moves, fens, name, 1),
+          name: name,
+          white: _buildMobilePhaseGrade(moves, fens, name, 0),
+        ),
+      )
+      .toList(growable: false);
+}
+
+MobileReviewPhaseGrade? _buildMobilePhaseGrade(
+  List<MobileReviewedMove> moves,
+  List<String> fens,
+  String phase,
+  int parity,
+) {
+  final phaseMoves = <MobileReviewedMove>[];
+  for (var index = 0; index < moves.length; index++) {
+    if (index % 2 == parity &&
+        mobileReviewPhaseForPosition(index, fens[index + 1]) == phase) {
+      phaseMoves.add(moves[index]);
+    }
+  }
+  if (phaseMoves.isEmpty) return null;
+
+  final accuracy =
+      phaseMoves.fold<double>(0, (sum, move) => sum + move.accuracy) /
+      phaseMoves.length;
+  return MobileReviewPhaseGrade(
+    accuracy: accuracy,
+    classification: mobilePhaseClassificationForAccuracy(accuracy),
+    moveCount: phaseMoves.length,
+  );
+}
+
+bool _isMobileEndgamePosition(String fen) {
+  final placement = fen.split(RegExp(r'\s+')).first.toLowerCase();
+  var queens = 0;
+  var nonPawnMaterial = 0;
+
+  for (final codeUnit in placement.codeUnits) {
+    final piece = String.fromCharCode(codeUnit);
+    if (piece == 'q') queens += 1;
+    nonPawnMaterial += switch (piece) {
+      'q' => 9,
+      'r' => 5,
+      'b' || 'n' => 3,
+      _ => 0,
+    };
+  }
+
+  return queens == 0 || nonPawnMaterial <= 20;
 }
 
 List<String> mobileUciLineAsSan(String fen, List<String> moves) {

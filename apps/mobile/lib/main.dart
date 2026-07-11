@@ -6006,9 +6006,11 @@ class _MobileProfileHistoryPanelState extends State<MobileProfileHistoryPanel> {
     openPrototypeRoute(
       context,
       MobileGameReviewWorkspace(
+        blackRating: game.blackRating,
         key: ValueKey('${game.source.name}:${game.id}'),
         game: parsed,
         white: game.white,
+        whiteRating: game.whiteRating,
         black: game.black,
       ),
     );
@@ -6607,9 +6609,11 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
       openPrototypeRoute(
         context,
         MobileGameReviewWorkspace(
+          blackRating: int.tryParse(parsed.headers['BlackElo'] ?? ''),
           key: ValueKey('pgn:${parsed.moves.join('|')}'),
           game: parsed,
           white: parsed.headers['White'] ?? 'White',
+          whiteRating: int.tryParse(parsed.headers['WhiteElo'] ?? ''),
           black: parsed.headers['Black'] ?? 'Black',
         ),
       );
@@ -6757,12 +6761,16 @@ class MobileGameReviewWorkspace extends StatefulWidget {
     required this.black,
     required this.game,
     required this.white,
+    this.blackRating,
+    this.whiteRating,
     super.key,
   });
 
   final String black;
+  final int? blackRating;
   final MobileParsedReviewGame game;
   final String white;
+  final int? whiteRating;
 
   @override
   State<MobileGameReviewWorkspace> createState() =>
@@ -6874,6 +6882,7 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
           const SizedBox(height: 14),
           _MobileReviewReadySummary(
             black: widget.black,
+            blackRating: widget.blackRating,
             onStart: () => setState(() {
               moveIndex = 0;
               reviewStarted = true;
@@ -6884,6 +6893,7 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
             }),
             review: completedReview,
             white: widget.white,
+            whiteRating: widget.whiteRating,
           ),
           const SizedBox(height: 18),
         ],
@@ -7168,17 +7178,21 @@ const _mobileSummaryClassifications = <MobileMoveClassification>[
 class _MobileReviewReadySummary extends StatelessWidget {
   const _MobileReviewReadySummary({
     required this.black,
+    required this.blackRating,
     required this.onSelectMove,
     required this.onStart,
     required this.review,
     required this.white,
+    required this.whiteRating,
   });
 
   final String black;
+  final int? blackRating;
   final ValueChanged<int> onSelectMove;
   final VoidCallback onStart;
   final MobileGameReviewResult review;
   final String white;
+  final int? whiteRating;
 
   @override
   Widget build(BuildContext context) {
@@ -7270,6 +7284,18 @@ class _MobileReviewReadySummary extends StatelessWidget {
               classification: classification,
               review: review,
             ),
+          const Divider(height: 22),
+          _MobileGameRatingRow(
+            blackRating: mobileEstimatedGameRating(
+              review.blackAccuracy,
+              blackRating,
+            ),
+            whiteRating: mobileEstimatedGameRating(
+              review.whiteAccuracy,
+              whiteRating,
+            ),
+          ),
+          for (final phase in review.phases) _MobilePhaseGradeRow(phase: phase),
           const SizedBox(height: 14),
           SizedBox(
             height: 48,
@@ -7351,6 +7377,122 @@ class _MobileClassificationCountRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MobileGameRatingRow extends StatelessWidget {
+  const _MobileGameRatingRow({
+    required this.blackRating,
+    required this.whiteRating,
+  });
+
+  final int blackRating;
+  final int whiteRating;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 38,
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Game rating',
+              style: TextStyle(
+                color: PrototypeColors.black,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          _MobileRatingValue(value: whiteRating),
+          const SizedBox(width: 30),
+          _MobileRatingValue(value: blackRating),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileRatingValue extends StatelessWidget {
+  const _MobileRatingValue({required this.value});
+
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 52,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0x24111111)),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          '$value',
+          style: const TextStyle(
+            color: PrototypeColors.black,
+            fontFamily: 'monospace',
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobilePhaseGradeRow extends StatelessWidget {
+  const _MobilePhaseGradeRow({required this.phase});
+
+  final MobileReviewPhaseSummary phase;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 32,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              phase.name,
+              style: const TextStyle(
+                color: PrototypeColors.black,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          SizedBox(width: 52, child: _phaseGrade(phase.white)),
+          const SizedBox(width: 30),
+          SizedBox(width: 52, child: _phaseGrade(phase.black)),
+        ],
+      ),
+    );
+  }
+
+  Widget _phaseGrade(MobileReviewPhaseGrade? grade) {
+    if (grade == null) {
+      return const Text(
+        '-',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Color(0x80111111), fontSize: 13),
+      );
+    }
+    return Center(
+      child: Tooltip(
+        message:
+            '${mobileClassificationLabel(grade.classification)} · ${grade.accuracy.toStringAsFixed(1)} accuracy',
+        child: _MobileClassificationBadge(
+          classification: grade.classification,
+          size: 24,
+        ),
       ),
     );
   }
@@ -8327,9 +8469,11 @@ class _PickGameScreenState extends State<PickGameScreen> {
       openPrototypeRoute(
         context,
         MobileGameReviewWorkspace(
+          blackRating: game.blackRating,
           key: ValueKey('${game.source.name}:${game.id}'),
           game: parsed,
           white: game.white,
+          whiteRating: game.whiteRating,
           black: game.black,
         ),
       );

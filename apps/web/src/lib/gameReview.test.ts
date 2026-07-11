@@ -2,12 +2,15 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   classifyReviewMove,
+  estimateGameRating,
   expectedScore,
   isOpeningBookMove,
   moveAccuracyFromLoss,
   parseAnalysisPosition,
   parseReviewGame,
   parseStockfishOutput,
+  phaseClassificationForAccuracy,
+  reviewPhaseForPosition,
   reviewGameIdentity,
 } from './gameReview.ts'
 
@@ -131,4 +134,21 @@ test('accuracy and expected-score helpers stay bounded', () => {
   assert.equal(moveAccuracyFromLoss(0), 100)
   assert.ok(moveAccuracyFromLoss(0.2) < 100)
   assert.ok(moveAccuracyFromLoss(10) >= 0)
+})
+
+test('game ratings and phase grades are stable and bounded', () => {
+  assert.equal(estimateGameRating(100, 1800), 2100)
+  assert.equal(estimateGameRating(0, 100), 100)
+  assert.equal(phaseClassificationForAccuracy(96), 'Excellent')
+  assert.equal(phaseClassificationForAccuracy(84), 'Good')
+  assert.equal(phaseClassificationForAccuracy(72), 'Inaccuracy')
+  assert.equal(phaseClassificationForAccuracy(50), 'Mistake')
+  assert.equal(phaseClassificationForAccuracy(20), 'Blunder')
+})
+
+test('review phases progress from opening through a detected endgame', () => {
+  const queenlessFen = '4k3/8/8/8/8/8/8/4K3 w - - 0 1'
+  assert.equal(reviewPhaseForPosition(4, queenlessFen), 'Opening')
+  assert.equal(reviewPhaseForPosition(14, queenlessFen), 'Middlegame')
+  assert.equal(reviewPhaseForPosition(24, queenlessFen), 'Endgame')
 })

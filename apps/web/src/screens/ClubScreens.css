@@ -1898,6 +1898,43 @@
   line-height: 1;
 }
 
+.review-phase-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(17, 17, 17, 0.14);
+}
+
+.review-phase-breakdown > div {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) 34px 28px 34px;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.review-phase-breakdown span {
+  color: rgba(17, 17, 17, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.review-phase-breakdown strong,
+.review-phase-breakdown em {
+  color: var(--ink);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+  text-align: center;
+}
+
+.review-phase-breakdown .review-classification-badge {
+  justify-self: center;
+}
+
 .review-classification-badge.compact {
   width: 22px;
   height: 22px;
@@ -1965,6 +2002,16 @@
 .review-panel[data-review-state="summary"] .review-start-button {
   min-height: 43px;
   margin-top: 10px;
+}
+
+.review-panel[data-review-state="summary"] .review-phase-breakdown {
+  gap: 3px;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.review-panel[data-review-state="summary"] .review-phase-breakdown > div {
+  min-height: 24px;
 }
 
 .moves-panel {

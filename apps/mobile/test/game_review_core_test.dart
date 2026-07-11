@@ -120,4 +120,36 @@ void main() {
       isNull,
     );
   });
+
+  test('game ratings and phase grades are stable and bounded', () {
+    expect(mobileEstimatedGameRating(100, 1800), 2100);
+    expect(mobileEstimatedGameRating(0, 100), 100);
+    expect(
+      mobilePhaseClassificationForAccuracy(96),
+      MobileMoveClassification.excellent,
+    );
+    expect(
+      mobilePhaseClassificationForAccuracy(84),
+      MobileMoveClassification.good,
+    );
+    expect(
+      mobilePhaseClassificationForAccuracy(72),
+      MobileMoveClassification.inaccuracy,
+    );
+    expect(
+      mobilePhaseClassificationForAccuracy(50),
+      MobileMoveClassification.mistake,
+    );
+    expect(
+      mobilePhaseClassificationForAccuracy(20),
+      MobileMoveClassification.blunder,
+    );
+  });
+
+  test('review phases progress from opening through a detected endgame', () {
+    const queenlessFen = '4k3/8/8/8/8/8/8/4K3 w - - 0 1';
+    expect(mobileReviewPhaseForPosition(4, queenlessFen), 'Opening');
+    expect(mobileReviewPhaseForPosition(14, queenlessFen), 'Middlegame');
+    expect(mobileReviewPhaseForPosition(24, queenlessFen), 'Endgame');
+  });
 }

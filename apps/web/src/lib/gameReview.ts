@@ -78,8 +78,26 @@ export type GameReviewResult = {
   blackAccuracy: number
   depth: number
   moves: ReviewedMove[]
+  phases: ReviewPhaseSummary[]
   positions: PositionReview[]
   whiteAccuracy: number
+}
+
+export type ReviewPhaseName = 'Opening' | 'Middlegame' | 'Endgame'
+
+export type ReviewPhaseGrade = {
+  accuracy: number
+  classification: Extract<
+    ReviewClassification,
+    'Excellent' | 'Good' | 'Inaccuracy' | 'Mistake' | 'Blunder'
+  >
+  moveCount: number
+}
+
+export type ReviewPhaseSummary = {
+  black: ReviewPhaseGrade | null
+  name: ReviewPhaseName
+  white: ReviewPhaseGrade | null
 }
 
 export type PositionAnalysisResult = PositionReview & {
@@ -213,6 +231,32 @@ export function expectedScore(evaluation: number, color: Color) {
 
 export function moveAccuracyFromLoss(loss: number) {
   return Math.max(0, Math.min(100, 100 * Math.exp(-3.5 * Math.max(0, loss))))
+}
+
+export function estimateGameRating(accuracy: number, publishedRating?: number) {
+  const reference = publishedRating && publishedRating > 0 ? publishedRating : 1200
+  const expectedAccuracy = Math.max(55, Math.min(92, 58 + (reference - 600) / 45))
+  const estimate = reference + (Math.max(0, Math.min(100, accuracy)) - expectedAccuracy) * 18
+  return Math.round(Math.max(100, Math.min(3200, estimate)) / 50) * 50
+}
+
+export function phaseClassificationForAccuracy(
+  accuracy: number,
+): ReviewPhaseGrade['classification'] {
+  if (accuracy >= 92) return 'Excellent'
+  if (accuracy >= 80) return 'Good'
+  if (accuracy >= 65) return 'Inaccuracy'
+  if (accuracy >= 45) return 'Mistake'
+  return 'Blunder'
+}
+
+export function reviewPhaseForPosition(
+  moveIndex: number,
+  fen: string,
+): ReviewPhaseName {
+  if (moveIndex < 10) return 'Opening'
+  if (moveIndex >= 20 && isEndgamePosition(fen)) return 'Endgame'
+  return 'Middlegame'
 }
 
 export function classifyReviewMove({
@@ -510,9 +554,59 @@ export async function reviewGame(
     blackAccuracy: playerAccuracy(reviewedMoves, 1),
     depth,
     moves: reviewedMoves,
+    phases: buildReviewPhaseSummary(reviewedMoves, parsed.fens),
     positions,
     whiteAccuracy: playerAccuracy(reviewedMoves, 0),
   }
+}
+
+export function buildReviewPhaseSummary(
+  moves: ReviewedMove[],
+  fens: string[],
+): ReviewPhaseSummary[] {
+  const phaseNames: ReviewPhaseName[] = ['Opening', 'Middlegame', 'Endgame']
+
+  return phaseNames.map((name) => ({
+    black: buildPhaseGrade(moves, fens, name, 1),
+    name,
+    white: buildPhaseGrade(moves, fens, name, 0),
+  }))
+}
+
+function buildPhaseGrade(
+  moves: ReviewedMove[],
+  fens: string[],
+  phase: ReviewPhaseName,
+  parity: 0 | 1,
+) {
+  const phaseMoves = moves.filter((_move, index) => (
+    index % 2 === parity
+    && reviewPhaseForPosition(index, fens[index + 1]) === phase
+  ))
+  if (!phaseMoves.length) return null
+
+  const accuracy = phaseMoves.reduce((sum, move) => sum + move.accuracy, 0) / phaseMoves.length
+  return {
+    accuracy,
+    classification: phaseClassificationForAccuracy(accuracy),
+    moveCount: phaseMoves.length,
+  }
+}
+
+function isEndgamePosition(fen: string) {
+  const game = new Chess(fen)
+  let queens = 0
+  let nonPawnMaterial = 0
+
+  game.board().forEach((row) => row.forEach((piece) => {
+    if (!piece) return
+    if (piece.type === 'q') queens += 1
+    if (piece.type !== 'p' && piece.type !== 'k') {
+      nonPawnMaterial += pieceValue(piece.type)
+    }
+  }))
+
+  return queens === 0 || nonPawnMaterial <= 20
 }
 
 function isPotentialSacrifice(fen: string, uci: string) {
