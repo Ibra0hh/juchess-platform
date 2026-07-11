@@ -7952,6 +7952,12 @@ String _mobileEvaluationLabel(double value) {
   return '${value >= 0 ? '+' : ''}${value.toStringAsFixed(2)}';
 }
 
+String _mobilePositionEvaluationLabel(MobilePositionReview position) {
+  final mate = position.mate;
+  if (mate != null) return 'M${mate > 0 ? '+' : ''}$mate';
+  return _mobileEvaluationLabel(position.evaluation);
+}
+
 class PuzzlesScreen extends StatelessWidget {
   const PuzzlesScreen({super.key});
 
@@ -8761,6 +8767,12 @@ class AnalysisBoardScreen extends StatefulWidget {
 }
 
 class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
+  MobilePositionReview? analysis;
+  MobileStockfishReviewEngine? analysisEngine;
+  Timer? analysisDebounce;
+  bool analysisLoading = false;
+  String analysisError = '';
+  int analysisRun = 0;
   bool flipped = false;
   late final List<String> moves;
   String result = 'Live';
@@ -8769,11 +8781,84 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
   void initState() {
     super.initState();
     moves = [...widget.initialMoves];
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scheduleAnalysis());
+  }
+
+  void _scheduleAnalysis() {
+    final run = ++analysisRun;
+    analysisDebounce?.cancel();
+    analysisEngine?.dispose();
+    analysisEngine = null;
+    if (mounted) {
+      setState(() {
+        analysis = null;
+        analysisError = '';
+        analysisLoading = true;
+      });
+    }
+
+    analysisDebounce = Timer(const Duration(milliseconds: 300), () async {
+      MobileStockfishReviewEngine? nextEngine;
+      try {
+        final parsed = moves.isEmpty
+            ? null
+            : MobileParsedReviewGame.fromMoves(List<String>.from(moves));
+        final initialFen = parsed?.initialFen ?? mobileStandardFen;
+        final currentFen = parsed?.fens.last ?? mobileStandardFen;
+        final uciMoves = parsed?.uciMoves ?? const <String>[];
+        final preset = mobileReviewPresetFor(defaultMobileReviewStrength);
+        nextEngine = await MobileStockfishReviewEngine.create(preset: preset);
+        if (!mounted || run != analysisRun) {
+          nextEngine.dispose();
+          return;
+        }
+        analysisEngine = nextEngine;
+        final position = await nextEngine.evaluatePosition(
+          initialFen,
+          uciMoves,
+          currentFen,
+          preset.depth,
+        );
+        if (!mounted || run != analysisRun) return;
+        setState(() {
+          analysis = position;
+          analysisLoading = false;
+        });
+      } on MobileReviewCancelled {
+        return;
+      } catch (exception) {
+        if (!mounted || run != analysisRun) return;
+        setState(() {
+          analysisError = exception.toString().replaceFirst('Exception: ', '');
+          analysisLoading = false;
+        });
+      } finally {
+        nextEngine?.dispose();
+        if (identical(analysisEngine, nextEngine)) analysisEngine = null;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    analysisRun += 1;
+    analysisDebounce?.cancel();
+    analysisEngine?.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final boardSummary = _summarizeMobileBoard(moves);
+    final currentFen = _mobileGameFromMoves(moves).fen;
+    final bestLine = analysis == null
+        ? const <String>[]
+        : mobileUciLineAsSan(
+            currentFen,
+            analysis!.lines.isEmpty
+                ? const <String>[]
+                : analysis!.lines.first.moves,
+          );
     final topColor = flipped ? 'white' : 'black';
     final bottomColor = flipped ? 'black' : 'white';
 
@@ -8797,6 +8882,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                 name: topColor == 'white' ? widget.white : widget.black,
               ),
               PrototypeChessBoard(
+                evaluation: analysis?.evaluation ?? 0,
                 flipped: flipped,
                 moves: moves,
                 onChanged: (nextMoves, nextResult) {
@@ -8806,6 +8892,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                       ..addAll(nextMoves);
                     result = nextResult;
                   });
+                  _scheduleAnalysis();
                 },
               ),
               TournamentBoardPlayerBar(
@@ -8850,6 +8937,74 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  if (analysisLoading)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    const Icon(
+                      Icons.memory,
+                      size: 16,
+                      color: PrototypeColors.burgundy,
+                    ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      analysisLoading
+                          ? 'Stockfish is evaluating this position...'
+                          : analysis == null
+                          ? 'Stockfish evaluation unavailable'
+                          : 'Stockfish 18 · Depth ${analysis!.depth}',
+                      style: const TextStyle(
+                        color: Color(0xcc111111),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    analysis == null
+                        ? '0.00'
+                        : _mobilePositionEvaluationLabel(analysis!),
+                    style: const TextStyle(
+                      color: PrototypeColors.burgundy,
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              if (bestLine.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  bestLine.take(10).join(' '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0x99111111),
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+              if (analysisError.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  analysisError,
+                  style: const TextStyle(
+                    color: PrototypeColors.burgundy,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Text(
                 moves
@@ -8881,6 +9036,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                   onTap: () {
                     if (moves.isEmpty) return;
                     setState(() => moves.removeLast());
+                    _scheduleAnalysis();
                   },
                 ),
               ),
@@ -8888,10 +9044,13 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
               Expanded(
                 child: PrototypeOutlineButton(
                   label: 'Reset',
-                  onTap: () => setState(() {
-                    moves.clear();
-                    result = 'Live';
-                  }),
+                  onTap: () {
+                    setState(() {
+                      moves.clear();
+                      result = 'Live';
+                    });
+                    _scheduleAnalysis();
+                  },
                 ),
               ),
               const SizedBox(width: 10),

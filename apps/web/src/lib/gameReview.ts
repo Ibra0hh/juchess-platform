@@ -82,6 +82,10 @@ export type GameReviewResult = {
   whiteAccuracy: number
 }
 
+export type PositionAnalysisResult = PositionReview & {
+  bestLineSan: string[]
+}
+
 type ReviewInput = {
   fen?: string
   moves?: string[]
@@ -104,6 +108,11 @@ type ReviewOptions = {
   depth?: number
   onProgress?: (completed: number, total: number) => void
   signal?: AbortSignal
+}
+
+type PositionAnalysisInput = {
+  fen?: string
+  moves?: string[]
 }
 
 type ClassificationInput = {
@@ -170,6 +179,28 @@ export function parseReviewGame({ fen = standardFen, moves = [], pgn }: ReviewIn
     headers: game.getHeaders(),
     initialFen,
     moves: history.map((move) => move.san),
+    uciMoves: history.map((move) => `${move.from}${move.to}${move.promotion ?? ''}`),
+  }
+}
+
+export function parseAnalysisPosition({
+  fen = standardFen,
+  moves = [],
+}: PositionAnalysisInput) {
+  const game = new Chess(fen)
+
+  moves.forEach((move, index) => {
+    try {
+      game.move(move)
+    } catch {
+      throw new Error(`Move ${index + 1} (${move}) is not legal in this position.`)
+    }
+  })
+
+  const history = game.history({ verbose: true })
+  return {
+    currentFen: game.fen(),
+    initialFen: fen,
     uciMoves: history.map((move) => `${move.from}${move.to}${move.promotion ?? ''}`),
   }
 }
@@ -386,6 +417,29 @@ export class StockfishReviewEngine {
 
       commands.forEach((command) => this.worker?.postMessage(command))
     })
+  }
+}
+
+export async function analyzePosition(
+  input: PositionAnalysisInput,
+  engine: StockfishReviewEngine,
+  depth = getReviewEnginePreset(defaultReviewEngineStrength).depth,
+): Promise<PositionAnalysisResult> {
+  const parsed = parseAnalysisPosition(input)
+  await engine.newGame()
+  const result = await engine.evaluatePosition(
+    parsed.initialFen,
+    parsed.uciMoves,
+    parsed.currentFen,
+    depth,
+  )
+
+  return {
+    ...result,
+    bestLineSan: formatUciLineAsSan(
+      parsed.currentFen,
+      result.lines[0]?.moves ?? [],
+    ),
   }
 }
 

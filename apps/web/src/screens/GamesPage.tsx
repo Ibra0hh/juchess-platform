@@ -15,11 +15,11 @@ import {
   findSampleGame,
   loadTournamentGame,
   loadTournamentGameArchive,
-  sampleGamesBySource,
   type GameSource,
   type SampleGame,
 } from '../lib/juchess'
 import {
+  analyzePosition,
   parseReviewGame,
   reviewGame,
   reviewGameIdentity,
@@ -28,6 +28,7 @@ import {
   getReviewEnginePreset,
   reviewEnginePresets,
   type GameReviewResult,
+  type PositionAnalysisResult,
   type ReviewClassification,
   type ReviewEngineStrength,
   type ReviewedMove,
@@ -122,6 +123,9 @@ function GamesPage() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewProgress, setReviewProgress] = useState({ completed: 0, total: 0 })
   const [workspaceError, setWorkspaceError] = useState('')
+  const [workspaceAnalysis, setWorkspaceAnalysis] = useState<PositionAnalysisResult | null>(null)
+  const [workspaceAnalysisError, setWorkspaceAnalysisError] = useState('')
+  const [workspaceAnalysisLoading, setWorkspaceAnalysisLoading] = useState(false)
   const [engineSettingsOpen, setEngineSettingsOpen] = useState(false)
   const [engineStrength, setEngineStrength] = useState<ReviewEngineStrength>(loadReviewEngineStrength)
   const enginePreset = getReviewEnginePreset(engineStrength)
@@ -132,6 +136,9 @@ function GamesPage() {
   const reviewRunRef = useRef(0)
   const reviewAbortRef = useRef<AbortController | null>(null)
   const reviewEngineRef = useRef<StockfishReviewEngine | null>(null)
+  const workspaceAnalysisRunRef = useRef(0)
+  const workspaceAnalysisEngineRef = useRef<StockfishReviewEngine | null>(null)
+  const workspaceInitialFen = game?.fen || startFen
 
   const resetReviewState = () => {
     reviewRunRef.current += 1
@@ -320,6 +327,66 @@ function GamesPage() {
   }, [activeGameIdentity, enginePreset.depth, enginePreset.hashMb, game, step])
 
   useEffect(() => {
+    const run = ++workspaceAnalysisRunRef.current
+    workspaceAnalysisEngineRef.current?.dispose()
+    workspaceAnalysisEngineRef.current = null
+
+    if (step !== 'workspace' || !ran) {
+      setWorkspaceAnalysis(null)
+      setWorkspaceAnalysisError('')
+      setWorkspaceAnalysisLoading(false)
+      return
+    }
+
+    setWorkspaceAnalysis(null)
+    setWorkspaceAnalysisError('')
+    setWorkspaceAnalysisLoading(true)
+
+    const timer = window.setTimeout(() => {
+      const engine = new StockfishReviewEngine({
+        hashMb: enginePreset.hashMb,
+        multiPv: 1,
+      })
+      workspaceAnalysisEngineRef.current = engine
+
+      void analyzePosition(
+        { fen: workspaceInitialFen, moves: workspaceMoves },
+        engine,
+        enginePreset.depth,
+      ).then((result) => {
+        if (run !== workspaceAnalysisRunRef.current) return
+        setWorkspaceAnalysis(result)
+        setWorkspaceAnalysisLoading(false)
+      }).catch((error: unknown) => {
+        if (run !== workspaceAnalysisRunRef.current) return
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setWorkspaceAnalysisError(
+          error instanceof Error ? error.message : 'Stockfish could not evaluate this position.',
+        )
+        setWorkspaceAnalysisLoading(false)
+      }).finally(() => {
+        engine.dispose()
+        if (workspaceAnalysisEngineRef.current === engine) {
+          workspaceAnalysisEngineRef.current = null
+        }
+      })
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timer)
+      workspaceAnalysisEngineRef.current?.dispose()
+      workspaceAnalysisEngineRef.current = null
+    }
+  }, [
+    enginePreset.depth,
+    enginePreset.hashMb,
+    ran,
+    step,
+    workspaceInitialFen,
+    workspaceMoves,
+  ])
+
+  useEffect(() => {
     if (step !== 'review' || !game || !reviewStarted) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -356,9 +423,13 @@ function GamesPage() {
   const isReviewMode = mode === 'review'
   const inReview = step === 'review' && Boolean(game)
   const inWorkspace = step === 'workspace'
-  const workspaceGame = workspaceLoaded ? game || sampleGamesBySource['chess.com'][0] : null
+  const workspaceGame = workspaceLoaded ? game : null
   const boardGame = inReview ? game : inWorkspace ? workspaceGame : null
-  const evalNow = getCurrentEval(review, inReview, inWorkspace, workspaceLoaded, moveIdx)
+  const evalNow = inReview
+    ? getCurrentEval(review, moveIdx)
+    : inWorkspace && ran
+      ? workspaceAnalysis?.evaluation ?? 0
+      : undefined
   const boardMoves = inReview && game
     ? game.moves.slice(0, moveIdx + 1)
     : inWorkspace
@@ -476,7 +547,7 @@ function GamesPage() {
     setWorkspaceMoves([])
     setWorkspaceResult('Live')
     setSaved(false)
-    setRan(false)
+    setRan(true)
     setStep('workspace')
   }
 
@@ -506,7 +577,7 @@ function GamesPage() {
       setWorkspaceMoves(parsed.moves)
       setWorkspaceResult(importedGame.result)
       setWorkspaceError('')
-      setRan(false)
+      setRan(true)
     } catch (error) {
       setWorkspaceError(error instanceof Error ? error.message : 'The PGN could not be read.')
     }
@@ -528,13 +599,13 @@ function GamesPage() {
             <div className="board-title-actions">
               <span>
                 {boardGame ? boardGame.round || boardGame.date : 'Standard position'}
-                {inReview ? <small>Stockfish 18 · {enginePreset.label}</small> : null}
+                {inReview || (inWorkspace && ran) ? <small>Stockfish 18 · {enginePreset.label}</small> : null}
               </span>
               <div className="board-control-stack">
                 <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
                   <FlipHorizontal2 aria-hidden="true" />
                 </button>
-                {inReview ? (
+                {inReview || inWorkspace ? (
                   <button
                     type="button"
                     aria-expanded={engineSettingsOpen}
@@ -550,7 +621,7 @@ function GamesPage() {
             </div>
           </div>
 
-          {inReview && engineSettingsOpen ? (
+          {(inReview || inWorkspace) && engineSettingsOpen ? (
             <EngineSettingsPanel
               strength={engineStrength}
               onChange={setEngineStrength}
@@ -727,8 +798,10 @@ function GamesPage() {
 
           {step === 'workspace' ? (
             <WorkspacePanel
+              analysis={workspaceAnalysis}
+              analysisLoading={workspaceAnalysisLoading}
               game={workspaceGame}
-              error={workspaceError}
+              error={workspaceError || workspaceAnalysisError}
               loaded={workspaceLoaded}
               pgnText={pgnText}
               ran={ran}
@@ -741,6 +814,7 @@ function GamesPage() {
                 setWorkspaceLoaded(false)
                 setWorkspaceMoves([])
                 setWorkspaceResult('Live')
+                setRan(false)
               }}
               onLoad={loadPgn}
               onNew={() => {
@@ -750,7 +824,7 @@ function GamesPage() {
                 setWorkspaceMoves([])
                 setWorkspaceResult('Live')
                 setSaved(false)
-                setRan(false)
+                setRan(true)
                 setWorkspaceError('')
               }}
               onReview={() => {
@@ -761,7 +835,7 @@ function GamesPage() {
                 setStep('review')
                 setMoveIdx(Math.max(0, nextGame.moves.length - 1))
               }}
-              onRun={() => setRan(true)}
+              onRun={() => setRan((current) => !current)}
               onSave={() => setSaved(true)}
             />
           ) : null}
@@ -1291,6 +1365,8 @@ function ReviewClassificationGlyph({
 }
 
 function WorkspacePanel({
+  analysis,
+  analysisLoading,
   error,
   game,
   loaded,
@@ -1306,6 +1382,8 @@ function WorkspacePanel({
   saved,
   setPgnText,
 }: {
+  analysis: PositionAnalysisResult | null
+  analysisLoading: boolean
   error: string
   game: SampleGame | null
   loaded: boolean
@@ -1321,12 +1399,22 @@ function WorkspacePanel({
   saved: boolean
   setPgnText: (value: string) => void
 }) {
-  const engineEval = ran ? (loaded ? '+0.4' : '+0.2') : '-'
-  const engineLine = ran
-    ? loaded
-      ? '18. Qb3 Qd7 19. Rae1 Rhe8 20. Rxe8 Rxe8'
-      : '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3'
-    : 'Press Run to start the engine'
+  const engineEval = !ran
+    ? 'Off'
+    : analysis
+      ? formatAnalysisEvaluation(analysis)
+      : analysisLoading
+        ? '...'
+        : '-'
+  const engineLine = !ran
+    ? 'Press Run to start Stockfish'
+    : analysisLoading
+      ? 'Evaluating the current position...'
+      : analysis?.bestLineSan.length
+        ? analysis.bestLineSan.slice(0, 10).join(' ')
+        : analysis
+          ? 'No continuation - the game is over'
+          : 'Stockfish is waiting for a valid position'
 
   return (
     <>
@@ -1340,13 +1428,13 @@ function WorkspacePanel({
         <div className="engine-line">
           <div>
             <strong>{engineEval}</strong>
-            <span>depth 22</span>
+            <span>{analysis ? `depth ${analysis.depth}` : 'Stockfish 18'}</span>
           </div>
           <p>{engineLine}</p>
         </div>
         <div className="workspace-opening">
           <strong>{loaded && game ? game.opening : 'Starting position'}</strong>
-          <span>ECO C50</span>
+          <span>{loaded && game ? sourceName(game.source) : 'Standard'}</span>
         </div>
         <div className="workspace-actions">
           <button type="button" onClick={onNew}>
@@ -1359,7 +1447,7 @@ function WorkspacePanel({
             Review
           </button>
           <button type="button" className="run" onClick={onRun}>
-            {ran ? 'Running...' : 'Run'}
+            {ran ? 'Stop' : 'Run'}
           </button>
         </div>
       </section>
@@ -1418,14 +1506,9 @@ function loadReviewEngineStrength(): ReviewEngineStrength {
 
 function getCurrentEval(
   review: GameReviewResult | null,
-  inReview: boolean,
-  inWorkspace: boolean,
-  workspaceLoaded: boolean,
   moveIdx: number,
 ) {
-  if (inReview) return review?.positions[Math.min(moveIdx + 1, review.positions.length - 1)]?.evaluation ?? 0
-  if (inWorkspace) return workspaceLoaded ? 0.4 : 0.2
-  return 0.2
+  return review?.positions[Math.min(moveIdx + 1, review.positions.length - 1)]?.evaluation ?? 0
 }
 
 function buildEvalArea(evals: number[]) {
@@ -1565,6 +1648,11 @@ function createWorkspaceGame(moves: string[], result: string): SampleGame {
 function formatEvaluation(value: number) {
   if (Math.abs(value) >= 99) return value > 0 ? 'M+' : 'M-'
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}`
+}
+
+function formatAnalysisEvaluation(analysis: PositionAnalysisResult) {
+  if (analysis.mate !== undefined) return `M${analysis.mate > 0 ? '+' : ''}${analysis.mate}`
+  return formatEvaluation(analysis.evaluation)
 }
 
 function buildWorkspaceRows(moves: string[]) {

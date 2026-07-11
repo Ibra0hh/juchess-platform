@@ -5,6 +5,7 @@ import {
   expectedScore,
   isOpeningBookMove,
   moveAccuracyFromLoss,
+  parseAnalysisPosition,
   parseReviewGame,
   parseStockfishOutput,
   reviewGameIdentity,
@@ -57,6 +58,14 @@ test('normalizes UCI scores to White perspective', () => {
   assert.equal(parsed.lines[1].evaluation, -0.3)
   assert.ok(Math.abs((parsed.whiteExpectedScore ?? 0) - 0.2) < 0.0001)
   assert.equal(parsed.bestMove, 'g8f6')
+})
+
+test('builds the exact current position for live analysis', () => {
+  const parsed = parseAnalysisPosition({ moves: ['e4', 'e5', 'Nf3', 'Nc6'] })
+
+  assert.deepEqual(parsed.uciMoves, ['e2e4', 'e7e5', 'g1f3', 'b8c6'])
+  assert.equal(parsed.currentFen.split(' ')[1], 'w')
+  assert.match(parsed.currentFen, /^r1bqkbnr\/pppp1ppp\/2n5\/4p3\/4P3\/5N2\/PPPP1PPP\/RNBQKB1R w /)
 })
 
 test('classifies exact engine choices and large expected-score losses', () => {
