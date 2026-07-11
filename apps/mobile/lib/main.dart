@@ -6144,6 +6144,7 @@ class _TournamentGameDetailScreenState
                 flipped: flipped,
                 moves: moves,
                 readOnly: true,
+                showEvaluation: false,
                 onChanged: (_, _) {},
               ),
               TournamentBoardPlayerBar(
@@ -6432,6 +6433,7 @@ class PrototypeChessBoard extends StatefulWidget {
     required this.moves,
     required this.onChanged,
     this.readOnly = false,
+    this.showEvaluation = true,
     super.key,
   });
 
@@ -6439,6 +6441,7 @@ class PrototypeChessBoard extends StatefulWidget {
   final List<String> moves;
   final void Function(List<String> moves, String result) onChanged;
   final bool readOnly;
+  final bool showEvaluation;
 
   @override
   State<PrototypeChessBoard> createState() => _PrototypeChessBoardState();
@@ -6553,7 +6556,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
     return Stack(
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 30),
+          padding: EdgeInsets.only(left: widget.showEvaluation ? 30 : 0),
           child: AspectRatio(
             aspectRatio: 1,
             child: DecoratedBox(
@@ -6759,13 +6762,14 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
             ),
           ),
         ),
-        Positioned(
-          top: 0,
-          bottom: 0,
-          left: 0,
-          width: 24,
-          child: _MobileEvaluationBar(value: evaluation),
-        ),
+        if (widget.showEvaluation)
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: 24,
+            child: _MobileEvaluationBar(value: evaluation),
+          ),
       ],
     );
   }

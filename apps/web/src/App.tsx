@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
 import { AuthProvider } from './context/AuthContext'
+import { useOnlineTournamentPlayLock } from './lib/onlineTournamentPlayLock'
 import AuthPage from './screens/AuthPage'
 import ForgotPasswordPage from './screens/ForgotPasswordPage'
 import GamesPage from './screens/GamesPage'
@@ -23,6 +24,12 @@ function NotFound() {
   )
 }
 
+function ToolsRoute() {
+  const playLock = useOnlineTournamentPlayLock()
+  if (playLock) return <Navigate to={`/games?game=${encodeURIComponent(playLock.gameId)}`} replace />
+  return <GamesPage />
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -35,7 +42,7 @@ function App() {
         <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/games" element={<OnlineGamesPage />} />
-        <Route path="/tools" element={<GamesPage />} />
+        <Route path="/tools" element={<ToolsRoute />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="*" element={<NotFound />} />

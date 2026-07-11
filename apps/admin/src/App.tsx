@@ -3470,10 +3470,12 @@ function LiveTournamentBoard({
             name={playerName(topColor)}
           />
           <JuChessBoard
+            annotationsEnabled={false}
             flipped={flipped}
             interactive={Boolean(pairing && !viewingHistory && (!pairing.completed || allowCompletedCorrections))}
             moves={displayedMoves}
             onChange={handleBoardChange}
+            showEvaluation={false}
           />
           <BoardPlayerBar
             captured={boardSummary.captured[bottomColor]}

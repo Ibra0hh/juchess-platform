@@ -15,6 +15,10 @@ import {
   type Tournament,
   type TournamentGame,
 } from '../lib/juchess'
+import {
+  clearOnlineTournamentPlayLock,
+  setOnlineTournamentPlayLock,
+} from '../lib/onlineTournamentPlayLock'
 import './OnlineGamesPage.css'
 
 type TournamentGameChoice = {
@@ -43,6 +47,10 @@ function OnlineGamesPage() {
       setBoardMoves(game.moves)
       setBoardResult(game.result)
       if (updateUrl) setSearchParams({ game: gameId })
+      if (game.live) setOnlineTournamentPlayLock(gameId)
+      else clearOnlineTournamentPlayLock(gameId)
+    } else {
+      clearOnlineTournamentPlayLock(gameId)
     }
     setGameLoading(false)
   }, [setSearchParams])
@@ -86,6 +94,7 @@ function OnlineGamesPage() {
   }, [openTournamentGame, selectedGame?.live, selectedGameId])
 
   function startFreeBoard() {
+    clearOnlineTournamentPlayLock()
     setSelectedGame(null)
     setSelectedGameId(null)
     setBoardMoves([])
@@ -105,6 +114,7 @@ function OnlineGamesPage() {
   }
 
   const watchingTournament = Boolean(selectedGame)
+  const playingOnlineTournament = Boolean(selectedGame?.live)
   const boardSummary = useMemo(() => getJuChessBoardSummary(undefined, boardMoves), [boardMoves])
   const topSide = flipped ? 'white' : 'black'
   const bottomSide = flipped ? 'black' : 'white'
@@ -118,7 +128,7 @@ function OnlineGamesPage() {
 
   return (
     <div className="club-screen online-games-screen" data-screen-label="Games">
-      <SiteHeader active="games" />
+      <SiteHeader active="games" toolsDisabled={playingOnlineTournament} />
       <main className="online-games-main">
         <header className="online-games-heading">
           <div>
@@ -151,11 +161,13 @@ function OnlineGamesPage() {
 
             <PlayerStrip {...playerFor(topSide)} edge="top" />
             <JuChessBoard
+              annotationsEnabled={!playingOnlineTournament}
               className="online-ju-board"
               flipped={flipped}
               interactive={!watchingTournament}
               moves={boardMoves}
               onChange={watchingTournament ? undefined : updateBoard}
+              showEvaluation={false}
             />
             <PlayerStrip {...playerFor(bottomSide)} edge="bottom" />
 

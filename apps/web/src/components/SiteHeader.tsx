@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useOnlineTournamentPlayLock } from '../lib/onlineTournamentPlayLock'
 import './SiteHeader.css'
 
 type SiteHeaderProps = {
@@ -8,12 +9,15 @@ type SiteHeaderProps = {
     displayName: string
     initials: string
   }
+  toolsDisabled?: boolean
 }
 
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 
-function SiteHeader({ active, profilePreview }: SiteHeaderProps) {
+function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeaderProps) {
   const { loading, profile, signOut, user } = useAuth()
+  const playLock = useOnlineTournamentPlayLock()
+  const toolsUnavailable = toolsDisabled || Boolean(playLock)
   const displayName = profile?.displayName || user?.name || user?.email || ''
   const initials = displayName
     .split(/\s+/)
@@ -42,9 +46,15 @@ function SiteHeader({ active, profilePreview }: SiteHeaderProps) {
           <Link to="/tournaments" className={active === 'tournaments' ? 'active' : undefined}>
             Tournaments
           </Link>
-          <Link to="/tools" className={active === 'tools' ? 'active' : undefined}>
-            Tools
-          </Link>
+          {toolsUnavailable ? (
+            <span aria-disabled="true" className="disabled" title="Tools are unavailable during live online tournament play">
+              Tools
+            </span>
+          ) : (
+            <Link to="/tools" className={active === 'tools' ? 'active' : undefined}>
+              Tools
+            </Link>
+          )}
           <Link to="/games" className={active === 'games' ? 'active' : undefined}>
             Games
           </Link>

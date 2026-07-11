@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:juchess_mobile/main.dart';
 
@@ -72,6 +73,34 @@ void main() {
       isTournamentRegistrationOpen(_seed('finished-event', 'completed')),
       isFalse,
     );
+  });
+
+  testWidgets('evaluation can be removed from tournament game boards', (
+    WidgetTester tester,
+  ) async {
+    Widget board({required bool showEvaluation}) => MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: 360,
+            height: 360,
+            child: PrototypeChessBoard(
+              flipped: false,
+              moves: const [],
+              readOnly: true,
+              showEvaluation: showEvaluation,
+              onChanged: (_, _) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(board(showEvaluation: false));
+    expect(find.text('0.0'), findsNothing);
+
+    await tester.pumpWidget(board(showEvaluation: true));
+    expect(find.text('0.0'), findsOneWidget);
   });
 }
 

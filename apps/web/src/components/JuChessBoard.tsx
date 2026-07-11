@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useId, useMemo, useState, type MouseEvent } from 'react'
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js'
 import './JuChessBoard.css'
 import { buildChessGame, deriveResult, getMaterialEvaluation, type JuCapturedPiece } from './JuChessRules'
@@ -36,6 +36,7 @@ type BoardSquare = {
 }
 
 type JuChessBoardProps = {
+  annotationsEnabled?: boolean
   className?: string
   evaluation?: number
   fen?: string
@@ -57,6 +58,7 @@ const PIECE_NAMES: Record<PieceSymbol, string> = {
   r: 'rook',
 }
 export function JuChessBoard({
+  annotationsEnabled = true,
   className,
   evaluation,
   fen,
@@ -80,6 +82,13 @@ export function JuChessBoard({
   const squares = buildSquares(game, flipped)
   const evaluationScore = evaluation ?? getMaterialEvaluation(game)
   const whiteShare = Math.max(4, Math.min(96, 50 + evaluationScore * 7))
+
+  useEffect(() => {
+    if (annotationsEnabled) return
+    setArrows([])
+    setMarkedSquares(new Set())
+    setRightDragFrom(null)
+  }, [annotationsEnabled])
 
   function emit(nextGame: Chess, nextMoves: string[], lastMoveSan: string) {
     onChange?.({
@@ -140,13 +149,13 @@ export function JuChessBoard({
   }
 
   function handleRightMouseDown(event: MouseEvent<HTMLButtonElement>, square: Square) {
-    if (event.button !== 2) return
+    if (!annotationsEnabled || event.button !== 2) return
     event.preventDefault()
     setRightDragFrom(square)
   }
 
   function handleRightMouseUp(event: MouseEvent<HTMLButtonElement>, square: Square) {
-    if (event.button !== 2 || !rightDragFrom) return
+    if (!annotationsEnabled || event.button !== 2 || !rightDragFrom) return
     event.preventDefault()
 
     if (rightDragFrom === square) {
@@ -171,7 +180,7 @@ export function JuChessBoard({
   return (
     <div
       className={['ju-chess-board-shell', showEvaluation ? '' : 'without-evaluation', className].filter(Boolean).join(' ')}
-      onContextMenu={(event) => event.preventDefault()}
+      onContextMenu={annotationsEnabled ? (event) => event.preventDefault() : undefined}
       onMouseLeave={() => setRightDragFrom(null)}
     >
       {showEvaluation ? (
@@ -194,7 +203,7 @@ export function JuChessBoard({
           const lastMoveSquare = lastMove?.from === square.key || lastMove?.to === square.key
           const target = legalTargets.has(square.key)
           const check = checkSquare === square.key
-          const marked = markedSquares.has(square.key)
+          const marked = annotationsEnabled && markedSquares.has(square.key)
           return (
             <button
               type="button"
@@ -222,7 +231,7 @@ export function JuChessBoard({
             </button>
           )
         })}
-        {arrows.length ? (
+        {annotationsEnabled && arrows.length ? (
           <svg className="ju-board-arrows" viewBox="0 0 8 8" aria-hidden="true">
             <defs>
               <marker id={markerId} markerHeight="4" markerWidth="4" orient="auto" refX="3.2" refY="2" viewBox="0 0 4 4">
