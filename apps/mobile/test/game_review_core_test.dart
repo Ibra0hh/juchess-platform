@@ -97,4 +97,27 @@ void main() {
     );
     expect(isMobileOpeningBookMove(['h2h4'], 0), isFalse);
   });
+
+  test('evaluation graph taps resolve to the nearest move point', () {
+    expect(
+      nearestMobileEvaluationPoint(
+        evaluations: const [0, 3, -3],
+        height: 80,
+        pointerX: 50,
+        pointerY: 22.5,
+        width: 100,
+      ),
+      1,
+    );
+    expect(
+      nearestMobileEvaluationPoint(
+        evaluations: const [0, 3, -3],
+        height: 80,
+        pointerX: 50,
+        pointerY: 80,
+        width: 100,
+      ),
+      isNull,
+    );
+  });
 }

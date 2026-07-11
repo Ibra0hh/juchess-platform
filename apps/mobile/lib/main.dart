@@ -6878,6 +6878,10 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
               moveIndex = 0;
               reviewStarted = true;
             }),
+            onSelectMove: (index) => setState(() {
+              moveIndex = index;
+              reviewStarted = true;
+            }),
             review: completedReview,
             white: widget.white,
           ),
@@ -7042,7 +7046,11 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
             ),
           ),
         if (review != null && selected != null)
-          _MobileReviewSummary(review: review!, selected: selected),
+          _MobileReviewSummary(
+            onSelectMove: (index) => setState(() => moveIndex = index),
+            review: review!,
+            selected: selected,
+          ),
         const SizedBox(height: 10),
         _MobileReviewMoves(
           currentIndex: moveIndex,
@@ -7160,12 +7168,14 @@ const _mobileSummaryClassifications = <MobileMoveClassification>[
 class _MobileReviewReadySummary extends StatelessWidget {
   const _MobileReviewReadySummary({
     required this.black,
+    required this.onSelectMove,
     required this.onStart,
     required this.review,
     required this.white,
   });
 
   final String black;
+  final ValueChanged<int> onSelectMove;
   final VoidCallback onStart;
   final MobileGameReviewResult review;
   final String white;
@@ -7201,7 +7211,7 @@ class _MobileReviewReadySummary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          _MobileEvaluationGraph(review: review),
+          _MobileEvaluationGraph(onSelectMove: onSelectMove, review: review),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -7347,8 +7357,13 @@ class _MobileClassificationCountRow extends StatelessWidget {
 }
 
 class _MobileEvaluationGraph extends StatelessWidget {
-  const _MobileEvaluationGraph({required this.review, this.selectedIndex});
+  const _MobileEvaluationGraph({
+    required this.review,
+    this.onSelectMove,
+    this.selectedIndex,
+  });
 
+  final ValueChanged<int>? onSelectMove;
   final MobileGameReviewResult review;
   final int? selectedIndex;
 
@@ -7356,10 +7371,29 @@ class _MobileEvaluationGraph extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 86,
-      child: CustomPaint(
-        painter: _MobileEvaluationGraphPainter(
-          review: review,
-          selectedIndex: selectedIndex,
+      child: LayoutBuilder(
+        builder: (context, constraints) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: onSelectMove == null
+              ? null
+              : (details) {
+                  final index = nearestMobileEvaluationPoint(
+                    evaluations: review.moves
+                        .map((move) => move.evaluation)
+                        .toList(growable: false),
+                    height: 86,
+                    pointerX: details.localPosition.dx,
+                    pointerY: details.localPosition.dy,
+                    width: constraints.maxWidth,
+                  );
+                  if (index != null) onSelectMove!(index);
+                },
+          child: CustomPaint(
+            painter: _MobileEvaluationGraphPainter(
+              review: review,
+              selectedIndex: selectedIndex,
+            ),
+          ),
         ),
       ),
     );
@@ -7474,8 +7508,13 @@ class _ReviewNavButton extends StatelessWidget {
 }
 
 class _MobileReviewSummary extends StatelessWidget {
-  const _MobileReviewSummary({required this.review, required this.selected});
+  const _MobileReviewSummary({
+    required this.onSelectMove,
+    required this.review,
+    required this.selected,
+  });
 
+  final ValueChanged<int> onSelectMove;
   final MobileGameReviewResult review;
   final MobileReviewedMove selected;
 
@@ -7541,7 +7580,11 @@ class _MobileReviewSummary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          _MobileEvaluationGraph(review: review, selectedIndex: selectedIndex),
+          _MobileEvaluationGraph(
+            onSelectMove: onSelectMove,
+            review: review,
+            selectedIndex: selectedIndex,
+          ),
         ],
       ),
     );

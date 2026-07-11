@@ -717,6 +717,10 @@ function GamesPage() {
               game={game}
               loading={reviewLoading}
               moveRows={reviewRows}
+              onSelectMove={(index) => {
+                setMoveIdx(index)
+                setReviewStarted(true)
+              }}
               progress={reviewProgress}
               review={review}
               selectedMove={selectedReviewMove}
@@ -1038,6 +1042,7 @@ function ReviewPanel({
   loading,
   moveRows,
   onExit,
+  onSelectMove,
   onStart,
   progress,
   review,
@@ -1052,6 +1057,7 @@ function ReviewPanel({
   loading: boolean
   moveRows: ReturnType<typeof buildMoveRows>
   onExit: () => void
+  onSelectMove: (index: number) => void
   onStart: () => void
   progress: { completed: number; total: number }
   review: GameReviewResult | null
@@ -1102,6 +1108,7 @@ function ReviewPanel({
             <ReviewGraph
               area={evalArea}
               cursorX={evalCursorX}
+              onSelectMove={onSelectMove}
               review={review}
               showCursor={started}
             />
@@ -1189,21 +1196,58 @@ function ReviewPanel({
 function ReviewGraph({
   area,
   cursorX,
+  onSelectMove,
   review,
   showCursor,
 }: {
   area: string
   cursorX: number
+  onSelectMove: (index: number) => void
   review: GameReviewResult
   showCursor: boolean
 }) {
   const dots = buildEvalDots(review)
   return (
-    <svg viewBox="0 0 300 80" className="eval-graph" preserveAspectRatio="none" aria-label="Evaluation graph">
+    <svg
+      viewBox="0 0 300 80"
+      className="eval-graph"
+      preserveAspectRatio="none"
+      aria-label="Evaluation graph"
+      onClick={(event) => {
+        const bounds = event.currentTarget.getBoundingClientRect()
+        if (!bounds.width || !bounds.height) return
+        const pointerX = (event.clientX - bounds.left) / bounds.width * 300
+        const pointerY = (event.clientY - bounds.top) / bounds.height * 80
+        let closest = dots[0]
+        let closestDistance = Number.POSITIVE_INFINITY
+        dots.forEach((dot) => {
+          const xDistance = (dot.x - pointerX) * bounds.width / 300
+          const yDistance = (dot.y - pointerY) * bounds.height / 80
+          const distance = xDistance * xDistance + yDistance * yDistance
+          if (distance >= closestDistance) return
+          closest = dot
+          closestDistance = distance
+        })
+        if (closest && closestDistance <= 14 * 14) onSelectMove(closest.index)
+      }}
+    >
       <path d={area} />
       <line x1="0" y1="40" x2="300" y2="40" />
       {dots.map((dot) => (
-        <circle cx={dot.x} cy={dot.y} fill={dot.color} key={dot.key} r="3.2" />
+        <g
+          aria-label={`Move ${dot.index + 1}: ${review.moves[dot.index].san}, ${review.moves[dot.index].classification}`}
+          className="eval-point"
+          key={dot.key}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            onSelectMove(dot.index)
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          <circle className="point" cx={dot.x} cy={dot.y} fill={dot.color} r="3.2" />
+        </g>
       ))}
       {showCursor ? <line className="cursor" x1={cursorX} y1="0" x2={cursorX} y2="80" /> : null}
     </svg>
@@ -1392,6 +1436,7 @@ function buildEvalDots(review: GameReviewResult) {
   const maxIndex = Math.max(1, review.moves.length - 1)
   return review.moves.map((move, index) => ({
     color: classificationColors[move.classification],
+    index,
     key: `${index}-${move.uci}`,
     x: (index / maxIndex) * 300,
     y: 40 - Math.max(-38, Math.min(38, move.evaluation * 6.5)),

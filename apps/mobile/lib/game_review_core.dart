@@ -70,6 +70,34 @@ MobileReviewEnginePreset mobileReviewPresetFor(MobileReviewStrength strength) {
   );
 }
 
+int? nearestMobileEvaluationPoint({
+  required List<double> evaluations,
+  required double height,
+  required double pointerX,
+  required double pointerY,
+  required double width,
+  double hitRadius = 18,
+}) {
+  if (evaluations.isEmpty || width <= 0 || height <= 0) return null;
+
+  final lastIndex = math.max(1, evaluations.length - 1);
+  var closestIndex = 0;
+  var closestDistanceSquared = double.infinity;
+  for (var index = 0; index < evaluations.length; index++) {
+    final x = index / lastIndex * width;
+    final score = evaluations[index].clamp(-6.0, 6.0);
+    final y = height / 2 - score / 6 * (height / 2 - 5);
+    final xDistance = x - pointerX;
+    final yDistance = y - pointerY;
+    final distanceSquared = xDistance * xDistance + yDistance * yDistance;
+    if (distanceSquared >= closestDistanceSquared) continue;
+    closestIndex = index;
+    closestDistanceSquared = distanceSquared;
+  }
+
+  return closestDistanceSquared <= hitRadius * hitRadius ? closestIndex : null;
+}
+
 const _mobileOpeningBookLines = <List<String>>[
   ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5', 'a7a6', 'b5a4', 'g8f6'],
   ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'g8f6', 'd2d3', 'f8c5'],

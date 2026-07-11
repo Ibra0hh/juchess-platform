@@ -1596,6 +1596,7 @@
   margin-top: 12px;
   background: #111111;
   border-radius: 6px;
+  cursor: pointer;
 }
 
 .eval-graph path {
@@ -1618,6 +1619,16 @@
   stroke: rgba(255, 255, 255, 0.94);
   stroke-width: 1.2;
   vector-effect: non-scaling-stroke;
+}
+
+.eval-graph .eval-point {
+  outline: none;
+  pointer-events: none;
+}
+
+.eval-graph .eval-point:focus .point {
+  stroke: #c9ae6b;
+  stroke-width: 2.6;
 }
 
 .review-progress {
