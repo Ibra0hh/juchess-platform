@@ -1,0 +1,391 @@
+import 'dart:math' as math;
+
+import 'package:chess/chess.dart' as chess;
+
+const mobileStandardFen =
+    'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+enum MobileMoveClassification {
+  brilliant,
+  great,
+  best,
+  excellent,
+  good,
+  inaccuracy,
+  mistake,
+  blunder,
+  forced,
+}
+
+class MobileParsedReviewGame {
+  const MobileParsedReviewGame({
+    required this.fens,
+    required this.headers,
+    required this.initialFen,
+    required this.moves,
+    required this.uciMoves,
+  });
+
+  final List<String> fens;
+  final Map<String, String> headers;
+  final String initialFen;
+  final List<String> moves;
+  final List<String> uciMoves;
+
+  factory MobileParsedReviewGame.fromPgn(String pgn) {
+    final game = chess.Chess();
+    bool loaded;
+    try {
+      loaded = game.load_pgn(pgn);
+    } catch (_) {
+      loaded = false;
+    }
+    if (!loaded) {
+      throw const FormatException('The PGN contains an invalid or illegal move.');
+    }
+    return MobileParsedReviewGame._fromGame(game);
+  }
+
+  factory MobileParsedReviewGame.fromMoves(
+    List<String> moves, {
+    String fen = mobileStandardFen,
+  }) {
+    final game = chess.Chess.fromFEN(fen);
+    for (var index = 0; index < moves.length; index++) {
+      if (!game.move(moves[index])) {
+        throw FormatException(
+          'Move ${index + 1} (${moves[index]}) is not legal in this game.',
+        );
+      }
+    }
+    return MobileParsedReviewGame._fromGame(game);
+  }
+
+  factory MobileParsedReviewGame._fromGame(chess.Chess game) {
+    final states = List<chess.State>.from(game.history);
+    if (states.isEmpty) {
+      throw const FormatException('The game does not contain any moves to review.');
+    }
+
+    final verbose = game.getHistory({'verbose': true}).cast<Map>();
+    final initialFen = game.header['FEN']?.toString() ?? mobileStandardFen;
+    final replay = chess.Chess.fromFEN(initialFen);
+    final fens = <String>[initialFen];
+    final uciMoves = <String>[];
+
+    for (final state in states) {
+      final move = state.move;
+      final promotion = move.promotion?.toString();
+      final request = <String, String>{
+        'from': move.fromAlgebraic,
+        'to': move.toAlgebraic,
+      };
+      if (promotion != null) request['promotion'] = promotion;
+      if (!replay.move(request)) {
+        throw const FormatException('The game could not be reconstructed.');
+      }
+      uciMoves.add(
+        '${move.fromAlgebraic}${move.toAlgebraic}${promotion ?? ''}',
+      );
+      fens.add(replay.fen);
+    }
+
+    return MobileParsedReviewGame(
+      fens: fens,
+      headers: game.header.map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      ),
+      initialFen: initialFen,
+      moves: verbose.map((move) => move['san'].toString()).toList(),
+      uciMoves: uciMoves,
+    );
+  }
+}
+
+class MobileEngineLine {
+  const MobileEngineLine({
+    required this.depth,
+    required this.evaluation,
+    required this.moves,
+    required this.multiPv,
+    this.mate,
+  });
+
+  final int depth;
+  final double evaluation;
+  final int? mate;
+  final List<String> moves;
+  final int multiPv;
+}
+
+class MobilePositionReview {
+  const MobilePositionReview({
+    required this.depth,
+    required this.evaluation,
+    required this.lines,
+    this.bestMove,
+    this.mate,
+  });
+
+  final String? bestMove;
+  final int depth;
+  final double evaluation;
+  final List<MobileEngineLine> lines;
+  final int? mate;
+}
+
+class MobileReviewedMove {
+  const MobileReviewedMove({
+    required this.accuracy,
+    required this.bestLine,
+    required this.classification,
+    required this.evaluation,
+    required this.loss,
+    required this.san,
+    required this.uci,
+    this.bestMove,
+    this.bestMoveSan,
+  });
+
+  final double accuracy;
+  final List<String> bestLine;
+  final String? bestMove;
+  final String? bestMoveSan;
+  final MobileMoveClassification classification;
+  final double evaluation;
+  final double loss;
+  final String san;
+  final String uci;
+}
+
+class MobileGameReviewResult {
+  const MobileGameReviewResult({
+    required this.blackAccuracy,
+    required this.depth,
+    required this.moves,
+    required this.positions,
+    required this.whiteAccuracy,
+  });
+
+  final double blackAccuracy;
+  final int depth;
+  final List<MobileReviewedMove> moves;
+  final List<MobilePositionReview> positions;
+  final double whiteAccuracy;
+}
+
+double mobileExpectedScore(double evaluation, String color) {
+  final bounded = evaluation.clamp(-12.0, 12.0);
+  final whiteScore = 1 / (1 + math.exp(-1.35 * bounded));
+  return color == 'w' ? whiteScore : 1 - whiteScore;
+}
+
+double mobileMoveAccuracyFromLoss(double loss) {
+  return (100 * math.exp(-3.5 * math.max(0, loss))).clamp(0.0, 100.0);
+}
+
+MobileMoveClassification classifyMobileReviewMove({
+  required double afterEvaluation,
+  required double beforeEvaluation,
+  required int legalMoves,
+  required String mover,
+  required String playedMove,
+  double? alternateEvaluation,
+  String? bestMove,
+}) {
+  if (legalMoves <= 1) return MobileMoveClassification.forced;
+
+  final before = mobileExpectedScore(beforeEvaluation, mover);
+  final after = mobileExpectedScore(afterEvaluation, mover);
+  final loss = math.max(0, before - after);
+  final isBest = bestMove != null && playedMove == bestMove;
+
+  if (isBest && alternateEvaluation != null) {
+    final alternative = mobileExpectedScore(alternateEvaluation, mover);
+    if (before - alternative >= 0.12) return MobileMoveClassification.great;
+  }
+  if (isBest) return MobileMoveClassification.best;
+  if (loss <= 0.015) return MobileMoveClassification.excellent;
+  if (loss <= 0.05) return MobileMoveClassification.good;
+  if (loss <= 0.12) return MobileMoveClassification.inaccuracy;
+  if (loss <= 0.25) return MobileMoveClassification.mistake;
+  return MobileMoveClassification.blunder;
+}
+
+MobilePositionReview parseMobileStockfishOutput(
+  List<String> messages,
+  String fen,
+) {
+  final sideMultiplier = fen.split(RegExp(r'\s+'))[1] == 'b' ? -1 : 1;
+  final latest = <int, MobileEngineLine>{};
+  String? bestMove;
+
+  for (final message in messages) {
+    if (message.startsWith('bestmove ')) {
+      final candidate = message.split(RegExp(r'\s+'))[1];
+      if (candidate != '(none)') bestMove = candidate;
+      continue;
+    }
+    if (!message.startsWith('info ') ||
+        !message.contains(' score ') ||
+        !message.contains(' pv ')) {
+      continue;
+    }
+
+    final depth = _readUciNumber(message, 'depth');
+    final multiPv = _readUciNumber(message, 'multipv') ?? 1;
+    final cp = _readUciNumber(message, 'cp');
+    final rawMate = _readUciNumber(message, 'mate');
+    final tokens = message.split(RegExp(r'\s+'));
+    final pvIndex = tokens.indexOf('pv');
+    if (depth == null || pvIndex < 0 || (cp == null && rawMate == null)) {
+      continue;
+    }
+
+    final mate = rawMate == null ? null : rawMate * sideMultiplier;
+    final evaluation = mate == null
+        ? cp! * sideMultiplier / 100
+        : mate > 0
+        ? 100.0
+        : -100.0;
+    final line = MobileEngineLine(
+      depth: depth,
+      evaluation: evaluation,
+      mate: mate,
+      moves: tokens.sublist(pvIndex + 1),
+      multiPv: multiPv,
+    );
+    final previous = latest[multiPv];
+    if (previous == null || line.depth >= previous.depth) latest[multiPv] = line;
+  }
+
+  final lines = latest.values.toList()
+    ..sort((a, b) => a.multiPv.compareTo(b.multiPv));
+  if (lines.isEmpty) {
+    throw const FormatException(
+      'Stockfish returned no usable evaluation for this position.',
+    );
+  }
+
+  return MobilePositionReview(
+    bestMove: bestMove,
+    depth: lines.map((line) => line.depth).reduce(math.max),
+    evaluation: lines.first.evaluation,
+    lines: lines,
+    mate: lines.first.mate,
+  );
+}
+
+MobileGameReviewResult buildMobileGameReview({
+  required int depth,
+  required MobileParsedReviewGame game,
+  required List<MobilePositionReview> positions,
+}) {
+  if (positions.length != game.moves.length + 1) {
+    throw ArgumentError('Every move must have a before and after evaluation.');
+  }
+
+  final reviewedMoves = <MobileReviewedMove>[];
+  for (var index = 0; index < game.moves.length; index++) {
+    final before = positions[index];
+    final after = positions[index + 1];
+    final mover = game.fens[index].split(RegExp(r'\s+'))[1];
+    final board = chess.Chess.fromFEN(game.fens[index]);
+    final loss = math.max(
+      0,
+      mobileExpectedScore(before.evaluation, mover) -
+          mobileExpectedScore(after.evaluation, mover),
+    ).toDouble();
+    final classification = classifyMobileReviewMove(
+      afterEvaluation: after.evaluation,
+      alternateEvaluation: before.lines.length > 1
+          ? before.lines[1].evaluation
+          : null,
+      beforeEvaluation: before.evaluation,
+      bestMove: before.bestMove,
+      legalMoves: board.moves().length,
+      mover: mover,
+      playedMove: game.uciMoves[index],
+    );
+
+    reviewedMoves.add(
+      MobileReviewedMove(
+        accuracy: mobileMoveAccuracyFromLoss(loss),
+        bestLine: mobileUciLineAsSan(
+          game.fens[index],
+          before.lines.first.moves,
+        ),
+        bestMove: before.bestMove,
+        bestMoveSan: before.bestMove == null
+            ? null
+            : mobileUciLineAsSan(game.fens[index], [before.bestMove!]).firstOrNull,
+        classification: classification,
+        evaluation: after.evaluation,
+        loss: loss * 100,
+        san: game.moves[index],
+        uci: game.uciMoves[index],
+      ),
+    );
+  }
+
+  return MobileGameReviewResult(
+    blackAccuracy: _playerAccuracy(reviewedMoves, 1),
+    depth: depth,
+    moves: reviewedMoves,
+    positions: positions,
+    whiteAccuracy: _playerAccuracy(reviewedMoves, 0),
+  );
+}
+
+List<String> mobileUciLineAsSan(String fen, List<String> moves) {
+  final game = chess.Chess.fromFEN(fen);
+  final san = <String>[];
+
+  for (final uci in moves) {
+    if (uci.length < 4) break;
+    final request = <String, String>{
+      'from': uci.substring(0, 2),
+      'to': uci.substring(2, 4),
+    };
+    if (uci.length > 4) request['promotion'] = uci.substring(4, 5);
+    if (!game.move(request)) break;
+    final history = game.getHistory({'verbose': true}).cast<Map>();
+    san.add(history.last['san'].toString());
+  }
+
+  return san;
+}
+
+String mobileClassificationLabel(MobileMoveClassification classification) {
+  return switch (classification) {
+    MobileMoveClassification.brilliant => 'Brilliant',
+    MobileMoveClassification.great => 'Great',
+    MobileMoveClassification.best => 'Best',
+    MobileMoveClassification.excellent => 'Excellent',
+    MobileMoveClassification.good => 'Good',
+    MobileMoveClassification.inaccuracy => 'Inaccuracy',
+    MobileMoveClassification.mistake => 'Mistake',
+    MobileMoveClassification.blunder => 'Blunder',
+    MobileMoveClassification.forced => 'Forced',
+  };
+}
+
+double _playerAccuracy(List<MobileReviewedMove> moves, int parity) {
+  final values = <double>[];
+  for (var index = parity; index < moves.length; index += 2) {
+    values.add(moves[index].accuracy);
+  }
+  if (values.isEmpty) return 0;
+  return values.reduce((a, b) => a + b) / values.length;
+}
+
+int? _readUciNumber(String message, String key) {
+  final tokens = message.split(RegExp(r'\s+'));
+  final index = tokens.indexOf(key);
+  if (index < 0 || index + 1 >= tokens.length) return null;
+  return int.tryParse(tokens[index + 1]);
+}
+
+extension _FirstOrNull<T> on List<T> {
+  T? get firstOrNull => isEmpty ? null : first;
+}

@@ -1410,6 +1410,109 @@
   stroke-width: 1.5;
 }
 
+.review-progress {
+  margin-top: 14px;
+  padding: 14px;
+  background: #fbf6e8;
+  border: 1px solid rgba(17, 17, 17, 0.15);
+  border-radius: 8px;
+}
+
+.review-progress > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-progress strong,
+.review-progress span,
+.review-progress small {
+  font-size: 12px;
+}
+
+.review-progress span,
+.review-progress small {
+  color: rgba(17, 17, 17, 0.58);
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.review-progress i {
+  height: 7px;
+  display: block;
+  overflow: hidden;
+  margin: 11px 0 6px;
+  background: rgba(17, 17, 17, 0.1);
+  border-radius: 4px;
+}
+
+.review-progress i b {
+  height: 100%;
+  display: block;
+  background: var(--wine);
+  transition: width 180ms ease-out;
+}
+
+.review-progress small {
+  display: block;
+  text-align: right;
+}
+
+.review-error,
+.pgn-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  color: #6c1724;
+  background: rgba(122, 36, 49, 0.08);
+  border: 1px solid rgba(122, 36, 49, 0.24);
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.review-move-detail {
+  margin-top: 10px;
+  padding: 11px 12px;
+  color: var(--paper);
+  background: #111111;
+  border-radius: 7px;
+}
+
+.review-move-detail > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-move-detail span {
+  color: #e1c979;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.review-move-detail strong {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 15px;
+}
+
+.review-move-detail p,
+.review-move-detail small {
+  margin: 6px 0 0;
+  color: rgba(245, 239, 227, 0.75);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.review-move-detail small {
+  display: block;
+  overflow: hidden;
+  font-family: "IBM Plex Mono", monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .accuracy-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

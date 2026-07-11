@@ -81,6 +81,7 @@ export function JuChessBoard({
   const checkSquare = game.isCheck() ? findKingSquare(game, game.turn()) : null
   const squares = buildSquares(game, flipped)
   const evaluationScore = evaluation ?? getMaterialEvaluation(game)
+  const evaluationName = evaluation === undefined ? 'Material evaluation' : 'Engine evaluation'
   const whiteShare = Math.max(4, Math.min(96, 50 + evaluationScore * 7))
 
   useEffect(() => {
@@ -185,13 +186,13 @@ export function JuChessBoard({
     >
       {showEvaluation ? (
         <div
-          aria-label={`Material evaluation ${formatEvaluation(evaluationScore)}. Positive values favor White.`}
+          aria-label={`${evaluationName} ${formatEvaluation(evaluationScore)}. Positive values favor White.`}
           className="ju-evaluation-bar"
           role="meter"
           aria-valuemin={-99}
           aria-valuemax={99}
           aria-valuenow={evaluationScore}
-          title="Material evaluation; positive values favor White"
+          title={`${evaluationName}; positive values favor White`}
         >
           <span className="ju-evaluation-fill" style={{ height: `${whiteShare}%` }} />
           <strong className="ju-evaluation-number">{formatEvaluation(evaluationScore)}</strong>

@@ -165,8 +165,6 @@ export type BoardCell = {
 
 export type GameSource = 'chess.com' | 'lichess' | 'tournament'
 
-export type MoveClassification = 'Brilliant' | 'Great' | 'Book' | 'Best' | 'Mistake' | 'Blunder'
-
 export type SampleGame = {
   key: string
   id: string
@@ -181,10 +179,7 @@ export type SampleGame = {
   round: string
   fen: string
   moves: string[]
-  classes: MoveClassification[]
-  evals: number[]
-  wAcc: number
-  bAcc: number
+  pgn?: string
   live?: boolean
 }
 
@@ -364,145 +359,31 @@ const pieceGlyphs: Record<string, string> = {
   k: '\u265a',
 }
 
-const sampleFens = [
-  'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R',
-  'r1bq1rk1/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1',
-  'r2q1rk1/pp1bppbp/2np1np1/8/3NP3/2N1BP2/PPPQ2PP/2KR1B1R',
-  'r1bqk2r/pp2bppp/2n1pn2/2pp4/3P1B2/2P1PN2/PP1N1PPP/R2QKB1R',
-  'r3r1k1/pp3ppp/2p2n2/3q4/3P4/2NB4/PP3PPP/R2Q1RK1',
-  '2r2rk1/pb2qppp/1pn1pn2/8/2PP4/1PN1PN2/PB2QPPP/2R2RK1',
-  'r4rk1/1pp1qppp/p1np1n2/4p3/2B1P1b1/2NP1N2/PPP1QPPP/R1B2RK1',
-  '3r2k1/5ppp/2p5/1pQ5/8/1P4P1/P4P1P/3q2K1',
-  '8/5pk1/6p1/8/3K4/8/5PP1/8',
-]
-
 const sampleMoves = [
   'e4',
   'e5',
   'Nf3',
   'Nc6',
-  'Bc4',
-  'Bc5',
-  'c3',
+  'Bb5',
+  'a6',
+  'Ba4',
   'Nf6',
-  'd4',
-  'exd4',
-  'cxd4',
-  'Bb4+',
-  'Nc3',
-  'Nxe4',
   'O-O',
-  'Bxc3',
-  'd5',
-  'Bf6',
+  'Be7',
   'Re1',
-  'Ne7',
-  'Rxe4',
+  'b5',
+  'Bb3',
   'd6',
-  'Bg5',
-  'Bxg5',
-  'Nxg5',
-  'h6',
-  'Qe2',
-  'hxg5',
-  'Re1',
-  'Be6',
-  'dxe6',
-  'f6',
-  'Qd3',
-  'gxe6',
-  'Rxe6',
-  'Kf7',
-  'Qb3',
-  'Qd7',
-  'Rae1',
-  'Rhe8',
-]
-
-const sampleClasses: MoveClassification[] = [
-  'Book',
-  'Book',
-  'Book',
-  'Book',
-  'Book',
-  'Book',
-  'Best',
-  'Best',
-  'Best',
-  'Great',
-  'Best',
-  'Book',
-  'Best',
-  'Mistake',
-  'Best',
-  'Best',
-  'Great',
-  'Best',
-  'Best',
-  'Best',
-  'Brilliant',
-  'Best',
-  'Best',
-  'Mistake',
-  'Best',
-  'Blunder',
-  'Best',
-  'Best',
-  'Best',
-  'Mistake',
-  'Great',
-  'Best',
-  'Best',
-  'Blunder',
-  'Brilliant',
-  'Best',
-  'Best',
-  'Best',
-  'Great',
-  'Best',
-]
-
-const sampleEvals = [
-  0.2,
-  0.2,
-  0.3,
-  0.2,
-  0.4,
-  0.3,
-  0.4,
-  0.4,
-  0.5,
-  0.3,
-  0.4,
-  0.4,
-  0.6,
-  1.1,
-  1.2,
-  1.0,
-  1.4,
-  1.3,
-  1.4,
-  1.5,
-  2.2,
-  2.0,
-  2.1,
-  2.9,
-  3.0,
-  4.6,
-  4.4,
-  4.5,
-  4.6,
-  5.4,
-  5.6,
-  5.5,
-  5.7,
-  7.2,
-  8.5,
-  8.3,
-  8.6,
-  8.8,
-  9.4,
-  9.6,
+  'c3',
+  'O-O',
+  'h3',
+  'Nb8',
+  'd4',
+  'Nbd7',
+  'c4',
+  'c6',
+  'Nc3',
+  'Bb7',
 ]
 
 export function fenBoard(fen: string): BoardCell[] {
@@ -572,12 +453,8 @@ function makeSampleGame(
     date,
     opening,
     round,
-    fen: sampleFens[id % sampleFens.length],
+    fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     moves: sampleMoves,
-    classes: sampleClasses,
-    evals: sampleEvals,
-    wAcc: [91.4, 84.2, 88.7, 79.3, 93.1, 86.5][id % 6],
-    bAcc: [83.6, 88.9, 76.2, 90.4, 81.7, 74.9][id % 6],
   }
 }
 
@@ -709,8 +586,6 @@ function appwriteGameToSampleGame(row: AppwriteGameRow, profiles: Map<string, Me
     universityId: row.blackProfileId,
   }
   const moves = parseStoredMoves(row.pgn)
-  const moveCount = Math.max(1, moves.length)
-
   return {
     key: row.$id,
     id: row.$id,
@@ -725,10 +600,7 @@ function appwriteGameToSampleGame(row: AppwriteGameRow, profiles: Map<string, Me
     round: `Round ${row.round ?? 1} · Board ${row.board ?? 1}`,
     fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     moves,
-    classes: Array.from({ length: moveCount }, (_value, index) => sampleClasses[index % sampleClasses.length]),
-    evals: Array.from({ length: moveCount }, (_value, index) => sampleEvals[index % sampleEvals.length] ?? 0.2),
-    wAcc: 0,
-    bAcc: 0,
+    pgn: row.pgn,
     live: row.status === 'live',
   }
 }

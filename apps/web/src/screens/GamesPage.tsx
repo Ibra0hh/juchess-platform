@@ -14,9 +14,16 @@ import {
   loadTournamentGameArchive,
   sampleGamesBySource,
   type GameSource,
-  type MoveClassification,
   type SampleGame,
 } from '../lib/juchess'
+import {
+  parseReviewGame,
+  reviewGame,
+  StockfishReviewEngine,
+  type GameReviewResult,
+  type ReviewClassification,
+  type ReviewedMove,
+} from '../lib/gameReview'
 import './ClubScreens.css'
 
 type GameMode = 'review' | 'analysis'
@@ -38,16 +45,29 @@ const sourceDefs: SourceDef[] = [
   { key: 'tournament', name: 'Tournament Games', sub: 'Search the club archive', icon: '\u2655', tone: 'wine' },
 ]
 
-const classificationColors: Record<MoveClassification, string> = {
+const classificationColors: Record<ReviewClassification, string> = {
   Brilliant: '#1f7a70',
   Great: '#2a5db0',
-  Book: '#8a7b5c',
   Best: '#3f6b36',
+  Excellent: '#638a4f',
+  Good: '#77946a',
+  Inaccuracy: '#a98a3f',
   Mistake: '#b0742a',
   Blunder: '#7a2431',
+  Forced: '#8a7b5c',
 }
 
-const classificationOrder: MoveClassification[] = ['Brilliant', 'Great', 'Best', 'Book', 'Mistake', 'Blunder']
+const classificationOrder: ReviewClassification[] = [
+  'Brilliant',
+  'Great',
+  'Best',
+  'Excellent',
+  'Good',
+  'Forced',
+  'Inaccuracy',
+  'Mistake',
+  'Blunder',
+]
 
 function GamesPage() {
   const [searchParams] = useSearchParams()
@@ -70,6 +90,11 @@ function GamesPage() {
   const [saved, setSaved] = useState(false)
   const [ran, setRan] = useState(false)
   const [flipped, setFlipped] = useState(false)
+  const [review, setReview] = useState<GameReviewResult | null>(null)
+  const [reviewError, setReviewError] = useState('')
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [reviewProgress, setReviewProgress] = useState({ completed: 0, total: 0 })
+  const [workspaceError, setWorkspaceError] = useState('')
 
   useEffect(() => {
     const gameId = queryGameId
@@ -168,6 +193,55 @@ function GamesPage() {
   }, [liveCloudGameId, step])
 
   useEffect(() => {
+    setReview(null)
+    setReviewError('')
+    setReviewLoading(false)
+    setReviewProgress({ completed: 0, total: 0 })
+
+    if (step !== 'review' || !game) return
+    if (game.live) {
+      setReviewError('The live board is still changing. Full engine review becomes available when the game finishes.')
+      return
+    }
+    if (!game.moves.length) {
+      setReviewError('This game does not contain any saved moves yet.')
+      return
+    }
+
+    const engine = new StockfishReviewEngine()
+    const controller = new AbortController()
+    let active = true
+    setReviewLoading(true)
+    setReviewProgress({ completed: 0, total: game.moves.length + 1 })
+
+    void reviewGame(
+      { fen: game.fen, moves: game.moves },
+      engine,
+      {
+        depth: 11,
+        signal: controller.signal,
+        onProgress: (completed, total) => {
+          if (active) setReviewProgress({ completed, total })
+        },
+      },
+    ).then((result) => {
+      if (!active) return
+      setReview(result)
+      setReviewLoading(false)
+    }).catch((error: unknown) => {
+      if (!active || (error instanceof DOMException && error.name === 'AbortError')) return
+      setReviewError(error instanceof Error ? error.message : 'The engine could not review this game.')
+      setReviewLoading(false)
+    }).finally(() => engine.dispose())
+
+    return () => {
+      active = false
+      controller.abort()
+      engine.dispose()
+    }
+  }, [game, step])
+
+  useEffect(() => {
     if (step !== 'review' || !game) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -206,7 +280,7 @@ function GamesPage() {
   const inWorkspace = step === 'workspace'
   const workspaceGame = workspaceLoaded ? game || sampleGamesBySource['chess.com'][0] : null
   const boardGame = inReview ? game : inWorkspace ? workspaceGame : null
-  const evalNow = getCurrentEval(boardGame, inWorkspace, workspaceLoaded, moveIdx)
+  const evalNow = getCurrentEval(review, inReview, inWorkspace, workspaceLoaded, moveIdx)
   const boardMoves = inReview && game
     ? game.moves.slice(0, moveIdx + 1)
     : inWorkspace
@@ -232,10 +306,12 @@ function GamesPage() {
   }
   const topPlayer = flipped ? playerData.white : playerData.black
   const bottomPlayer = flipped ? playerData.black : playerData.white
-  const reviewRows = game ? buildMoveRows(game, moveIdx, setMoveIdx) : []
-  const classCounts = game ? buildClassCounts(game) : []
-  const evalArea = game ? buildEvalArea(game.evals) : ''
-  const evalCursorX = game ? buildEvalCursor(game.evals, moveIdx) : 0
+  const reviewRows = game ? buildMoveRows(game, review, moveIdx, setMoveIdx) : []
+  const classCounts = review ? buildClassCounts(review) : []
+  const reviewEvals = review?.positions.slice(1).map((position) => position.evaluation) ?? []
+  const evalArea = buildEvalArea(reviewEvals)
+  const evalCursorX = buildEvalCursor(reviewEvals, moveIdx)
+  const selectedReviewMove = review?.moves[moveIdx]
   const workspaceRows = buildWorkspaceRows(workspaceMoves)
 
   const openSource = (nextSource: GameSource) => {
@@ -270,12 +346,34 @@ function GamesPage() {
 
   const loadPgn = () => {
     if (!pgnText.trim()) return
-
-    setGame(sampleGamesBySource['chess.com'][0])
-    setWorkspaceLoaded(true)
-    setWorkspaceMoves(sampleGamesBySource['chess.com'][0].moves)
-    setWorkspaceResult(sampleGamesBySource['chess.com'][0].result)
-    setRan(false)
+    try {
+      const parsed = parseReviewGame({ pgn: pgnText })
+      const importedId = `imported-${Date.now()}`
+      const importedGame: SampleGame = {
+        bRating: parseRating(parsed.headers.BlackElo),
+        black: parsed.headers.Black || 'Black',
+        date: formatPgnDate(parsed.headers.Date),
+        fen: parsed.initialFen,
+        id: importedId,
+        key: importedId,
+        moves: parsed.moves,
+        opening: parsed.headers.Opening || parsed.headers.ECO || 'Imported PGN',
+        pgn: pgnText,
+        result: parsed.headers.Result || '*',
+        round: parsed.headers.Round ? `Round ${parsed.headers.Round}` : 'Imported game',
+        source: 'tournament',
+        wRating: parseRating(parsed.headers.WhiteElo),
+        white: parsed.headers.White || 'White',
+      }
+      setGame(importedGame)
+      setWorkspaceLoaded(true)
+      setWorkspaceMoves(parsed.moves)
+      setWorkspaceResult(importedGame.result)
+      setWorkspaceError('')
+      setRan(false)
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : 'The PGN could not be read.')
+    }
   }
 
   const updateWorkspaceBoard = (state: JuChessBoardChange) => {
@@ -432,10 +530,15 @@ function GamesPage() {
           {step === 'review' && game ? (
             <ReviewPanel
               classCounts={classCounts}
+              error={reviewError}
               evalArea={evalArea}
               evalCursorX={evalCursorX}
               game={game}
+              loading={reviewLoading}
               moveRows={reviewRows}
+              progress={reviewProgress}
+              review={review}
+              selectedMove={selectedReviewMove}
               onExit={() => {
                 setStep('source')
                 setGame(null)
@@ -448,6 +551,7 @@ function GamesPage() {
           {step === 'workspace' ? (
             <WorkspacePanel
               game={workspaceGame}
+              error={workspaceError}
               loaded={workspaceLoaded}
               pgnText={pgnText}
               ran={ran}
@@ -470,9 +574,10 @@ function GamesPage() {
                 setWorkspaceResult('Live')
                 setSaved(false)
                 setRan(false)
+                setWorkspaceError('')
               }}
               onReview={() => {
-                const nextGame = game || sampleGamesBySource['chess.com'][0]
+                const nextGame = game || createWorkspaceGame(workspaceMoves, workspaceResult)
                 setGame(nextGame)
                 setMode('review')
                 setStep('review')
@@ -665,19 +770,33 @@ function ListStep({
 
 function ReviewPanel({
   classCounts,
+  error,
   evalArea,
   evalCursorX,
   game,
+  loading,
   moveRows,
   onExit,
+  progress,
+  review,
+  selectedMove,
 }: {
   classCounts: ReturnType<typeof buildClassCounts>
+  error: string
   evalArea: string
   evalCursorX: number
   game: SampleGame
+  loading: boolean
   moveRows: ReturnType<typeof buildMoveRows>
   onExit: () => void
+  progress: { completed: number; total: number }
+  review: GameReviewResult | null
+  selectedMove?: ReviewedMove
 }) {
+  const progressPercent = progress.total
+    ? Math.round(progress.completed / progress.total * 100)
+    : 0
+
   return (
     <>
       <section className="rail-panel review-panel">
@@ -687,33 +806,61 @@ function ReviewPanel({
             New review
           </button>
         </div>
-        <svg viewBox="0 0 300 80" className="eval-graph" preserveAspectRatio="none" aria-label="Evaluation graph">
-          <path d={evalArea} />
-          <line x1="0" y1="40" x2="300" y2="40" />
-          <line className="cursor" x1={evalCursorX} y1="0" x2={evalCursorX} y2="80" />
-        </svg>
-        <div className="accuracy-grid">
-          <div>
-            <span>White accuracy</span>
-            <strong>{game.wAcc.toFixed(1)}%</strong>
-          </div>
-          <div>
-            <span>Black accuracy</span>
-            <strong>{game.bAcc.toFixed(1)}%</strong>
-          </div>
-        </div>
-        <div className="class-counts">
-          {classCounts.map((count) => (
-            <div key={count.label}>
-              <span style={{ color: count.color }}>{count.label}</span>
-              <em>{count.white}</em>
-              <em>{count.black}</em>
-              <i>
-                <b style={{ background: count.color, width: `${count.percent}%` }} />
-              </i>
+        {loading ? (
+          <div className="review-progress" role="status" aria-live="polite">
+            <div>
+              <strong>Stockfish review</strong>
+              <span>{progress.completed} / {progress.total} positions</span>
             </div>
-          ))}
-        </div>
+            <i><b style={{ width: `${progressPercent}%` }} /></i>
+            <small>{progressPercent}%</small>
+          </div>
+        ) : null}
+        {error ? <p className="review-error" role="alert">{error}</p> : null}
+        {review ? (
+          <>
+            <svg viewBox="0 0 300 80" className="eval-graph" preserveAspectRatio="none" aria-label="Evaluation graph">
+              <path d={evalArea} />
+              <line x1="0" y1="40" x2="300" y2="40" />
+              <line className="cursor" x1={evalCursorX} y1="0" x2={evalCursorX} y2="80" />
+            </svg>
+            {selectedMove ? (
+              <div className="review-move-detail">
+                <div>
+                  <span>{selectedMove.classification}</span>
+                  <strong>{formatEvaluation(selectedMove.evaluation)}</strong>
+                </div>
+                <p>
+                  Played <b>{selectedMove.san}</b>
+                  {selectedMove.bestMoveSan ? <> · Best <b>{selectedMove.bestMoveSan}</b></> : null}
+                </p>
+                <small>{selectedMove.bestLine.slice(0, 8).join(' ') || 'Game over'}</small>
+              </div>
+            ) : null}
+            <div className="accuracy-grid">
+              <div>
+                <span>White accuracy</span>
+                <strong>{review.whiteAccuracy.toFixed(1)}%</strong>
+              </div>
+              <div>
+                <span>Black accuracy</span>
+                <strong>{review.blackAccuracy.toFixed(1)}%</strong>
+              </div>
+            </div>
+            <div className="class-counts">
+              {classCounts.map((count) => (
+                <div key={count.label}>
+                  <span style={{ color: count.color }}>{count.label}</span>
+                  <em>{count.white}</em>
+                  <em>{count.black}</em>
+                  <i>
+                    <b style={{ background: count.color, width: `${count.percent}%` }} />
+                  </i>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
       </section>
 
       <section className="moves-panel">
@@ -741,6 +888,7 @@ function ReviewPanel({
 }
 
 function WorkspacePanel({
+  error,
   game,
   loaded,
   onClose,
@@ -755,6 +903,7 @@ function WorkspacePanel({
   saved,
   setPgnText,
 }: {
+  error: string
   game: SampleGame | null
   loaded: boolean
   onClose: () => void
@@ -836,6 +985,7 @@ function WorkspacePanel({
           onChange={(event) => setPgnText(event.target.value)}
           placeholder="1. e4 e5 2. Nf3 ... or rnbqkbnr/pppppppp/8/..."
         />
+        {error ? <p className="pgn-error" role="alert">{error}</p> : null}
         <button type="button" onClick={onLoad}>
           Load into board
         </button>
@@ -851,19 +1001,19 @@ function sourceName(source: GameSource) {
 }
 
 function getCurrentEval(
-  game: SampleGame | null,
+  review: GameReviewResult | null,
+  inReview: boolean,
   inWorkspace: boolean,
   workspaceLoaded: boolean,
   moveIdx: number,
 ) {
-  if (game) {
-    return game.evals[Math.min(moveIdx, game.evals.length - 1)] || 0.2
-  }
+  if (inReview) return review?.positions[Math.min(moveIdx + 1, review.positions.length - 1)]?.evaluation ?? 0
   if (inWorkspace) return workspaceLoaded ? 0.4 : 0.2
   return 0.2
 }
 
 function buildEvalArea(evals: number[]) {
+  if (!evals.length) return 'M0,40 L300,40 L300,80 L0,80 Z'
   const maxIndex = Math.max(1, evals.length - 1)
   const path = ['M0,40']
 
@@ -878,17 +1028,18 @@ function buildEvalArea(evals: number[]) {
 }
 
 function buildEvalCursor(evals: number[], moveIdx: number) {
+  if (!evals.length) return 0
   const maxIndex = Math.max(1, evals.length - 1)
   return (Math.min(moveIdx, evals.length - 1) / maxIndex) * 300
 }
 
-function buildClassCounts(game: SampleGame) {
+function buildClassCounts(review: GameReviewResult) {
   return classificationOrder.map((label) => {
     let white = 0
     let black = 0
 
-    game.classes.forEach((classification, index) => {
-      if (classification !== label) return
+    review.moves.forEach((move, index) => {
+      if (move.classification !== label) return
       if (index % 2 === 0) {
         white += 1
       } else {
@@ -901,31 +1052,32 @@ function buildClassCounts(game: SampleGame) {
       white,
       black,
       color: classificationColors[label],
-      percent: Math.min(100, (white + black) * 9),
+      percent: review.moves.length ? (white + black) / review.moves.length * 100 : 0,
     }
-  })
+  }).filter((count) => count.white + count.black > 0)
 }
 
 function buildMoveRows(
   game: SampleGame,
+  review: GameReviewResult | null,
   moveIdx: number,
   setMoveIdx: (updater: number) => void,
 ) {
   const rows = []
 
   for (let index = 0; index < game.moves.length; index += 2) {
-    const whiteClass = game.classes[index]
-    const blackClass = game.classes[index + 1]
+    const whiteClass = review?.moves[index]?.classification
+    const blackClass = review?.moves[index + 1]?.classification
 
     rows.push({
       number: index / 2 + 1,
       whiteMove: game.moves[index],
-      whiteTag: whiteClass === 'Best' || whiteClass === 'Book' ? '' : whiteClass,
-      whiteColor: classificationColors[whiteClass],
+      whiteTag: whiteClass ?? '',
+      whiteColor: whiteClass ? classificationColors[whiteClass] : '#8a7b5c',
       whiteSelected: moveIdx === index,
       onWhite: () => setMoveIdx(index),
       blackMove: game.moves[index + 1] || '',
-      blackTag: blackClass === 'Best' || blackClass === 'Book' || !blackClass ? '' : blackClass,
+      blackTag: blackClass ?? '',
       blackColor: blackClass ? classificationColors[blackClass] : '#8a7b5c',
       blackSelected: moveIdx === index + 1,
       onBlack: () => setMoveIdx(index + 1),
@@ -933,6 +1085,43 @@ function buildMoveRows(
   }
 
   return rows
+}
+
+function parseRating(value?: string) {
+  const rating = Number.parseInt(value ?? '', 10)
+  return Number.isFinite(rating) ? rating : 1200
+}
+
+function formatPgnDate(value?: string) {
+  if (!value) return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date())
+  const match = /^(\d{4})[.-](\d{2})[.-](\d{2})$/.exec(value)
+  if (!match) return value
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(date)
+}
+
+function createWorkspaceGame(moves: string[], result: string): SampleGame {
+  const id = `workspace-${Date.now()}`
+  return {
+    bRating: 1200,
+    black: 'Black',
+    date: new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date()),
+    fen: startFen,
+    id,
+    key: id,
+    moves,
+    opening: 'Analysis board',
+    result,
+    round: 'Local analysis',
+    source: 'tournament',
+    wRating: 1200,
+    white: 'White',
+  }
+}
+
+function formatEvaluation(value: number) {
+  if (Math.abs(value) >= 99) return value > 0 ? 'M+' : 'M-'
+  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}`
 }
 
 function buildWorkspaceRows(moves: string[]) {

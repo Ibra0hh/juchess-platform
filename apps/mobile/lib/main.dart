@@ -13,6 +13,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import 'game_review_core.dart';
+import 'game_review_stockfish.dart';
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const OrientationPolicy(child: JuChessApp()));
@@ -5677,8 +5680,51 @@ class LeaderboardRow extends StatelessWidget {
   }
 }
 
-class GameReviewScreen extends StatelessWidget {
+class GameReviewScreen extends StatefulWidget {
   const GameReviewScreen({super.key});
+
+  @override
+  State<GameReviewScreen> createState() => _GameReviewScreenState();
+}
+
+class _GameReviewScreenState extends State<GameReviewScreen> {
+  static const _samplePgn = '''[Event "JU Chess Club Practice"]
+[Site "University of Jordan"]
+[Date "2026.07.11"]
+[Round "1"]
+[White "Ibrahim Ahmad"]
+[Black "Sara Nasser"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7
+6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7
+11. c4 c6 12. Nc3 Bb7 *''';
+
+  final _pgnController = TextEditingController();
+  String error = '';
+
+  @override
+  void dispose() {
+    _pgnController.dispose();
+    super.dispose();
+  }
+
+  void _openPgnReview() {
+    try {
+      final parsed = MobileParsedReviewGame.fromPgn(_pgnController.text);
+      setState(() => error = '');
+      openPrototypeRoute(
+        context,
+        MobileGameReviewWorkspace(
+          game: parsed,
+          white: parsed.headers['White'] ?? 'White',
+          black: parsed.headers['Black'] ?? 'Black',
+        ),
+      );
+    } on FormatException catch (exception) {
+      setState(() => error = exception.message);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -5686,6 +5732,81 @@ class GameReviewScreen extends StatelessWidget {
       title: 'Game Review',
       children: [
         const SizedBox(height: 14),
+        PrototypeCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SerifText(
+                'Review a PGN',
+                size: 20,
+                weight: FontWeight.w700,
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Paste a completed game, then run the local engine review.',
+                style: TextStyle(
+                  color: Color(0x99111111),
+                  fontSize: 12.5,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _pgnController,
+                minLines: 6,
+                maxLines: 10,
+                decoration: InputDecoration(
+                  hintText: '[White "Player"]\n[Black "Player"]\n\n1. e4 e5 ...',
+                  filled: true,
+                  fillColor: const Color(0xfffbf6e8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(7),
+                    borderSide: const BorderSide(color: Color(0x33111111)),
+                  ),
+                ),
+                style: const TextStyle(
+                  color: PrototypeColors.black,
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+              ),
+              if (error.isNotEmpty) ...[
+                const SizedBox(height: 9),
+                Text(
+                  error,
+                  style: const TextStyle(
+                    color: PrototypeColors.burgundy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: PrototypeOutlineButton(
+                      label: 'Use sample',
+                      onTap: () => setState(() {
+                        _pgnController.text = _samplePgn;
+                        error = '';
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: PrototypeButton(
+                      label: 'Review game',
+                      onTap: _openPgnReview,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         PrototypeOptionTile(
           title: 'Chess.com games',
           subtitle: 'Import from your linked account',
@@ -5714,15 +5835,6 @@ class GameReviewScreen extends StatelessWidget {
           ),
         ),
         PrototypeOptionTile(
-          title: 'Upload / import PGN file',
-          subtitle: 'Review a game from a PGN',
-          icon: 'PGN',
-          onTap: () => openPrototypeRoute(
-            context,
-            const AnalysisBoardScreen(mode: 'review'),
-          ),
-        ),
-        PrototypeOptionTile(
           title: 'Upload / import FEN file',
           subtitle: 'Review from a position',
           icon: 'FEN',
@@ -5734,6 +5846,557 @@ class GameReviewScreen extends StatelessWidget {
       ],
     );
   }
+}
+
+class MobileGameReviewWorkspace extends StatefulWidget {
+  const MobileGameReviewWorkspace({
+    required this.black,
+    required this.game,
+    required this.white,
+    super.key,
+  });
+
+  final String black;
+  final MobileParsedReviewGame game;
+  final String white;
+
+  @override
+  State<MobileGameReviewWorkspace> createState() =>
+      _MobileGameReviewWorkspaceState();
+}
+
+class _MobileGameReviewWorkspaceState
+    extends State<MobileGameReviewWorkspace> {
+  MobileStockfishReviewEngine? engine;
+  MobileGameReviewResult? review;
+  String error = '';
+  bool cancelled = false;
+  bool flipped = false;
+  int completed = 0;
+  late int moveIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    moveIndex = widget.game.moves.length - 1;
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_runReview()));
+  }
+
+  Future<void> _runReview() async {
+    try {
+      final nextEngine = await MobileStockfishReviewEngine.create();
+      if (!mounted || cancelled) {
+        nextEngine.dispose();
+        return;
+      }
+      engine = nextEngine;
+      final result = await nextEngine.review(
+        widget.game,
+        depth: 11,
+        isCancelled: () => cancelled,
+        onProgress: (value, _) {
+          if (mounted && !cancelled) setState(() => completed = value);
+        },
+      );
+      if (mounted && !cancelled) setState(() => review = result);
+    } on MobileReviewCancelled {
+      return;
+    } catch (exception) {
+      if (mounted && !cancelled) {
+        setState(() => error = exception.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      engine?.dispose();
+      engine = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    cancelled = true;
+    engine?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shownMoves = widget.game.moves.sublist(0, moveIndex + 1);
+    final boardSummary = _summarizeMobileBoard(shownMoves);
+    final topColor = flipped ? 'white' : 'black';
+    final bottomColor = flipped ? 'black' : 'white';
+    final selected = review?.moves[moveIndex];
+    final evaluation = review?.positions[moveIndex + 1].evaluation;
+    final total = widget.game.fens.length;
+
+    return PrototypeRouteScaffold(
+      title: 'Game Review',
+      trailing: SquareIconButton(
+        icon: Icons.flip,
+        tooltip: 'Flip board',
+        onTap: () => setState(() => flipped = !flipped),
+      ),
+      children: [
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              TournamentBoardPlayerBar(
+                capturedPieces: boardSummary.capturedBy(topColor),
+                color: topColor,
+                edge: 'top',
+                name: topColor == 'white' ? widget.white : widget.black,
+              ),
+              PrototypeChessBoard(
+                evaluation: evaluation,
+                flipped: flipped,
+                moves: shownMoves,
+                onChanged: (_, _) {},
+                readOnly: true,
+              ),
+              TournamentBoardPlayerBar(
+                capturedPieces: boardSummary.capturedBy(bottomColor),
+                color: bottomColor,
+                edge: 'bottom',
+                name: bottomColor == 'white' ? widget.white : widget.black,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _ReviewNavButton(
+                icon: Icons.first_page,
+                tooltip: 'First move',
+                onTap: () => setState(() => moveIndex = 0),
+              ),
+              _ReviewNavButton(
+                icon: Icons.chevron_left,
+                tooltip: 'Previous move',
+                onTap: () => setState(() => moveIndex = math.max(0, moveIndex - 1)),
+              ),
+              SizedBox(
+                width: 96,
+                child: Text(
+                  '${moveIndex + 1} / ${widget.game.moves.length}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: PrototypeColors.black,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              _ReviewNavButton(
+                icon: Icons.chevron_right,
+                tooltip: 'Next move',
+                onTap: () => setState(
+                  () => moveIndex = math.min(
+                    widget.game.moves.length - 1,
+                    moveIndex + 1,
+                  ),
+                ),
+              ),
+              _ReviewNavButton(
+                icon: Icons.last_page,
+                tooltip: 'Last move',
+                onTap: () => setState(
+                  () => moveIndex = widget.game.moves.length - 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (review == null && error.isEmpty)
+          PrototypeCard(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Stockfish review',
+                        style: TextStyle(
+                          color: PrototypeColors.black,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '$completed / $total',
+                      style: const TextStyle(
+                        color: Color(0x99111111),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                LinearProgressIndicator(
+                  value: total == 0 ? 0 : completed / total,
+                  minHeight: 7,
+                  color: PrototypeColors.burgundy,
+                  backgroundColor: const Color(0x1f111111),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ],
+            ),
+          ),
+        if (error.isNotEmpty)
+          PrototypeCard(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              error,
+              style: const TextStyle(
+                color: PrototypeColors.burgundy,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        if (review != null && selected != null)
+          _MobileReviewSummary(review: review!, selected: selected),
+        const SizedBox(height: 10),
+        _MobileReviewMoves(
+          currentIndex: moveIndex,
+          game: widget.game,
+          review: review,
+          onSelect: (index) => setState(() => moveIndex = index),
+        ),
+        const SizedBox(height: 18),
+      ],
+    );
+  }
+}
+
+class _ReviewNavButton extends StatelessWidget {
+  const _ReviewNavButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      constraints: const BoxConstraints.tightFor(width: 40, height: 38),
+      icon: Icon(icon, size: 21),
+      onPressed: onTap,
+      style: IconButton.styleFrom(
+        foregroundColor: PrototypeColors.black,
+        backgroundColor: Colors.white,
+        side: const BorderSide(color: Color(0x2a111111)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      tooltip: tooltip,
+    );
+  }
+}
+
+class _MobileReviewSummary extends StatelessWidget {
+  const _MobileReviewSummary({required this.review, required this.selected});
+
+  final MobileGameReviewResult review;
+  final MobileReviewedMove selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeCard(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _MobileAccuracyMetric(
+                  label: 'White accuracy',
+                  value: review.whiteAccuracy,
+                  dark: false,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MobileAccuracyMetric(
+                  label: 'Black accuracy',
+                  value: review.blackAccuracy,
+                  dark: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: PrototypeColors.black,
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        mobileClassificationLabel(selected.classification),
+                        style: TextStyle(
+                          color: _mobileClassificationColor(
+                            selected.classification,
+                          ),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _mobileEvaluationLabel(selected.evaluation),
+                      style: const TextStyle(
+                        color: PrototypeColors.cream,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Played ${selected.san}${selected.bestMoveSan == null ? '' : '  ·  Best ${selected.bestMoveSan}'}',
+                  style: const TextStyle(
+                    color: Color(0xdff5efe3),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  selected.bestLine.isEmpty
+                      ? 'Game over'
+                      : selected.bestLine.take(8).join(' '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0x99f5efe3),
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileAccuracyMetric extends StatelessWidget {
+  const _MobileAccuracyMetric({
+    required this.dark,
+    required this.label,
+    required this.value,
+  });
+
+  final bool dark;
+  final String label;
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: dark ? PrototypeColors.black : const Color(0xfffbf6e8),
+        border: Border.all(color: const Color(0x26111111)),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: dark ? const Color(0x99f5efe3) : const Color(0x99111111),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${value.toStringAsFixed(1)}%',
+            style: TextStyle(
+              color: dark ? PrototypeColors.cream : PrototypeColors.black,
+              fontFamily: 'monospace',
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileReviewMoves extends StatelessWidget {
+  const _MobileReviewMoves({
+    required this.currentIndex,
+    required this.game,
+    required this.onSelect,
+    required this.review,
+  });
+
+  final int currentIndex;
+  final MobileParsedReviewGame game;
+  final ValueChanged<int> onSelect;
+  final MobileGameReviewResult? review;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeCard(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Moves',
+            style: TextStyle(
+              color: PrototypeColors.black,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (var index = 0; index < game.moves.length; index += 2)
+            Row(
+              children: [
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    '${index ~/ 2 + 1}.',
+                    style: const TextStyle(
+                      color: Color(0x77111111),
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _MobileReviewMoveButton(
+                    index: index,
+                    move: game.moves[index],
+                    reviewedMove: review?.moves[index],
+                    selected: currentIndex == index,
+                    onTap: () => onSelect(index),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: index + 1 < game.moves.length
+                      ? _MobileReviewMoveButton(
+                          index: index + 1,
+                          move: game.moves[index + 1],
+                          reviewedMove: review?.moves[index + 1],
+                          selected: currentIndex == index + 1,
+                          onTap: () => onSelect(index + 1),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileReviewMoveButton extends StatelessWidget {
+  const _MobileReviewMoveButton({
+    required this.index,
+    required this.move,
+    required this.onTap,
+    required this.reviewedMove,
+    required this.selected,
+  });
+
+  final int index;
+  final String move;
+  final VoidCallback onTap;
+  final MobileReviewedMove? reviewedMove;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final classification = reviewedMove?.classification;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 34),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0x33a98a3f) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                move,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: PrototypeColors.black,
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (classification != null)
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: _mobileClassificationColor(classification),
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Color _mobileClassificationColor(MobileMoveClassification classification) {
+  return switch (classification) {
+    MobileMoveClassification.brilliant => const Color(0xff1f7a70),
+    MobileMoveClassification.great => const Color(0xff2a5db0),
+    MobileMoveClassification.best => const Color(0xff3f6b36),
+    MobileMoveClassification.excellent => const Color(0xff638a4f),
+    MobileMoveClassification.good => const Color(0xff77946a),
+    MobileMoveClassification.inaccuracy => const Color(0xffa98a3f),
+    MobileMoveClassification.mistake => const Color(0xffb0742a),
+    MobileMoveClassification.blunder => PrototypeColors.burgundy,
+    MobileMoveClassification.forced => const Color(0xff8a7b5c),
+  };
+}
+
+String _mobileEvaluationLabel(double value) {
+  if (value.abs() >= 99) return value > 0 ? 'M+' : 'M-';
+  return '${value >= 0 ? '+' : ''}${value.toStringAsFixed(2)}';
 }
 
 class PuzzlesScreen extends StatelessWidget {
@@ -5954,7 +6617,7 @@ class NewAnalysisScreen extends StatelessWidget {
           icon: '♜',
           onTap: () => openPrototypeRoute(
             context,
-            const PickGameScreen(title: 'Tournament games'),
+            const PickGameScreen(title: 'Tournament games', review: false),
           ),
         ),
         PrototypeOptionTile(
@@ -5963,7 +6626,7 @@ class NewAnalysisScreen extends StatelessWidget {
           icon: '♘',
           onTap: () => openPrototypeRoute(
             context,
-            const PickGameScreen(title: 'Chess.com games'),
+            const PickGameScreen(title: 'Chess.com games', review: false),
           ),
         ),
         PrototypeOptionTile(
@@ -5972,7 +6635,7 @@ class NewAnalysisScreen extends StatelessWidget {
           icon: '♞',
           onTap: () => openPrototypeRoute(
             context,
-            const PickGameScreen(title: 'Lichess games'),
+            const PickGameScreen(title: 'Lichess games', review: false),
           ),
         ),
       ],
@@ -5981,9 +6644,10 @@ class NewAnalysisScreen extends StatelessWidget {
 }
 
 class PickGameScreen extends StatelessWidget {
-  const PickGameScreen({required this.title, super.key});
+  const PickGameScreen({required this.title, this.review = true, super.key});
 
   final String title;
+  final bool review;
 
   @override
   Widget build(BuildContext context) {
@@ -5996,8 +6660,24 @@ class PickGameScreen extends StatelessWidget {
             title: game.title,
             subtitle: game.subtitle,
             icon: game.result,
-            onTap: () =>
-                openPrototypeRoute(context, const AnalysisBoardScreen()),
+            onTap: () {
+              if (!review) {
+                openPrototypeRoute(context, const AnalysisBoardScreen());
+                return;
+              }
+              final players = game.title.split(' vs ');
+              final parsed = MobileParsedReviewGame.fromPgn(
+                _GameReviewScreenState._samplePgn,
+              );
+              openPrototypeRoute(
+                context,
+                MobileGameReviewWorkspace(
+                  game: parsed,
+                  white: players.first,
+                  black: players.length > 1 ? players[1] : 'Black',
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -6186,6 +6866,32 @@ class _TournamentGameDetailScreenState
             ],
           ),
         ),
+        if (moves.isNotEmpty && currentResult != 'live') ...[
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: PrototypeButton(
+              label: 'Review game',
+              onTap: () {
+                try {
+                  final parsed = MobileParsedReviewGame.fromMoves(moves);
+                  openPrototypeRoute(
+                    context,
+                    MobileGameReviewWorkspace(
+                      game: parsed,
+                      white: widget.match.white,
+                      black: widget.match.black,
+                    ),
+                  );
+                } on FormatException catch (exception) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(exception.message)),
+                  );
+                }
+              },
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
       ],
     );
@@ -6432,6 +7138,7 @@ class PrototypeChessBoard extends StatefulWidget {
     required this.flipped,
     required this.moves,
     required this.onChanged,
+    this.evaluation,
     this.readOnly = false,
     this.showEvaluation = true,
     super.key,
@@ -6440,6 +7147,7 @@ class PrototypeChessBoard extends StatefulWidget {
   final bool flipped;
   final List<String> moves;
   final void Function(List<String> moves, String result) onChanged;
+  final double? evaluation;
   final bool readOnly;
   final bool showEvaluation;
 
@@ -6551,7 +7259,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
         ? const [1, 2, 3, 4, 5, 6, 7, 8]
         : const [8, 7, 6, 5, 4, 3, 2, 1];
     final files = _files;
-    final evaluation = _mobileMaterialEvaluation(game);
+    final evaluation = widget.evaluation ?? _mobileMaterialEvaluation(game);
 
     return Stack(
       children: [
@@ -6768,7 +7476,10 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
             bottom: 0,
             left: 0,
             width: 24,
-            child: _MobileEvaluationBar(value: evaluation),
+            child: _MobileEvaluationBar(
+              engine: widget.evaluation != null,
+              value: evaluation,
+            ),
           ),
       ],
     );
@@ -6851,8 +7562,9 @@ class _MobileChessPiece extends StatelessWidget {
 }
 
 class _MobileEvaluationBar extends StatelessWidget {
-  const _MobileEvaluationBar({required this.value});
+  const _MobileEvaluationBar({required this.engine, required this.value});
 
+  final bool engine;
   final double value;
 
   @override
@@ -6861,7 +7573,7 @@ class _MobileEvaluationBar extends StatelessWidget {
     final label = '${value > 0 ? '+' : ''}${value.toStringAsFixed(1)}';
 
     return Semantics(
-      label: 'Material evaluation $label. Positive values favor White.',
+      label: '${engine ? 'Engine' : 'Material'} evaluation $label. Positive values favor White.',
       child: LayoutBuilder(
         builder: (context, constraints) => Container(
           decoration: BoxDecoration(
