@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Square } from 'chess.js'
-import { FlipHorizontal2, Settings2, X } from 'lucide-react'
+import { BookOpen, Check, FlipHorizontal2, Settings2, Star, ThumbsUp, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import chessComLogo from '../assets/providers/chess-com.png'
 import lichessLogo from '../assets/providers/lichess.png'
@@ -74,20 +74,6 @@ const classificationColors: Record<ReviewClassification, string> = {
   Miss: '#f36f68',
   Blunder: '#ef4035',
   Forced: '#7d8790',
-}
-
-const classificationSymbols: Record<ReviewClassification, string> = {
-  Brilliant: '!!',
-  Great: '!',
-  Book: '▤',
-  Best: '★',
-  Excellent: '✓+',
-  Good: '✓',
-  Inaccuracy: '?!',
-  Mistake: '?',
-  Miss: '×',
-  Blunder: '??',
-  Forced: '=',
 }
 
 const classificationOrder: ReviewClassification[] = [
@@ -409,7 +395,7 @@ function GamesPage() {
         color: classificationColors[selectedReviewMove.classification],
         label: `${selectedReviewMove.classification} move ${selectedReviewMove.san}`,
         square: selectedReviewMove.uci.slice(2, 4) as Square,
-        symbol: classificationSymbols[selectedReviewMove.classification],
+        symbol: <ReviewClassificationGlyph classification={selectedReviewMove.classification} />,
       }
     : undefined
   const workspaceRows = buildWorkspaceRows(workspaceMoves)
@@ -1268,9 +1254,40 @@ function ReviewClassificationBadge({
       style={{ backgroundColor: classificationColors[classification] }}
       title={classification}
     >
-      {classificationSymbols[classification]}
+      <ReviewClassificationGlyph classification={classification} />
     </i>
   )
+}
+
+function ReviewClassificationGlyph({
+  classification,
+}: {
+  classification: ReviewClassification
+}) {
+  switch (classification) {
+    case 'Book':
+      return <BookOpen aria-hidden="true" />
+    case 'Best':
+      return <Star aria-hidden="true" fill="currentColor" />
+    case 'Excellent':
+      return <ThumbsUp aria-hidden="true" fill="currentColor" />
+    case 'Good':
+      return <Check aria-hidden="true" />
+    case 'Miss':
+      return <X aria-hidden="true" />
+    case 'Brilliant':
+      return <span aria-hidden="true">!!</span>
+    case 'Great':
+      return <span aria-hidden="true">!</span>
+    case 'Inaccuracy':
+      return <span aria-hidden="true">?!</span>
+    case 'Mistake':
+      return <span aria-hidden="true">?</span>
+    case 'Blunder':
+      return <span aria-hidden="true">??</span>
+    case 'Forced':
+      return <span aria-hidden="true">=</span>
+  }
 }
 
 function WorkspacePanel({

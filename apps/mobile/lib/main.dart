@@ -7839,34 +7839,64 @@ class _MobileClassificationBadge extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: _mobileClassificationColor(classification),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.94),
-            width: size <= 20 ? 1.3 : 1.7,
-          ),
           shape: BoxShape.circle,
           boxShadow: const [
             BoxShadow(
-              color: Color(0x44111111),
-              blurRadius: 5,
-              offset: Offset(0, 2),
+              color: Color(0x33111111),
+              blurRadius: 3,
+              offset: Offset(0, 1),
             ),
           ],
         ),
         child: ExcludeSemantics(
-          child: Text(
-            _mobileClassificationSymbol(classification),
-            maxLines: 1,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: size <= 20 ? 8 : 9.5,
-              fontWeight: FontWeight.w900,
-              height: 1,
-            ),
+          child: _MobileClassificationGlyph(
+            classification: classification,
+            size: size,
           ),
         ),
       ),
     );
   }
+}
+
+class _MobileClassificationGlyph extends StatelessWidget {
+  const _MobileClassificationGlyph({
+    required this.classification,
+    required this.size,
+  });
+
+  final MobileMoveClassification classification;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = _mobileClassificationIcon(classification);
+    if (icon != null) {
+      return Icon(icon, color: Colors.white, size: size * 0.62, weight: 800);
+    }
+
+    return Text(
+      _mobileClassificationSymbol(classification),
+      maxLines: 1,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: size <= 20 ? 9.5 : 11,
+        fontWeight: FontWeight.w900,
+        height: 1,
+      ),
+    );
+  }
+}
+
+IconData? _mobileClassificationIcon(MobileMoveClassification classification) {
+  return switch (classification) {
+    MobileMoveClassification.book => Icons.menu_book_rounded,
+    MobileMoveClassification.best => Icons.star_rounded,
+    MobileMoveClassification.excellent => Icons.thumb_up_alt_rounded,
+    MobileMoveClassification.good => Icons.check_rounded,
+    MobileMoveClassification.miss => Icons.close_rounded,
+    _ => null,
+  };
 }
 
 Color _mobileClassificationColor(MobileMoveClassification classification) {
@@ -7889,13 +7919,13 @@ String _mobileClassificationSymbol(MobileMoveClassification classification) {
   return switch (classification) {
     MobileMoveClassification.brilliant => '!!',
     MobileMoveClassification.great => '!',
-    MobileMoveClassification.book => '▤',
-    MobileMoveClassification.best => '★',
-    MobileMoveClassification.excellent => '✓+',
-    MobileMoveClassification.good => '✓',
+    MobileMoveClassification.book => '',
+    MobileMoveClassification.best => '',
+    MobileMoveClassification.excellent => '',
+    MobileMoveClassification.good => '',
     MobileMoveClassification.inaccuracy => '?!',
     MobileMoveClassification.mistake => '?',
-    MobileMoveClassification.miss => '×',
+    MobileMoveClassification.miss => '',
     MobileMoveClassification.blunder => '??',
     MobileMoveClassification.forced => '=',
   };

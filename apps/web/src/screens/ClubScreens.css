@@ -1886,9 +1886,9 @@
   flex: none;
   width: 28px;
   height: 28px;
-  border: 2px solid rgba(255, 255, 255, 0.92);
+  border: 0;
   border-radius: 50%;
-  box-shadow: 0 2px 5px rgba(17, 17, 17, 0.2);
+  box-shadow: 0 1px 3px rgba(17, 17, 17, 0.2);
   color: #ffffff;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-size: 11px;
@@ -1901,8 +1901,18 @@
 .review-classification-badge.compact {
   width: 22px;
   height: 22px;
-  border-width: 1.5px;
   font-size: 9px;
+}
+
+.review-classification-badge svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.7;
+}
+
+.review-classification-badge.compact svg {
+  width: 13px;
+  height: 13px;
 }
 
 .review-start-button {

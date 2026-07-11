@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js'
 import './JuChessBoard.css'
 import { buildChessGame, deriveResult, getMaterialEvaluation, type JuCapturedPiece } from './JuChessRules'
@@ -49,7 +49,7 @@ type JuChessBoardProps = {
     color: string
     label: string
     square: Square
-    symbol: string
+    symbol: ReactNode
   }
 }
 
