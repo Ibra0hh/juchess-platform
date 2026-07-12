@@ -1,5 +1,5 @@
-import { Query, type Models } from 'appwrite'
-import { appwriteConfig, appwriteReady, storage, tablesDB } from './appwrite'
+import { Channel, Query, type Models } from 'appwrite'
+import { appwriteConfig, appwriteReady, realtime, storage, tablesDB } from './appwrite'
 
 const tournamentAssetsBucketId = 'tournament-assets'
 const tournamentMediaPrefix = 'ju-media'
@@ -22,6 +22,10 @@ export type Tournament = {
   capacity?: number
   roundsTotal?: number
   currentRound?: number
+  firstMoveGraceSeconds?: number
+  disconnectGraceSeconds?: number
+  chatPolicy?: 'full' | 'preset' | 'disabled'
+  fairPlayMode?: 'standard' | 'strict' | 'proctored'
   round: string
   desc: string
   registeredPlayers?: Member[]
@@ -57,6 +61,10 @@ type AppwriteTournamentRow = Models.Row & {
   capacity?: number
   description?: string
   bracketSnapshot?: string
+  firstMoveGraceSeconds?: number
+  disconnectGraceSeconds?: number
+  chatPolicy?: 'full' | 'preset' | 'disabled'
+  fairPlayMode?: 'standard' | 'strict' | 'proctored'
 }
 
 type AppwriteRegistrationRow = Models.Row & {
@@ -88,6 +96,11 @@ type AppwriteGameRow = Models.Row & {
   whiteTimeMs?: number
   blackTimeMs?: number
   turnStartedAt?: string
+  scheduledStartAt?: string
+  firstMoveDeadlineAt?: string
+  clockDeadlineAt?: string
+  terminationReason?: 'checkmate' | 'draw' | 'resignation' | 'timeout' | 'noShow' | 'forfeit' | 'cancelled'
+  forfeitedProfileId?: string
   startedAt?: string
   finishedAt?: string
 }
@@ -122,6 +135,11 @@ export type TournamentGame = {
   whiteTimeMs?: number
   blackTimeMs?: number
   turnStartedAt?: string
+  scheduledStartAt?: string
+  firstMoveDeadlineAt?: string
+  clockDeadlineAt?: string
+  terminationReason?: 'checkmate' | 'draw' | 'resignation' | 'timeout' | 'noShow' | 'forfeit' | 'cancelled'
+  forfeitedProfileId?: string
   startedAt?: string
   finishedAt?: string
 }
@@ -203,10 +221,18 @@ export type SampleGame = {
   whiteTimeMs?: number
   blackTimeMs?: number
   turnStartedAt?: string
+  scheduledStartAt?: string
+  firstMoveDeadlineAt?: string
+  clockDeadlineAt?: string
+  terminationReason?: TournamentGame['terminationReason']
+  forfeitedProfileId?: string
   onlinePlatform?: OnlineTournamentPlatform
   tournamentStatus?: TournamentStatus
   tournamentId?: string
   tournamentName?: string
+  tournamentTimeControl?: string
+  chatPolicy?: 'full' | 'preset' | 'disabled'
+  fairPlayMode?: 'standard' | 'strict' | 'proctored'
 }
 
 export const tableIds = {
@@ -217,6 +243,9 @@ export const tableIds = {
   games: 'games',
   standings: 'standings',
   announcements: 'announcements',
+  gameMessages: 'game_messages',
+  fairPlayEvents: 'fair_play_events',
+  fairPlayReviews: 'fair_play_reviews',
   adminAudit: 'admin_audit',
   identityBlocks: 'identity_blocks',
   ipBlocks: 'ip_blocks',
@@ -546,6 +575,9 @@ export async function loadTournamentGame(gameId: string | null | undefined): Pro
       ...game,
       onlinePlatform: normalizeOnlinePlatform(tournament?.onlinePlatform),
       tournamentStatus: mapStatus(tournament?.status) ?? undefined,
+      tournamentTimeControl: tournament?.timeControl,
+      chatPolicy: tournament?.chatPolicy,
+      fairPlayMode: tournament?.fairPlayMode,
     }
   } catch (error) {
     console.warn('JuChess cloud game read failed.', error)
@@ -728,6 +760,11 @@ function appwriteGameToSampleGame(
     whiteTimeMs: row.whiteTimeMs,
     blackTimeMs: row.blackTimeMs,
     turnStartedAt: row.turnStartedAt,
+    scheduledStartAt: row.scheduledStartAt,
+    firstMoveDeadlineAt: row.firstMoveDeadlineAt,
+    clockDeadlineAt: row.clockDeadlineAt,
+    terminationReason: row.terminationReason,
+    forfeitedProfileId: row.forfeitedProfileId,
     tournamentId: row.tournamentId,
     tournamentName,
   }
@@ -764,7 +801,7 @@ function gameTimestamp(row: AppwriteGameRow) {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
-function parseStoredMoves(value?: string) {
+export function parseStoredMoves(value?: string) {
   if (!value) return []
 
   return value
@@ -780,6 +817,27 @@ export type TournamentLoadResult = {
   tournaments: Tournament[]
   source: 'cloud' | 'unavailable'
   error?: unknown
+}
+
+export async function subscribeToTournamentGameChanges(tournamentId: string, onChange: () => void) {
+  const subscription = await realtime.subscribe(
+    Channel.tablesdb(appwriteConfig.databaseId).table(tableIds.games).row(),
+    onChange,
+    [Query.equal('tournamentId', tournamentId)],
+  )
+  return () => {
+    void subscription.unsubscribe()
+  }
+}
+
+export async function subscribeToTournamentGameRow(gameId: string, onChange: () => void) {
+  const subscription = await realtime.subscribe(
+    Channel.tablesdb(appwriteConfig.databaseId).table(tableIds.games).row(gameId),
+    onChange,
+  )
+  return () => {
+    void subscription.unsubscribe()
+  }
 }
 
 export type AnnouncementLoadResult = {
@@ -1052,6 +1110,11 @@ function groupPublishedGames(rows: AppwriteGameRow[], profiles: Map<string, Memb
       whiteTimeMs: row.whiteTimeMs,
       blackTimeMs: row.blackTimeMs,
       turnStartedAt: row.turnStartedAt,
+      scheduledStartAt: row.scheduledStartAt,
+      firstMoveDeadlineAt: row.firstMoveDeadlineAt,
+      clockDeadlineAt: row.clockDeadlineAt,
+      terminationReason: row.terminationReason,
+      forfeitedProfileId: row.forfeitedProfileId,
       startedAt: row.startedAt,
       finishedAt: row.finishedAt,
     })
@@ -1096,6 +1159,10 @@ function mapAppwriteTournament(
     capacity: row.capacity,
     roundsTotal: row.roundsTotal,
     currentRound: row.currentRound,
+    firstMoveGraceSeconds: row.firstMoveGraceSeconds,
+    disconnectGraceSeconds: row.disconnectGraceSeconds,
+    chatPolicy: row.chatPolicy,
+    fairPlayMode: row.fairPlayMode,
     round: formatRound(row),
     desc: row.description || 'Club tournament details will be published by the organizers.',
     registeredPlayers: playersByTournament.get(row.$id) ?? [],

@@ -8,6 +8,9 @@ const tableIds = {
   registrations: 'registrations',
   checkIns: 'check_ins',
   games: 'games',
+  gameMessages: 'game_messages',
+  fairPlayEvents: 'fair_play_events',
+  fairPlayReviews: 'fair_play_reviews',
   standings: 'standings',
   announcements: 'announcements',
   adminAudit: 'admin_audit',
@@ -1149,6 +1152,61 @@ function parseHostedTimeControl(value) {
   return { initialMs: minutes * 60 * 1000, incrementMs: incrementSeconds * 1000 };
 }
 
+function hostedTimeClass(value) {
+  const { initialMs } = parseHostedTimeControl(value);
+  if (initialMs <= 2 * 60 * 1000) return 'bullet';
+  if (initialMs <= 10 * 60 * 1000) return 'blitz';
+  return 'rapid';
+}
+
+function firstMoveGraceMs(tournament) {
+  const configured = Number(tournament.firstMoveGraceSeconds);
+  if (Number.isFinite(configured) && configured >= 5) {
+    return Math.min(600, Math.floor(configured)) * 1000;
+  }
+  const timeClass = hostedTimeClass(tournament.timeControl);
+  if (timeClass === 'bullet') return 15_000;
+  if (timeClass === 'blitz') return 20_000;
+  return 60_000;
+}
+
+function validTimestamp(value) {
+  const parsed = Date.parse(String(value ?? ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hostedGameSchedule(tournament, nowMs = Date.now()) {
+  const publishedStart = validTimestamp(tournament.startsAt);
+  const scheduledStartMs = tournament.status === 'active'
+    ? Math.max(nowMs, publishedStart ?? nowMs)
+    : publishedStart ?? nowMs;
+  return {
+    scheduledStartAt: new Date(scheduledStartMs).toISOString(),
+    firstMoveDeadlineAt: new Date(scheduledStartMs + firstMoveGraceMs(tournament)).toISOString(),
+  };
+}
+
+function hostedGameDeadline(row, tournament, nowMs = Date.now()) {
+  if (row.status === 'scheduled') {
+    const startMs = validTimestamp(row.scheduledStartAt) ?? validTimestamp(tournament.startsAt) ?? nowMs;
+    return validTimestamp(row.firstMoveDeadlineAt) ?? startMs + firstMoveGraceMs(tournament);
+  }
+  if (row.status !== 'live') return null;
+  const turnStartedMs = validTimestamp(row.turnStartedAt);
+  if (turnStartedMs === null) return null;
+  const chess = loadHostedChessGame(row.pgn);
+  const control = parseHostedTimeControl(tournament.timeControl);
+  const remaining = chess.turn() === 'w'
+    ? Number(row.whiteTimeMs ?? control.initialMs)
+    : Number(row.blackTimeMs ?? control.initialMs);
+  return turnStartedMs + Math.max(0, remaining);
+}
+
+function initializedHostedClockMs(value, fallbackMs) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallbackMs;
+}
+
 function hostedResultFor(game) {
   if (!game.isGameOver()) return '*';
   if (game.isCheckmate()) return game.turn() === 'w' ? '0-1' : '1-0';
@@ -1712,6 +1770,27 @@ async function listConfirmedRegistrations(tablesDB, databaseId, tournamentId) {
 async function createTournamentGames(tablesDB, databaseId, tournamentId, games, physicalBoards = 3) {
   const rows = [];
   const plannedGames = buildProcedureAssignments(games, physicalBoards);
+  let hostedSetup = null;
+  if (typeof tablesDB.getRow === 'function') {
+    try {
+      const tournament = await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: tournamentId,
+      });
+      if (isJuChessHostedTournament(tournament)) {
+        const control = parseHostedTimeControl(tournament.timeControl);
+        hostedSetup = {
+          ...hostedGameSchedule(tournament),
+          whiteTimeMs: control.initialMs,
+          blackTimeMs: control.initialMs,
+        };
+      }
+    } catch {
+      // Pairing publication must remain compatible while new timing columns are
+      // being rolled out. Activation and the clock sweeper backfill old rows.
+    }
+  }
   for (const game of plannedGames) {
     const row = await tablesDB.createRow({
       databaseId,
@@ -1725,6 +1804,7 @@ async function createTournamentGames(tablesDB, databaseId, tournamentId, games, 
         blackProfileId: String(game.blackProfileId),
         status: 'scheduled',
         result: '*',
+        ...hostedSetup,
         procedureWave: game.procedureWave,
         physicalBoard: game.physicalBoard,
         queuePosition: game.queuePosition,
@@ -1766,6 +1846,34 @@ async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextD
     roundsTotal: Math.max(publishedRounds, Number(nextTournament.roundsTotal) || 0),
     bracketSnapshot: nextTournament.bracketSnapshot ?? null,
   };
+}
+
+async function initializeHostedTournamentGames(tablesDB, databaseId, tournament, games, { refreshSchedule = false } = {}) {
+  if (!isJuChessHostedTournament(tournament)) return [];
+  const control = parseHostedTimeControl(tournament.timeControl);
+  const timing = hostedGameSchedule(tournament);
+  const updated = [];
+
+  for (const game of games) {
+    if (game.blackProfileId === SYSTEM_BYE_PROFILE_ID || game.status !== 'scheduled') continue;
+    const data = cleanObject({
+      whiteTimeMs: refreshSchedule ? control.initialMs : initializedHostedClockMs(game.whiteTimeMs, control.initialMs),
+      blackTimeMs: refreshSchedule ? control.initialMs : initializedHostedClockMs(game.blackTimeMs, control.initialMs),
+      scheduledStartAt: refreshSchedule ? timing.scheduledStartAt : game.scheduledStartAt ?? timing.scheduledStartAt,
+      firstMoveDeadlineAt: refreshSchedule ? timing.firstMoveDeadlineAt : game.firstMoveDeadlineAt ?? timing.firstMoveDeadlineAt,
+      clockDeadlineAt: refreshSchedule
+        ? timing.firstMoveDeadlineAt
+        : game.clockDeadlineAt ?? game.firstMoveDeadlineAt ?? timing.firstMoveDeadlineAt,
+    });
+    const row = await tablesDB.updateRow({
+      databaseId,
+      tableId: tableIds.games,
+      rowId: game.$id,
+      data,
+    });
+    updated.push(row);
+  }
+  return updated;
 }
 
 async function recalculateStandings(tablesDB, databaseId, tournamentId) {
@@ -2142,7 +2250,13 @@ async function submitGameResult(tablesDB, databaseId, gameId, body) {
   return row;
 }
 
-async function loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile) {
+async function loadHostedGameContext(
+  tablesDB,
+  databaseId,
+  gameId,
+  profile,
+  { allowFinished = false, requireActive = true } = {},
+) {
   let game;
   try {
     game = await tablesDB.getRow({ databaseId, tableId: tableIds.games, rowId: gameId });
@@ -2157,7 +2271,7 @@ async function loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile) {
   if (!isJuChessHostedTournament(tournament)) {
     throw new HttpError(409, 'This game is not hosted on JuChess.');
   }
-  if (tournament.status !== 'active') {
+  if (requireActive && tournament.status !== 'active') {
     throw new HttpError(409, 'This tournament is not live.');
   }
   if (game.blackProfileId === SYSTEM_BYE_PROFILE_ID) {
@@ -2166,10 +2280,23 @@ async function loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile) {
   if (game.whiteProfileId !== profile.$id && game.blackProfileId !== profile.$id) {
     throw new HttpError(403, 'Only the two assigned players can play this board.');
   }
-  if (game.status !== 'scheduled' && game.status !== 'live') {
+  if (requireActive && Number(game.round) !== (Number(tournament.currentRound) || 1)) {
+    throw new HttpError(409, `Only round ${Number(tournament.currentRound) || 1} can be played right now.`);
+  }
+  if (!allowFinished && game.status !== 'scheduled' && game.status !== 'live') {
     throw new HttpError(409, 'This game is already finished.');
   }
   return { game, tournament };
+}
+
+async function loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile) {
+  const context = await loadHostedGameContext(tablesDB, databaseId, gameId, profile);
+  const opensAt = validTimestamp(context.game.scheduledStartAt)
+    ?? validTimestamp(context.tournament.startsAt);
+  if (context.game.status === 'scheduled' && opensAt !== null && opensAt > Date.now()) {
+    throw new HttpError(409, `This board opens at ${new Date(opensAt).toISOString()}.`);
+  }
+  return context;
 }
 
 function loadHostedChessGame(pgn) {
@@ -2186,17 +2313,19 @@ function loadHostedChessGame(pgn) {
 
 async function finishHostedGame(tablesDB, databaseId, game, result, data = {}) {
   await assertResultAllowed(tablesDB, databaseId, game, result);
+  const { status = 'completed', ...finishData } = data;
   const row = await tablesDB.updateRow({
     databaseId,
     tableId: tableIds.games,
     rowId: game.$id,
     data: cleanObject({
-      ...data,
-      status: 'completed',
+      ...finishData,
+      status,
       result,
       startedAt: game.startedAt || new Date().toISOString(),
       finishedAt: new Date().toISOString(),
       turnStartedAt: null,
+      clockDeadlineAt: null,
     }),
   });
   await recalculateStandings(tablesDB, databaseId, row.tournamentId);
@@ -2204,8 +2333,49 @@ async function finishHostedGame(tablesDB, databaseId, game, result, data = {}) {
   return row;
 }
 
+async function syncHostedGameTimeout(tablesDB, databaseId, game, tournament, nowMs = Date.now()) {
+  if (game.status !== 'scheduled' && game.status !== 'live') {
+    return { expired: false, row: game };
+  }
+  const deadline = hostedGameDeadline(game, tournament, nowMs);
+  if (deadline === null || nowMs < deadline) return { expired: false, row: game };
+
+  if (game.status === 'scheduled') {
+    const control = parseHostedTimeControl(tournament.timeControl);
+    const row = await finishHostedGame(tablesDB, databaseId, game, '0-1', {
+      status: 'forfeit',
+      terminationReason: 'noShow',
+      forfeitedProfileId: game.whiteProfileId,
+      whiteTimeMs: control.initialMs,
+      blackTimeMs: control.initialMs,
+    });
+    return { expired: true, reason: 'noShow', row };
+  }
+
+  const chess = loadHostedChessGame(game.pgn);
+  const loserProfileId = chess.turn() === 'w' ? game.whiteProfileId : game.blackProfileId;
+  const result = chess.turn() === 'w' ? '0-1' : '1-0';
+  const clock = hostedClockForMove(game, tournament, chess.turn(), nowMs);
+  clock[clock.moverClockKey] = 0;
+  const row = await finishHostedGame(tablesDB, databaseId, game, result, {
+    status: 'forfeit',
+    terminationReason: 'timeout',
+    forfeitedProfileId: loserProfileId,
+    whiteTimeMs: Math.round(clock.whiteTimeMs),
+    blackTimeMs: Math.round(clock.blackTimeMs),
+  });
+  return { expired: true, reason: 'timeout', row };
+}
+
 async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, profile) {
-  const { game: row, tournament } = await loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile);
+  const context = await loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile);
+  const timeout = await syncHostedGameTimeout(tablesDB, databaseId, context.game, context.tournament);
+  if (timeout.expired) {
+    throw new HttpError(409, timeout.reason === 'noShow'
+      ? 'The first-move deadline expired. This game was forfeited.'
+      : 'The clock expired. This game was forfeited.');
+  }
+  const { game: row, tournament } = context;
   const currentVersion = Math.max(0, Number(row.moveVersion) || 0);
   const expectedVersion = Number(body.expectedVersion);
   if (!Number.isInteger(expectedVersion) || expectedVersion !== currentVersion) {
@@ -2223,6 +2393,9 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
   if (clock[clock.moverClockKey] <= 0) {
     const timeoutResult = chess.turn() === 'w' ? '0-1' : '1-0';
     const timedOut = await finishHostedGame(tablesDB, databaseId, row, timeoutResult, {
+      status: 'forfeit',
+      terminationReason: 'timeout',
+      forfeitedProfileId: chess.turn() === 'w' ? row.whiteProfileId : row.blackProfileId,
       whiteTimeMs: clock.whiteTimeMs,
       blackTimeMs: clock.blackTimeMs,
     });
@@ -2261,7 +2434,10 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
       });
       return { row: saved, move: move.san, requiresTiebreak: true };
     }
-    const finished = await finishHostedGame(tablesDB, databaseId, row, result, moveData);
+    const finished = await finishHostedGame(tablesDB, databaseId, row, result, {
+      ...moveData,
+      terminationReason: result === '1/2-1/2' ? 'draw' : 'checkmate',
+    });
     return { row: finished, move: move.san, requiresTiebreak: false };
   }
 
@@ -2274,6 +2450,9 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
       status: 'live',
       result: '*',
       turnStartedAt: now.toISOString(),
+      clockDeadlineAt: new Date(now.getTime() + (
+        chess.turn() === 'w' ? moveData.whiteTimeMs : moveData.blackTimeMs
+      )).toISOString(),
     },
   });
   return { row: updated, move: move.san, requiresTiebreak: false };
@@ -2282,7 +2461,214 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
 async function resignHostedTournamentGame(tablesDB, databaseId, gameId, profile) {
   const { game } = await loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile);
   const result = game.whiteProfileId === profile.$id ? '0-1' : '1-0';
-  return await finishHostedGame(tablesDB, databaseId, game, result);
+  return await finishHostedGame(tablesDB, databaseId, game, result, {
+    terminationReason: 'resignation',
+    forfeitedProfileId: profile.$id,
+  });
+}
+
+const CHAT_PRESETS = new Set(['Good luck!', 'Good game!', 'Connection problem.', 'Please call an arbiter.']);
+const FAIR_PLAY_EVENT_TYPES = new Set([
+  'heartbeat',
+  'tabHidden',
+  'tabVisible',
+  'windowBlur',
+  'windowFocus',
+  'fullscreenExit',
+  'disconnect',
+  'reconnect',
+  'analysisAttempt',
+]);
+
+async function listPlayerGameMessages(tablesDB, databaseId, gameId, profile) {
+  await loadHostedGameContext(tablesDB, databaseId, gameId, profile, {
+    allowFinished: true,
+    requireActive: false,
+  });
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.gameMessages,
+    queries: [Query.equal('gameId', gameId), Query.limit(200)],
+    total: false,
+  });
+  return response.rows
+    .filter((row) => row.status !== 'removed')
+    .toSorted((left, right) => String(left.createdAt).localeCompare(String(right.createdAt)));
+}
+
+async function sendPlayerGameMessage(tablesDB, databaseId, gameId, body, profile) {
+  const { game, tournament } = await loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile);
+  if (tournament.chatPolicy === 'disabled') throw new HttpError(409, 'Chat is disabled for this tournament.');
+  const message = String(body.body ?? '').trim().replace(/\s+/g, ' ');
+  if (!message) throw new HttpError(400, 'Write a message first.');
+  if (message.length > 500) throw new HttpError(400, 'Messages are limited to 500 characters.');
+  const kind = body.kind === 'preset' ? 'preset' : 'text';
+  if (tournament.chatPolicy === 'preset' && (kind !== 'preset' || !CHAT_PRESETS.has(message))) {
+    throw new HttpError(409, 'Only approved preset messages are allowed in this tournament.');
+  }
+
+  const participantProfiles = await Promise.all([game.whiteProfileId, game.blackProfileId].map((profileId) => (
+    tablesDB.getRow({ databaseId, tableId: tableIds.profiles, rowId: profileId })
+  )));
+  const accountIds = [...new Set(participantProfiles.map((item) => item.accountId).filter(Boolean))];
+  if (accountIds.length !== 2) throw new HttpError(409, 'Both player accounts must be available before chat can start.');
+
+  return await tablesDB.createRow({
+    databaseId,
+    tableId: tableIds.gameMessages,
+    rowId: ID.unique(),
+    data: {
+      gameId,
+      tournamentId: game.tournamentId,
+      senderProfileId: profile.$id,
+      kind,
+      body: message,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    },
+    permissions: accountIds.map((accountId) => Permission.read(Role.user(accountId))),
+  });
+}
+
+async function recordFairPlayEvent(tablesDB, databaseId, gameId, body, profile) {
+  const { game } = await loadHostedGameContext(tablesDB, databaseId, gameId, profile);
+  const eventType = String(body.eventType ?? '');
+  if (!FAIR_PLAY_EVENT_TYPES.has(eventType)) throw new HttpError(400, 'Unknown fair-play event.');
+  const sessionId = String(body.sessionId ?? '').trim().slice(0, 96);
+  if (!sessionId) throw new HttpError(400, 'A fair-play session is required.');
+  const metadata = body.metadata === undefined ? undefined : JSON.stringify(body.metadata).slice(0, 2000);
+  return await tablesDB.createRow({
+    databaseId,
+    tableId: tableIds.fairPlayEvents,
+    rowId: ID.unique(),
+    data: cleanObject({
+      gameId,
+      tournamentId: game.tournamentId,
+      profileId: profile.$id,
+      sessionId,
+      eventType,
+      durationMs: Math.max(0, Math.min(2147483647, Math.floor(Number(body.durationMs) || 0))),
+      metadata,
+      occurredAt: new Date().toISOString(),
+    }),
+    permissions: [],
+  });
+}
+
+async function listActiveHostedGamesForPlayer(tablesDB, databaseId, profile) {
+  let rows;
+  try {
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.games,
+      queries: [
+        Query.or([
+          Query.equal('whiteProfileId', profile.$id),
+          Query.equal('blackProfileId', profile.$id),
+        ]),
+        Query.equal('status', ['scheduled', 'live']),
+        Query.limit(50),
+      ],
+      total: false,
+    });
+    rows = response.rows;
+  } catch {
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.games,
+      queries: [Query.limit(500)],
+      total: false,
+    });
+    rows = response.rows.filter((row) => (
+      (row.whiteProfileId === profile.$id || row.blackProfileId === profile.$id)
+      && (row.status === 'scheduled' || row.status === 'live')
+    ));
+  }
+
+  const active = [];
+  for (const game of rows) {
+    const tournament = await tablesDB.getRow({
+      databaseId,
+      tableId: tableIds.tournaments,
+      rowId: game.tournamentId,
+    }).catch(() => null);
+    if (!tournament || tournament.status !== 'active' || !isJuChessHostedTournament(tournament)) continue;
+    if (Number(game.round) !== (Number(tournament.currentRound) || 1)) continue;
+    const timeout = await syncHostedGameTimeout(tablesDB, databaseId, game, tournament);
+    if (timeout.row.status !== 'scheduled' && timeout.row.status !== 'live') continue;
+    const opensAt = validTimestamp(timeout.row.scheduledStartAt) ?? validTimestamp(tournament.startsAt);
+    if (opensAt !== null && opensAt > Date.now()) continue;
+    active.push({ game: timeout.row, tournament });
+  }
+  return active.toSorted((left, right) => (
+    Number(right.game.status === 'live') - Number(left.game.status === 'live')
+    || Number(left.game.round) - Number(right.game.round)
+    || Number(left.game.board) - Number(right.game.board)
+  ));
+}
+
+async function sweepHostedGameDeadlines(tablesDB, databaseId, nowMs = Date.now()) {
+  let response;
+  try {
+    response = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.games,
+      queries: [Query.equal('status', ['scheduled', 'live']), Query.limit(500)],
+      total: false,
+    });
+  } catch {
+    response = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.games,
+      queries: [Query.limit(500)],
+      total: false,
+    });
+  }
+
+  const tournaments = new Map();
+  let initialized = 0;
+  let finished = 0;
+  for (let game of response.rows.filter((row) => row.status === 'scheduled' || row.status === 'live')) {
+    let tournament = tournaments.get(game.tournamentId);
+    if (tournament === undefined) {
+      tournament = await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: game.tournamentId,
+      }).catch(() => null);
+      tournaments.set(game.tournamentId, tournament);
+    }
+    if (!tournament || tournament.status !== 'active' || !isJuChessHostedTournament(tournament)) continue;
+
+    if (game.status === 'scheduled' && (
+      !Number.isFinite(Number(game.whiteTimeMs))
+      || Number(game.whiteTimeMs) <= 0
+      || !Number.isFinite(Number(game.blackTimeMs))
+      || Number(game.blackTimeMs) <= 0
+      || !game.scheduledStartAt
+      || !game.firstMoveDeadlineAt
+    )) {
+      const control = parseHostedTimeControl(tournament.timeControl);
+      const timing = hostedGameSchedule(tournament, nowMs);
+      game = await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.games,
+        rowId: game.$id,
+        data: {
+          whiteTimeMs: initializedHostedClockMs(game.whiteTimeMs, control.initialMs),
+          blackTimeMs: initializedHostedClockMs(game.blackTimeMs, control.initialMs),
+          scheduledStartAt: game.scheduledStartAt ?? timing.scheduledStartAt,
+          firstMoveDeadlineAt: game.firstMoveDeadlineAt ?? timing.firstMoveDeadlineAt,
+          clockDeadlineAt: game.clockDeadlineAt ?? game.firstMoveDeadlineAt ?? timing.firstMoveDeadlineAt,
+        },
+      });
+      initialized += 1;
+    }
+
+    const result = await syncHostedGameTimeout(tablesDB, databaseId, game, tournament, nowMs);
+    if (result.expired) finished += 1;
+  }
+  return { checked: response.rows.length, finished, initialized };
 }
 
 async function findTournamentGameByBoard(tablesDB, databaseId, tournamentId, round, board) {
@@ -2449,6 +2835,16 @@ export default async ({ req, res, log, error }) => {
 
   log(`JuChess admin action ${method} ${path}`);
 
+  if (segments.length === 0 && req.headers['x-appwrite-trigger'] === 'schedule') {
+    try {
+      const sweep = await sweepHostedGameDeadlines(tablesDB, databaseId);
+      return res.json({ ok: true, action: 'sweepHostedGameDeadlines', ...sweep });
+    } catch (cause) {
+      error(cause?.message ?? String(cause));
+      return res.json({ ok: false, error: 'Clock sweep failed.' }, 500);
+    }
+  }
+
   if (method === 'GET' && segments.length === 0) {
     return res.json({
       ok: true,
@@ -2467,6 +2863,11 @@ export default async ({ req, res, log, error }) => {
         'POST /tournaments/:id/procedure/configure',
         'POST /player/games/:id/move',
         'POST /player/games/:id/resign',
+        'POST /player/active-game',
+        'POST /player/games/:id/sync',
+        'POST /player/games/:id/messages/list',
+        'POST /player/games/:id/messages/send',
+        'POST /player/games/:id/fair-play',
         'POST /profiles/lookup',
         'DELETE /players',
         'GET /admin/session',
@@ -2492,6 +2893,17 @@ export default async ({ req, res, log, error }) => {
   }
 
   try {
+    if (method === 'POST' && segments[0] === 'player' && segments[1] === 'active-game') {
+      const player = await requirePlayerActor(req, tablesDB, databaseId);
+      const activeGames = await listActiveHostedGamesForPlayer(tablesDB, databaseId, player);
+      return res.json({
+        ok: true,
+        action: 'loadActiveHostedGame',
+        game: activeGames[0]?.game ?? null,
+        tournament: activeGames[0]?.tournament ?? null,
+      });
+    }
+
     if (method === 'POST' && segments[0] === 'player' && segments[1] === 'games' && segments[2] && segments[3] === 'move') {
       const player = await requirePlayerActor(req, tablesDB, databaseId);
       const outcome = await submitHostedTournamentMove(tablesDB, databaseId, segments[2], body, player);
@@ -2504,7 +2916,95 @@ export default async ({ req, res, log, error }) => {
       return res.json({ ok: true, action: 'resignHostedTournamentGame', row });
     }
 
+    if (method === 'POST' && segments[0] === 'player' && segments[1] === 'games' && segments[2] && segments[3] === 'sync') {
+      const player = await requirePlayerActor(req, tablesDB, databaseId);
+      const context = await loadHostedGameContext(tablesDB, databaseId, segments[2], player, {
+        allowFinished: true,
+        requireActive: false,
+      });
+      const outcome = context.tournament.status === 'active'
+        ? await syncHostedGameTimeout(tablesDB, databaseId, context.game, context.tournament)
+        : { expired: false, row: context.game };
+      return res.json({
+        ok: true,
+        action: 'syncHostedTournamentGame',
+        expired: outcome.expired,
+        reason: outcome.reason,
+        row: outcome.row,
+        tournament: context.tournament,
+      });
+    }
+
+    if (method === 'POST' && segments[0] === 'player' && segments[1] === 'games' && segments[2] && segments[3] === 'messages' && segments[4] === 'list') {
+      const player = await requirePlayerActor(req, tablesDB, databaseId);
+      const messages = await listPlayerGameMessages(tablesDB, databaseId, segments[2], player);
+      return res.json({ ok: true, action: 'listPlayerGameMessages', messages });
+    }
+
+    if (method === 'POST' && segments[0] === 'player' && segments[1] === 'games' && segments[2] && segments[3] === 'messages' && segments[4] === 'send') {
+      const player = await requirePlayerActor(req, tablesDB, databaseId);
+      const message = await sendPlayerGameMessage(tablesDB, databaseId, segments[2], body, player);
+      return res.json({ ok: true, action: 'sendPlayerGameMessage', message });
+    }
+
+    if (method === 'POST' && segments[0] === 'player' && segments[1] === 'games' && segments[2] && segments[3] === 'fair-play') {
+      const player = await requirePlayerActor(req, tablesDB, databaseId);
+      const event = await recordFairPlayEvent(tablesDB, databaseId, segments[2], body, player);
+      return res.json({ ok: true, action: 'recordFairPlayEvent', event });
+    }
+
     const actor = await requireAdminActor(req, tablesDB, databaseId);
+
+    if (method === 'POST' && segments[0] === 'fair-play' && segments[1] === 'report') {
+      const queries = [Query.limit(500)];
+      if (body.gameId) queries.unshift(Query.equal('gameId', String(body.gameId)));
+      else if (body.tournamentId) queries.unshift(Query.equal('tournamentId', String(body.tournamentId)));
+      else throw new HttpError(400, 'Choose a game or tournament for the fair-play report.');
+      const response = await tablesDB.listRows({
+        databaseId,
+        tableId: tableIds.fairPlayEvents,
+        queries,
+        total: false,
+      });
+      const byProfile = Object.values(response.rows.reduce((groups, event) => {
+        const current = groups[event.profileId] ?? {
+          profileId: event.profileId,
+          events: 0,
+          hiddenCount: 0,
+          hiddenDurationMs: 0,
+          fullscreenExits: 0,
+          disconnects: 0,
+          analysisAttempts: 0,
+          lastEventAt: null,
+        };
+        current.events += 1;
+        if (event.eventType === 'tabHidden') {
+          current.hiddenCount += 1;
+        }
+        if (event.eventType === 'tabVisible') current.hiddenDurationMs += Number(event.durationMs) || 0;
+        if (event.eventType === 'fullscreenExit') current.fullscreenExits += 1;
+        if (event.eventType === 'disconnect') current.disconnects += 1;
+        if (event.eventType === 'analysisAttempt') current.analysisAttempts += 1;
+        if (!current.lastEventAt || String(event.occurredAt) > current.lastEventAt) current.lastEventAt = event.occurredAt;
+        groups[event.profileId] = current;
+        return groups;
+      }, {})).map((summary) => {
+        const hiddenTimePoints = Math.min(30, Math.floor(summary.hiddenDurationMs / 10000));
+        const riskScore = Math.min(100, (
+          Math.min(24, summary.hiddenCount * 4)
+          + hiddenTimePoints
+          + Math.min(16, summary.disconnects * 8)
+          + Math.min(10, summary.fullscreenExits * 5)
+          + Math.min(40, summary.analysisAttempts * 40)
+        ));
+        return {
+          ...summary,
+          riskScore,
+          riskLevel: riskScore >= 60 ? 'high' : riskScore >= 30 ? 'medium' : 'low',
+        };
+      }).toSorted((left, right) => right.riskScore - left.riskScore);
+      return res.json({ ok: true, action: 'fairPlayReport', events: response.rows, byProfile });
+    }
 
     if (method === 'DELETE' && segments[0] === 'players' && segments.length === 1) {
       const profileIds = Array.isArray(body.profileIds)
@@ -2931,11 +3431,25 @@ export default async ({ req, res, log, error }) => {
         }),
       });
 
+      let initializedGames = [];
+      if (row.status === 'active' && isJuChessHostedTournament(row)) {
+        const hostedGames = await listRowsByTournament(tablesDB, databaseId, tableIds.games, row.$id);
+        initializedGames = await initializeHostedTournamentGames(tablesDB, databaseId, row, hostedGames, {
+          refreshSchedule: currentTournament.status !== 'active' && body.status === 'active',
+        });
+      }
+
       if (activation?.createdGames?.length) {
         await recalculateStandings(tablesDB, databaseId, segments[1]);
       }
 
-      return res.json({ ok: true, action: 'updateTournament', row, createdGames: activation?.createdGames ?? [] });
+      return res.json({
+        ok: true,
+        action: 'updateTournament',
+        row,
+        createdGames: activation?.createdGames ?? [],
+        initializedGames,
+      });
     }
 
     if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'pairings' && segments[3] === 'publish') {

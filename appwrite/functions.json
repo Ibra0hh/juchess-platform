@@ -12,8 +12,8 @@
       "users"
     ],
     "events": [],
-    "schedule": "",
-    "timeout": 15,
+    "schedule": "* * * * *",
+    "timeout": 30,
     "enabled": true,
     "logging": true,
     "ignore": [

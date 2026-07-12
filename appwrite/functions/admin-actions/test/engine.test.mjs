@@ -37,6 +37,11 @@ const EXPORTED = [
   'validateTournamentOnlinePlatform',
   'isJuChessHostedTournament',
   'parseHostedTimeControl',
+  'hostedTimeClass',
+  'firstMoveGraceMs',
+  'hostedGameSchedule',
+  'hostedGameDeadline',
+  'initializedHostedClockMs',
   'hostedResultFor',
   'hostedClockForMove',
   'multiStageStageOneRounds',
@@ -66,7 +71,7 @@ const Account = stub, Client = stub, TablesDB = stub, Teams = stub, Users = stub
 const ID = { unique: () => 'stub' };
 const Permission = { read: () => 'stub' };
 const Role = { any: () => 'stub', user: () => 'stub' };
-const Query = { cursorAfter: () => 'query', equal: () => 'query', limit: () => 'query', notEqual: () => 'query' };
+const Query = { cursorAfter: () => 'query', equal: () => 'query', limit: () => 'query', notEqual: () => 'query', or: () => 'query' };
 `
 
 function loadEngine() {
@@ -836,6 +841,43 @@ test('hosted clock deducts only the running side and preserves the increment', (
   assert.equal(clock.blackTimeMs, 290000)
   assert.equal(clock.incrementMs, 3000)
   assert.equal(clock.moverClockKey, 'whiteTimeMs')
+})
+
+test('hosted first-move grace follows the public time class defaults and supports an override', () => {
+  assert.equal(engine.hostedTimeClass('1+0'), 'bullet')
+  assert.equal(engine.hostedTimeClass('5+3'), 'blitz')
+  assert.equal(engine.hostedTimeClass('15+10'), 'rapid')
+  assert.equal(engine.firstMoveGraceMs({ timeControl: '1+0' }), 15000)
+  assert.equal(engine.firstMoveGraceMs({ timeControl: '5+0' }), 20000)
+  assert.equal(engine.firstMoveGraceMs({ timeControl: '15+10' }), 60000)
+  assert.equal(engine.firstMoveGraceMs({ timeControl: '5+0', firstMoveGraceSeconds: 45 }), 45000)
+})
+
+test('hosted deadlines distinguish the first-move grace from the running chess clock', () => {
+  const now = Date.parse('2026-07-12T10:00:00.000Z')
+  const tournament = { status: 'active', startsAt: '2026-07-12T09:00:00.000Z', timeControl: '5+0' }
+  const schedule = engine.hostedGameSchedule(tournament, now)
+  assert.equal(schedule.scheduledStartAt, '2026-07-12T10:00:00.000Z')
+  assert.equal(schedule.firstMoveDeadlineAt, '2026-07-12T10:00:20.000Z')
+  assert.equal(engine.hostedGameDeadline({
+    status: 'scheduled',
+    scheduledStartAt: schedule.scheduledStartAt,
+    firstMoveDeadlineAt: schedule.firstMoveDeadlineAt,
+  }, tournament, now), Date.parse(schedule.firstMoveDeadlineAt))
+  assert.equal(engine.hostedGameDeadline({
+    status: 'live',
+    pgn: '1. e4',
+    whiteTimeMs: 300000,
+    blackTimeMs: 275000,
+    turnStartedAt: '2026-07-12T10:01:00.000Z',
+  }, tournament, now), Date.parse('2026-07-12T10:05:35.000Z'))
+})
+
+test('scheduled hosted clocks repair legacy zero values without overwriting positive time', () => {
+  assert.equal(engine.initializedHostedClockMs(undefined, 900_000), 900_000)
+  assert.equal(engine.initializedHostedClockMs(0, 900_000), 900_000)
+  assert.equal(engine.initializedHostedClockMs(-1, 900_000), 900_000)
+  assert.equal(engine.initializedHostedClockMs(452_345.7, 900_000), 452_346)
 })
 
 test('hosted chess derives decisive and drawn terminal results', () => {

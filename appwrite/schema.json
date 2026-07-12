@@ -49,6 +49,10 @@
         "description": "string",
         "bracketSnapshot": "longtext",
         "physicalBoards": "integer|default:3|min:1|max:64",
+        "firstMoveGraceSeconds": "integer|min:5|max:600",
+        "disconnectGraceSeconds": "integer|min:15|max:600",
+        "chatPolicy": "enum:full,preset,disabled|default:full",
+        "fairPlayMode": "enum:standard,strict,proctored|default:standard",
         "createdByProfileId": "string|required"
       }
     },
@@ -102,11 +106,77 @@
         "whiteTimeMs": "integer|min:0",
         "blackTimeMs": "integer|min:0",
         "turnStartedAt": "datetime",
+        "scheduledStartAt": "datetime",
+        "firstMoveDeadlineAt": "datetime",
+        "clockDeadlineAt": "datetime",
+        "terminationReason": "enum:checkmate,draw,resignation,timeout,noShow,forfeit,cancelled",
+        "forfeitedProfileId": "string",
         "procedureWave": "integer",
         "physicalBoard": "integer",
         "queuePosition": "integer",
         "startedAt": "datetime",
         "finishedAt": "datetime"
+      }
+    },
+    "game_messages": {
+      "note": "Private per-game chat. Rows are created by admin-actions and grant read access only to the two player accounts. Finished-game threads remain readable but become write-locked by the function.",
+      "permissions": [],
+      "rowSecurity": true,
+      "indexes": {
+        "game_created": "key:gameId,createdAt",
+        "tournament_created": "key:tournamentId,createdAt"
+      },
+      "fields": {
+        "gameId": "string|required",
+        "tournamentId": "string|required",
+        "senderProfileId": "string|required",
+        "kind": "enum:text,preset,system|default:text",
+        "body": "string|required|max:500",
+        "status": "enum:active,removed|default:active",
+        "createdAt": "datetime|required",
+        "removedAt": "datetime",
+        "removedByProfileId": "string"
+      }
+    },
+    "fair_play_events": {
+      "note": "Server-written fair-play telemetry. No client read permissions; organizers consume summaries through admin-actions.",
+      "permissions": [],
+      "indexes": {
+        "game_time": "key:gameId,occurredAt",
+        "profile_time": "key:profileId,occurredAt",
+        "tournament_time": "key:tournamentId,occurredAt"
+      },
+      "fields": {
+        "gameId": "string|required",
+        "tournamentId": "string|required",
+        "profileId": "string|required",
+        "sessionId": "string|required",
+        "eventType": "enum:heartbeat,tabHidden,tabVisible,windowBlur,windowFocus,fullscreenExit,disconnect,reconnect,analysisAttempt",
+        "durationMs": "integer|min:0",
+        "metadata": "string|max:2000",
+        "occurredAt": "datetime|required"
+      }
+    },
+    "fair_play_reviews": {
+      "note": "Private organizer decisions and post-game statistical screening summaries.",
+      "permissions": [],
+      "indexes": {
+        "game_review": "key:gameId",
+        "profile_review": "key:profileId,status"
+      },
+      "fields": {
+        "gameId": "string|required",
+        "tournamentId": "string|required",
+        "profileId": "string|required",
+        "status": "enum:clear,watch,review,confirmed,appealed",
+        "riskScore": "integer|min:0|max:100",
+        "accuracy": "float",
+        "engineMatchRate": "float",
+        "averageCentipawnLoss": "float",
+        "signals": "longtext",
+        "reviewedByProfileId": "string",
+        "reviewedAt": "datetime",
+        "createdAt": "datetime|required"
       }
     },
     "standings": {
@@ -169,5 +239,5 @@
     }
   },
   "buckets": ["avatars", "tournament-assets"],
-  "functions": ["admin-actions", "access-guards"]
+  "functions": ["admin-actions", "player-actions", "access-guards"]
 }

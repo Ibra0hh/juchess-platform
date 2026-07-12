@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FlipHorizontal2, Radio, RotateCcw, Trophy, Undo2, Users } from 'lucide-react'
+import { FlipHorizontal2, Radio, RotateCcw, ShieldAlert, Trophy, Undo2, Users } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   JuCapturedPieces,
   JuChessBoard,
   type JuChessBoardChange,
 } from '../components/JuChessBoard'
+import { GameChat } from '../components/GameChat'
 import { getJuChessBoardSummary, type JuCapturedPiece } from '../components/JuChessRules'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
+import { useTournamentPlay } from '../context/useTournamentPlay'
+import { useFairPlayMonitor } from '../hooks/useFairPlayMonitor'
 import {
   loadTournamentGame,
   loadTournaments,
+  subscribeToTournamentGameRow,
   type SampleGame,
   type Tournament,
   type TournamentGame,
@@ -20,7 +24,11 @@ import {
   clearOnlineTournamentPlayLock,
   setOnlineTournamentPlayLock,
 } from '../lib/onlineTournamentPlayLock'
-import { resignHostedTournamentGame, submitHostedTournamentMove } from '../lib/onlineTournament'
+import {
+  resignHostedTournamentGame,
+  submitHostedTournamentMove,
+  syncHostedTournamentGame,
+} from '../lib/onlineTournament'
 import './OnlineGamesPage.css'
 
 type TournamentGameChoice = {
@@ -30,6 +38,12 @@ type TournamentGameChoice = {
 
 function OnlineGamesPage() {
   const { profile } = useAuth()
+  const {
+    activeGame,
+    activeTournament,
+    error: assignmentError,
+    refresh: refreshActiveGame,
+  } = useTournamentPlay()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedGameId = searchParams.get('game')
   const [tournaments, setTournaments] = useState<Tournament[]>([])
@@ -44,21 +58,28 @@ function OnlineGamesPage() {
   const [message, setMessage] = useState('')
   const [, setClockTick] = useState(0)
   const orientedGameRef = useRef<string | null>(null)
+  const dueGameId = activeGame?.$id
 
   const openTournamentGame = useCallback(async (gameId: string, updateUrl = true) => {
     setGameLoading(true)
-    const game = await loadTournamentGame(gameId)
-    if (game) {
-      setSelectedGame(game)
-      setSelectedGameId(gameId)
-      setBoardMoves(game.moves)
-      setBoardResult(game.result)
-      if (updateUrl) setSearchParams({ game: gameId })
-    } else {
-      clearOnlineTournamentPlayLock(gameId)
+    try {
+      if (dueGameId === gameId) {
+        await syncHostedTournamentGame(gameId).catch(() => null)
+      }
+      const game = await loadTournamentGame(gameId)
+      if (game) {
+        setSelectedGame(game)
+        setSelectedGameId(gameId)
+        setBoardMoves(game.moves)
+        setBoardResult(game.result)
+        if (updateUrl) setSearchParams({ game: gameId })
+      } else if (dueGameId !== gameId) {
+        clearOnlineTournamentPlayLock(gameId)
+      }
+    } finally {
+      setGameLoading(false)
     }
-    setGameLoading(false)
-  }, [setSearchParams])
+  }, [dueGameId, setSearchParams])
 
   useEffect(() => {
     let alive = true
@@ -107,19 +128,43 @@ function OnlineGamesPage() {
   useEffect(() => {
     if (!selectedGameId || (selectedGame?.status !== 'scheduled' && selectedGame?.status !== 'live')) return
 
-    const timer = window.setInterval(() => {
-      void openTournamentGame(selectedGameId, false)
-    }, 1200)
-    return () => window.clearInterval(timer)
+    let unsubscribe: (() => void) | undefined
+    let alive = true
+    const refresh = () => void openTournamentGame(selectedGameId, false)
+    const timer = window.setInterval(refresh, 5_000)
+    void subscribeToTournamentGameRow(selectedGameId, refresh)
+      .then((stop) => {
+        if (alive) unsubscribe = stop
+        else stop()
+      })
+      .catch(() => {
+        // The fallback refresh keeps the board current if Realtime is blocked.
+      })
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+      unsubscribe?.()
+    }
   }, [openTournamentGame, selectedGame?.status, selectedGameId])
 
   useEffect(() => {
-    if (!selectedGame?.live || !selectedGame.turnStartedAt) return
+    if (!selectedGame || (selectedGame.status !== 'scheduled' && selectedGame.status !== 'live')) return
     const timer = window.setInterval(() => setClockTick((value) => value + 1), 1000)
     return () => window.clearInterval(timer)
-  }, [selectedGame?.live, selectedGame?.turnStartedAt])
+  }, [selectedGame])
+
+  useEffect(() => {
+    if (!dueGameId || dueGameId !== selectedGameId) return
+    if (selectedGame?.status === 'completed' || selectedGame?.status === 'forfeit') {
+      void refreshActiveGame()
+    }
+  }, [dueGameId, refreshActiveGame, selectedGame?.status, selectedGameId])
 
   function startFreeBoard() {
+    if (activeGame) {
+      setMessage('Your tournament pairing is due now. Finish that game before opening a free board.')
+      return
+    }
     clearOnlineTournamentPlayLock()
     setSelectedGame(null)
     setSelectedGameId(null)
@@ -145,6 +190,7 @@ function OnlineGamesPage() {
       setMessage(error instanceof Error ? error.message : 'The game server rejected this move.')
     } finally {
       await openTournamentGame(selectedGameId, false)
+      await refreshActiveGame()
       setMovePending(false)
     }
   }
@@ -160,6 +206,7 @@ function OnlineGamesPage() {
       setMessage(error instanceof Error ? error.message : 'Could not resign this game.')
     } finally {
       await openTournamentGame(selectedGameId, false)
+      await refreshActiveGame()
       setMovePending(false)
     }
   }
@@ -178,9 +225,12 @@ function OnlineGamesPage() {
     ? 'black'
     : null
   const turnColor = boardMoves.length % 2 === 0 ? 'white' : 'black'
-  const assignedParticipant = Boolean(assignedColor && selectedGame && (selectedGame.status === 'scheduled' || selectedGame.status === 'live'))
+  const isParticipant = Boolean(assignedColor && selectedGame)
+  const assignedParticipant = Boolean(isParticipant && selectedGame && (selectedGame.status === 'scheduled' || selectedGame.status === 'live'))
   const canMove = Boolean(assignedParticipant && assignedColor === turnColor && !movePending)
-  const playingOnlineTournament = assignedParticipant
+  const playingOnlineTournament = Boolean(dueGameId && dueGameId === selectedGameId)
+
+  useFairPlayMonitor(selectedGameId, assignedParticipant)
 
   useEffect(() => {
     if (assignedParticipant && selectedGameId) setOnlineTournamentPlayLock(selectedGameId)
@@ -198,11 +248,15 @@ function OnlineGamesPage() {
 
   const playerFor = (side: 'white' | 'black') => ({
     captured: boardSummary.captured[side],
-    clock: hostedClockLabel(selectedGame, side, turnColor),
+    clock: hostedClockState(selectedGame, side, turnColor),
     name: side === 'white' ? selectedGame?.white ?? 'White' : selectedGame?.black ?? 'Black',
     rating: side === 'white' ? selectedGame?.wRating : selectedGame?.bRating,
     side,
   })
+  const firstMoveCountdown = selectedGame?.status === 'scheduled'
+    ? deadlineCountdown(selectedGame.firstMoveDeadlineAt)
+    : null
+  const opponentName = assignedColor === 'white' ? selectedGame?.black : selectedGame?.white
 
   return (
     <div className="club-screen online-games-screen" data-screen-label="Games">
@@ -212,13 +266,28 @@ function OnlineGamesPage() {
           <div>
             <span>Club play</span>
             <h1>Games</h1>
-            <p>Use the board freely or open a published tournament game and follow every live move.</p>
+            <p>Play an assigned tournament game or watch any published board move by move.</p>
           </div>
           <div className={watchingTournament ? 'online-status live' : 'online-status'}>
             <Radio size={15} aria-hidden="true" />
             {watchingTournament ? selectedGame?.round || 'Tournament game' : 'Free board'}
           </div>
         </header>
+
+        {playingOnlineTournament ? (
+          <div className="forced-game-banner" role="status">
+            <ShieldAlert size={19} aria-hidden="true" />
+            <div>
+              <strong>Your tournament pairing is ready</strong>
+              <span>
+                {activeTournament?.name || selectedGame?.tournamentName || 'Online tournament'} ·
+                {' '}analysis, review tools, and other pages stay locked until this game finishes.
+              </span>
+            </div>
+          </div>
+        ) : assignmentError && dueGameId ? (
+          <div className="forced-game-banner warning" role="status">{assignmentError}</div>
+        ) : null}
 
         <div className="online-games-layout">
           <section className="online-board-station" aria-label="Chess board">
@@ -231,11 +300,18 @@ function OnlineGamesPage() {
                 <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
                   <FlipHorizontal2 size={17} aria-hidden="true" />
                 </button>
-                {watchingTournament ? (
+                {watchingTournament && !playingOnlineTournament ? (
                   <button type="button" onClick={startFreeBoard}>Free board</button>
                 ) : null}
               </div>
             </div>
+
+            {firstMoveCountdown ? (
+              <div className={firstMoveCountdown.expired ? 'first-move-deadline expired' : 'first-move-deadline'}>
+                <span>White must make the first move</span>
+                <strong>{firstMoveCountdown.label}</strong>
+              </div>
+            ) : null}
 
             <PlayerStrip {...playerFor(topSide)} edge="top" />
             <JuChessBoard
@@ -257,11 +333,24 @@ function OnlineGamesPage() {
                 <Undo2 size={16} aria-hidden="true" />
                 Undo
               </button>
-              <span>{movePending ? 'Saving move...' : assignedParticipant ? canMove ? 'Your turn' : 'Opponent to move' : `${boardMoves.length} moves · ${boardResult}`}</span>
+              <span>
+                {movePending
+                  ? 'Saving move...'
+                  : assignedParticipant
+                    ? selectedGame?.status === 'scheduled' && assignedColor === 'black'
+                      ? 'Waiting for White to begin'
+                      : canMove ? 'Your turn' : 'Opponent to move'
+                    : `${boardMoves.length} moves · ${boardResult}`}
+              </span>
               {assignedParticipant ? (
                 <button type="button" disabled={movePending} onClick={() => void resignGame()}>Resign</button>
               ) : null}
-              <button type="button" disabled={watchingTournament && gameLoading} onClick={startFreeBoard}>
+              <button
+                type="button"
+                disabled={playingOnlineTournament || (watchingTournament && gameLoading)}
+                onClick={startFreeBoard}
+                title={playingOnlineTournament ? 'Finish your assigned tournament game first' : undefined}
+              >
                 <RotateCcw size={16} aria-hidden="true" />
                 New game
               </button>
@@ -328,6 +417,16 @@ function OnlineGamesPage() {
                 <div className="online-empty">No upcoming or active online tournaments right now.</div>
               )}
             </div>
+
+            {selectedGameId && isParticipant && profile?.$id && opponentName ? (
+              <GameChat
+                canSend={assignedParticipant}
+                currentProfileId={profile.$id}
+                gameId={selectedGameId}
+                opponentName={opponentName}
+                policy={selectedGame?.chatPolicy ?? 'full'}
+              />
+            ) : null}
           </aside>
         </div>
       </main>
@@ -351,7 +450,7 @@ function PlayerStrip({
   side,
 }: {
   captured: JuCapturedPiece[]
-  clock?: string
+  clock?: HostedClockState
   edge: 'bottom' | 'top'
   name: string
   rating?: number
@@ -364,20 +463,67 @@ function PlayerStrip({
         <strong>{name}</strong>
         <JuCapturedPieces pieces={captured} />
       </div>
-      <small>{clock ? `${clock} · ` : ''}{rating ?? 'Unrated'}</small>
+      <div className="online-player-meta">
+        {clock ? <time className={clock.tone}>{clock.label}</time> : null}
+        <small>{rating ?? 'Unrated'}</small>
+      </div>
     </div>
   )
 }
 
-function hostedClockLabel(game: SampleGame | null, side: 'white' | 'black', turn: 'white' | 'black') {
+type HostedClockState = {
+  label: string
+  tone: 'normal' | 'warning' | 'danger'
+}
+
+function hostedClockState(
+  game: SampleGame | null,
+  side: 'white' | 'black',
+  turn: 'white' | 'black',
+): HostedClockState | undefined {
   const stored = side === 'white' ? game?.whiteTimeMs : game?.blackTimeMs
-  if (stored === undefined) return undefined
+  const initialMs = parseTimeControlInitialMs(game?.tournamentTimeControl)
+  const base = stored ?? initialMs
+  if (base === undefined) return undefined
   const runningSince = game?.live && side === turn && game.turnStartedAt ? Date.parse(game.turnStartedAt) : Number.NaN
-  const remaining = Number.isFinite(runningSince) ? Math.max(0, stored - (Date.now() - runningSince)) : stored
+  const remaining = Number.isFinite(runningSince) ? Math.max(0, base - (Date.now() - runningSince)) : base
   const totalSeconds = Math.ceil(remaining / 1000)
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = String(totalSeconds % 60).padStart(2, '0')
-  return `${minutes}:${seconds}`
+  const thresholds = clockWarningThresholds(initialMs ?? base)
+  return {
+    label: `${minutes}:${seconds}`,
+    tone: remaining <= thresholds.dangerMs
+      ? 'danger'
+      : remaining <= thresholds.warningMs ? 'warning' : 'normal',
+  }
+}
+
+function parseTimeControlInitialMs(value?: string) {
+  if (!value) return undefined
+  const match = value.match(/(\d+(?:\.\d+)?)/)
+  if (!match) return undefined
+  const minutes = Number(match[1])
+  return Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes * 60_000) : undefined
+}
+
+function clockWarningThresholds(initialMs: number) {
+  if (initialMs <= 3 * 60_000) return { warningMs: 20_000, dangerMs: 10_000 }
+  if (initialMs <= 10 * 60_000) return { warningMs: 110_000, dangerMs: 30_000 }
+  return { warningMs: 2 * 60_000, dangerMs: 60_000 }
+}
+
+function deadlineCountdown(value?: string) {
+  if (!value) return null
+  const deadline = Date.parse(value)
+  if (!Number.isFinite(deadline)) return null
+  const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1_000))
+  return {
+    expired: seconds === 0,
+    label: seconds === 0
+      ? 'Confirming forfeit…'
+      : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
+  }
 }
 
 export default OnlineGamesPage

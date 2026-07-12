@@ -2,6 +2,8 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
 import { AuthProvider } from './context/AuthContext'
+import { TournamentPlayProvider } from './context/TournamentPlayContext'
+import { TournamentPlayGuard } from './components/TournamentPlayGuard'
 import { useOnlineTournamentPlayLock } from './lib/onlineTournamentPlayLock'
 
 const AuthPage = lazy(() => import('./screens/AuthPage'))
@@ -39,22 +41,26 @@ function ToolsRoute() {
 function App() {
   return (
     <AuthProvider>
-      <Suspense fallback={<RouteLoading />}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/home" replace />} />
-          <Route path="/home" element={<HomePage />} />
-          <Route path="/tournaments" element={<TournamentsPage />} />
-          <Route path="/tournament/:id" element={<TournamentDetailPage />} />
-          <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
-          <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/games" element={<OnlineGamesPage />} />
-          <Route path="/tools" element={<ToolsRoute />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
+      <TournamentPlayProvider>
+        <TournamentPlayGuard>
+          <Suspense fallback={<RouteLoading />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/home" replace />} />
+              <Route path="/home" element={<HomePage />} />
+              <Route path="/tournaments" element={<TournamentsPage />} />
+              <Route path="/tournament/:id" element={<TournamentDetailPage />} />
+              <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
+              <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/games" element={<OnlineGamesPage />} />
+              <Route path="/tools" element={<ToolsRoute />} />
+              <Route path="/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </TournamentPlayGuard>
+      </TournamentPlayProvider>
     </AuthProvider>
   )
 }

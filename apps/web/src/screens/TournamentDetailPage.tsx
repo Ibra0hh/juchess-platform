@@ -10,6 +10,7 @@ import {
   List,
   LoaderCircle,
   Play,
+  Search,
   ShieldCheck,
   Trophy,
   X,
@@ -17,10 +18,13 @@ import {
 import QRCode from 'qrcode'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
+import { TournamentMiniBoard } from '../components/TournamentMiniBoard'
 import { useAuth } from '../context/useAuth'
 import { ensureProfileForUser } from '../lib/auth'
 import {
   loadTournaments,
+  parseStoredMoves,
+  subscribeToTournamentGameChanges,
   type Member,
   type PublishedBracketMatch,
   type PublishedBracketRound,
@@ -54,15 +58,6 @@ type StandingRow = {
   losses: number
   tieBreak: number
   status: 'Registered' | 'Playing' | 'Finished' | 'Qualified' | 'Final'
-}
-
-type GameCard = {
-  id: string
-  board: number
-  round: string
-  white: Member
-  black: Member
-  result: 'LIVE' | '1-0' | '0-1' | '1/2-1/2' | '*'
 }
 
 type RoundPairing = {
@@ -109,7 +104,6 @@ type BracketConfig =
       brackets: Record<BracketView, BracketDefinition>
     }
 
-const boardPieces = ['♜', '♞', '', '♛', '', '♜', '♚', '', '♟', '♟', '', '', '♟', '♟', '♟', '', '', '', '♝', '', '', '♞', '', '', '', '', '', '♙', '♗', '', '', '', '', '', '♘', '', '♙', '', '', '', '', '', '', '', '', '♘', '♙', '', '♙', '♙', '♙', '', '', '♙', '♙', '♙', '♖', '', '♗', '♕', '', '♖', '♔', '']
 const bracketByeName = 'Bye'
 
 const bracketConfigs: Record<string, BracketConfig> = {
@@ -244,6 +238,32 @@ function TournamentDetailPage() {
     [id, tournaments],
   )
 
+  useEffect(() => {
+    if (tournament?.status !== 'Active' || !tournament.rowId) return
+    let alive = true
+    let unsubscribe: (() => void) | undefined
+    const refreshGames = async () => {
+      const result = await loadTournaments()
+      if (!alive) return
+      setTournaments(result.tournaments)
+      setCloudError(Boolean(result.error))
+    }
+    const timer = window.setInterval(() => void refreshGames(), 15_000)
+    void subscribeToTournamentGameChanges(tournament.rowId, () => void refreshGames())
+      .then((stop) => {
+        if (alive) unsubscribe = stop
+        else stop()
+      })
+      .catch(() => {
+        // The periodic refresh remains available when Realtime is blocked.
+      })
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+      unsubscribe?.()
+    }
+  }, [tournament?.rowId, tournament?.status])
+
   const detail = useMemo(() => (tournament ? buildDetail(tournament) : null), [tournament])
 
   if (loading) {
@@ -281,12 +301,14 @@ function TournamentDetailPage() {
     ? [
         { key: 'registration', label: 'Registration' },
         { key: 'players', label: 'Players' },
+        { key: 'games', label: 'Games' },
         { key: 'table', label: 'Bracket' },
       ]
     : [
         { key: 'registration', label: 'Registration' },
         { key: 'players', label: 'Players' },
         { key: 'rounds', label: 'Rounds' },
+        { key: 'games', label: 'Games' },
         { key: 'table', label: 'Standings' },
       ]
   if (tournament.status === 'Completed') tabs.push({ key: 'media', label: 'Photos' })
@@ -348,7 +370,7 @@ function TournamentDetailPage() {
         ) : null}
 
         {activeTab === 'games' ? (
-          <GamesTab games={detail.games} view={gameView} setView={setGameView} />
+          <GamesTab games={detail.games} tournament={tournament} view={gameView} setView={setGameView} />
         ) : null}
 
         {activeTab === 'table' ? (
@@ -905,19 +927,65 @@ function roundAdminStatus(round: RoundGroup, tournament: Tournament) {
 
 function GamesTab({
   games,
+  tournament,
   view,
   setView,
 }: {
-  games: GameCard[]
+  games: TournamentGame[]
+  tournament: Tournament
   view: GameView
   setView: (view: GameView) => void
 }) {
+  const [query, setQuery] = useState('')
+  const [roundFilter, setRoundFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'live' | 'finished' | 'scheduled'>('all')
+  const [, setClockTick] = useState(0)
+  const rounds = useMemo(
+    () => [...new Set(games.map((game) => game.round))].sort((left, right) => right - left),
+    [games],
+  )
+  const groupedGames = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    const visible = games.filter((game) => {
+      const matchesQuery = !normalizedQuery || [
+        game.white.name,
+        game.black.name,
+        String(game.board),
+        String(game.round),
+      ].some((value) => value.toLowerCase().includes(normalizedQuery))
+      const matchesRound = roundFilter === 'all' || game.round === Number(roundFilter)
+      const matchesStatus = statusFilter === 'all'
+        || (statusFilter === 'live' && game.status === 'live')
+        || (statusFilter === 'finished' && (game.status === 'completed' || game.status === 'forfeit'))
+        || (statusFilter === 'scheduled' && game.status === 'scheduled')
+      return matchesQuery && matchesRound && matchesStatus
+    })
+    const groups = new Map<number, TournamentGame[]>()
+    visible.forEach((game) => {
+      const roundGames = groups.get(game.round) ?? []
+      roundGames.push(game)
+      groups.set(game.round, roundGames)
+    })
+    return [...groups.entries()]
+      .sort(([left], [right]) => right - left)
+      .map(([round, roundGames]) => ({
+        round,
+        games: roundGames.sort((left, right) => left.board - right.board),
+      }))
+  }, [games, query, roundFilter, statusFilter])
+
+  useEffect(() => {
+    if (!games.some((game) => game.status === 'live')) return
+    const timer = window.setInterval(() => setClockTick((value) => value + 1), 1_000)
+    return () => window.clearInterval(timer)
+  }, [games])
+
   return (
     <section className="detail-tab-panel">
       <div className="games-toolbar">
         <div>
           <h2>Games</h2>
-          <p>Live boards and recent pairings from the current stage.</p>
+          <p>Watch every board live, then scroll through completed rounds and results.</p>
         </div>
         <div className="view-toggle" aria-label="Game view">
           <button type="button" className={view === 'grid' ? 'active' : undefined} onClick={() => setView('grid')}>
@@ -931,30 +999,129 @@ function GamesTab({
         </div>
       </div>
 
-      {games.length ? (
-        <div className={`game-card-wrap ${view}`}>
-          {games.map((game) => (
-            <Link to={`/games?game=${game.id}`} className="game-card" key={game.id}>
-              <BoardPreview />
-              <div className="game-card-body">
+      <div className="games-filter-bar">
+        <label className="games-search">
+          <Search size={16} aria-hidden="true" />
+          <span className="sr-only">Search games</span>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search player, board or round"
+          />
+        </label>
+        <select value={roundFilter} onChange={(event) => setRoundFilter(event.target.value)} aria-label="Filter by round">
+          <option value="all">All rounds</option>
+          {rounds.map((round) => <option value={round} key={round}>Round {round}</option>)}
+        </select>
+        <div className="game-status-filter" aria-label="Filter games by status">
+          {(['all', 'live', 'finished', 'scheduled'] as const).map((status) => (
+            <button
+              type="button"
+              className={statusFilter === status ? 'active' : undefined}
+              onClick={() => setStatusFilter(status)}
+              key={status}
+            >
+              {status === 'all' ? 'All' : status[0].toUpperCase() + status.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {groupedGames.length ? (
+        <div className="tournament-game-rounds">
+          {groupedGames.map((group) => (
+            <section className="tournament-game-round" key={group.round}>
+              <header>
                 <div>
-                  <span>Board {game.board}</span>
-                  <strong>{game.round}</strong>
+                  <h3>Round {group.round}</h3>
+                  <span>
+                    {group.round === tournament.currentRound && tournament.status === 'Active'
+                      ? 'Current round · updates live'
+                      : group.games.every((game) => game.status === 'completed' || game.status === 'forfeit')
+                        ? 'Completed'
+                        : 'Published pairings'}
+                  </span>
                 </div>
-                <div className="game-color-players">
-                  <p><span className="tournament-color-chip white">W</span>{game.white.name}</p>
-                  <p><span className="tournament-color-chip black">B</span>{game.black.name}</p>
-                </div>
-                <small>{game.result === 'LIVE' ? 'Watch the game ->' : game.result === '*' ? 'Scheduled' : `Result ${game.result}`}</small>
+                <strong>{group.games.length} {group.games.length === 1 ? 'game' : 'games'}</strong>
+              </header>
+              <div className={`game-card-wrap live-boards ${view}`}>
+                {group.games.map((game) => (
+                  <Link to={`/games?game=${game.id}`} className="game-card live-game-card" key={game.id}>
+                    <span className={`game-state-overlay ${game.status}`}>
+                      {gameStatusLabel(game)}
+                    </span>
+                    <TournamentMiniBoard game={game} />
+                    <div className="game-card-body">
+                      <div>
+                        <span>Board {game.board}</span>
+                        <strong>{game.status === 'live' ? 'Watch live' : `Round ${game.round}`}</strong>
+                      </div>
+                      <div className="game-color-players">
+                        <p>
+                          <span className="tournament-color-chip white">W</span>
+                          <span>{game.white.name}<small>{game.white.rating}</small></span>
+                          <time>{spectatorClockLabel(game, 'white', tournament.timeControl)}</time>
+                        </p>
+                        <p>
+                          <span className="tournament-color-chip black">B</span>
+                          <span>{game.black.name}<small>{game.black.rating}</small></span>
+                          <time>{spectatorClockLabel(game, 'black', tournament.timeControl)}</time>
+                        </p>
+                      </div>
+                      <small>{gameOutcomeLabel(game)}</small>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            </Link>
+            </section>
           ))}
         </div>
       ) : (
-        <UnpublishedPanel title="Games not published" body="Games will appear after the organizer publishes pairings." />
+        <UnpublishedPanel
+          title={games.length ? 'No games match these filters' : 'Games not published'}
+          body={games.length ? 'Change the search or filters to see more boards.' : 'Games will appear after the organizer publishes pairings.'}
+        />
       )}
     </section>
   )
+}
+
+function gameStatusLabel(game: TournamentGame) {
+  if (game.status === 'live') return 'Live'
+  if (game.status === 'scheduled') return 'Scheduled'
+  if (game.status === 'forfeit') return 'Forfeit'
+  return game.result
+}
+
+function gameOutcomeLabel(game: TournamentGame) {
+  if (game.status === 'live') return 'Open the board to watch every move'
+  if (game.status === 'scheduled') return game.scheduledStartAt
+    ? `Starts ${new Date(game.scheduledStartAt).toLocaleString()}`
+    : 'Waiting for the round to begin'
+  const reason = game.terminationReason
+    ? game.terminationReason === 'noShow' ? 'no-show'
+      : game.terminationReason.replace(/([A-Z])/g, ' $1').toLowerCase()
+    : ''
+  return `Result ${game.result}${reason ? ` · ${reason}` : ''}`
+}
+
+function spectatorClockLabel(game: TournamentGame, side: 'white' | 'black', timeControl: string) {
+  const stored = side === 'white' ? game.whiteTimeMs : game.blackTimeMs
+  const initialMinutes = Number(timeControl.match(/(\d+(?:\.\d+)?)/)?.[1])
+  const fallback = Number.isFinite(initialMinutes) && initialMinutes > 0
+    ? Math.round(initialMinutes * 60_000)
+    : undefined
+  const base = game.status === 'scheduled' && (!stored || stored <= 0) ? fallback : stored
+  if (base === undefined) return ''
+  const turn = parseStoredMoves(game.pgn).length % 2 === 0 ? 'white' : 'black'
+  const runningSince = game.status === 'live' && turn === side && game.turnStartedAt
+    ? Date.parse(game.turnStartedAt)
+    : Number.NaN
+  const remaining = Number.isFinite(runningSince)
+    ? Math.max(0, base - (Date.now() - runningSince))
+    : base
+  const totalSeconds = Math.ceil(remaining / 1_000)
+  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`
 }
 
 function TableTab({
@@ -2129,18 +2296,6 @@ function OverviewItem({ label, value, tone }: { label: string; value: string; to
   )
 }
 
-function BoardPreview() {
-  return (
-    <span className="board-preview" aria-hidden="true">
-      {boardPieces.map((piece, index) => (
-        <span className={(Math.floor(index / 8) + index) % 2 ? 'dark' : 'light'} key={`${piece}-${index}`}>
-          {piece}
-        </span>
-      ))}
-    </span>
-  )
-}
-
 function StatusBadge({ status }: { status: Tournament['status'] }) {
   if (status === 'Active') {
     return (
@@ -2208,23 +2363,12 @@ function buildDetail(tournament: Tournament) {
   }).sort((a, b) => b.points - a.points || b.wins - a.wins || a.seedOrder - b.seedOrder)
     .map(({ seedOrder: _seedOrder, ...row }, index) => ({ ...row, rank: index + 1 }))
 
-  const games = publishedGames.map(gameToCard)
+  const games = publishedGames
 
   return {
     standings,
     games,
     rounds: buildRoundGroups(tournament, publishedGames),
-  }
-}
-
-function gameToCard(game: TournamentGame): GameCard {
-  return {
-    id: game.id,
-    board: game.board,
-    round: `Round ${game.round}`,
-    white: game.white,
-    black: game.black,
-    result: game.status === 'live' ? 'LIVE' : game.result,
   }
 }
 

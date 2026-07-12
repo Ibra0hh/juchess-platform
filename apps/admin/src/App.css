@@ -1299,6 +1299,151 @@ button {
   font-weight: 800;
 }
 
+.fair-play-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.fair-play-notice,
+.fair-play-error {
+  margin: 16px 18px 0;
+  border: 1px solid #e2d3a9;
+  border-radius: 8px;
+  background: #fff8dc;
+  color: #674f16;
+  padding: 11px 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.fair-play-error {
+  border-color: #e6b9c0;
+  background: #fff0f2;
+  color: #84273a;
+}
+
+.fair-play-list {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 20px;
+}
+
+.fair-play-card {
+  overflow: hidden;
+  border: 1px solid #e2ddd3;
+  border-left: 4px solid #4f8c68;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.fair-play-card.medium {
+  border-left-color: #c48a26;
+}
+
+.fair-play-card.high {
+  border-left-color: #a52c40;
+}
+
+.fair-play-card > header,
+.fair-play-card > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+}
+
+.fair-play-card > header > div,
+.fair-play-card > footer {
+  min-width: 0;
+}
+
+.fair-play-card > header strong,
+.fair-play-card > header span,
+.fair-play-card > footer strong,
+.fair-play-card > footer span {
+  display: block;
+}
+
+.fair-play-card > header strong {
+  color: #111;
+  font-size: 13px;
+}
+
+.fair-play-card > header span,
+.fair-play-card > footer span {
+  margin-top: 2px;
+  color: #8b8577;
+  font-size: 10px;
+}
+
+.fair-play-card > header > b {
+  color: #2e7550;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 22px;
+}
+
+.fair-play-card.medium > header > b {
+  color: #9c6812;
+}
+
+.fair-play-card.high > header > b {
+  color: #9a2438;
+}
+
+.fair-play-card > header > b small {
+  font-size: 9px;
+}
+
+.fair-play-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid #eee9df;
+  border-bottom: 1px solid #eee9df;
+  background: #faf8f3;
+}
+
+.fair-play-signal-grid span {
+  padding: 10px 8px;
+  border-right: 1px solid #eee9df;
+  color: #726d63;
+  font-size: 9.5px;
+  text-align: center;
+}
+
+.fair-play-signal-grid span:last-child {
+  border-right: 0;
+}
+
+.fair-play-signal-grid b {
+  display: block;
+  margin-bottom: 2px;
+  color: #111;
+  font-size: 13px;
+}
+
+.fair-play-card > footer strong {
+  color: #333;
+  font-size: 10.5px;
+}
+
+@media (max-width: 640px) {
+  .fair-play-head,
+  .fair-play-card > header,
+  .fair-play-card > footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fair-play-signal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fair-play-signal-grid span {
+    border-bottom: 1px solid #eee9df;
+  }
+}
+
 .tournament-media-view {
   display: grid;
   gap: 18px;

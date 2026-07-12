@@ -593,6 +593,32 @@ export async function configureTournamentProcedure(rowId: string, physicalBoards
   })
 }
 
+export type FairPlayProfileSummary = {
+  profileId: string
+  events: number
+  hiddenCount: number
+  hiddenDurationMs: number
+  fullscreenExits: number
+  disconnects: number
+  analysisAttempts: number
+  lastEventAt?: string
+  riskScore: number
+  riskLevel: 'low' | 'medium' | 'high'
+}
+
+export type FairPlayReport = {
+  byProfile: FairPlayProfileSummary[]
+  events: Array<Record<string, unknown>>
+}
+
+export async function loadTournamentFairPlayReport(tournamentId: string) {
+  return await runAdminAction<FairPlayReport>({
+    method: ExecutionMethod.POST,
+    path: '/fair-play/report',
+    body: { tournamentId },
+  })
+}
+
 export async function startTournamentGame(gameId: string, physicalBoard: number) {
   const response = await runAdminAction<{ row: AppwriteGameRow }>({
     method: ExecutionMethod.POST,

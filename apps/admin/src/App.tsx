@@ -32,6 +32,7 @@ import {
   configureTournamentProcedure,
   loadClubPlayers,
   loadTournamentCheckIns,
+  loadTournamentFairPlayReport,
   loadTournamentRegistrations,
   loadBlockLists,
   loadAdminTournaments,
@@ -63,6 +64,7 @@ import {
   type AdminTournament,
   type BlockListLoadResult,
   type ClubPlayer,
+  type FairPlayProfileSummary,
   type IdentityBlock,
   type IdentityBlockType,
   type IpBlock,
@@ -2318,6 +2320,7 @@ function TournamentManageView({
         { key: 'rounds', label: 'Phase One' },
         { key: 'bracket', label: 'Phase Two' },
         ...(procedureAvailable ? [{ key: 'procedure', label: 'Procedure' }] : []),
+        ...(hostedOnline ? [{ key: 'fairPlay', label: 'Fair Play' }] : []),
         { key: 'standings', label: 'Standings' },
       ]
     : knockout
@@ -2325,11 +2328,13 @@ function TournamentManageView({
         { key: 'participants', label: 'Participants' },
         { key: playStage, label: capitalize(playStage) },
         ...(procedureAvailable ? [{ key: 'procedure', label: 'Procedure' }] : []),
+        ...(hostedOnline ? [{ key: 'fairPlay', label: 'Fair Play' }] : []),
       ]
     : [
         { key: 'participants', label: 'Participants' },
         { key: playStage, label: capitalize(playStage) },
         ...(procedureAvailable ? [{ key: 'procedure', label: 'Procedure' }] : []),
+        ...(hostedOnline ? [{ key: 'fairPlay', label: 'Fair Play' }] : []),
         { key: 'standings', label: 'Standings' },
       ]
   const [stage, setStage] = useState(playStage)
@@ -2816,6 +2821,13 @@ function TournamentManageView({
             </div>
           </div>
         ) : null}
+        {stage === 'fairPlay' && tournament.rowId ? (
+          <TournamentFairPlayPanel
+            active={tournament.status === 'active'}
+            players={tournamentPlayers}
+            tournamentId={tournament.rowId}
+          />
+        ) : null}
         {stage === 'standings' ? (
           <>
             <div className="manage-panel-head">
@@ -2853,6 +2865,103 @@ function TournamentManageView({
       </section>
     </div>
   )
+}
+
+function TournamentFairPlayPanel({
+  active,
+  players,
+  tournamentId,
+}: {
+  active: boolean
+  players: Player[]
+  tournamentId: string
+}) {
+  const [summaries, setSummaries] = useState<FairPlayProfileSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const playerNames = useMemo(
+    () => new Map(players.map((player) => [player.id, player.name])),
+    [players],
+  )
+  const refresh = useCallback(async () => {
+    try {
+      const report = await loadTournamentFairPlayReport(tournamentId)
+      setSummaries(report.byProfile)
+      setError('')
+    } catch (caught) {
+      setError(formatAdminError(caught))
+    } finally {
+      setLoading(false)
+    }
+  }, [tournamentId])
+
+  useEffect(() => {
+    setLoading(true)
+    void refresh()
+    if (!active) return
+    const timer = window.setInterval(() => void refresh(), 5_000)
+    return () => window.clearInterval(timer)
+  }, [active, refresh])
+
+  return (
+    <div className="fair-play-panel">
+      <div className="manage-panel-head fair-play-head">
+        <div>
+          <strong>Fair-play review</strong>
+          <span>Live browser-focus and connection signals from tournament players</span>
+        </div>
+        <button type="button" className="mini-button ghost" disabled={loading} onClick={() => void refresh()}>
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
+      <div className="fair-play-notice">
+        These signals help an organizer decide what to review. They are not proof of cheating and must never cause an automatic ban or disqualification by themselves.
+      </div>
+      {error ? <div className="fair-play-error" role="alert">{error}</div> : null}
+      {!loading && !summaries.length ? (
+        <EmptyState title="No fair-play signals yet" body="Signals appear after assigned players open a live JuChess tournament board." />
+      ) : (
+        <div className="fair-play-list">
+          {summaries.map((summary) => (
+            <article className={`fair-play-card ${summary.riskLevel}`} key={summary.profileId}>
+              <header>
+                <div>
+                  <strong>{playerNames.get(summary.profileId) || summary.profileId}</strong>
+                  <span>{summary.events} events · last {formatFairPlayTimestamp(summary.lastEventAt)}</span>
+                </div>
+                <b>{summary.riskScore}<small>/100</small></b>
+              </header>
+              <div className="fair-play-signal-grid">
+                <span><b>{summary.hiddenCount}</b> tab exits</span>
+                <span><b>{formatFairPlayDuration(summary.hiddenDurationMs)}</b> away</span>
+                <span><b>{summary.disconnects}</b> disconnects</span>
+                <span><b>{summary.fullscreenExits}</b> fullscreen exits</span>
+                <span><b>{summary.analysisAttempts}</b> tool attempts</span>
+              </div>
+              <footer>
+                <strong>{summary.riskLevel === 'high' ? 'Manual review recommended' : summary.riskLevel === 'medium' ? 'Watch and review context' : 'No strong browser signal'}</strong>
+                <span>{summary.riskLevel} telemetry risk</span>
+              </footer>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function formatFairPlayDuration(durationMs: number) {
+  const seconds = Math.round(durationMs / 1_000)
+  if (seconds < 60) return `${seconds}s`
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+}
+
+function formatFairPlayTimestamp(value?: string) {
+  if (!value) return 'never'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? 'unknown'
+    : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 function ProcedurePlanner({

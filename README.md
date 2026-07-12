@@ -128,6 +128,7 @@ Appwrite project:
 ```powershell
 npm run migrate:procedure
 npm run migrate:profile-usernames
+npm run migrate:tournament-live
 ```
 
 The migration uses the current Appwrite CLI login, or `APPWRITE_API_KEY` when
@@ -148,6 +149,9 @@ appwrite functions create-deployment \
 
 - Web sign-in, sign-up, password recovery, tournament reads, and profile
   session state are wired to Appwrite with prototype fallback data.
+- JuChess-hosted online tournaments use server-authoritative clocks, first-move
+  no-show deadlines, timeout forfeits, forced assigned-game routing, private
+  per-game chat, live spectator boards, and organizer fair-play telemetry.
 - Admin sign-in now uses separate admin-only teams and `admin_profiles`, not the
   player `profiles.role` field. Super admins can create/suspend admin access
   from the admin panel.

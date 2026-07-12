@@ -519,10 +519,119 @@
   font-size: 13px;
 }
 
+.games-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+  padding: 12px;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 252, 244, 0.82);
+}
+
+.games-search {
+  display: flex;
+  align-items: center;
+  flex: 1 1 260px;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: 7px;
+  background: #fff;
+  color: rgba(17, 17, 17, 0.54);
+  padding: 0 11px;
+}
+
+.games-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.games-filter-bar select {
+  min-height: 38px;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: 7px;
+  background: #fff;
+  color: #111;
+  padding: 0 30px 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.game-status-filter {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgba(17, 17, 17, 0.07);
+}
+
+.game-status-filter button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(17, 17, 17, 0.64);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.game-status-filter button.active {
+  background: #7a2431;
+  color: #fff;
+  box-shadow: 0 3px 9px rgba(122, 36, 49, 0.2);
+}
+
+.tournament-game-rounds {
+  display: grid;
+  gap: 26px;
+}
+
+.tournament-game-round {
+  content-visibility: auto;
+  contain-intrinsic-size: 480px;
+}
+
+.tournament-game-round > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.12);
+  padding-bottom: 10px;
+}
+
+.tournament-game-round > header h3 {
+  margin: 0;
+  color: #111;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 23px;
+}
+
+.tournament-game-round > header span,
+.tournament-game-round > header > strong {
+  color: rgba(17, 17, 17, 0.58);
+  font-size: 11px;
+}
+
 .game-card-wrap {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 14px;
+}
+
+.game-card-wrap.live-boards {
+  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
 }
 
 .game-card-wrap.list {
@@ -542,9 +651,91 @@
   padding: 14px;
 }
 
+.live-game-card {
+  position: relative;
+  overflow: hidden;
+  gap: 0;
+  padding: 0;
+  contain: layout paint;
+}
+
+.game-state-overlay {
+  position: absolute;
+  z-index: 2;
+  top: 9px;
+  left: 9px;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.82);
+  color: #fff;
+  padding: 5px 8px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+}
+
+.game-state-overlay.live {
+  background: #a7283c;
+  box-shadow: 0 0 0 3px rgba(167, 40, 60, 0.15);
+}
+
+.game-state-overlay.completed {
+  background: rgba(24, 94, 62, 0.88);
+}
+
+.game-state-overlay.forfeit {
+  background: rgba(144, 83, 20, 0.9);
+}
+
+.tournament-mini-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #ead9b8;
+}
+
+.tournament-mini-board > span {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  aspect-ratio: 1;
+}
+
+.tournament-mini-board .light {
+  background: #eadcc0;
+}
+
+.tournament-mini-board .dark {
+  background: #8e4350;
+}
+
+.tournament-mini-board .last-move {
+  box-shadow: inset 0 0 0 999px rgba(217, 179, 61, 0.48);
+}
+
+.tournament-mini-board img {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1px rgba(17, 17, 17, 0.18));
+}
+
 .game-card-wrap.list .game-card {
   flex-direction: row;
   align-items: center;
+}
+
+.game-card-wrap.list .live-game-card {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+}
+
+.game-card-wrap.list .tournament-mini-board {
+  width: 160px;
 }
 
 .game-card:hover {
@@ -625,6 +816,10 @@
 
 .tournament-media-panel .panel-heading > div {
   min-width: 0;
+}
+
+.live-game-card .game-card-body {
+  padding: 12px 13px 13px;
 }
 
 .tournament-media-panel .panel-heading p {
@@ -881,6 +1076,46 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.live-game-card .game-color-players p {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+}
+
+.live-game-card .game-color-players p > span:nth-child(2) {
+  display: grid;
+  color: #111;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.15;
+  text-transform: none;
+}
+
+.live-game-card .game-color-players p > span:nth-child(2) small {
+  margin-top: 2px;
+  color: rgba(17, 17, 17, 0.48);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+}
+
+.live-game-card .game-color-players time {
+  color: #111;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 .tournament-color-chip {
@@ -1684,6 +1919,35 @@
 
   .game-card-wrap.list .game-card {
     align-items: flex-start;
+  }
+
+  .games-filter-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .games-search {
+    flex-basis: auto;
+  }
+
+  .game-status-filter {
+    overflow-x: auto;
+  }
+
+  .game-status-filter button {
+    flex: 1 0 auto;
+  }
+
+  .game-card-wrap.live-boards {
+    grid-template-columns: 1fr;
+  }
+
+  .game-card-wrap.list .live-game-card {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .game-card-wrap.list .tournament-mini-board {
+    width: 112px;
   }
 
   .bracket-track {

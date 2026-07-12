@@ -1,4 +1,4 @@
-import { Account, Client, Functions, Storage, TablesDB } from 'appwrite'
+import { Account, Client, Functions, Realtime, Storage, TablesDB } from 'appwrite'
 
 // Appwrite endpoint, project, and database IDs are public client configuration,
 // not secrets. Keep production-safe defaults so static GitHub Pages builds do
@@ -32,3 +32,4 @@ export const account = new Account(client)
 export const tablesDB = new TablesDB(client)
 export const storage = new Storage(client)
 export const functions = new Functions(client)
+export const realtime = new Realtime(client)

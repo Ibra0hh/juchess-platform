@@ -60,6 +60,42 @@
   color: #7a2431;
 }
 
+.forced-game-banner {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: -4px 0 18px;
+  border: 1px solid rgba(122, 36, 49, 0.34);
+  border-radius: 8px;
+  background: #fff1ee;
+  color: #7a2431;
+  padding: 11px 13px;
+}
+
+.forced-game-banner > svg {
+  flex: none;
+}
+
+.forced-game-banner > div {
+  display: grid;
+  gap: 2px;
+}
+
+.forced-game-banner strong {
+  font-size: 12.5px;
+}
+
+.forced-game-banner span {
+  color: rgba(86, 24, 34, 0.76);
+  font-size: 11.5px;
+}
+
+.forced-game-banner.warning {
+  border-color: rgba(154, 93, 24, 0.35);
+  background: #fff6dc;
+  color: #6d4518;
+}
+
 .online-games-layout {
   display: grid;
   grid-template-columns: minmax(420px, 620px) minmax(320px, 1fr);
@@ -91,6 +127,31 @@
 
 .online-board-head {
   margin-bottom: 14px;
+}
+
+.first-move-deadline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(100%, 580px);
+  margin: 0 auto 8px;
+  border: 1px solid rgba(161, 91, 27, 0.28);
+  border-radius: 7px;
+  background: #fff6dc;
+  color: #6d4518;
+  padding: 8px 10px;
+  font-size: 11px;
+}
+
+.first-move-deadline strong {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+}
+
+.first-move-deadline.expired {
+  border-color: rgba(167, 40, 60, 0.3);
+  background: #fff0f0;
+  color: #8e1f31;
 }
 
 .online-board-head > div {
@@ -207,6 +268,35 @@
   color: rgba(17, 17, 17, 0.58);
   font-family: "IBM Plex Mono", monospace;
   font-size: 11px;
+}
+
+.online-player-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.online-player-meta time {
+  min-width: 54px;
+  border-radius: 5px;
+  background: rgba(17, 17, 17, 0.08);
+  color: #111;
+  padding: 5px 7px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.online-player-meta time.warning {
+  background: #f1d896;
+  color: #5c3c00;
+}
+
+.online-player-meta time.danger {
+  animation: clock-danger-pulse 1s ease-in-out infinite;
+  background: #a7283c;
+  color: #fff;
 }
 
 .online-ju-board {
@@ -412,6 +502,173 @@
   text-align: center;
 }
 
+.game-chat {
+  margin: 14px 16px 0;
+  overflow: hidden;
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.game-chat > header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.1);
+  padding: 11px 12px;
+}
+
+.game-chat > header > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: #f4e8df;
+  color: #7a2431;
+}
+
+.game-chat h2 {
+  margin: 0;
+  color: #111;
+  font-size: 13px;
+}
+
+.game-chat header p {
+  margin: 2px 0 0;
+  color: rgba(17, 17, 17, 0.56);
+  font-size: 10px;
+}
+
+.game-chat-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 90px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 11px;
+  background: #f9f5ed;
+}
+
+.game-chat-thread article {
+  align-self: flex-start;
+  max-width: 84%;
+}
+
+.game-chat-thread article.mine {
+  align-self: flex-end;
+  text-align: right;
+}
+
+.game-chat-thread article > span,
+.game-chat-thread time {
+  color: rgba(17, 17, 17, 0.48);
+  font-size: 8.5px;
+}
+
+.game-chat-thread article p {
+  margin: 2px 0;
+  border-radius: 7px 7px 7px 2px;
+  background: #fff;
+  color: #111;
+  padding: 7px 9px;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+  word-break: break-word;
+}
+
+.game-chat-thread article.mine p {
+  border-radius: 7px 7px 2px;
+  background: #7a2431;
+  color: #fff;
+}
+
+.game-chat-empty {
+  margin: auto;
+  color: rgba(17, 17, 17, 0.5);
+  font-size: 10.5px;
+  text-align: center;
+}
+
+.game-chat-presets {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
+  padding: 8px;
+}
+
+.game-chat-presets button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(122, 36, 49, 0.22);
+  border-radius: 999px;
+  background: #fff8f3;
+  color: #7a2431;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.game-chat form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 7px;
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
+  padding: 8px;
+}
+
+.game-chat form input {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 6px;
+  outline: 0;
+  padding: 0 9px;
+  font: inherit;
+  font-size: 10.5px;
+}
+
+.game-chat form input:focus {
+  border-color: #7a2431;
+}
+
+.game-chat form button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: #111;
+  color: #fff;
+}
+
+.game-chat form button:disabled,
+.game-chat-presets button:disabled {
+  opacity: 0.42;
+}
+
+.game-chat-closed,
+.game-chat-error {
+  margin: 0;
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
+  color: rgba(17, 17, 17, 0.56);
+  padding: 8px 10px;
+  font-size: 9.5px;
+  text-align: center;
+}
+
+.game-chat-error {
+  color: #8e1f31;
+}
+
+@keyframes clock-danger-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(167, 40, 60, 0.14);
+  }
+}
+
 @media (max-width: 960px) {
   .online-games-layout {
     grid-template-columns: 1fr;
@@ -449,5 +706,25 @@
 
   .online-board-controls button {
     flex: 1;
+  }
+
+  .online-player-meta {
+    gap: 5px;
+  }
+
+  .online-player-meta time {
+    min-width: 48px;
+    padding-inline: 5px;
+    font-size: 12px;
+  }
+
+  .online-player-meta small {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .online-player-meta time.danger {
+    animation: none;
   }
 }
