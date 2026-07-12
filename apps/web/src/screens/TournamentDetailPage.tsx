@@ -2370,6 +2370,7 @@ function StatusBadge({ status }: { status: Tournament['status'] }) {
 function buildDetail(tournament: Tournament) {
   const selectedMembers = tournament.registeredPlayers ?? []
   const publishedGames = tournament.publishedGames ?? []
+  const savedStandings = new Map((tournament.standings ?? []).map((row) => [row.profileId, row]))
   const stats = new Map<string, { points: number; wins: number; draws: number; losses: number; playing: boolean }>()
 
   selectedMembers.forEach((member) => {
@@ -2406,20 +2407,25 @@ function buildDetail(tournament: Tournament) {
 
   const standings = selectedMembers.map((member, index) => {
     const row = stats.get(member.id) ?? { points: 0, wins: 0, draws: 0, losses: 0, playing: false }
+    const saved = savedStandings.get(member.id)
 
     return {
       member,
-      rank: index + 1,
-      points: row.points,
-      wins: row.wins,
-      draws: row.draws,
-      losses: row.losses,
-      tieBreak: 0,
-      status: row.playing ? 'Playing' : row.wins || row.draws || row.losses ? 'Finished' : 'Registered',
+      rank: saved?.rank ?? index + 1,
+      points: saved?.points ?? row.points,
+      wins: saved?.wins ?? row.wins,
+      draws: saved?.draws ?? row.draws,
+      losses: saved?.losses ?? row.losses,
+      tieBreak: saved?.tieBreak ?? 0,
+      status: row.playing ? 'Playing' : (saved?.played ?? row.wins + row.draws + row.losses) > 0 ? 'Finished' : 'Registered',
+      authoritative: Boolean(saved),
       seedOrder: index,
-    } satisfies StandingRow & { seedOrder: number }
-  }).sort((a, b) => b.points - a.points || b.wins - a.wins || a.seedOrder - b.seedOrder)
-    .map(({ seedOrder: _seedOrder, ...row }, index) => ({ ...row, rank: index + 1 }))
+    } satisfies StandingRow & { authoritative: boolean; seedOrder: number }
+  }).sort((a, b) => (
+    a.authoritative && b.authoritative
+      ? a.rank - b.rank
+      : b.points - a.points || b.tieBreak - a.tieBreak || b.wins - a.wins || a.seedOrder - b.seedOrder
+  )).map(({ authoritative: _authoritative, seedOrder: _seedOrder, ...row }, index) => ({ ...row, rank: index + 1 }))
 
   const games = publishedGames
 

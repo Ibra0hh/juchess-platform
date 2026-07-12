@@ -31,8 +31,20 @@ export type Tournament = {
   desc: string
   registeredPlayers?: Member[]
   publishedGames?: TournamentGame[]
+  standings?: TournamentStanding[]
   bracketSnapshot?: PublishedBracketSnapshot
   media?: TournamentMedia[]
+}
+
+export type TournamentStanding = {
+  profileId: string
+  rank: number
+  points: number
+  tieBreak: number
+  played: number
+  wins: number
+  draws: number
+  losses: number
 }
 
 export type TournamentMedia = {
@@ -103,6 +115,18 @@ type AppwriteGameRow = Models.Row & {
   forfeitedProfileId?: string
   startedAt?: string
   finishedAt?: string
+}
+
+type AppwriteStandingRow = Models.Row & {
+  tournamentId?: string
+  profileId?: string
+  rank?: number
+  points?: number
+  tieBreak?: number
+  played?: number
+  wins?: number
+  draws?: number
+  losses?: number
 }
 
 type AppwriteAnnouncementRow = Models.Row & {
@@ -881,26 +905,38 @@ async function loadTournamentRows(includeDetails: boolean): Promise<TournamentLo
     const gameRows = includeDetails
       ? safeListRows<AppwriteGameRow>(tableIds.games, [Query.limit(1000)], 'games')
       : Promise.resolve<AppwriteGameRow[]>([])
+    const standingRows = includeDetails
+      ? safeListRows<AppwriteStandingRow>(tableIds.standings, [Query.limit(1000)], 'standings')
+      : Promise.resolve<AppwriteStandingRow[]>([])
     const mediaFiles = includeDetails
       ? safeListTournamentMedia()
       : Promise.resolve<Models.File[]>([])
 
-    const [response, registrations, profilesResponse, gamesResponse, mediaResponse] = await Promise.all([
+    const [response, registrations, profilesResponse, gamesResponse, standingsResponse, mediaResponse] = await Promise.all([
       tournamentRows,
       registrationRows,
       profileRows,
       gameRows,
+      standingRows,
       mediaFiles,
     ])
 
     const profiles = mapProfiles(profilesResponse)
     const playersByTournament = groupRegisteredPlayers(registrations, profiles)
     const gamesByTournament = groupPublishedGames(gamesResponse, profiles)
+    const standingsByTournament = groupTournamentStandings(standingsResponse)
     const participantCounts = groupRegistrationCounts(registrations)
     const mediaByTournament = groupTournamentMedia(mediaResponse)
 
     const rows = uniqueTournamentsByFormat(response.rows
-      .map((row) => mapAppwriteTournament(row, participantCounts, playersByTournament, gamesByTournament, mediaByTournament))
+      .map((row) => mapAppwriteTournament(
+        row,
+        participantCounts,
+        playersByTournament,
+        gamesByTournament,
+        standingsByTournament,
+        mediaByTournament,
+      ))
       .filter((tournament): tournament is Tournament => Boolean(tournament)))
       .sort(compareTournaments)
 
@@ -1127,11 +1163,40 @@ function groupPublishedGames(rows: AppwriteGameRow[], profiles: Map<string, Memb
   ]))
 }
 
+function groupTournamentStandings(rows: AppwriteStandingRow[]) {
+  const groups = new Map<string, TournamentStanding[]>()
+
+  rows.forEach((row) => {
+    if (!row.tournamentId || !row.profileId || !Number.isFinite(row.points)) return
+    const list = groups.get(row.tournamentId) ?? []
+    list.push({
+      profileId: row.profileId,
+      rank: Number.isFinite(row.rank) ? Math.max(1, Number(row.rank)) : list.length + 1,
+      points: Number(row.points),
+      tieBreak: Number(row.tieBreak) || 0,
+      played: Math.max(0, Number(row.played) || 0),
+      wins: Math.max(0, Number(row.wins) || 0),
+      draws: Math.max(0, Number(row.draws) || 0),
+      losses: Math.max(0, Number(row.losses) || 0),
+    })
+    groups.set(row.tournamentId, list)
+  })
+
+  groups.forEach((standings) => standings.sort((a, b) => (
+    a.rank - b.rank
+    || b.points - a.points
+    || b.tieBreak - a.tieBreak
+    || a.profileId.localeCompare(b.profileId)
+  )))
+  return groups
+}
+
 function mapAppwriteTournament(
   row: AppwriteTournamentRow,
   participantCounts: Map<string, number>,
   playersByTournament: Map<string, Member[]>,
   gamesByTournament: Map<string, TournamentGame[]>,
+  standingsByTournament: Map<string, TournamentStanding[]>,
   mediaByTournament: Map<string, TournamentMedia[]>,
 ): Tournament | null {
   if (!row.format || !row.timeControl) return null
@@ -1168,6 +1233,7 @@ function mapAppwriteTournament(
     desc: row.description || 'Club tournament details will be published by the organizers.',
     registeredPlayers: playersByTournament.get(row.$id) ?? [],
     publishedGames: gamesByTournament.get(row.$id) ?? [],
+    standings: standingsByTournament.get(row.$id) ?? [],
     bracketSnapshot: parsePublishedBracketSnapshot(row.bracketSnapshot),
     media: mediaByTournament.get(row.$id) ?? [],
   }
