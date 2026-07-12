@@ -12,7 +12,6 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import 'game_review_core.dart';
@@ -4126,22 +4125,66 @@ class _TournamentMediaGallery extends StatelessWidget {
   }
 }
 
-class _TournamentMediaCard extends StatelessWidget {
+Future<bool> _saveTournamentMediaToDevice(
+  BuildContext context,
+  TournamentMediaSeed item,
+) async {
+  try {
+    final response = await http
+        .get(item.downloadUri)
+        .timeout(const Duration(seconds: 90));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Download returned ${response.statusCode}');
+    }
+
+    final savedPath = await FilePicker.saveFile(
+      dialogTitle: 'Save ${item.name}',
+      fileName: _safeMobileDownloadName(item.name),
+      bytes: response.bodyBytes,
+    );
+    if (savedPath == null) return false;
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${item.name} saved on your device.')),
+      );
+    }
+    return true;
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Download failed. Please try again.')),
+      );
+    }
+    return false;
+  }
+}
+
+String _safeMobileDownloadName(String value) {
+  final sanitized = value
+      .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), '_')
+      .trim();
+  return sanitized.isEmpty ? 'juchess-media' : sanitized;
+}
+
+class _TournamentMediaCard extends StatefulWidget {
   const _TournamentMediaCard({required this.item, required this.onView});
 
   final TournamentMediaSeed item;
   final VoidCallback onView;
 
+  @override
+  State<_TournamentMediaCard> createState() => _TournamentMediaCardState();
+}
+
+class _TournamentMediaCardState extends State<_TournamentMediaCard> {
+  bool downloading = false;
+
   Future<void> _download(BuildContext context) async {
-    final opened = await launchUrl(
-      item.downloadUri,
-      mode: LaunchMode.externalApplication,
-    );
-    if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open this download.')),
-      );
-    }
+    if (downloading) return;
+    setState(() => downloading = true);
+    await _saveTournamentMediaToDevice(context, widget.item);
+    if (mounted) setState(() => downloading = false);
   }
 
   @override
@@ -4161,14 +4204,14 @@ class _TournamentMediaCard extends StatelessWidget {
             child: Material(
               color: PrototypeColors.black,
               child: InkWell(
-                onTap: onView,
+                onTap: widget.onView,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    item.isVideo
-                        ? _TournamentVideo(uri: item.viewUri)
+                    widget.item.isVideo
+                        ? _TournamentVideo(uri: widget.item.viewUri)
                         : Image.network(
-                            item.viewUri.toString(),
+                            widget.item.viewUri.toString(),
                             fit: BoxFit.contain,
                             errorBuilder: (_, _, _) => const Icon(
                               Icons.broken_image_outlined,
@@ -4187,7 +4230,9 @@ class _TournamentMediaCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Icon(
-                          item.isVideo ? Icons.play_arrow : Icons.fullscreen,
+                          widget.item.isVideo
+                              ? Icons.play_arrow
+                              : Icons.fullscreen,
                           color: Colors.white,
                         ),
                       ),
@@ -4202,7 +4247,9 @@ class _TournamentMediaCard extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  item.isVideo ? Icons.videocam_outlined : Icons.image_outlined,
+                  widget.item.isVideo
+                      ? Icons.videocam_outlined
+                      : Icons.image_outlined,
                   size: 18,
                   color: PrototypeColors.burgundy,
                 ),
@@ -4212,7 +4259,7 @@ class _TournamentMediaCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item.name,
+                        widget.item.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -4222,15 +4269,15 @@ class _TournamentMediaCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        _formatMediaSize(item.size),
+                        _formatMediaSize(widget.item.size),
                         style: const TextStyle(
                           color: Color(0x99111111),
                           fontSize: 10.5,
                         ),
                       ),
-                      if (item.tags.isNotEmpty)
+                      if (widget.item.tags.isNotEmpty)
                         Text(
-                          item.tags.map((tag) => '#$tag').join(' '),
+                          widget.item.tags.map((tag) => '#$tag').join(' '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -4242,9 +4289,15 @@ class _TournamentMediaCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Download ${item.name}',
-                  onPressed: () => _download(context),
-                  icon: const Icon(Icons.download_outlined),
+                  tooltip: 'Download ${widget.item.name}',
+                  onPressed: downloading ? null : () => _download(context),
+                  icon: downloading
+                      ? const SizedBox(
+                          width: 19,
+                          height: 19,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.download_outlined),
                   color: PrototypeColors.burgundy,
                 ),
               ],
@@ -4272,6 +4325,7 @@ class _TournamentMediaViewer extends StatefulWidget {
 class _TournamentMediaViewerState extends State<_TournamentMediaViewer> {
   late final PageController controller;
   late int currentIndex;
+  bool downloading = false;
 
   @override
   void initState() {
@@ -4287,16 +4341,10 @@ class _TournamentMediaViewerState extends State<_TournamentMediaViewer> {
   }
 
   Future<void> _download() async {
-    final item = widget.items[currentIndex];
-    final opened = await launchUrl(
-      item.downloadUri,
-      mode: LaunchMode.externalApplication,
-    );
-    if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open this download.')),
-      );
-    }
+    if (downloading) return;
+    setState(() => downloading = true);
+    await _saveTournamentMediaToDevice(context, widget.items[currentIndex]);
+    if (mounted) setState(() => downloading = false);
   }
 
   @override
@@ -4326,8 +4374,17 @@ class _TournamentMediaViewerState extends State<_TournamentMediaViewer> {
         actions: [
           IconButton(
             tooltip: 'Download ${item.name}',
-            onPressed: _download,
-            icon: const Icon(Icons.download_outlined),
+            onPressed: downloading ? null : _download,
+            icon: downloading
+                ? const SizedBox(
+                    width: 19,
+                    height: 19,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.download_outlined),
           ),
         ],
       ),

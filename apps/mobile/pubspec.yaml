@@ -40,7 +40,6 @@ dependencies:
   chess: ^0.8.1
   qr_flutter: ^4.1.0
   video_player: 2.11.1
-  url_launcher: 6.3.2
   stockfish: 1.8.1
   http: ^1.6.0
   file_picker: ^11.0.2
