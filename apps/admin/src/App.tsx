@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Trash2, Upload, Video, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
 import {
   JuCapturedPieces,
@@ -46,6 +46,7 @@ import {
   unblockIp,
   updateAdminStatus,
   updateRegistrationStatus,
+  updateTournamentMediaTags,
   updateTournament,
   updateTournamentGamePgn,
   unpublishTournamentPairings,
@@ -1967,12 +1968,38 @@ function TournamentMediaManager({
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [deletingId, setDeletingId] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [typeFilter, setTypeFilter] = useState<'all' | 'photos' | 'videos'>('all')
+  const [tagFilter, setTagFilter] = useState('all')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name-asc' | 'name-desc'>('newest')
   const rowId = tournament.rowId ?? ''
+
+  const allTags = useMemo(
+    () => Array.from(new Set(items.flatMap((item) => item.tags))).sort((a, b) => a.localeCompare(b)),
+    [items],
+  )
+  const visibleItems = useMemo(() => {
+    const filtered = items.filter((item) => {
+      const video = item.mimeType.startsWith('video/')
+      if (typeFilter === 'photos' && video) return false
+      if (typeFilter === 'videos' && !video) return false
+      return tagFilter === 'all' || item.tags.includes(tagFilter)
+    })
+    return [...filtered].sort((left, right) => {
+      if (sortOrder === 'oldest') return left.createdAt.localeCompare(right.createdAt)
+      if (sortOrder === 'name-asc') return left.name.localeCompare(right.name)
+      if (sortOrder === 'name-desc') return right.name.localeCompare(left.name)
+      return right.createdAt.localeCompare(left.createdAt)
+    })
+  }, [items, sortOrder, tagFilter, typeFilter])
+  const allVisibleSelected = visibleItems.length > 0 && visibleItems.every((item) => selectedIds.has(item.id))
 
   const refreshMedia = useCallback(async () => {
     setLoading(true)
     try {
-      setItems(await listTournamentMedia(rowId))
+      const nextItems = await listTournamentMedia(rowId)
+      setItems(nextItems)
+      setSelectedIds((current) => new Set([...current].filter((id) => nextItems.some((item) => item.id === id))))
     } catch (error) {
       onMessage(formatAdminError(error))
     } finally {
@@ -2018,7 +2045,69 @@ function TournamentMediaManager({
     try {
       await deleteTournamentMedia(item.id)
       setItems((current) => current.filter((media) => media.id !== item.id))
+      setSelectedIds((current) => {
+        const next = new Set(current)
+        next.delete(item.id)
+        return next
+      })
       onMessage(`${item.name} deleted.`)
+    } catch (error) {
+      onMessage(formatAdminError(error))
+    } finally {
+      setDeletingId('')
+    }
+  }
+
+  function toggleSelection(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectVisible() {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (allVisibleSelected) visibleItems.forEach((item) => next.delete(item.id))
+      else visibleItems.forEach((item) => next.add(item.id))
+      return next
+    })
+  }
+
+  async function handleBulkDelete() {
+    const selected = items.filter((item) => selectedIds.has(item.id))
+    if (!selected.length || !window.confirm(`Permanently delete ${selected.length} selected files?`)) return
+
+    setDeletingId('bulk')
+    onMessage(null)
+    try {
+      for (const item of selected) await deleteTournamentMedia(item.id)
+      const deleted = new Set(selected.map((item) => item.id))
+      setItems((current) => current.filter((item) => !deleted.has(item.id)))
+      setSelectedIds(new Set())
+      onMessage(`${selected.length} files deleted permanently.`)
+    } catch (error) {
+      onMessage(formatAdminError(error))
+      await refreshMedia()
+    } finally {
+      setDeletingId('')
+    }
+  }
+
+  async function handleTags(item: TournamentMedia) {
+    const value = window.prompt('Tags separated by commas', item.tags.join(', '))
+    if (value === null) return
+    const tags = value.split(',').map((tag) => tag.trim()).filter(Boolean)
+
+    setDeletingId(`tag:${item.id}`)
+    onMessage(null)
+    try {
+      const updated = await updateTournamentMediaTags(item, tags)
+      if (!updated) throw new Error('The updated media could not be read.')
+      setItems((current) => current.map((media) => media.id === item.id ? updated : media))
+      onMessage(`${item.name} tags updated.`)
     } catch (error) {
       onMessage(formatAdminError(error))
     } finally {
@@ -2052,14 +2141,64 @@ function TournamentMediaManager({
         />
       </header>
 
+      {items.length ? (
+        <div className="media-library-toolbar">
+          <div className="media-type-filter" role="group" aria-label="Filter media type">
+            {(['all', 'photos', 'videos'] as const).map((value) => (
+              <button
+                type="button"
+                className={typeFilter === value ? 'active' : undefined}
+                aria-pressed={typeFilter === value}
+                key={value}
+                onClick={() => setTypeFilter(value)}
+              >
+                {value === 'all' ? 'All' : value === 'photos' ? 'Photos' : 'Videos'}
+              </button>
+            ))}
+          </div>
+          <label>
+            <span>Tag</span>
+            <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
+              <option value="all">All tags</option>
+              {allTags.map((tag) => <option value={tag} key={tag}>{tag}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Sort</span>
+            <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name-asc">Name A-Z</option>
+              <option value="name-desc">Name Z-A</option>
+            </select>
+          </label>
+          <button className="media-select-button" type="button" onClick={toggleSelectVisible} disabled={!visibleItems.length}>
+            {allVisibleSelected ? 'Clear visible' : 'Select visible'}
+          </button>
+          <button className="media-delete-selected" type="button" onClick={() => void handleBulkDelete()} disabled={!selectedIds.size || Boolean(deletingId)}>
+            <Trash2 size={15} aria-hidden="true" />
+            Delete selected ({selectedIds.size})
+          </button>
+        </div>
+      ) : null}
+
       {loading ? (
         <div className="media-empty-state">Loading tournament media...</div>
       ) : items.length ? (
-        <div className="tournament-media-grid">
-          {items.map((item) => {
+        visibleItems.length ? (
+          <div className="tournament-media-grid">
+          {visibleItems.map((item) => {
             const video = item.mimeType.startsWith('video/')
             return (
-              <article className="tournament-media-card" key={item.id}>
+              <article className={`tournament-media-card${selectedIds.has(item.id) ? ' selected' : ''}`} key={item.id}>
+                <label className="media-card-select">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(item.id)}
+                    onChange={() => toggleSelection(item.id)}
+                    aria-label={`Select ${item.name}`}
+                  />
+                </label>
                 <div className="tournament-media-preview">
                   {video ? (
                     <video controls preload="metadata" src={item.viewUrl} />
@@ -2072,13 +2211,19 @@ function TournamentMediaManager({
                     {video ? <Video size={16} aria-hidden="true" /> : <ImageIcon size={16} aria-hidden="true" />}
                     <div>
                       <strong>{item.name}</strong>
-                      <span>{formatMediaSize(item.size)}</span>
+                      <span>{formatMediaSize(item.size)} · {new Date(item.createdAt).toLocaleDateString()}</span>
+                      {item.tags.length ? (
+                        <div className="media-tag-list">{item.tags.map((tag) => <span key={tag}>#{tag}</span>)}</div>
+                      ) : null}
                     </div>
                   </div>
                   <div className="tournament-media-actions">
                     <a href={item.downloadUrl} title={`Download ${item.name}`}>
                       <Download size={16} aria-hidden="true" />
                     </a>
+                    <button type="button" disabled={Boolean(deletingId)} title={`Edit tags for ${item.name}`} onClick={() => void handleTags(item)}>
+                      <Tag size={16} aria-hidden="true" />
+                    </button>
                     <button type="button" disabled={deletingId === item.id} title={`Delete ${item.name}`} onClick={() => void handleDelete(item)}>
                       <Trash2 size={16} aria-hidden="true" />
                     </button>
@@ -2087,7 +2232,14 @@ function TournamentMediaManager({
               </article>
             )
           })}
-        </div>
+          </div>
+        ) : (
+          <div className="media-empty-state">
+            <Search size={30} aria-hidden="true" />
+            <strong>No matching media</strong>
+            <span>Change the type, tag, or sort filters.</span>
+          </div>
+        )
       ) : (
         <div className="media-empty-state">
           <ImageIcon size={30} aria-hidden="true" />

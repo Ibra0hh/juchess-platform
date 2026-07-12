@@ -36,6 +36,7 @@ export type TournamentMedia = {
   mimeType: string
   size: number
   createdAt: string
+  tags: string[]
   viewUrl: string
   downloadUrl: string
 }
@@ -830,13 +831,19 @@ function groupTournamentMedia(files: Models.File[]) {
   files.forEach((file) => {
     const parts = file.name.split('--')
     if (parts.length < 4 || parts[0] !== tournamentMediaPrefix || !parts[1]) return
+    const tagged = parts[3]?.startsWith('tags=')
+    const tags = tagged
+      ? parts[3].slice(5).split('+').map(decodeMediaTag).filter(Boolean)
+      : []
+    const nameIndex = tagged ? 4 : 3
     const list = groups.get(parts[1]) ?? []
     list.push({
       id: file.$id,
-      name: parts.slice(3).join('--').replaceAll('_', ' '),
+      name: parts.slice(nameIndex).join('--').replaceAll('_', ' '),
       mimeType: file.mimeType,
       size: file.sizeOriginal,
       createdAt: file.$createdAt,
+      tags,
       viewUrl: storage.getFileView({ bucketId: tournamentAssetsBucketId, fileId: file.$id }),
       downloadUrl: storage.getFileDownload({ bucketId: tournamentAssetsBucketId, fileId: file.$id }),
     })
@@ -845,6 +852,14 @@ function groupTournamentMedia(files: Models.File[]) {
 
   groups.forEach((items) => items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
   return groups
+}
+
+function decodeMediaTag(value: string) {
+  try {
+    return decodeURIComponent(value).trim()
+  } catch {
+    return value.replaceAll('_', ' ').trim()
+  }
 }
 
 export async function loadAnnouncements(): Promise<AnnouncementLoadResult> {

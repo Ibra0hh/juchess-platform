@@ -2,13 +2,17 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
   ArrowLeft,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Image as ImageIcon,
   LayoutGrid,
   List,
   LoaderCircle,
+  Play,
   ShieldCheck,
   Trophy,
+  X,
 } from 'lucide-react'
 import QRCode from 'qrcode'
 import { Link, useParams } from 'react-router-dom'
@@ -365,6 +369,32 @@ function TournamentDetailPage() {
 }
 
 function TournamentMediaTab({ items }: { items: TournamentMedia[] }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const touchStartX = useRef<number | null>(null)
+  const activeItem = activeIndex === null ? null : items[activeIndex]
+  const moveViewer = useCallback((direction: number) => {
+    setActiveIndex((current) => {
+      if (current === null || !items.length) return current
+      return (current + direction + items.length) % items.length
+    })
+  }, [items.length])
+
+  useEffect(() => {
+    if (activeIndex === null) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActiveIndex(null)
+      if (event.key === 'ArrowLeft') moveViewer(-1)
+      if (event.key === 'ArrowRight') moveViewer(1)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [activeIndex, moveViewer])
+
   return (
     <section className="detail-tab-panel tournament-media-panel">
       <div className="panel-heading">
@@ -376,19 +406,30 @@ function TournamentMediaTab({ items }: { items: TournamentMedia[] }) {
       </div>
       {items.length ? (
         <div className="public-media-grid">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <article className="public-media-card" key={item.id}>
-              <div className="public-media-preview">
+              <button
+                className="public-media-preview"
+                type="button"
+                onClick={() => setActiveIndex(index)}
+                aria-label={`View ${item.name}`}
+              >
                 {item.mimeType.startsWith('video/') ? (
-                  <video controls preload="metadata" src={item.viewUrl} />
+                  <>
+                    <video muted preload="metadata" src={item.viewUrl} />
+                    <span className="public-media-play"><Play size={22} fill="currentColor" aria-hidden="true" /></span>
+                  </>
                 ) : (
                   <img src={item.viewUrl} alt={item.name} loading="lazy" />
                 )}
-              </div>
+              </button>
               <div className="public-media-meta">
                 <div>
                   <strong>{item.name}</strong>
                   <span>{formatMediaSize(item.size)}</span>
+                  {item.tags.length ? (
+                    <span className="public-media-tags">{item.tags.map((tag) => `#${tag}`).join(' ')}</span>
+                  ) : null}
                 </div>
                 <a href={item.downloadUrl} download={item.name} title={`Download ${item.name}`}>
                   <Download size={16} aria-hidden="true" />
@@ -405,6 +446,51 @@ function TournamentMediaTab({ items }: { items: TournamentMedia[] }) {
           <span>The organizer has not added photos or videos for this tournament.</span>
         </div>
       )}
+      {activeItem && activeIndex !== null ? (
+        <div className="media-lightbox" role="dialog" aria-modal="true" aria-label={`Viewing ${activeItem.name}`} onClick={() => setActiveIndex(null)}>
+          <div className="media-lightbox-toolbar" onClick={(event) => event.stopPropagation()}>
+            <div>
+              <strong>{activeItem.name}</strong>
+              <span>{activeIndex + 1} / {items.length}</span>
+            </div>
+            <a href={activeItem.downloadUrl} download={activeItem.name} title={`Download ${activeItem.name}`}>
+              <Download size={18} aria-hidden="true" />
+            </a>
+            <button type="button" title="Close viewer" onClick={() => setActiveIndex(null)}>
+              <X size={21} aria-hidden="true" />
+            </button>
+          </div>
+          <button className="media-lightbox-nav previous" type="button" title="Previous media" onClick={(event) => { event.stopPropagation(); moveViewer(-1) }}>
+            <ChevronLeft size={30} aria-hidden="true" />
+          </button>
+          <div
+            className="media-lightbox-stage"
+            onClick={(event) => event.stopPropagation()}
+            onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null }}
+            onTouchEnd={(event) => {
+              const start = touchStartX.current
+              const end = event.changedTouches[0]?.clientX
+              touchStartX.current = null
+              if (start === null || end === undefined || Math.abs(end - start) < 45) return
+              moveViewer(end < start ? 1 : -1)
+            }}
+          >
+            {activeItem.mimeType.startsWith('video/') ? (
+              <video key={activeItem.id} controls autoPlay playsInline src={activeItem.viewUrl} />
+            ) : (
+              <img key={activeItem.id} src={activeItem.viewUrl} alt={activeItem.name} />
+            )}
+          </div>
+          <button className="media-lightbox-nav next" type="button" title="Next media" onClick={(event) => { event.stopPropagation(); moveViewer(1) }}>
+            <ChevronRight size={30} aria-hidden="true" />
+          </button>
+          {activeItem.tags.length ? (
+            <div className="media-lightbox-tags" onClick={(event) => event.stopPropagation()}>
+              {activeItem.tags.map((tag) => <span key={tag}>#{tag}</span>)}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   )
 }

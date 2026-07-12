@@ -1350,6 +1350,77 @@ button {
   gap: 8px;
 }
 
+.media-library-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.media-library-toolbar label {
+  display: grid;
+  gap: 4px;
+}
+
+.media-library-toolbar label > span {
+  color: rgba(17, 17, 17, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.media-library-toolbar select,
+.media-select-button,
+.media-delete-selected,
+.media-type-filter button {
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.media-type-filter {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+}
+
+.media-type-filter button {
+  cursor: pointer;
+}
+
+.media-type-filter button.active {
+  border-color: #8d2638;
+  background: #8d2638;
+  color: #ffffff;
+}
+
+.media-select-button,
+.media-delete-selected {
+  cursor: pointer;
+}
+
+.media-delete-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: rgba(141, 38, 56, 0.35);
+  color: #8d2638;
+}
+
+.media-library-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .tournament-media-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -1357,12 +1428,40 @@ button {
 }
 
 .tournament-media-card {
+  position: relative;
   min-width: 0;
   overflow: hidden;
   border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 8px;
   background: #fffdf8;
   box-shadow: 0 4px 16px rgba(17, 17, 17, 0.06);
+}
+
+.tournament-media-card.selected {
+  border-color: #8d2638;
+  box-shadow: 0 0 0 2px rgba(141, 38, 56, 0.12);
+}
+
+.media-card-select {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  left: 10px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 6px;
+  background: rgba(17, 17, 17, 0.78);
+  cursor: pointer;
+  place-items: center;
+}
+
+.media-card-select input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #8d2638;
 }
 
 .tournament-media-preview {
@@ -1414,6 +1513,22 @@ button {
 .tournament-media-name span {
   color: rgba(17, 17, 17, 0.55);
   font-size: 10.5px;
+}
+
+.media-tag-list {
+  display: flex;
+  max-width: 170px;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.media-tag-list span {
+  flex: none;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(141, 38, 56, 0.08);
+  color: #8d2638;
+  font-size: 9.5px;
 }
 
 .tournament-media-actions {
@@ -1480,6 +1595,19 @@ button {
 
   .media-upload-button {
     width: 100%;
+  }
+
+  .media-library-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .media-type-filter {
+    margin-right: 0;
+  }
+
+  .media-type-filter button {
+    flex: 1;
   }
 }
 

@@ -13,9 +13,11 @@ export type TournamentMedia = {
   id: string
   tournamentId: string
   name: string
+  storedName: string
   mimeType: string
   size: number
   createdAt: string
+  tags: string[]
   viewUrl: string
   downloadUrl: string
 }
@@ -505,19 +507,76 @@ export async function deleteTournamentMedia(fileId: string) {
   await storage.deleteFile({ bucketId: tournamentAssetsBucketId, fileId })
 }
 
+export async function updateTournamentMediaTags(item: TournamentMedia, tags: string[]) {
+  const parts = item.storedName.split('--')
+  if (parts.length < 4 || parts[0] !== tournamentMediaPrefix) {
+    throw new Error('This media filename cannot be updated.')
+  }
+
+  const nameIndex = parts[3]?.startsWith('tags=') ? 4 : 3
+  const originalName = parts.slice(nameIndex).join('--') || sanitizeMediaName(item.name)
+  const normalizedTags = normalizeMediaTags(tags)
+  const encodedTags = encodeMediaTags(normalizedTags)
+  const tagSegment = encodedTags.length
+    ? `--tags=${encodedTags.join('+')}`
+    : ''
+  const prefix = `${tournamentMediaPrefix}--${parts[1]}--${parts[2]}${tagSegment}--`
+  const name = `${prefix}${originalName.slice(-Math.max(20, 240 - prefix.length))}`
+  const updated = await storage.updateFile({
+    bucketId: tournamentAssetsBucketId,
+    fileId: item.id,
+    name,
+  })
+  return mapTournamentMedia(updated)
+}
+
 function mapTournamentMedia(file: Models.File): TournamentMedia | null {
   const parts = file.name.split('--')
   if (parts.length < 4 || parts[0] !== tournamentMediaPrefix || !parts[1]) return null
 
+  const tagged = parts[3]?.startsWith('tags=')
+  const tags = tagged
+    ? parts[3].slice(5).split('+').map(decodeMediaTag).filter(Boolean)
+    : []
+  const nameIndex = tagged ? 4 : 3
+
   return {
     id: file.$id,
     tournamentId: parts[1],
-    name: parts.slice(3).join('--').replaceAll('_', ' '),
+    name: parts.slice(nameIndex).join('--').replaceAll('_', ' '),
+    storedName: file.name,
     mimeType: file.mimeType,
     size: file.sizeOriginal,
     createdAt: file.$createdAt,
+    tags,
     viewUrl: storage.getFileView({ bucketId: tournamentAssetsBucketId, fileId: file.$id }),
     downloadUrl: storage.getFileDownload({ bucketId: tournamentAssetsBucketId, fileId: file.$id }),
+  }
+}
+
+function normalizeMediaTags(tags: string[]) {
+  return Array.from(new Set(tags.map((tag) => tag.trim().toLowerCase().slice(0, 32)).filter(Boolean))).slice(0, 12)
+}
+
+function encodeMediaTag(tag: string) {
+  return encodeURIComponent(tag).replaceAll('-', '%2D')
+}
+
+function encodeMediaTags(tags: string[]) {
+  const encoded: string[] = []
+  for (const tag of tags) {
+    const next = encodeMediaTag(tag)
+    if ([...encoded, next].join('+').length > 96) break
+    encoded.push(next)
+  }
+  return encoded
+}
+
+function decodeMediaTag(tag: string) {
+  try {
+    return decodeURIComponent(tag).trim()
+  } catch {
+    return tag.replaceAll('_', ' ').trim()
   }
 }
 

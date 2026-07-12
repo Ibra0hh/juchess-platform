@@ -1283,12 +1283,23 @@ Map<String, List<TournamentMediaSeed>> _groupTournamentMedia(
     if (parts.length < 4 || parts.first != 'ju-media' || parts[1].isEmpty) {
       continue;
     }
+    final tagged = parts[3].startsWith('tags=');
+    final tags = tagged
+        ? parts[3]
+              .substring(5)
+              .split('+')
+              .map(_decodeTournamentMediaTag)
+              .where((tag) => tag.isNotEmpty)
+              .toList(growable: false)
+        : const <String>[];
+    final nameIndex = tagged ? 4 : 3;
     final item = TournamentMediaSeed(
       id: file.$id,
-      name: parts.sublist(3).join('--').replaceAll('_', ' '),
+      name: parts.sublist(nameIndex).join('--').replaceAll('_', ' '),
       mimeType: file.mimeType,
       size: file.sizeOriginal,
       createdAt: file.$createdAt,
+      tags: tags,
       viewUri: _tournamentMediaUri(file.$id, 'view'),
       downloadUri: _tournamentMediaUri(file.$id, 'download'),
     );
@@ -1298,6 +1309,14 @@ Map<String, List<TournamentMediaSeed>> _groupTournamentMedia(
     items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
   return groups;
+}
+
+String _decodeTournamentMediaTag(String value) {
+  try {
+    return Uri.decodeComponent(value).trim();
+  } catch (_) {
+    return value.replaceAll('_', ' ').trim();
+  }
 }
 
 Uri _tournamentMediaUri(String fileId, String action) {
@@ -4065,8 +4084,19 @@ class _TournamentMediaGallery extends StatelessWidget {
             ),
           )
         else
-          for (final item in items) ...[
-            _TournamentMediaCard(item: item),
+          for (var index = 0; index < items.length; index++) ...[
+            _TournamentMediaCard(
+              item: items[index],
+              onView: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  fullscreenDialog: true,
+                  builder: (_) => _TournamentMediaViewer(
+                    initialIndex: index,
+                    items: items,
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
           ],
       ],
@@ -4075,9 +4105,10 @@ class _TournamentMediaGallery extends StatelessWidget {
 }
 
 class _TournamentMediaCard extends StatelessWidget {
-  const _TournamentMediaCard({required this.item});
+  const _TournamentMediaCard({required this.item, required this.onView});
 
   final TournamentMediaSeed item;
+  final VoidCallback onView;
 
   Future<void> _download(BuildContext context) async {
     final opened = await launchUrl(
@@ -4105,18 +4136,43 @@ class _TournamentMediaCard extends StatelessWidget {
         children: [
           AspectRatio(
             aspectRatio: 16 / 10,
-            child: ColoredBox(
+            child: Material(
               color: PrototypeColors.black,
-              child: item.isVideo
-                  ? _TournamentVideo(uri: item.viewUri)
-                  : Image.network(
-                      item.viewUri.toString(),
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const Icon(
-                        Icons.broken_image_outlined,
-                        color: PrototypeColors.cream,
+              child: InkWell(
+                onTap: onView,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    item.isVideo
+                        ? _TournamentVideo(uri: item.viewUri)
+                        : Image.network(
+                            item.viewUri.toString(),
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => const Icon(
+                              Icons.broken_image_outlined,
+                              color: PrototypeColors.cream,
+                            ),
+                          ),
+                    Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xcc111111),
+                          border: Border.all(color: const Color(0x66ffffff)),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          item.isVideo ? Icons.play_arrow : Icons.fullscreen,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              ),
             ),
           ),
           Padding(
@@ -4150,6 +4206,16 @@ class _TournamentMediaCard extends StatelessWidget {
                           fontSize: 10.5,
                         ),
                       ),
+                      if (item.tags.isNotEmpty)
+                        Text(
+                          item.tags.map((tag) => '#$tag').join(' '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: PrototypeColors.burgundy,
+                            fontSize: 10.5,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -4162,6 +4228,148 @@ class _TournamentMediaCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TournamentMediaViewer extends StatefulWidget {
+  const _TournamentMediaViewer({
+    required this.initialIndex,
+    required this.items,
+  });
+
+  final int initialIndex;
+  final List<TournamentMediaSeed> items;
+
+  @override
+  State<_TournamentMediaViewer> createState() => _TournamentMediaViewerState();
+}
+
+class _TournamentMediaViewerState extends State<_TournamentMediaViewer> {
+  late final PageController controller;
+  late int currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    currentIndex = widget.initialIndex;
+    controller = PageController(initialPage: currentIndex);
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _download() async {
+    final item = widget.items[currentIndex];
+    final opened = await launchUrl(
+      item.downloadUri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this download.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.items[currentIndex];
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        titleSpacing: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            Text(
+              '${currentIndex + 1} / ${widget.items.length}',
+              style: const TextStyle(color: Color(0x99ffffff), fontSize: 11),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Download ${item.name}',
+            onPressed: _download,
+            icon: const Icon(Icons.download_outlined),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: PageView.builder(
+              controller: controller,
+              itemCount: widget.items.length,
+              onPageChanged: (index) => setState(() => currentIndex = index),
+              itemBuilder: (context, index) {
+                final page = widget.items[index];
+                return Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: page.isVideo
+                      ? _TournamentVideo(uri: page.viewUri)
+                      : InteractiveViewer(
+                          minScale: 1,
+                          maxScale: 4,
+                          child: Center(
+                            child: Image.network(
+                              page.viewUri.toString(),
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, _, _) => const Icon(
+                                Icons.broken_image_outlined,
+                                color: Colors.white70,
+                                size: 42,
+                              ),
+                            ),
+                          ),
+                        ),
+                );
+              },
+            ),
+          ),
+          if (item.tags.isNotEmpty)
+            SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+                child: Row(
+                  children: item.tags
+                      .map(
+                        (tag) => Padding(
+                          padding: const EdgeInsets.only(right: 7),
+                          child: Chip(
+                            label: Text('#$tag'),
+                            backgroundColor: const Color(0xff252525),
+                            labelStyle: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
+                            side: const BorderSide(color: Color(0x33ffffff)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -13455,6 +13663,7 @@ class TournamentMediaSeed {
     required this.mimeType,
     required this.size,
     required this.createdAt,
+    this.tags = const [],
     required this.viewUri,
     required this.downloadUri,
   });
@@ -13464,6 +13673,7 @@ class TournamentMediaSeed {
   final String mimeType;
   final int size;
   final String createdAt;
+  final List<String> tags;
   final Uri viewUri;
   final Uri downloadUri;
 
