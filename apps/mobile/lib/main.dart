@@ -8529,9 +8529,16 @@ class PuzzleBoardScreen extends StatefulWidget {
 
 class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
   late List<String> moves = [...widget.puzzle.setupMoves];
+  late int currentPly;
   late bool flipped = widget.puzzle.setupMoves.length.isOdd;
   String notice = 'Find the best move.';
   bool solved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    currentPly = moves.length;
+  }
 
   void _handleMove(List<String> nextMoves, String result) {
     if (solved || nextMoves.length <= widget.puzzle.setupMoves.length) return;
@@ -8547,11 +8554,13 @@ class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
     setState(() {
       if (!correct) {
         moves = [...widget.puzzle.setupMoves];
+        currentPly = moves.length;
         notice = 'Not that move. Try again.';
         return;
       }
 
       moves = nextMoves;
+      currentPly = moves.length;
       if (attempt.length >= expected.length) {
         solved = true;
         notice = 'Solved: ${_formatStoredMoves(expected)}';
@@ -8564,6 +8573,7 @@ class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
   void _reset() {
     setState(() {
       moves = [...widget.puzzle.setupMoves];
+      currentPly = moves.length;
       notice = 'Find the best move.';
       solved = false;
     });
@@ -8572,6 +8582,7 @@ class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
   void _showAnswer() {
     setState(() {
       moves = [...widget.puzzle.setupMoves, ...widget.puzzle.solutionMoves];
+      currentPly = moves.length;
       notice = 'Answer: ${_formatStoredMoves(widget.puzzle.solutionMoves)}';
       solved = true;
     });
@@ -8579,6 +8590,7 @@ class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final shownMoves = moves.sublist(0, currentPly);
     return PrototypeRouteScaffold(
       title: 'Puzzle',
       trailing: SquareIconButton(
@@ -8620,9 +8632,16 @@ class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: PrototypeChessBoard(
             flipped: flipped,
-            moves: moves,
+            moves: shownMoves,
             onChanged: _handleMove,
+            readOnly: solved || currentPly != moves.length,
           ),
+        ),
+        const SizedBox(height: 10),
+        _BoardMoveControls(
+          currentPly: currentPly,
+          onChanged: (ply) => setState(() => currentPly = ply),
+          totalPlies: moves.length,
         ),
         const SizedBox(height: 12),
         PrototypeCard(
