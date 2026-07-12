@@ -42,6 +42,7 @@
         "currentRound": "integer",
         "startsAt": "datetime",
         "endsAt": "datetime",
+        "registrationDeadline": "datetime",
         "playMode": "enum:inPerson,online|default:inPerson",
         "onlinePlatform": "enum:chessCom,lichess,juchess",
         "location": "string",

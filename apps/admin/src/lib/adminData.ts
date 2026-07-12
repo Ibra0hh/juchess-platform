@@ -52,6 +52,7 @@ type AppwriteTournamentRow = Models.Row & {
   currentRound?: number
   startsAt?: string
   endsAt?: string
+  registrationDeadline?: string
   playMode?: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location?: string
@@ -133,6 +134,7 @@ export type AdminTournament = {
   roundsTotal?: number
   currentRound?: number
   startsAt?: string
+  registrationDeadline?: string
   playMode: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location?: string
@@ -209,6 +211,7 @@ export type TournamentInput = {
   currentRound?: number
   startsAt?: string
   endsAt?: string
+  registrationDeadline?: string
   playMode?: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location?: string
@@ -1112,6 +1115,7 @@ function mapTournament(
     roundsTotal: row.roundsTotal,
     currentRound: row.currentRound,
     startsAt: row.startsAt,
+    registrationDeadline: row.registrationDeadline,
     playMode: row.playMode === 'online' ? 'online' : 'inPerson',
     onlinePlatform: normalizeOnlinePlatform(row.onlinePlatform),
     location: row.location,

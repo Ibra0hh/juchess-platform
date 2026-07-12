@@ -85,6 +85,7 @@ Fields:
 - `currentRound` integer, optional.
 - `startsAt` datetime, optional.
 - `endsAt` datetime, optional.
+- `registrationDeadline` datetime, optional.
 - `playMode` enum: `inPerson`, `online`; defaults to `inPerson`.
 - `onlinePlatform` enum: `chessCom`, `lichess`, `juchess`, optional. Required by the admin function when `playMode` is `online`. `juchess` means the game is played inside JuChess rather than linked to an external room.
 - `location` string, optional.

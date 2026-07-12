@@ -21,6 +21,7 @@
     "migrate:game-query-indexes": "powershell -ExecutionPolicy Bypass -File scripts/migrate-game-query-indexes.ps1",
     "migrate:tournament-live": "powershell -ExecutionPolicy Bypass -File scripts/migrate-tournament-live-schema.ps1",
     "migrate:profile-usernames": "powershell -ExecutionPolicy Bypass -File scripts/migrate-profile-game-usernames.ps1",
+    "migrate:registration-deadline": "powershell -ExecutionPolicy Bypass -File scripts/migrate-tournament-registration-deadline.ps1",
     "lint:web": "npm --workspace apps/web run lint",
     "lint:admin": "npm --workspace apps/admin run lint",
     "mobile:analyze": "cd apps/mobile && flutter analyze",

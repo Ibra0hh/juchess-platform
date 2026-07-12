@@ -115,6 +115,71 @@ function avatarColorFor(profileId: string) {
   return avatarPalette[hash % avatarPalette.length]
 }
 
+function TournamentDateTimeControl({
+  label,
+  value,
+  onChange,
+  onStep,
+}: {
+  label: string
+  value?: string
+  onChange: (value?: string) => void
+  onStep: (minutes: number) => void
+}) {
+  const dateValue = toDateInputValue(value)
+  const timeValue = toTimeInputValue(value)
+
+  return (
+    <div className="create-field wide">
+      <span>{label}</span>
+      <div className="date-time-picker-control">
+        <input
+          type="date"
+          aria-label={`${label} date`}
+          value={dateValue}
+          onChange={(event) => {
+            if (!event.target.value) {
+              onChange(undefined)
+              return
+            }
+            onChange(fromLocalDateAndTime(event.target.value, timeValue || '12:00'))
+          }}
+        />
+        <input
+          type="time"
+          aria-label={`${label} time`}
+          step={900}
+          value={timeValue}
+          onChange={(event) => {
+            if (!event.target.value) return
+            onChange(fromLocalDateAndTime(dateValue || localTodayValue(), event.target.value))
+          }}
+        />
+        <div className="date-time-stepper" role="group" aria-label={`Adjust ${label.toLowerCase()}`}>
+          <button
+            type="button"
+            title="15 minutes later"
+            aria-label={`${label}: 15 minutes later`}
+            disabled={!value}
+            onClick={() => onStep(15)}
+          >
+            <ChevronUp size={15} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            title="15 minutes earlier"
+            aria-label={`${label}: 15 minutes earlier`}
+            disabled={!value}
+            onClick={() => onStep(-15)}
+          >
+            <ChevronDown size={15} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 type AdminBracketSide = 'white' | 'black'
 
 type Pairing = {
@@ -1082,12 +1147,16 @@ function TournamentsScreen({
     setTimeCategory(match[3] || 'Rapid')
   }
 
-  function stepStartDateTime(minutesToAdd: number) {
-    if (!form.startsAt) return
-    const date = new Date(form.startsAt)
+  function stepTournamentDateTime(
+    key: 'startsAt' | 'registrationDeadline',
+    minutesToAdd: number,
+  ) {
+    const value = form[key]
+    if (!value) return
+    const date = new Date(value)
     if (Number.isNaN(date.getTime())) return
     date.setMinutes(date.getMinutes() + minutesToAdd)
-    update('startsAt', date.toISOString())
+    update(key, date.toISOString())
   }
 
   function setTimeSelection(next: Partial<{ category: string; minutes: string; increment: string }>) {
@@ -1153,6 +1222,14 @@ function TournamentsScreen({
     }
     if (form.playMode === 'online' && !form.onlinePlatform) {
       setMessage('Choose Chess.com, Lichess, or JuChess for this online tournament.')
+      return
+    }
+    if (
+      form.startsAt
+      && form.registrationDeadline
+      && new Date(form.registrationDeadline).getTime() >= new Date(form.startsAt).getTime()
+    ) {
+      setMessage('Registration deadline must be before the tournament start time.')
       return
     }
 
@@ -1654,38 +1731,18 @@ function TournamentsScreen({
                       />
                     </label>
                   )}
-                  <div className="create-field wide">
-                    <span>Start date / time</span>
-                    <div className="date-time-picker-control">
-                      <input
-                        type="datetime-local"
-                        step={900}
-                        value={toDateTimeLocalValue(form.startsAt)}
-                        onChange={(event) => update('startsAt', fromDateTimeLocalValue(event.target.value))}
-                      />
-                      <div className="date-time-stepper" role="group" aria-label="Adjust start time">
-                        <button
-                          type="button"
-                          title="15 minutes later"
-                          aria-label="15 minutes later"
-                          disabled={!form.startsAt}
-                          onClick={() => stepStartDateTime(15)}
-                        >
-                          <ChevronUp size={15} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          title="15 minutes earlier"
-                          aria-label="15 minutes earlier"
-                          disabled={!form.startsAt}
-                          onClick={() => stepStartDateTime(-15)}
-                        >
-                          <ChevronDown size={15} aria-hidden="true" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <label>Registration deadline<input type="datetime-local" /></label>
+                  <TournamentDateTimeControl
+                    label="Tournament start"
+                    value={form.startsAt}
+                    onChange={(value) => update('startsAt', value)}
+                    onStep={(minutes) => stepTournamentDateTime('startsAt', minutes)}
+                  />
+                  <TournamentDateTimeControl
+                    label="Registration deadline"
+                    value={form.registrationDeadline}
+                    onChange={(value) => update('registrationDeadline', value)}
+                    onStep={(minutes) => stepTournamentDateTime('registrationDeadline', minutes)}
+                  />
                   <div className="create-upload wide">
                     <span>Tournament design image</span>
                     <strong>Attach design later from tournament media</strong>
@@ -6245,6 +6302,7 @@ function tournamentToEditForm(item: AdminTournament): TournamentInput {
     location: item.location ?? '',
     description: item.description ?? '',
     startsAt: item.startsAt,
+    registrationDeadline: item.registrationDeadline,
   }
 }
 
@@ -6323,9 +6381,21 @@ function toDateTimeLocalValue(value?: string) {
   return localDate.toISOString().slice(0, 16)
 }
 
-function fromDateTimeLocalValue(value: string) {
-  if (!value) return undefined
-  const date = new Date(value)
+function toDateInputValue(value?: string) {
+  return toDateTimeLocalValue(value).slice(0, 10)
+}
+
+function toTimeInputValue(value?: string) {
+  return toDateTimeLocalValue(value).slice(11, 16)
+}
+
+function localTodayValue() {
+  const now = new Date()
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+}
+
+function fromLocalDateAndTime(dateValue: string, timeValue: string) {
+  const date = new Date(`${dateValue}T${timeValue}`)
   if (Number.isNaN(date.getTime())) return undefined
   return date.toISOString()
 }

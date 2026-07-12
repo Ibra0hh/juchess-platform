@@ -909,7 +909,7 @@ button {
 
 .date-time-picker-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: minmax(135px, 1fr) minmax(108px, 0.72fr) 34px;
   gap: 6px;
   min-width: 0;
 }
