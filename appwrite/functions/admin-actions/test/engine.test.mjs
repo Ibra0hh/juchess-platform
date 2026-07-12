@@ -67,7 +67,7 @@ const EXPORTED = [
 
 const SDK_STUB = `
 const stub = () => { throw new Error('appwrite SDK called in a pure-logic test') };
-const Account = stub, Client = stub, TablesDB = stub, Teams = stub, Users = stub;
+const Account = stub, Client = stub, Messaging = stub, TablesDB = stub, Teams = stub, Users = stub;
 const ID = { unique: () => 'stub' };
 const Permission = { read: () => 'stub' };
 const Role = { any: () => 'stub', user: () => 'stub' };
@@ -76,8 +76,8 @@ const Query = { cursorAfter: () => 'query', equal: () => 'query', limit: () => '
 
 function loadEngine() {
   const source = readFileSync(join(here, '..', 'src', 'main.js'), 'utf8')
-  const importLine = source.split('\n')[0]
-  assert.match(importLine, /^import .* from 'node-appwrite';$/, 'expected the SDK import on line 1')
+  const importLine = source.split('\n').find((line) => line.includes("from 'node-appwrite'"))
+  assert.match(importLine ?? '', /^import .* from 'node-appwrite';$/, 'expected the SDK import')
   const chessImport = "import { Chess } from 'chess.js';"
   const chessModule = pathToFileURL(join(here, '..', 'node_modules', 'chess.js', 'dist', 'esm', 'chess.js')).href
 
@@ -91,6 +91,21 @@ function loadEngine() {
 }
 
 const engine = await loadEngine()
+
+test('attendance reminder opens only during the final hour before an upcoming tournament', () => {
+  const now = Date.parse('2026-07-12T12:00:00.000Z')
+  assert.equal(engine.isAttendanceReminderDue({ status: 'upcoming', startsAt: '2026-07-12T13:00:00.000Z' }, now), true)
+  assert.equal(engine.isAttendanceReminderDue({ status: 'upcoming', startsAt: '2026-07-12T13:00:00.001Z' }, now), false)
+  assert.equal(engine.isAttendanceReminderDue({ status: 'active', startsAt: '2026-07-12T12:30:00.000Z' }, now), false)
+  assert.equal(engine.isAttendanceReminderDue({ status: 'upcoming', startsAt: '2026-07-12T12:00:00.000Z' }, now), false)
+})
+
+test('attendance row IDs are deterministic and Appwrite-safe', () => {
+  const id = engine.attendanceRowId('registration-1')
+  assert.equal(id, engine.attendanceRowId('registration-1'))
+  assert.match(id, /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/)
+  assert.notEqual(id, engine.attendanceRowId('registration-2'))
+})
 
 /** Plays a whole knockout, resolving each round before the next is emitted. */
 function playKnockout(structure, entrants, winnerOf) {

@@ -305,53 +305,60 @@
   margin-top: 8px;
 }
 
-.checkin-pass {
+.attendance-prompt {
   margin-top: 14px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
   padding: 14px 16px;
   background: #fdf8ec;
-  border: 1px dashed rgba(169, 138, 63, 0.55);
+  border: 1px solid rgba(169, 138, 63, 0.55);
   border-radius: 10px;
-  width: fit-content;
+  max-width: 560px;
 }
 
-.checkin-pass canvas {
-  border-radius: 6px;
-  background: #fdf8ec;
-}
-
-.checkin-pass span {
+.attendance-prompt > strong {
   display: block;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 15px;
+}
+
+.attendance-prompt p {
+  margin: 4px 0 12px;
   color: rgba(17, 17, 17, 0.55);
 }
 
-.checkin-pass strong {
-  display: block;
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 26px;
-  letter-spacing: 0.08em;
-  color: #111111;
+.attendance-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.checkin-pass small {
-  display: block;
-  font-size: 12px;
-  color: rgba(17, 17, 17, 0.6);
-  margin-top: 2px;
+.attendance-prompt-actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(17, 17, 17, 0.28) !important;
+  border-radius: 8px;
+  color: #111;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
 }
 
-.checkin-note {
+.attendance-prompt-actions button.selected {
+  color: #fffaf0;
+  background: #2e7d5b;
+  border-color: #2e7d5b !important;
+}
+
+.attendance-prompt-actions button.selected.decline {
+  background: #7a2431;
+  border-color: #7a2431 !important;
+}
+
+.attendance-note {
   margin-top: 10px;
-  font-style: italic;
+  max-width: 68ch;
+  color: rgba(17, 17, 17, 0.68);
 }
 
-.checkin-done {
+.attendance-status {
   font-size: 13px;
   font-weight: 700;
   color: #2e7d5b;
@@ -894,6 +901,12 @@
   font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.attendance-status.missed {
+  color: #7a2431;
+  border-color: rgba(122, 36, 49, 0.35);
+  background: rgba(122, 36, 49, 0.06);
 }
 
 .public-media-meta span {

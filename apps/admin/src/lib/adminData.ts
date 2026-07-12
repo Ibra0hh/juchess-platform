@@ -83,8 +83,6 @@ type AppwriteRegistrationRow = Models.Row & {
   profileId?: string
   status?: 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
   seed?: number
-  checkInCode?: string
-  checkedIn?: boolean
 }
 
 type AppwriteStandingRow = Models.Row & {
@@ -181,6 +179,8 @@ export type AdminGame = {
 }
 
 export type AdminRegistrationStatus = 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
+export type AdminAttendanceStatus = 'pending' | 'confirmed' | 'declined'
+export type AdminAttendanceDeliveryStatus = 'pending' | 'sent' | 'unavailable' | 'failed' | 'skipped'
 
 export type AdminRegistration = {
   rowId: string
@@ -192,8 +192,12 @@ export type AdminRegistration = {
   rating?: number
   status: AdminRegistrationStatus
   seed?: number
-  checkInCode?: string
-  checkedIn: boolean
+  attendanceStatus?: AdminAttendanceStatus
+  attendanceRemindedAt?: string
+  attendanceRespondedAt?: string
+  attendanceResponseSource?: 'web' | 'app' | 'email'
+  attendanceEmailStatus?: AdminAttendanceDeliveryStatus
+  attendancePushStatus?: AdminAttendanceDeliveryStatus
 }
 
 export type RegistrationLoadResult = {
@@ -719,41 +723,56 @@ export async function countPendingRegistrations(): Promise<number> {
   }
 }
 
-export type AdminCheckIn = {
+export type AdminAttendanceConfirmation = {
   rowId: string
   tournamentId: string
   profileId: string
   registrationId: string
-  code: string
-  checkedIn: boolean
+  status: AdminAttendanceStatus
+  reminderSentAt?: string
+  respondedAt?: string
+  responseSource?: 'web' | 'app' | 'email'
+  reminderEmailStatus?: AdminAttendanceDeliveryStatus
+  reminderPushStatus?: AdminAttendanceDeliveryStatus
 }
 
 /**
- * Check-in codes are not readable from the client: the `check_ins` table has no
- * public read. Staff fetch them through the admin function, which uses its
- * server-side key.
+ * Attendance responses are private. Staff fetch them through the admin
+ * function while players can read only their own row.
  */
-export async function loadTournamentCheckIns(tournamentRowId: string): Promise<AdminCheckIn[]> {
+export async function loadTournamentAttendance(tournamentRowId: string): Promise<AdminAttendanceConfirmation[]> {
   if (!appwriteReady || !tournamentRowId) return []
 
   try {
-    const response = await runAdminAction<{ checkIns: Array<Record<string, unknown>> }>({
+    const response = await runAdminAction<{ attendance: Array<Record<string, unknown>> }>({
       method: ExecutionMethod.GET,
-      path: `/tournaments/${tournamentRowId}/check-ins`,
+      path: `/tournaments/${tournamentRowId}/attendance`,
     })
 
-    return (response.checkIns ?? []).map((row) => ({
+    return (response.attendance ?? []).map((row) => ({
       rowId: String(row.$id ?? ''),
       tournamentId: String(row.tournamentId ?? ''),
       profileId: String(row.profileId ?? ''),
       registrationId: String(row.registrationId ?? ''),
-      code: String(row.code ?? ''),
-      checkedIn: row.checkedIn === true,
+      status: (row.status === 'confirmed' || row.status === 'declined' ? row.status : 'pending'),
+      reminderSentAt: typeof row.reminderSentAt === 'string' ? row.reminderSentAt : undefined,
+      respondedAt: typeof row.respondedAt === 'string' ? row.respondedAt : undefined,
+      responseSource: row.responseSource === 'web' || row.responseSource === 'app' || row.responseSource === 'email'
+        ? row.responseSource
+        : undefined,
+      reminderEmailStatus: parseAttendanceDeliveryStatus(row.reminderEmailStatus),
+      reminderPushStatus: parseAttendanceDeliveryStatus(row.reminderPushStatus),
     }))
   } catch (error) {
-    console.warn('JuChess check-in codes could not be loaded.', error)
+    console.warn('JuChess attendance confirmations could not be loaded.', error)
     return []
   }
+}
+
+function parseAttendanceDeliveryStatus(value: unknown): AdminAttendanceDeliveryStatus | undefined {
+  return value === 'pending' || value === 'sent' || value === 'unavailable' || value === 'failed' || value === 'skipped'
+    ? value
+    : undefined
 }
 
 export type AdvanceRoundResult = {
@@ -777,16 +796,20 @@ export async function loadTournamentRegistrations(tournamentRowId: string): Prom
   if (!appwriteReady || !tournamentRowId) return { registrations: [] }
 
   try {
-    const response = await tablesDB.listRows<AppwriteRegistrationRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.registrations,
-      queries: [Query.equal('tournamentId', tournamentRowId), Query.limit(500)],
-      total: false,
-    })
+    const [response, attendanceRows] = await Promise.all([
+      tablesDB.listRows<AppwriteRegistrationRow>({
+        databaseId: appwriteConfig.databaseId,
+        tableId: tableIds.registrations,
+        queries: [Query.equal('tournamentId', tournamentRowId), Query.limit(500)],
+        total: false,
+      }),
+      loadTournamentAttendance(tournamentRowId),
+    ])
     const profiles = await loadProfilesById(response.rows.map((row) => row.profileId).filter(Boolean) as string[])
+    const attendanceByRegistration = new Map(attendanceRows.map((row) => [row.registrationId, row]))
 
     const registrations = response.rows
-      .map((row) => mapRegistration(row, profiles))
+      .map((row) => mapRegistration(row, profiles, attendanceByRegistration.get(row.$id)))
       .filter((row): row is AdminRegistration => Boolean(row))
 
     return {
@@ -802,7 +825,6 @@ export async function updateRegistrationStatus(
   input: {
     status?: AdminRegistrationStatus
     seed?: number
-    checkedIn?: boolean
   },
 ) {
   const response = await runAdminAction<{ row: AppwriteRegistrationRow }>({
@@ -815,7 +837,7 @@ export async function updateRegistrationStatus(
 }
 
 export async function addTournamentParticipant(tournamentRowId: string, profileId: string) {
-  const response = await runAdminAction<{ row: AppwriteRegistrationRow; checkIn: Record<string, unknown> }>(
+  const response = await runAdminAction<{ row: AppwriteRegistrationRow; attendance: Record<string, unknown> }>(
     {
       method: ExecutionMethod.POST,
       path: `/tournaments/${tournamentRowId}/participants`,
@@ -943,7 +965,7 @@ async function loadRegistrationCounts() {
     })
 
     response.rows.forEach((row) => {
-      if (!row.tournamentId || (row.status !== 'confirmed' && !row.checkedIn)) return
+      if (!row.tournamentId || row.status !== 'confirmed') return
       const key = `${row.tournamentId}:${row.profileId}`
       if (!row.profileId || countedPlayers.has(key)) return
       countedPlayers.add(key)
@@ -1150,6 +1172,7 @@ function formatRouteId(format: string) {
 function mapRegistration(
   row: AppwriteRegistrationRow,
   profiles: Map<string, AppwriteProfileRow>,
+  attendance?: AdminAttendanceConfirmation,
 ): AdminRegistration | null {
   if (!row.tournamentId || !row.profileId) return null
   const profile = profiles.get(row.profileId)
@@ -1164,8 +1187,12 @@ function mapRegistration(
     rating: profile?.rating,
     status: row.status ?? 'pending',
     seed: row.seed,
-    checkInCode: row.checkInCode,
-    checkedIn: Boolean(row.checkedIn),
+    attendanceStatus: attendance?.status,
+    attendanceRemindedAt: attendance?.reminderSentAt,
+    attendanceRespondedAt: attendance?.respondedAt,
+    attendanceResponseSource: attendance?.responseSource,
+    attendanceEmailStatus: attendance?.reminderEmailStatus,
+    attendancePushStatus: attendance?.reminderPushStatus,
   }
 }
 
@@ -1199,8 +1226,8 @@ function dedupeAdminRegistrations(rows: AdminRegistration[]) {
       return
     }
 
-    const existingRank = (existing.checkedIn ? 10 : 0) + statusRank[existing.status]
-    const nextRank = (row.checkedIn ? 10 : 0) + statusRank[row.status]
+    const existingRank = statusRank[existing.status]
+    const nextRank = statusRank[row.status]
     if (nextRank > existingRank) registrations.set(key, row)
   })
 

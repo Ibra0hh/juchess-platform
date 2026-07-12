@@ -13,7 +13,7 @@
     ],
     "events": [],
     "schedule": "* * * * *",
-    "timeout": 30,
+    "timeout": 60,
     "enabled": true,
     "logging": true,
     "ignore": [
@@ -30,12 +30,18 @@
       "teams.read",
       "teams.write",
       "users.read",
-      "users.write"
+      "users.write",
+      "providers.read",
+      "messages.write"
     ],
     "vars": [
       {
         "key": "JUCHESS_DATABASE_ID",
         "value": "juchess"
+      },
+      {
+        "key": "JUCHESS_PUBLIC_WEB_URL",
+        "value": "https://ibra0hh.github.io/juchess-platform/web"
       }
     ]
   },
@@ -52,6 +58,40 @@
     "events": [],
     "schedule": "",
     "timeout": 15,
+    "enabled": true,
+    "logging": true,
+    "ignore": [
+      "node_modules",
+      ".git"
+    ],
+    "scopes": [
+      "databases.read",
+      "databases.write",
+      "rows.read",
+      "rows.write",
+      "documents.read",
+      "documents.write"
+    ],
+    "vars": [
+      {
+        "key": "JUCHESS_DATABASE_ID",
+        "value": "juchess"
+      }
+    ]
+  },
+  {
+    "$id": "attendance-actions",
+    "name": "JuChess Attendance Links",
+    "runtime": "node-22",
+    "path": "functions/attendance-actions",
+    "entrypoint": "src/main.js",
+    "commands": "npm install",
+    "execute": [
+      "any"
+    ],
+    "events": [],
+    "schedule": "",
+    "timeout": 10,
     "enabled": true,
     "logging": true,
     "ignore": [

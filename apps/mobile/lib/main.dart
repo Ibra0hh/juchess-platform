@@ -11,7 +11,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:video_player/video_player.dart';
 
 import 'game_review_core.dart';
@@ -97,9 +96,9 @@ class AppConfig {
     'APPWRITE_REGISTRATIONS_TABLE_ID',
     defaultValue: 'registrations',
   );
-  static const checkInsTableId = String.fromEnvironment(
-    'APPWRITE_CHECK_INS_TABLE_ID',
-    defaultValue: 'check_ins',
+  static const attendanceTableId = String.fromEnvironment(
+    'APPWRITE_ATTENDANCE_TABLE_ID',
+    defaultValue: 'attendance_confirmations',
   );
   static const gamesTableId = String.fromEnvironment(
     'APPWRITE_GAMES_TABLE_ID',
@@ -790,6 +789,16 @@ class AppwriteService {
     }
   }
 
+  Future<void> respondToTournamentAttendance({
+    required String registrationRowId,
+    required String status,
+  }) async {
+    await _runPlayerAction(
+      '/registrations/$registrationRowId/attendance',
+      body: {'status': status, 'source': 'app'},
+    );
+  }
+
   Future<Map<String, MyRegistrationInfo>> loadMyRegistrations(
     String profileId,
   ) async {
@@ -805,35 +814,40 @@ class AppwriteService {
       ttl: 0,
     );
 
-    // Check-in codes live in a table with no public read; row permissions mean
-    // this query returns only the signed-in player's own passes.
-    final passes = <String, Map<String, dynamic>>{};
+    // Attendance rows are private. Row permissions return only this player's
+    // accepted registrations and never expose another player's response.
+    final attendanceByTournament = <String, Map<String, dynamic>>{};
     try {
-      final checkIns = await tablesDB.listRows(
+      final attendance = await tablesDB.listRows(
         databaseId: AppConfig.databaseId,
-        tableId: AppConfig.checkInsTableId,
+        tableId: AppConfig.attendanceTableId,
         queries: [Query.equal('profileId', profileId), Query.limit(500)],
         total: false,
         ttl: 0,
       );
-      for (final row in checkIns.rows) {
+      for (final row in attendance.rows) {
         final tournamentId = row.data['tournamentId']?.toString();
-        if (tournamentId != null) passes[tournamentId] = row.data;
+        if (tournamentId != null) {
+          attendanceByTournament[tournamentId] = row.data;
+        }
       }
     } catch (_) {
-      // A player without any issued pass simply sees no code yet.
+      // Existing accepted registrations are backfilled when the reminder opens.
     }
 
     final registrations = <String, MyRegistrationInfo>{};
     for (final row in response.rows) {
       final tournamentId = row.data['tournamentId']?.toString();
       if (tournamentId == null) continue;
-      final pass = passes[tournamentId];
+      final attendance = attendanceByTournament[tournamentId];
       registrations[tournamentId] = MyRegistrationInfo(
         rowId: row.$id,
         status: row.data['status']?.toString() ?? 'pending',
-        checkInCode: pass?['code']?.toString(),
-        checkedIn: (pass?['checkedIn'] ?? row.data['checkedIn']) == true,
+        attendanceStatus: attendance?['status']?.toString() ?? 'pending',
+        reminderSentAt: attendance?['reminderSentAt']?.toString(),
+        reminderEmailStatus: attendance?['reminderEmailStatus']?.toString(),
+        reminderPushStatus: attendance?['reminderPushStatus']?.toString(),
+        respondedAt: attendance?['respondedAt']?.toString(),
       );
     }
     return registrations;
@@ -1253,16 +1267,20 @@ class MyRegistrationInfo {
   const MyRegistrationInfo({
     required this.rowId,
     required this.status,
-    this.checkInCode,
-    this.checkedIn = false,
+    this.attendanceStatus = 'pending',
+    this.reminderSentAt,
+    this.reminderEmailStatus,
+    this.reminderPushStatus,
+    this.respondedAt,
   });
 
   final String rowId;
   final String status;
-  final String? checkInCode;
-  final bool checkedIn;
-
-  String get qrPayload => 'JUCHESS-CHECKIN:$rowId:${checkInCode ?? ''}';
+  final String attendanceStatus;
+  final String? reminderSentAt;
+  final String? reminderEmailStatus;
+  final String? reminderPushStatus;
+  final String? respondedAt;
 }
 
 class _TournamentCloudData {
@@ -1357,10 +1375,9 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
     final tournamentId = data['tournamentId']?.toString();
     final profileId = data['profileId']?.toString();
     final status = data['status']?.toString();
-    final checkedIn = data['checkedIn'] == true;
     if (tournamentId == null ||
         profileId == null ||
-        (status != 'confirmed' && !checkedIn) ||
+        status != 'confirmed' ||
         !profiles.containsKey(profileId)) {
       continue;
     }
@@ -1400,10 +1417,9 @@ Map<String, int> _groupRegistrationCounts(List<models.Row> rows) {
     final tournamentId = data['tournamentId']?.toString();
     final profileId = data['profileId']?.toString();
     final status = data['status']?.toString();
-    final checkedIn = data['checkedIn'] == true;
     if (tournamentId == null ||
         profileId == null ||
-        (status != 'confirmed' && !checkedIn) ||
+        status != 'confirmed' ||
         !countedPlayers.add('$tournamentId:$profileId')) {
       continue;
     }
@@ -1602,6 +1618,7 @@ class AppState extends ChangeNotifier {
   List<TournamentSeed> tournamentItems = const [];
   Map<String, MyRegistrationInfo> myRegistrations = {};
   final Set<String> _registrationMutations = {};
+  final Set<String> _attendanceMutations = {};
 
   Set<String> get registeredTournamentRowIds => myRegistrations.keys.toSet();
 
@@ -1900,6 +1917,10 @@ class AppState extends ChangeNotifier {
     return _registrationMutations.contains(event.rowId);
   }
 
+  bool isAttendanceBusy(TournamentSeed event) {
+    return _attendanceMutations.contains(event.rowId);
+  }
+
   Future<bool> ensurePlayerProfile() async {
     if (profileId != null) return true;
 
@@ -1963,7 +1984,6 @@ class AppState extends ChangeNotifier {
         event.rowId: const MyRegistrationInfo(
           rowId: 'preview-registration',
           status: 'confirmed',
-          checkInCode: 'JU-PREVIEW',
         ),
       };
       error = null;
@@ -2030,6 +2050,62 @@ class AppState extends ChangeNotifier {
       return false;
     } finally {
       _registrationMutations.remove(event.rowId);
+      authLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> respondToTournamentAttendance(
+    TournamentSeed event,
+    String status,
+  ) async {
+    final registration = myRegistrations[event.rowId];
+    if (!signedIn || registration == null) {
+      error = 'Sign in to answer for this registration.';
+      notifyListeners();
+      return false;
+    }
+    if (registration.status != 'confirmed') {
+      error = 'The organizer must accept this registration first.';
+      notifyListeners();
+      return false;
+    }
+
+    if (_isMemberPreview()) {
+      myRegistrations = {
+        ...myRegistrations,
+        event.rowId: MyRegistrationInfo(
+          rowId: registration.rowId,
+          status: registration.status,
+          attendanceStatus: status,
+          reminderSentAt: DateTime.now().toUtc().toIso8601String(),
+          reminderEmailStatus: 'unavailable',
+          reminderPushStatus: 'unavailable',
+          respondedAt: DateTime.now().toUtc().toIso8601String(),
+        ),
+      };
+      error = null;
+      notifyListeners();
+      return true;
+    }
+
+    if (!_attendanceMutations.add(event.rowId)) return true;
+    authLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      if (!await ensurePlayerProfile()) return false;
+      await service.respondToTournamentAttendance(
+        registrationRowId: registration.rowId,
+        status: status,
+      );
+      myRegistrations = await service.loadMyRegistrations(profileId!);
+      return true;
+    } catch (caught) {
+      error = appwriteMessage(caught);
+      return false;
+    } finally {
+      _attendanceMutations.remove(event.rowId);
       authLoading = false;
       notifyListeners();
     }
@@ -3828,6 +3904,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                         registered: registered,
                         registration: state.registrationFor(event),
                         registrationBusy: state.isRegistrationBusy(event),
+                        attendanceBusy: state.isAttendanceBusy(event),
                         assignedGame: assignedGame,
                         onRegister: () async {
                           if (!state.signedIn) {
@@ -3852,6 +3929,25 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                                           : 'Registration received. Organizers will review your spot.'
                                     : appState.error ??
                                           'Could not register right now.',
+                              ),
+                            ),
+                          );
+                        },
+                        onAttendance: (status) async {
+                          final appState = context.read<AppState>();
+                          final messenger = ScaffoldMessenger.of(context);
+                          final ok = await appState
+                              .respondToTournamentAttendance(event, status);
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                ok
+                                    ? status == 'confirmed'
+                                          ? 'Attendance confirmed.'
+                                          : 'Attendance declined.'
+                                    : appState.error ??
+                                          'Your attendance answer could not be saved.',
                               ),
                             ),
                           );
@@ -3975,8 +4071,10 @@ class _TournamentOverview extends StatelessWidget {
     required this.event,
     required this.registered,
     required this.onRegister,
+    required this.onAttendance,
     required this.onMain,
     required this.registrationBusy,
+    required this.attendanceBusy,
     this.assignedGame,
     this.registration,
   });
@@ -3986,7 +4084,9 @@ class _TournamentOverview extends StatelessWidget {
   final bool registered;
   final MyRegistrationInfo? registration;
   final bool registrationBusy;
+  final bool attendanceBusy;
   final VoidCallback onRegister;
+  final Future<void> Function(String status) onAttendance;
   final VoidCallback onMain;
 
   @override
@@ -4012,7 +4112,12 @@ class _TournamentOverview extends StatelessWidget {
                   child: child,
                 ),
               ),
-              child: _RegistrationStatusCard(registration: registration!),
+              child: _RegistrationStatusCard(
+                event: event,
+                registration: registration!,
+                busy: attendanceBusy,
+                onAttendance: onAttendance,
+              ),
             ),
             const SizedBox(height: 12),
           ],
@@ -4541,9 +4646,17 @@ String _formatMediaSize(int bytes) {
 }
 
 class _RegistrationStatusCard extends StatelessWidget {
-  const _RegistrationStatusCard({required this.registration});
+  const _RegistrationStatusCard({
+    required this.event,
+    required this.registration,
+    required this.busy,
+    required this.onAttendance,
+  });
 
+  final TournamentSeed event;
   final MyRegistrationInfo registration;
+  final bool busy;
+  final Future<void> Function(String status) onAttendance;
 
   @override
   Widget build(BuildContext context) {
@@ -4553,8 +4666,8 @@ class _RegistrationStatusCard extends StatelessWidget {
       return const _RegistrationNotice(
         title: 'Registration pending',
         body:
-            'Your spot is waiting for organizer approval. Your check-in code '
-            'will appear here once you are accepted.',
+            'Your spot is waiting for organizer approval. The accepted status '
+            'will appear here after the admin reviews it.',
       );
     }
 
@@ -4565,11 +4678,36 @@ class _RegistrationStatusCard extends StatelessWidget {
       );
     }
 
-    final code = registration.checkInCode;
-    if (code == null || code.isEmpty) {
+    final startsAt = DateTime.tryParse(event.startsAt ?? '')?.toUtc();
+    if (startsAt == null) {
       return const _RegistrationNotice(
-        title: 'You are in!',
-        body: 'Your check-in code is on its way. Check back before the event.',
+        title: 'Registration accepted',
+        body:
+            'Attendance confirmation will open after the organizer schedules '
+            'the tournament start time.',
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    final started = !now.isBefore(startsAt);
+    final promptOpen =
+        registration.reminderSentAt != null ||
+        (!started &&
+            !now.isBefore(startsAt.subtract(const Duration(hours: 1))));
+    if (started && registration.attendanceStatus != 'confirmed') {
+      return const _RegistrationNotice(
+        title: 'Attendance not confirmed',
+        body:
+            'No Yes response was received before the tournament started. The '
+            'admin panel shows this registration as not confirmed.',
+      );
+    }
+    if (!promptOpen) {
+      return const _RegistrationNotice(
+        title: 'Registration accepted',
+        body:
+            'One hour before the tournament, JuChess will ask you to confirm '
+            'attendance and will use your available notification channels.',
       );
     }
 
@@ -4580,58 +4718,63 @@ class _RegistrationStatusCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(13),
         border: Border.all(color: const Color(0x8CA98A3F)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          QrImageView(
-            data: registration.qrPayload,
-            version: QrVersions.auto,
-            size: 104,
-            backgroundColor: const Color(0xFFFDF8EC),
-            eyeStyle: const QrEyeStyle(
-              eyeShape: QrEyeShape.square,
-              color: PrototypeColors.black,
-            ),
-            dataModuleStyle: const QrDataModuleStyle(
-              dataModuleShape: QrDataModuleShape.square,
-              color: PrototypeColors.black,
+          const Text(
+            'DO YOU CONFIRM YOUR ATTENDANCE?',
+            style: TextStyle(
+              color: Color(0x99111111),
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'CHECK-IN CODE',
-                  style: TextStyle(
-                    color: Color(0x99111111),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  code,
-                  style: const TextStyle(
-                    color: PrototypeColors.black,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  registration.checkedIn
-                      ? 'Checked in at the venue'
-                      : 'Show this at the venue to check in',
-                  style: const TextStyle(
-                    color: Color(0x99111111),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 6),
+          Text(
+            registration.attendanceStatus == 'confirmed'
+                ? 'Your current answer is Yes.'
+                : registration.attendanceStatus == 'declined'
+                ? 'Your current answer is No.'
+                : 'Please answer before the tournament begins.',
+            style: const TextStyle(
+              color: PrototypeColors.black,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: busy ? null : () => onAttendance('confirmed'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor:
+                        registration.attendanceStatus == 'confirmed'
+                        ? const Color(0xFF2E7D5B)
+                        : PrototypeColors.burgundy,
+                    foregroundColor: PrototypeColors.cream,
+                  ),
+                  child: Text(busy ? 'Saving...' : 'Yes'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : () => onAttendance('declined'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: PrototypeColors.burgundy,
+                    side: BorderSide(
+                      color: registration.attendanceStatus == 'declined'
+                          ? PrototypeColors.burgundy
+                          : const Color(0x40111111),
+                    ),
+                  ),
+                  child: const Text('No'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -12349,12 +12492,14 @@ class AppNotificationSeed {
     required this.body,
     required this.time,
     this.actionLabel,
+    this.tournamentRowId,
   });
 
   final String title;
   final String body;
   final String time;
   final String? actionLabel;
+  final String? tournamentRowId;
 }
 
 AppNotificationSeed latestNotificationFor(AppState state) {
@@ -12377,12 +12522,48 @@ AppNotificationSeed latestNotificationFor(AppState state) {
         time: 'Latest',
       );
     }
-    if (registration.status == 'confirmed' && !registration.checkedIn) {
-      return const AppNotificationSeed(
-        title: 'You are registered',
+    if (registration.status == 'confirmed') {
+      TournamentSeed? tournament;
+      for (final item in state.tournamentItems) {
+        if (item.rowId == entry.key) {
+          tournament = item;
+          break;
+        }
+      }
+      final startsAt = DateTime.tryParse(tournament?.startsAt ?? '')?.toUtc();
+      final now = DateTime.now().toUtc();
+      final due =
+          registration.reminderSentAt != null ||
+          (startsAt != null &&
+              now.isBefore(startsAt) &&
+              !now.isBefore(startsAt.subtract(const Duration(hours: 1))));
+      if (due && registration.attendanceStatus == 'pending') {
+        return AppNotificationSeed(
+          title: 'Confirm your attendance',
+          body:
+              '${tournament?.name ?? 'Your tournament'} starts in one hour. Answer Yes or No before it begins.',
+          time: 'Now',
+          actionLabel: 'Answer now',
+          tournamentRowId: entry.key,
+        );
+      }
+      if (registration.attendanceStatus == 'confirmed') {
+        return AppNotificationSeed(
+          title: 'Attendance confirmed',
+          body:
+              'Your attendance for ${tournament?.name ?? 'the tournament'} is confirmed.',
+          time: 'Latest',
+          actionLabel: 'View tournament',
+          tournamentRowId: entry.key,
+        );
+      }
+      return AppNotificationSeed(
+        title: 'Registration accepted',
         body:
-            'Your check-in code is ready. Open the tournament page before the event.',
+            'JuChess will ask you to confirm attendance one hour before ${tournament?.name ?? 'the tournament'}.',
         time: 'Latest',
+        actionLabel: 'View tournament',
+        tournamentRowId: entry.key,
       );
     }
   }
@@ -12483,7 +12664,23 @@ class NotificationScreen extends StatelessWidget {
                 const SizedBox(height: 18),
                 PrototypeButton(
                   label: notification.actionLabel!,
-                  onTap: () => showAuthSheet(context),
+                  onTap: () {
+                    final rowId = notification.tournamentRowId;
+                    if (rowId == null) {
+                      showAuthSheet(context);
+                      return;
+                    }
+                    final state = context.read<AppState>();
+                    for (final event in state.tournamentItems) {
+                      if (event.rowId == rowId) {
+                        openPrototypeRoute(
+                          context,
+                          TournamentDetailScreen(event: event),
+                        );
+                        return;
+                      }
+                    }
+                  },
                 ),
               ],
             ],

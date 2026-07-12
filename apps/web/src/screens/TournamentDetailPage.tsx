@@ -15,7 +15,6 @@ import {
   Trophy,
   X,
 } from 'lucide-react'
-import QRCode from 'qrcode'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { TournamentMiniBoard } from '../components/TournamentMiniBoard'
@@ -35,11 +34,12 @@ import {
 } from '../lib/juchess'
 import {
   cancelMyRegistration,
-  checkInQrPayload,
-  loadMyCheckIn,
+  loadMyAttendance,
   loadMyRegistration,
   registerForTournament,
-  type MyCheckIn,
+  respondToAttendance,
+  type AttendanceStatus,
+  type MyAttendanceConfirmation,
   type MyRegistration,
 } from '../lib/registrations'
 import './TournamentDetailPage.css'
@@ -554,9 +554,10 @@ function RegistrationTab({
 function RegistrationActions({ tournament }: { tournament: Tournament }) {
   const { loading: authLoading, profile, refresh, user } = useAuth()
   const [registration, setRegistration] = useState<MyRegistration | null>(null)
-  const [checkIn, setCheckIn] = useState<MyCheckIn | null>(null)
+  const [attendance, setAttendance] = useState<MyAttendanceConfirmation | null>(null)
   const [registrationLoading, setRegistrationLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [attendanceBusy, setAttendanceBusy] = useState<AttendanceStatus | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const registrationLockRef = useRef(false)
 
@@ -571,21 +572,21 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   const refreshRegistration = useCallback(async () => {
     if (!tournamentRowId || !profileId) {
       setRegistration(null)
-      setCheckIn(null)
+      setAttendance(null)
       return
     }
 
     setRegistrationLoading(true)
     try {
-      const [nextRegistration, nextCheckIn] = await Promise.all([
+      const [nextRegistration, nextAttendance] = await Promise.all([
         loadMyRegistration(tournamentRowId, profileId),
-        loadMyCheckIn(tournamentRowId, profileId),
+        loadMyAttendance(tournamentRowId, profileId),
       ])
       setRegistration(nextRegistration)
-      setCheckIn(nextCheckIn)
+      setAttendance(nextAttendance)
     } catch {
       setRegistration(null)
-      setCheckIn(null)
+      setAttendance(null)
     } finally {
       setRegistrationLoading(false)
     }
@@ -593,6 +594,8 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
 
   useEffect(() => {
     void refreshRegistration()
+    const timer = window.setInterval(() => void refreshRegistration(), 60_000)
+    return () => window.clearInterval(timer)
   }, [refreshRegistration])
 
   if (authLoading) {
@@ -674,12 +677,28 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
     setMessage(null)
     try {
       setRegistration(await cancelMyRegistration(registration.$id))
-      setCheckIn(null)
+      setAttendance(null)
       setMessage('Your registration was cancelled.')
     } catch {
       setMessage('Could not cancel right now. Ask an organizer for help at the venue.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleAttendance(status: Exclude<AttendanceStatus, 'pending'>) {
+    if (!registration || attendanceBusy) return
+    setAttendanceBusy(status)
+    setMessage(null)
+    try {
+      setAttendance(await respondToAttendance(registration.$id, status))
+      setMessage(status === 'confirmed'
+        ? 'Attendance confirmed. We will see you at the tournament.'
+        : 'Attendance declined. The organizer has been notified in the admin panel.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Your attendance answer could not be saved.')
+    } finally {
+      setAttendanceBusy(null)
     }
   }
 
@@ -709,7 +728,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
         ) : status === 'pending' ? (
           <>
             <h2>Registration pending</h2>
-            <p>Your spot is waiting for organizer approval. Your check-in code will appear here once you are accepted.</p>
+            <p>Your spot is waiting for organizer approval. You will see an accepted status here after the admin reviews it.</p>
           </>
         ) : status === 'waitlisted' ? (
           <>
@@ -718,9 +737,14 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
           </>
         ) : (
           <>
-            <h2>You are in!</h2>
-            <p>Show this code at the venue to check in for {tournament.name}.</p>
-            <CheckInPass checkIn={checkIn} />
+            <h2>Registration accepted</h2>
+            <AttendancePrompt
+              attendance={attendance}
+              busy={attendanceBusy}
+              onAnswer={handleAttendance}
+              startsAt={tournament.startsAt}
+              tournamentName={tournament.name}
+            />
           </>
         )}
         {message ? <p className="register-message" role="status">{message}</p> : null}
@@ -737,8 +761,6 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
             {busy || registrationLoading ? <LoaderCircle className="registration-spinner" size={16} aria-hidden="true" /> : null}
             {registrationLoading ? 'Checking...' : busy ? 'Registering...' : 'Register'}
           </button>
-        ) : checkIn?.checkedIn || registration?.checkedIn ? (
-          <span className="checkin-done">Checked in</span>
         ) : (
           <button type="button" className="secondary-action" disabled={busy} onClick={handleCancel}>
             {busy ? 'Cancelling...' : 'Cancel registration'}
@@ -749,31 +771,67 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   )
 }
 
-function CheckInPass({ checkIn }: { checkIn: MyCheckIn | null }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+function AttendancePrompt({
+  attendance,
+  busy,
+  onAnswer,
+  startsAt,
+  tournamentName,
+}: {
+  attendance: MyAttendanceConfirmation | null
+  busy: AttendanceStatus | null
+  onAnswer: (status: Exclude<AttendanceStatus, 'pending'>) => Promise<void>
+  startsAt?: string
+  tournamentName: string
+}) {
+  const startsAtMs = Date.parse(startsAt ?? '')
+  const nowMs = Date.now()
+  const scheduled = Number.isFinite(startsAtMs)
+  const started = scheduled && nowMs >= startsAtMs
+  const promptOpen = Boolean(attendance?.reminderSentAt)
+    || (scheduled && nowMs >= startsAtMs - 60 * 60 * 1000 && !started)
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || !checkIn) return
-
-    QRCode.toCanvas(canvas, checkInQrPayload(checkIn), {
-      width: 148,
-      margin: 1,
-      color: { dark: '#111111', light: '#FDF8EC' },
-    }).catch(() => undefined)
-  }, [checkIn])
-
-  if (!checkIn) {
-    return <p className="checkin-note">Your check-in code is on its way. Check back before the event.</p>
+  if (!scheduled) {
+    return <p className="attendance-note">The admin accepted you. Attendance confirmation will open after the tournament start time is scheduled.</p>
+  }
+  if (started && attendance?.status !== 'confirmed') {
+    return <p className="attendance-status missed">Attendance was not confirmed before the tournament started.</p>
+  }
+  if (!promptOpen) {
+    return (
+      <p className="attendance-note">
+        One hour before {tournamentName}, JuChess will ask you to confirm attendance here and will try your available email and app notification channels.
+      </p>
+    )
   }
 
   return (
-    <div className="checkin-pass">
-      <canvas ref={canvasRef} aria-label="Check-in QR code" />
-      <div>
-        <span>Check-in code</span>
-        <strong>{checkIn.code}</strong>
-        <small>{checkIn.checkedIn ? 'Checked in at the venue' : 'Keep this ready at the venue'}</small>
+    <div className="attendance-prompt">
+      <strong>Do you confirm your attendance?</strong>
+      <p>
+        {attendance?.status === 'confirmed'
+          ? 'Your current answer is Yes.'
+          : attendance?.status === 'declined'
+            ? 'Your current answer is No.'
+            : 'Please answer before the tournament begins.'}
+      </p>
+      <div className="attendance-prompt-actions">
+        <button
+          type="button"
+          className={attendance?.status === 'confirmed' ? 'selected' : ''}
+          disabled={Boolean(busy)}
+          onClick={() => void onAnswer('confirmed')}
+        >
+          {busy === 'confirmed' ? 'Saving…' : 'Yes, I will attend'}
+        </button>
+        <button
+          type="button"
+          className={attendance?.status === 'declined' ? 'selected decline' : 'decline'}
+          disabled={Boolean(busy)}
+          onClick={() => void onAnswer('declined')}
+        >
+          {busy === 'declined' ? 'Saving…' : 'No, I cannot attend'}
+        </button>
       </div>
     </div>
   )

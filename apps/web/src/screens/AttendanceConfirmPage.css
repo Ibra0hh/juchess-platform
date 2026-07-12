@@ -1,0 +1,121 @@
+.attendance-page-shell {
+  min-height: 100vh;
+  background: #f7efe2;
+}
+
+.attendance-page {
+  min-height: calc(100vh - 92px);
+  display: grid;
+  place-items: center;
+  padding: 40px 18px 72px;
+}
+
+.attendance-card {
+  width: min(100%, 560px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 38px;
+  text-align: center;
+  color: #111;
+  background: #fffaf0;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(68, 38, 24, 0.12);
+}
+
+.attendance-card > img {
+  width: 68px;
+  height: 68px;
+  object-fit: contain;
+}
+
+.attendance-card h1 {
+  margin: 2px 0 0;
+  font-family: Georgia, serif;
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  line-height: 1.1;
+}
+
+.attendance-card p {
+  max-width: 46ch;
+  margin: 0;
+  color: rgba(17, 17, 17, 0.68);
+  line-height: 1.6;
+}
+
+.attendance-card svg {
+  color: #7a2431;
+}
+
+.attendance-loader {
+  animation: attendance-spin 0.8s linear infinite;
+}
+
+.attendance-eyebrow {
+  color: #7a2431;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.attendance-buttons {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.attendance-buttons button,
+.attendance-secondary {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.attendance-buttons button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.attendance-yes {
+  color: #fffaf0;
+  background: #7a2431;
+  border: 1px solid #7a2431;
+}
+
+.attendance-no,
+.attendance-secondary {
+  color: #111;
+  background: transparent;
+  border: 1px solid rgba(17, 17, 17, 0.25);
+}
+
+.attendance-secondary {
+  margin-top: 4px;
+}
+
+.attendance-card .attendance-error {
+  color: #8b1e2e;
+  font-weight: 700;
+}
+
+@keyframes attendance-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 560px) {
+  .attendance-page { padding: 24px 14px 54px; }
+  .attendance-card { padding: 28px 20px; }
+  .attendance-buttons { grid-template-columns: 1fr; }
+}

@@ -107,14 +107,37 @@ Fields:
 - `tournamentId` string, required.
 - `profileId` string, required.
 - `status` enum: `pending`, `confirmed`, `waitlisted`, `cancelled`.
+  `confirmed` is the stored compatibility value for an admin-accepted player.
 - `seed` integer, optional.
-- `checkInCode` string, optional.
-- `checkedIn` boolean, default `false`.
+- `checkInCode` string, legacy only. New flows always leave it empty.
+- `checkedIn` boolean, legacy only. QR/code check-in is retired.
 
 Permissions:
 - Player can read own registrations.
 - Tournament organizer/admin can read registrations.
-- Admin Function confirms/checks in players.
+- Admin Function accepts, waitlists, cancels, or rejects players.
+
+### `attendance_confirmations`
+
+Private one-hour attendance response for an accepted registration. This table
+replaces QR codes and check-in codes.
+
+Fields:
+- `tournamentId`, `profileId`, `registrationId`, and `accountId` strings,
+  required. `registrationId` is unique.
+- `status` enum: `pending`, `confirmed`, `declined`.
+- `tokenNonce` and `tokenHash` strings used for secure email links. The raw
+  token is never stored.
+- `tokenExpiresAt`, `reminderSentAt`, `respondedAt`, `createdAt`, and
+  `updatedAt` datetimes.
+- `reminderEmailStatus` and `reminderPushStatus` strings for delivery state.
+- `emailMessageId`, `pushMessageId`, `lastDeliveryError`, and `responseSource`
+  strings for audit and admin visibility.
+
+Permissions:
+- The owning player can read the row used by web/mobile in-app prompts.
+- Only server Functions can create or update attendance responses.
+- Admins read tournament attendance through `admin-actions`.
 
 ### `games`
 
@@ -264,7 +287,7 @@ Responsibilities:
 - Approve member accounts.
 - Permanently delete player profiles and Auth accounts only when they have no tournament game history or admin access; dependent registrations, check-ins, and standings are removed first.
 - Create/update tournaments.
-- Confirm registrations and check-ins.
+- Accept or reject registrations and report attendance responses.
 - Publish pairings/results.
 - Recalculate standings.
 - Manage announcements.
@@ -288,10 +311,17 @@ Implemented routes:
 - `DELETE /tournaments/:id`
 - `POST /registrations/:id/confirm`
 - `POST /registrations/:id/status`
+- `GET /tournaments/:id/attendance`
 - `POST /games/:id/result`
 - `POST /profiles/:id/role`
 - `POST /profiles/:id/status`
 - `POST /announcements`
+
+Player registration mutations use the authenticated `player-actions` Function,
+including `POST /registrations/:id/attendance` for the final-hour Yes/No
+answer. Email links use the public `attendance-actions` Function with
+`POST /resolve` and `POST /respond`; the server validates a hashed,
+tournament-scoped token and rejects expired invitations.
 
 ## First Guard Function
 

@@ -16,6 +16,7 @@ export const appwriteConfig = {
   accessGuardFunctionId: import.meta.env.VITE_APPWRITE_ACCESS_GUARD_FUNCTION_ID ?? 'access-guards',
   adminFunctionId: import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions',
   playerFunctionId: import.meta.env.VITE_APPWRITE_PLAYER_FUNCTION_ID ?? 'player-actions',
+  attendanceFunctionId: import.meta.env.VITE_APPWRITE_ATTENDANCE_FUNCTION_ID ?? 'attendance-actions',
 }
 
 export const appwriteReady = Boolean(

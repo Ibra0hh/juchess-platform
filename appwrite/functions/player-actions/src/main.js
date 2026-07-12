@@ -1,15 +1,16 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { Account, Client, Permission, Query, Role, TablesDB } from 'node-appwrite';
 
 // Player-facing writes. Everything a signed-in student is allowed to change
 // about their own registration goes through here, so the client can never pick
-// its own status, profileId, or check-in code.
+// its own approval status or profileId.
 
 const tableIds = {
   profiles: 'profiles',
   tournaments: 'tournaments',
   registrations: 'registrations',
   checkIns: 'check_ins',
+  attendance: 'attendance_confirmations',
 };
 
 const OPEN_TOURNAMENT_STATUSES = ['upcoming'];
@@ -95,11 +96,64 @@ export function registrationRowId(tournamentId, profileId) {
   return `reg_${digest}`;
 }
 
+export function attendanceRowId(registrationId) {
+  const digest = createHash('sha256').update(String(registrationId)).digest('hex').slice(0, 32);
+  return `att_${digest}`;
+}
+
+export function attendanceWindowState(startsAtValue, nowMs = Date.now()) {
+  const startsAt = Date.parse(String(startsAtValue ?? ''));
+  if (!Number.isFinite(startsAt)) return 'unscheduled';
+  if (nowMs >= startsAt) return 'closed';
+  if (nowMs < startsAt - (60 * 60 * 1000)) return 'early';
+  return 'open';
+}
+
+async function findAttendance(tablesDB, databaseId, registrationId) {
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.attendance,
+    queries: [Query.equal('registrationId', registrationId), Query.limit(1)],
+    total: false,
+  });
+  return response.rows[0] ?? null;
+}
+
+async function ensureAttendance(tablesDB, databaseId, registration, accountId) {
+  const existing = await findAttendance(tablesDB, databaseId, registration.$id);
+  if (existing) return existing;
+  const now = new Date().toISOString();
+  try {
+    return await tablesDB.createRow({
+      databaseId,
+      tableId: tableIds.attendance,
+      rowId: attendanceRowId(registration.$id),
+      data: {
+        tournamentId: registration.tournamentId,
+        profileId: registration.profileId,
+        registrationId: registration.$id,
+        accountId,
+        status: 'pending',
+        tokenNonce: randomBytes(16).toString('hex'),
+        reminderEmailStatus: 'pending',
+        reminderPushStatus: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      },
+      permissions: [Permission.read(Role.user(accountId))],
+    });
+  } catch (cause) {
+    if (!isConflict(cause)) throw cause;
+    const raced = await findAttendance(tablesDB, databaseId, registration.$id);
+    if (!raced) throw cause;
+    return raced;
+  }
+}
+
 export function selectCanonicalRegistration(rows) {
   const statusRank = { confirmed: 4, waitlisted: 3, pending: 2, cancelled: 1 };
   return [...rows].sort((left, right) => (
-    Number(Boolean(right.checkedIn)) - Number(Boolean(left.checkedIn))
-    || (statusRank[right.status] ?? 0) - (statusRank[left.status] ?? 0)
+    (statusRank[right.status] ?? 0) - (statusRank[left.status] ?? 0)
     || String(left.$createdAt ?? '').localeCompare(String(right.$createdAt ?? ''))
   ))[0] ?? null;
 }
@@ -127,7 +181,11 @@ export default async ({ req, res, log, error }) => {
     return res.json({
       ok: true,
       service: 'juchess-player-actions',
-      routes: ['POST /registrations', 'POST /registrations/:id/cancel'],
+      routes: [
+        'POST /registrations',
+        'POST /registrations/:id/cancel',
+        'POST /registrations/:id/attendance',
+      ],
     });
   }
 
@@ -231,7 +289,12 @@ export default async ({ req, res, log, error }) => {
         data: { status: 'cancelled', checkedIn: false },
       });
 
-      // A cancelled player must not keep a usable check-in pass.
+      const attendance = await findAttendance(tablesDB, databaseId, registration.$id);
+      if (attendance) {
+        await tablesDB.deleteRow({ databaseId, tableId: tableIds.attendance, rowId: attendance.$id });
+      }
+
+      // Clean up an obsolete pass created by an older deployment.
       const codes = await tablesDB.listRows({
         databaseId,
         tableId: tableIds.checkIns,
@@ -247,6 +310,61 @@ export default async ({ req, res, log, error }) => {
       }
 
       return res.json({ ok: true, action: 'cancelRegistration', row });
+    }
+
+    if (method === 'POST' && segments[0] === 'registrations' && segments[1] && segments[2] === 'attendance') {
+      const status = String(body.status ?? '');
+      if (!['confirmed', 'declined'].includes(status)) {
+        return res.json({ ok: false, error: 'Choose Yes or No to answer the attendance question.' }, 400);
+      }
+
+      let registration;
+      try {
+        registration = await tablesDB.getRow({
+          databaseId,
+          tableId: tableIds.registrations,
+          rowId: segments[1],
+        });
+      } catch {
+        return res.json({ ok: false, error: 'That registration does not exist.' }, 404);
+      }
+      if (registration.profileId !== profile.$id) {
+        return res.json({ ok: false, error: 'You can answer only for your own registration.' }, 403);
+      }
+      if (registration.status !== 'confirmed') {
+        return res.json({ ok: false, error: 'The organizer must accept this registration first.' }, 409);
+      }
+
+      const tournament = await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: registration.tournamentId,
+      });
+      const attendance = await ensureAttendance(tablesDB, databaseId, registration, accountId);
+      const windowState = attendanceWindowState(tournament.startsAt);
+      if (windowState === 'unscheduled') {
+        return res.json({ ok: false, error: 'The organizer has not scheduled the tournament start time yet.' }, 409);
+      }
+      if (windowState === 'closed') {
+        return res.json({ ok: false, error: 'Attendance confirmation closed when the tournament started.' }, 409);
+      }
+      if (windowState === 'early' && !attendance.reminderSentAt) {
+        return res.json({ ok: false, error: 'Attendance confirmation opens one hour before the tournament.' }, 409);
+      }
+
+      const now = new Date().toISOString();
+      const row = await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.attendance,
+        rowId: attendance.$id,
+        data: {
+          status,
+          respondedAt: now,
+          responseSource: body.source === 'app' ? 'app' : 'web',
+          updatedAt: now,
+        },
+      });
+      return res.json({ ok: true, action: 'respondToAttendance', row });
     }
 
     return res.json({ ok: false, error: `No player action for ${method} ${path}` }, 404);

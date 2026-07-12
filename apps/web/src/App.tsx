@@ -7,6 +7,7 @@ import { TournamentPlayGuard } from './components/TournamentPlayGuard'
 import { useOnlineTournamentPlayLock } from './lib/onlineTournamentPlayLock'
 
 const AuthPage = lazy(() => import('./screens/AuthPage'))
+const AttendanceConfirmPage = lazy(() => import('./screens/AttendanceConfirmPage'))
 const ForgotPasswordPage = lazy(() => import('./screens/ForgotPasswordPage'))
 const GamesPage = lazy(() => import('./screens/GamesPage'))
 const HomePage = lazy(() => import('./screens/HomePage'))
@@ -48,6 +49,7 @@ function App() {
               <Route path="/" element={<Navigate to="/home" replace />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/tournaments" element={<TournamentsPage />} />
+              <Route path="/attendance-confirm" element={<AttendanceConfirmPage />} />
               <Route path="/tournament/:id" element={<TournamentDetailPage />} />
               <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
               <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />

@@ -31,7 +31,6 @@ import {
   countPendingRegistrations,
   configureTournamentProcedure,
   loadClubPlayers,
-  loadTournamentCheckIns,
   loadTournamentFairPlayReport,
   loadTournamentRegistrations,
   loadBlockLists,
@@ -209,7 +208,6 @@ function ClockTimePicker({
                 <button type="button" className={phase === 'hour' ? 'active' : undefined} onClick={() => setPhase('hour')}>
                   {String(hour).padStart(2, '0')}
                 </button>
-                <span>:</span>
                 <button type="button" className={phase === 'minute' ? 'active' : undefined} onClick={() => setPhase('minute')}>
                   {String(minute).padStart(2, '0')}
                 </button>
@@ -1068,7 +1066,7 @@ function DashboardScreen({
             <div className="dispute-row">
               <div>
                 <strong>{pendingCount} player{pendingCount === 1 ? '' : 's'} waiting for approval</strong>
-                <small>Approve them in a tournament&apos;s registration queue to issue check-in codes.</small>
+                <small>Review each request in the tournament registration queue and accept or waitlist the player.</small>
               </div>
               <button type="button" className="mini-button" onClick={goTournaments}>Review</button>
             </div>
@@ -1119,20 +1117,12 @@ function QueueRow({
 }
 
 async function loadManagedTournamentParticipantRows(tournamentRowId: string) {
-  const [result, checkIns] = await Promise.all([
-    loadTournamentRegistrations(tournamentRowId),
-    loadTournamentCheckIns(tournamentRowId),
-  ])
-  const codeByProfile = new Map(checkIns.map((entry) => [entry.profileId, entry]))
+  const result = await loadTournamentRegistrations(tournamentRowId)
 
   return {
     error: result.error,
     registrations: result.registrations
-      .map((item) => {
-        const entry = codeByProfile.get(item.profileId)
-        return entry ? { ...item, checkInCode: entry.code, checkedIn: entry.checkedIn } : item
-      })
-      .filter((item) => item.status === 'confirmed' || item.checkedIn),
+      .filter((item) => item.status === 'confirmed'),
   }
 }
 
@@ -1613,21 +1603,6 @@ function TournamentsScreen({
     }
   }
 
-  async function handleRegistrationCheckIn(item: AdminRegistration, checkedIn: boolean) {
-    setRegistrationActionId(item.rowId)
-    setMessage(null)
-
-    try {
-      await updateRegistrationStatus(item.rowId, { checkedIn })
-      setMessage(checkedIn ? 'Player checked in.' : 'Check-in cleared.')
-      await refreshRegistrationQueue()
-    } catch (error) {
-      setMessage(formatAdminError(error))
-    } finally {
-      setRegistrationActionId(null)
-    }
-  }
-
   async function handleAddParticipant(item: AdminTournament, profileId: string) {
     if (!item.rowId) {
       setMessage('Only cloud tournaments can add participants.')
@@ -1641,7 +1616,7 @@ function TournamentsScreen({
       await addTournamentParticipant(item.rowId, profileId)
       const refreshed = await loadManagedTournamentParticipantRows(item.rowId)
       setManagedRegistrations(refreshed.registrations)
-      setMessage('Participant added and confirmed. A check-in code was issued.')
+      setMessage('Participant added and accepted. Attendance confirmation will open one hour before the tournament.')
       await onChanged()
       return true
     } catch (error) {
@@ -2045,7 +2020,7 @@ function TournamentsScreen({
               <span>Permanent action</span>
               <h2 id="delete-tournament-title">Delete tournament?</h2>
               <p id="delete-tournament-description">
-                <strong>{deleteTarget.name}</strong> and its registrations, check-ins, games, standings, bracket, and procedure data will be permanently removed.
+                <strong>{deleteTarget.name}</strong> and its registrations, attendance responses, games, standings, bracket, and procedure data will be permanently removed.
               </p>
             </div>
             <div className="delete-tournament-actions">
@@ -2079,7 +2054,6 @@ function TournamentsScreen({
         <RegistrationQueue
           actionId={registrationActionId}
           loading={registrationsLoading}
-          onCheckInChange={handleRegistrationCheckIn}
           onSelectedChange={setSelectedTournamentKey}
           onStatusChange={handleRegistrationStatus}
           registrations={registrations}
@@ -4216,7 +4190,6 @@ function initialLiveBoardState(board: LiveBoardOption): LiveBoardState {
 function RegistrationQueue({
   actionId,
   loading,
-  onCheckInChange,
   onSelectedChange,
   onStatusChange,
   registrations,
@@ -4226,7 +4199,6 @@ function RegistrationQueue({
 }: {
   actionId: string | null
   loading: boolean
-  onCheckInChange: (item: AdminRegistration, checkedIn: boolean) => Promise<void>
   onSelectedChange: (key: string) => void
   onStatusChange: (item: AdminRegistration, status: AdminRegistrationStatus) => Promise<void>
   registrations: AdminRegistration[]
@@ -4273,9 +4245,9 @@ function RegistrationQueue({
                 <th>Player</th>
                 <th>University ID</th>
                 <th>Rating</th>
-                <th>Status</th>
+                <th>Approval</th>
                 <th>Seed</th>
-                <th>Check-in</th>
+                <th>Attendance</th>
                 <th className="right">Actions</th>
               </tr>
             </thead>
@@ -4290,13 +4262,10 @@ function RegistrationQueue({
                     </td>
                     <td>{item.universityId || 'Not set'}</td>
                     <td className="mono center">{item.rating ?? '-'}</td>
-                    <td><StatusPill status={item.status} /></td>
+                    <td><StatusPill status={item.status === 'confirmed' ? 'accepted' : item.status} /></td>
                     <td className="mono center">{item.seed ?? '-'}</td>
                     <td>
-                      {item.checkedIn ? 'Checked in' : 'Not checked in'}
-                      {item.status === 'confirmed' && item.checkInCode ? (
-                        <small className="checkin-code">{item.checkInCode}</small>
-                      ) : null}
+                      <AttendanceAdminState item={item} tournament={selectedTournament} />
                     </td>
                     <td className="right">
                       <select
@@ -4307,18 +4276,10 @@ function RegistrationQueue({
                         onChange={(event) => void onStatusChange(item, event.target.value as AdminRegistrationStatus)}
                       >
                         <option value="pending">Pending</option>
-                        <option value="confirmed">Confirmed</option>
+                        <option value="confirmed">Accepted</option>
                         <option value="waitlisted">Waitlisted</option>
                         <option value="cancelled">Cancelled</option>
                       </select>
-                      <button
-                        type="button"
-                        className="mini-button ghost"
-                        disabled={busy || item.status === 'cancelled'}
-                        onClick={() => void onCheckInChange(item, !item.checkedIn)}
-                      >
-                        {item.checkedIn ? 'Undo check-in' : 'Check in'}
-                      </button>
                     </td>
                   </tr>
                 )
@@ -4331,6 +4292,71 @@ function RegistrationQueue({
       )}
     </section>
   )
+}
+
+function AttendanceAdminState({
+  item,
+  tournament,
+}: {
+  item: AdminRegistration
+  tournament: AdminTournament
+}) {
+  if (item.status !== 'confirmed') return <span className="attendance-admin-state muted">Not applicable</span>
+  if (item.attendanceStatus === 'confirmed') {
+    return (
+      <span className="attendance-admin-state confirmed">
+        Confirmed
+        <small>{attendanceResponseDetail(item)}</small>
+      </span>
+    )
+  }
+  if (item.attendanceStatus === 'declined') {
+    return (
+      <span className="attendance-admin-state declined">
+        Declined
+        <small>{attendanceResponseDetail(item)}</small>
+      </span>
+    )
+  }
+
+  const startsAt = Date.parse(tournament.startsAt ?? '')
+  const now = Date.now()
+  const label = !Number.isFinite(startsAt)
+    ? 'Start time not set'
+    : now >= startsAt
+      ? 'Not confirmed'
+      : item.attendanceRemindedAt || now >= startsAt - 60 * 60 * 1000
+        ? 'No response yet'
+        : 'Reminder scheduled'
+  const delivery = item.attendanceRemindedAt
+    ? `Email ${deliveryLabel(item.attendanceEmailStatus)} · App ${deliveryLabel(item.attendancePushStatus)}`
+    : 'Opens one hour before start'
+
+  return (
+    <span className={`attendance-admin-state ${label === 'Not confirmed' ? 'missed' : 'pending'}`}>
+      {label}
+      <small>{delivery}</small>
+    </span>
+  )
+}
+
+function attendanceResponseDetail(item: AdminRegistration) {
+  const source = item.attendanceResponseSource === 'email'
+    ? 'email link'
+    : item.attendanceResponseSource === 'app'
+      ? 'mobile app'
+      : 'website'
+  return item.attendanceRespondedAt
+    ? `${source} · ${new Date(item.attendanceRespondedAt).toLocaleString()}`
+    : source
+}
+
+function deliveryLabel(status: AdminRegistration['attendanceEmailStatus']) {
+  if (status === 'sent') return 'sent'
+  if (status === 'failed') return 'failed'
+  if (status === 'unavailable') return 'unavailable'
+  if (status === 'skipped') return 'skipped'
+  return 'pending'
 }
 
 function TournamentMiniTable({ tournaments }: { tournaments: AdminTournament[] }) {
@@ -4546,7 +4572,7 @@ function PlayersScreen({
               <span>Permanent action</span>
               <h2 id="delete-player-title">Delete {deleteTargets.length === 1 ? 'player' : `${deleteTargets.length} players`}?</h2>
               <p id="delete-player-description">
-                This removes the selected player accounts, registrations, check-ins, and standings. Players with tournament game history or admin access cannot be deleted.
+                This removes the selected player accounts, registrations, attendance responses, and standings. Players with tournament game history or admin access cannot be deleted.
               </p>
               <strong className="delete-player-names">{deleteTargets.map((player) => player.name).join(', ')}</strong>
             </div>

@@ -102,6 +102,10 @@ Provisioned resources:
 - Storage buckets: `avatars`, `tournament-assets`.
 - Function: `admin-actions`, runtime `node-22`, deployed from
   `appwrite/functions/admin-actions`.
+- Function: `player-actions`, runtime `node-22`, deployed from
+  `appwrite/functions/player-actions`.
+- Function: `attendance-actions`, runtime `node-22`, deployed from
+  `appwrite/functions/attendance-actions`.
 - Function: `access-guards`, runtime `node-22`, deployed from
   `appwrite/functions/access-guards`.
 
@@ -129,10 +133,20 @@ Appwrite project:
 npm run migrate:procedure
 npm run migrate:profile-usernames
 npm run migrate:tournament-live
+npm run migrate:attendance
 ```
 
 The migration uses the current Appwrite CLI login, or `APPWRITE_API_KEY` when
 running non-interactively. It never stores the key in the repository.
+
+Attendance confirmation uses the scheduled `admin-actions` execution once per
+minute. Accepted players receive the in-app Yes/No prompt during the final hour
+before `startsAt`. Secure email links additionally require a secret
+`ATTENDANCE_TOKEN_SECRET` variable on `admin-actions` and an enabled Appwrite
+email provider. Operating-system push notifications require an enabled push
+provider and a registered device target; without those provider credentials,
+the web and in-app confirmation flow remains available and the admin panel
+reports each unavailable delivery channel explicitly.
 
 To deploy the public access guard function:
 

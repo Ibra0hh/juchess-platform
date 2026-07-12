@@ -1,4 +1,5 @@
-import { Account, Client, ID, Permission, Query, Role, TablesDB, Teams, Users } from 'node-appwrite';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { Account, Client, ID, Messaging, Permission, Query, Role, TablesDB, Teams, Users } from 'node-appwrite';
 import { Chess } from 'chess.js';
 
 const tableIds = {
@@ -7,6 +8,7 @@ const tableIds = {
   tournaments: 'tournaments',
   registrations: 'registrations',
   checkIns: 'check_ins',
+  attendance: 'attendance_confirmations',
   games: 'games',
   gameMessages: 'game_messages',
   fairPlayEvents: 'fair_play_events',
@@ -117,68 +119,268 @@ function actorProfileId(req, body, actor) {
   return body.actorProfileId || actor?.$id || req.headers['x-appwrite-user-id'] || 'system';
 }
 
-function generateCheckInCode() {
-  // Unambiguous alphabet: no 0/O, 1/I/L so staff can read codes aloud at the venue.
-  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let index = 0; index < 6; index += 1) {
-    code += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return `JU-${code}`;
+const ATTENDANCE_WINDOW_MS = 60 * 60 * 1000;
+
+export function attendanceRowId(registrationId) {
+  const digest = createHash('sha256').update(String(registrationId)).digest('hex').slice(0, 32);
+  return `att_${digest}`;
 }
 
-async function findCheckIn(tablesDB, databaseId, tournamentId, profileId) {
+export function isAttendanceReminderDue(tournament, nowMs = Date.now()) {
+  const startsAt = Date.parse(String(tournament.startsAt ?? ''));
+  if (!Number.isFinite(startsAt)) return false;
+  const timeUntilStart = startsAt - nowMs;
+  return tournament.status === 'upcoming' && timeUntilStart > 0 && timeUntilStart <= ATTENDANCE_WINDOW_MS;
+}
+
+async function findAttendance(tablesDB, databaseId, registrationId) {
   const response = await tablesDB.listRows({
     databaseId,
-    tableId: tableIds.checkIns,
-    queries: [
-      Query.equal('tournamentId', tournamentId),
-      Query.equal('profileId', profileId),
-      Query.limit(1),
-    ],
+    tableId: tableIds.attendance,
+    queries: [Query.equal('registrationId', registrationId), Query.limit(1)],
     total: false,
   });
   return response.rows[0] ?? null;
 }
 
-// Check-in codes live in `check_ins`, which has no public read. The row grants
-// read only to the player's own account, so a confirmed student sees their pass
-// and nobody else's. Staff read them back through this function's API key.
-async function issueCheckInCode(tablesDB, databaseId, registration) {
-  const existing = await findCheckIn(tablesDB, databaseId, registration.tournamentId, registration.profileId);
+async function ensureAttendanceConfirmation(tablesDB, databaseId, registration, suppliedProfile = null) {
+  const existing = await findAttendance(tablesDB, databaseId, registration.$id);
   if (existing) return existing;
 
-  let accountId = null;
-  try {
-    const profile = await tablesDB.getRow({
+  const profile = suppliedProfile ?? await tablesDB.getRow({
       databaseId,
       tableId: tableIds.profiles,
       rowId: registration.profileId,
     });
-    accountId = profile.accountId || null;
-  } catch {
-    // A missing profile should not block the organizer's approval.
-  }
+  if (!profile.accountId) return null;
+  const now = new Date().toISOString();
 
-  return await tablesDB.createRow({
-    databaseId,
-    tableId: tableIds.checkIns,
-    rowId: ID.unique(),
-    data: {
-      tournamentId: registration.tournamentId,
-      profileId: registration.profileId,
-      registrationId: registration.$id,
-      code: generateCheckInCode(),
-      checkedIn: false,
-    },
-    permissions: accountId ? [Permission.read(Role.user(accountId))] : [],
-  });
+  try {
+    return await tablesDB.createRow({
+      databaseId,
+      tableId: tableIds.attendance,
+      rowId: attendanceRowId(registration.$id),
+      data: {
+        tournamentId: registration.tournamentId,
+        profileId: registration.profileId,
+        registrationId: registration.$id,
+        accountId: profile.accountId,
+        status: 'pending',
+        tokenNonce: randomBytes(16).toString('hex'),
+        reminderEmailStatus: 'pending',
+        reminderPushStatus: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      },
+      permissions: [Permission.read(Role.user(profile.accountId))],
+    });
+  } catch (cause) {
+    if (!isConflict(cause)) throw cause;
+    return await findAttendance(tablesDB, databaseId, registration.$id);
+  }
 }
 
-async function revokeCheckInCode(tablesDB, databaseId, registration) {
-  const existing = await findCheckIn(tablesDB, databaseId, registration.tournamentId, registration.profileId);
+async function deleteAttendanceConfirmation(tablesDB, databaseId, registration) {
+  const existing = await findAttendance(tablesDB, databaseId, registration.$id);
   if (!existing) return;
-  await tablesDB.deleteRow({ databaseId, tableId: tableIds.checkIns, rowId: existing.$id });
+  await tablesDB.deleteRow({ databaseId, tableId: tableIds.attendance, rowId: existing.$id });
+}
+
+// Old installations may still have an obsolete pass. It is deleted when a
+// registration changes, but no new pass is ever created.
+async function deleteLegacyCheckIn(tablesDB, databaseId, registration) {
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.checkIns,
+    queries: [
+      Query.equal('tournamentId', registration.tournamentId),
+      Query.equal('profileId', registration.profileId),
+      Query.limit(10),
+    ],
+    total: false,
+  }).catch(() => ({ rows: [] }));
+  for (const row of response.rows) {
+    await tablesDB.deleteRow({ databaseId, tableId: tableIds.checkIns, rowId: row.$id });
+  }
+}
+
+function attendanceToken(row, secret) {
+  return createHmac('sha256', secret)
+    .update(`${row.$id}:${row.tokenNonce}`)
+    .digest('base64url');
+}
+
+function attendanceMessageId(channel, rowId) {
+  const digest = createHash('sha256').update(`${channel}:${rowId}`).digest('hex').slice(0, 26);
+  return `att_${channel}_${digest}`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function isConflict(error) {
+  return error?.code === 409 || error?.response?.code === 409;
+}
+
+async function dispatchAttendanceReminders(tablesDB, messaging, databaseId, nowMs = Date.now()) {
+  const tournamentResponse = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.tournaments,
+    queries: [Query.equal('status', 'upcoming'), Query.limit(100)],
+    total: false,
+  });
+  const dueTournaments = tournamentResponse.rows.filter((row) => isAttendanceReminderDue(row, nowMs));
+  if (!dueTournaments.length) {
+    return { dueTournaments: 0, prompted: 0, emailSent: 0, pushSent: 0, emailProvider: false, pushProvider: false };
+  }
+
+  let providers = [];
+  try {
+    providers = (await messaging.listProviders({ queries: [Query.equal('enabled', true)], total: false })).providers;
+  } catch {
+    // A missing messaging scope or temporarily unavailable service must not
+    // prevent the in-app attendance prompt from being published.
+  }
+  const emailProvider = providers.some((provider) => provider.enabled && provider.type === 'email');
+  const pushProvider = providers.some((provider) => provider.enabled && provider.type === 'push');
+  const publicWebUrl = String(process.env.JUCHESS_PUBLIC_WEB_URL ?? 'https://ibra0hh.github.io/juchess-platform/web').replace(/\/$/, '');
+  const tokenSecret = process.env.ATTENDANCE_TOKEN_SECRET ?? '';
+  let prompted = 0;
+  let emailSent = 0;
+  let pushSent = 0;
+
+  for (const tournament of dueTournaments) {
+    const registrations = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.registrations,
+      queries: [
+        Query.equal('tournamentId', tournament.$id),
+        Query.limit(500),
+      ],
+      total: false,
+    });
+
+    for (const registration of registrations.rows.filter((row) => row.status === 'confirmed')) {
+      let attendance;
+      try {
+        attendance = await ensureAttendanceConfirmation(tablesDB, databaseId, registration);
+      } catch {
+        continue;
+      }
+      if (!attendance) continue;
+      if (attendance.status !== 'pending') continue;
+
+      const now = new Date(nowMs).toISOString();
+      const baseData = {
+        reminderSentAt: attendance.reminderSentAt ?? now,
+        reminderEmailStatus: emailProvider ? attendance.reminderEmailStatus : 'unavailable',
+        reminderPushStatus: pushProvider ? attendance.reminderPushStatus : 'unavailable',
+        updatedAt: now,
+      };
+      if (!attendance.reminderSentAt) prompted += 1;
+      attendance = await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.attendance,
+        rowId: attendance.$id,
+        data: baseData,
+      });
+
+      const deliveryErrors = [];
+      const deliveryData = {};
+      if (emailProvider && attendance.reminderEmailStatus !== 'sent') {
+        if (!tokenSecret) {
+          deliveryData.reminderEmailStatus = 'failed';
+          deliveryErrors.push('Attendance email secret is not configured.');
+        } else {
+          const token = attendanceToken(attendance, tokenSecret);
+          const tokenHash = createHash('sha256').update(token).digest('hex');
+          const messageId = attendance.emailMessageId || attendanceMessageId('email', attendance.$id);
+          const confirmUrl = `${publicWebUrl}/attendance-confirm?token=${encodeURIComponent(token)}`;
+          await tablesDB.updateRow({
+            databaseId,
+            tableId: tableIds.attendance,
+            rowId: attendance.$id,
+            data: {
+              tokenHash,
+              tokenExpiresAt: tournament.startsAt,
+              emailMessageId: messageId,
+              updatedAt: now,
+            },
+          });
+          try {
+            await messaging.createEmail({
+              messageId,
+              subject: `Confirm your attendance: ${tournament.name}`,
+              content: `<h2>Do you confirm your attendance?</h2><p>Your accepted registration for <strong>${escapeHtml(tournament.name)}</strong> starts at ${escapeHtml(new Date(tournament.startsAt).toLocaleString('en-US', { timeZone: 'Asia/Amman' }))}.</p><p><a href="${escapeHtml(confirmUrl)}" style="display:inline-block;padding:12px 18px;background:#7a2431;color:#fff;text-decoration:none;border-radius:8px">Answer Yes or No</a></p><p>If you do not answer before the tournament starts, the organizer will see that your attendance is not confirmed.</p>`,
+              users: [attendance.accountId],
+              html: true,
+              draft: false,
+            });
+            deliveryData.reminderEmailStatus = 'sent';
+            emailSent += 1;
+          } catch (cause) {
+            if (isConflict(cause)) {
+              deliveryData.reminderEmailStatus = 'sent';
+            } else {
+              deliveryData.reminderEmailStatus = 'failed';
+              deliveryErrors.push(`Email: ${String(cause?.message ?? cause).slice(0, 400)}`);
+            }
+          }
+        }
+      }
+
+      if (pushProvider && attendance.reminderPushStatus !== 'sent') {
+        const messageId = attendance.pushMessageId || attendanceMessageId('push', attendance.$id);
+        try {
+          await messaging.createPush({
+            messageId,
+            title: 'Confirm your JuChess attendance',
+            body: `${tournament.name} starts in one hour. Tap to answer Yes or No.`,
+            users: [attendance.accountId],
+            action: `${publicWebUrl}/tournament/${encodeURIComponent(tournament.slug ?? tournament.$id)}`,
+            data: { type: 'attendance_confirmation', tournamentId: tournament.$id },
+            draft: false,
+          });
+          deliveryData.reminderPushStatus = 'sent';
+          deliveryData.pushMessageId = messageId;
+          pushSent += 1;
+        } catch (cause) {
+          if (isConflict(cause)) {
+            deliveryData.reminderPushStatus = 'sent';
+          } else {
+            deliveryData.reminderPushStatus = 'failed';
+            deliveryErrors.push(`Push: ${String(cause?.message ?? cause).slice(0, 400)}`);
+          }
+        }
+      }
+
+      await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.attendance,
+        rowId: attendance.$id,
+        data: cleanObject({
+          ...deliveryData,
+          lastDeliveryError: deliveryErrors.length ? deliveryErrors.join(' | ').slice(0, 1000) : null,
+          updatedAt: now,
+        }),
+      });
+    }
+  }
+
+  return {
+    dueTournaments: dueTournaments.length,
+    prompted,
+    emailSent,
+    pushSent,
+    emailProvider,
+    pushProvider,
+  };
 }
 
 function normalizeResult(value) {
@@ -1746,11 +1948,11 @@ function assertParticipantCanBeAdded(tournament, games, registrations, profileId
   }
 
   const existing = registrations.find((row) => row.profileId === profileId) ?? null;
-  if (existing && (existing.status === 'confirmed' || existing.checkedIn)) {
+  if (existing && existing.status === 'confirmed') {
     throw new HttpError(409, 'This player is already a tournament participant.');
   }
 
-  const participantCount = registrations.filter((row) => row.status === 'confirmed' || row.checkedIn).length;
+  const participantCount = registrations.filter((row) => row.status === 'confirmed').length;
   const capacity = Number(tournament.capacity) || 0;
   if (capacity > 0 && participantCount >= capacity) {
     throw new HttpError(409, `Tournament capacity is ${capacity}. Increase capacity before adding another participant.`);
@@ -1762,7 +1964,7 @@ function assertParticipantCanBeAdded(tournament, games, registrations, profileId
 async function listConfirmedRegistrations(tablesDB, databaseId, tournamentId) {
   const rows = await listRowsByTournament(tablesDB, databaseId, tableIds.registrations, tournamentId);
   return rows
-    .filter((row) => row.status === 'confirmed' || row.checkedIn)
+    .filter((row) => row.status === 'confirmed')
     .filter((row) => row.profileId)
     .toSorted(compareRegistrationSeeds);
 }
@@ -2825,6 +3027,7 @@ export default async ({ req, res, log, error }) => {
     .setKey(req.headers['x-appwrite-key'] ?? '');
 
   const tablesDB = new TablesDB(client);
+  const messaging = new Messaging(client);
   const users = new Users(client);
   const teams = new Teams(client);
   const databaseId = process.env.JUCHESS_DATABASE_ID ?? 'juchess';
@@ -2836,13 +3039,23 @@ export default async ({ req, res, log, error }) => {
   log(`JuChess admin action ${method} ${path}`);
 
   if (segments.length === 0 && req.headers['x-appwrite-trigger'] === 'schedule') {
-    try {
-      const sweep = await sweepHostedGameDeadlines(tablesDB, databaseId);
-      return res.json({ ok: true, action: 'sweepHostedGameDeadlines', ...sweep });
-    } catch (cause) {
-      error(cause?.message ?? String(cause));
-      return res.json({ ok: false, error: 'Clock sweep failed.' }, 500);
+    const [clockResult, attendanceResult] = await Promise.allSettled([
+      sweepHostedGameDeadlines(tablesDB, databaseId),
+      dispatchAttendanceReminders(tablesDB, messaging, databaseId),
+    ]);
+    if (clockResult.status === 'rejected') error(clockResult.reason?.message ?? String(clockResult.reason));
+    if (attendanceResult.status === 'rejected') error(attendanceResult.reason?.message ?? String(attendanceResult.reason));
+    if (clockResult.status === 'rejected' && attendanceResult.status === 'rejected') {
+      return res.json({ ok: false, error: 'Scheduled tournament maintenance failed.' }, 500);
     }
+    return res.json({
+      ok: true,
+      action: 'scheduledTournamentMaintenance',
+      clocks: clockResult.status === 'fulfilled' ? clockResult.value : { error: 'Clock sweep failed.' },
+      attendance: attendanceResult.status === 'fulfilled'
+        ? attendanceResult.value
+        : { error: 'Attendance reminder dispatch failed.' },
+    });
   }
 
   if (method === 'GET' && segments.length === 0) {
@@ -2881,7 +3094,7 @@ export default async ({ req, res, log, error }) => {
         'POST /blocks/ip/:id/unblock',
         'POST /registrations/:id/confirm',
         'POST /registrations/:id/status',
-        'GET /tournaments/:id/check-ins',
+        'GET /tournaments/:id/attendance',
         'POST /games/:id/result',
         'POST /games/:id/start',
         'POST /games/:id/pgn',
@@ -3019,10 +3232,11 @@ export default async ({ req, res, log, error }) => {
         tableId: tableIds.profiles,
         rowId: profileId,
       })));
-      const [games, registrations, checkIns, standings, adminProfiles] = await Promise.all([
+      const [games, registrations, checkIns, attendance, standings, adminProfiles] = await Promise.all([
         listAllRows(tablesDB, databaseId, tableIds.games),
         listAllRows(tablesDB, databaseId, tableIds.registrations),
         listAllRows(tablesDB, databaseId, tableIds.checkIns),
+        listAllRows(tablesDB, databaseId, tableIds.attendance),
         listAllRows(tablesDB, databaseId, tableIds.standings),
         listAllRows(tablesDB, databaseId, tableIds.adminProfiles),
       ]);
@@ -3033,6 +3247,7 @@ export default async ({ req, res, log, error }) => {
       const deletedRows = {
         registrations: await deleteProfileRows(tablesDB, databaseId, tableIds.registrations, registrations, profileIdSet),
         checkIns: await deleteProfileRows(tablesDB, databaseId, tableIds.checkIns, checkIns, profileIdSet),
+        attendance: await deleteProfileRows(tablesDB, databaseId, tableIds.attendance, attendance, profileIdSet),
         standings: await deleteProfileRows(tablesDB, databaseId, tableIds.standings, standings, profileIdSet),
       };
 
@@ -3625,7 +3840,7 @@ export default async ({ req, res, log, error }) => {
       }
 
       const deleted = {};
-      for (const tableId of [tableIds.checkIns, tableIds.games, tableIds.standings, tableIds.registrations]) {
+      for (const tableId of [tableIds.checkIns, tableIds.attendance, tableIds.games, tableIds.standings, tableIds.registrations]) {
         deleted[tableId] = await deleteTournamentRows(tablesDB, databaseId, tableId, tournamentId);
       }
 
@@ -3690,7 +3905,8 @@ export default async ({ req, res, log, error }) => {
             data: { tournamentId, profileId: profile.$id, ...data },
             permissions: profile.accountId ? [Permission.read(Role.user(profile.accountId))] : [],
           });
-      const checkIn = await issueCheckInCode(tablesDB, databaseId, row);
+      const attendance = await ensureAttendanceConfirmation(tablesDB, databaseId, row, profile);
+      await deleteLegacyCheckIn(tablesDB, databaseId, row);
 
       await writeAudit(tablesDB, databaseId, {
         actorProfileId: actor.$id,
@@ -3700,7 +3916,7 @@ export default async ({ req, res, log, error }) => {
         payload: { tournamentId, profileId: profile.$id, seed: nextSeed },
       });
 
-      return res.json({ ok: true, action: 'addTournamentParticipant', row, checkIn });
+      return res.json({ ok: true, action: 'addTournamentParticipant', row, attendance });
     }
 
     if (
@@ -3720,11 +3936,8 @@ export default async ({ req, res, log, error }) => {
         rowId: segments[1],
       });
 
-      const nextCheckedIn = nextStatus === 'confirmed'
-        ? Boolean(body.checkedIn ?? existing.checkedIn)
-        : false;
-      const wasParticipant = existing.status === 'confirmed' || Boolean(existing.checkedIn);
-      const willBeParticipant = nextStatus === 'confirmed' || nextCheckedIn;
+      const wasParticipant = existing.status === 'confirmed';
+      const willBeParticipant = nextStatus === 'confirmed';
       const seedChanged = body.seed !== undefined && Number(body.seed) !== Number(existing.seed);
       if (wasParticipant !== willBeParticipant || seedChanged) {
         const [publishedGames, tournament, tournamentRegistrations] = await Promise.all([
@@ -3744,7 +3957,7 @@ export default async ({ req, res, log, error }) => {
         }
         if (willBeParticipant && !wasParticipant) {
           const confirmedCount = tournamentRegistrations.filter((row) => (
-            row.$id !== existing.$id && (row.status === 'confirmed' || row.checkedIn)
+            row.$id !== existing.$id && row.status === 'confirmed'
           )).length;
           const capacity = Number(tournament.capacity) || 0;
           if (capacity > 0 && confirmedCount >= capacity) {
@@ -3760,50 +3973,40 @@ export default async ({ req, res, log, error }) => {
         data: cleanObject({
           status: nextStatus,
           seed: body.seed,
-          checkedIn: nextCheckedIn,
-          // Never write the code here: this table is world-readable.
+          checkedIn: false,
+          // Legacy public fields remain empty while older clients are phased out.
           checkInCode: null,
         }),
       });
 
-      let checkIn = null;
+      let attendance = null;
       if (nextStatus === 'confirmed') {
-        checkIn = await issueCheckInCode(tablesDB, databaseId, row);
-        if (body.checkedIn !== undefined) {
-          checkIn = await tablesDB.updateRow({
-            databaseId,
-            tableId: tableIds.checkIns,
-            rowId: checkIn.$id,
-            data: cleanObject({
-              checkedIn: Boolean(body.checkedIn),
-              checkedInAt: body.checkedIn ? new Date().toISOString() : undefined,
-            }),
-          });
-        }
+        attendance = await ensureAttendanceConfirmation(tablesDB, databaseId, row);
       } else {
-        await revokeCheckInCode(tablesDB, databaseId, existing);
+        await deleteAttendanceConfirmation(tablesDB, databaseId, existing);
       }
+      await deleteLegacyCheckIn(tablesDB, databaseId, existing);
 
       await writeAudit(tablesDB, databaseId, {
         actorProfileId: actor.$id,
         action: 'updateRegistration',
         targetTable: tableIds.registrations,
         targetRowId: row.$id,
-        payload: { status: nextStatus, seed: body.seed, checkedIn: nextStatus === 'cancelled' ? false : body.checkedIn },
+        payload: { status: nextStatus, seed: body.seed },
       });
 
-      return res.json({ ok: true, action: 'updateRegistration', row, checkIn });
+      return res.json({ ok: true, action: 'updateRegistration', row, attendance });
     }
 
-    if (method === 'GET' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'check-ins') {
+    if (method === 'GET' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'attendance') {
       const response = await tablesDB.listRows({
         databaseId,
-        tableId: tableIds.checkIns,
+        tableId: tableIds.attendance,
         queries: [Query.equal('tournamentId', segments[1]), Query.limit(500)],
         total: false,
       });
 
-      return res.json({ ok: true, action: 'listCheckIns', checkIns: response.rows });
+      return res.json({ ok: true, action: 'listAttendanceConfirmations', attendance: response.rows });
     }
 
     if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'procedure' && segments[3] === 'configure') {

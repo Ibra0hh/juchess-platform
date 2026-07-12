@@ -9,15 +9,21 @@ export type MyRegistration = Models.Row & {
   profileId: string
   status: RegistrationStatus
   seed?: number
-  checkedIn?: boolean
 }
 
-export type MyCheckIn = Models.Row & {
+export type AttendanceStatus = 'pending' | 'confirmed' | 'declined'
+export type AttendanceDeliveryStatus = 'pending' | 'sent' | 'unavailable' | 'failed' | 'skipped'
+
+export type MyAttendanceConfirmation = Models.Row & {
   tournamentId: string
   profileId: string
   registrationId: string
-  code: string
-  checkedIn?: boolean
+  status: AttendanceStatus
+  reminderSentAt?: string
+  reminderEmailStatus?: AttendanceDeliveryStatus
+  reminderPushStatus?: AttendanceDeliveryStatus
+  respondedAt?: string
+  responseSource?: 'web' | 'app' | 'email'
 }
 
 /**
@@ -74,19 +80,19 @@ export async function loadMyRegistration(
 }
 
 /**
- * Check-in codes live in a table with no public read. Row permissions let a
- * player read only their own pass, so this returns null for everyone else.
+ * Attendance responses are private. Row permissions let a player read only
+ * their own attendance row; all writes still go through a server function.
  */
-export async function loadMyCheckIn(
+export async function loadMyAttendance(
   tournamentRowId: string,
   profileId: string,
-): Promise<MyCheckIn | null> {
+): Promise<MyAttendanceConfirmation | null> {
   if (!appwriteReady || !tournamentRowId || !profileId) return null
 
   try {
-    const response = await tablesDB.listRows<MyCheckIn>({
+    const response = await tablesDB.listRows<MyAttendanceConfirmation>({
       databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.checkIns,
+      tableId: tableIds.attendance,
       queries: [
         Query.equal('tournamentId', tournamentRowId),
         Query.equal('profileId', profileId),
@@ -114,8 +120,15 @@ export async function cancelMyRegistration(registrationRowId: string): Promise<M
   return payload.row
 }
 
-export function checkInQrPayload(checkIn: MyCheckIn) {
-  return `JUCHESS-CHECKIN:${checkIn.registrationId}:${checkIn.code}`
+export async function respondToAttendance(
+  registrationRowId: string,
+  status: Exclude<AttendanceStatus, 'pending'>,
+): Promise<MyAttendanceConfirmation> {
+  const payload = await runPlayerAction<{ row: MyAttendanceConfirmation }>(
+    `/registrations/${registrationRowId}/attendance`,
+    { status, source: 'web' },
+  )
+  return payload.row
 }
 
 function requireReady() {

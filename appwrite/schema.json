@@ -71,7 +71,7 @@
       }
     },
     "check_ins": {
-      "note": "Private check-in passes. No table-level permissions: each row grants read only to its owner's account, and staff read them through admin-actions using the server key. Written by admin-actions on registration confirm; deleted on cancel.",
+      "note": "Legacy disabled table retained only so obsolete check-in rows can be cleaned up safely. New registrations never create QR codes or check-in codes.",
       "permissions": [],
       "rowSecurity": true,
       "indexes": {
@@ -84,6 +84,37 @@
         "code": "string|required",
         "checkedIn": "boolean|default:false",
         "checkedInAt": "string"
+      }
+    },
+    "attendance_confirmations": {
+      "note": "Private attendance responses for admin-accepted registrations. Players receive read-only access to their own row; all responses are written through server functions.",
+      "permissions": [],
+      "rowSecurity": true,
+      "indexes": {
+        "registration_unique": "unique:registrationId",
+        "tournament_status": "key:tournamentId,status",
+        "profile_status": "key:profileId,status",
+        "token_lookup": "key:tokenHash"
+      },
+      "fields": {
+        "tournamentId": "string|required",
+        "profileId": "string|required",
+        "registrationId": "string|required",
+        "accountId": "string|required",
+        "status": "enum:pending,confirmed,declined|default:pending",
+        "tokenNonce": "string|required",
+        "tokenHash": "string",
+        "tokenExpiresAt": "datetime",
+        "reminderSentAt": "datetime",
+        "reminderEmailStatus": "enum:pending,sent,unavailable,failed,skipped|default:pending",
+        "reminderPushStatus": "enum:pending,sent,unavailable,failed,skipped|default:pending",
+        "emailMessageId": "string",
+        "pushMessageId": "string",
+        "lastDeliveryError": "string",
+        "respondedAt": "datetime",
+        "responseSource": "enum:web,app,email",
+        "createdAt": "datetime|required",
+        "updatedAt": "datetime|required"
       }
     },
     "games": {
@@ -240,5 +271,5 @@
     }
   },
   "buckets": ["avatars", "tournament-assets"],
-  "functions": ["admin-actions", "player-actions", "access-guards"]
+  "functions": ["admin-actions", "player-actions", "attendance-actions", "access-guards"]
 }

@@ -13,6 +13,7 @@ export type Tournament = {
   name: string
   status: TournamentStatus
   date: string
+  startsAt?: string
   playMode: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location: string
@@ -72,7 +73,6 @@ type AppwriteRegistrationRow = Models.Row & {
   profileId?: string
   status?: 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
   seed?: number
-  checkedIn?: boolean
 }
 
 type AppwriteProfileRow = Models.Row & {
@@ -239,7 +239,7 @@ export const tableIds = {
   profiles: 'profiles',
   tournaments: 'tournaments',
   registrations: 'registrations',
-  checkIns: 'check_ins',
+  attendance: 'attendance_confirmations',
   games: 'games',
   standings: 'standings',
   announcements: 'announcements',
@@ -1053,7 +1053,7 @@ function groupRegistrationCounts(rows: AppwriteRegistrationRow[]) {
   const countedPlayers = new Set<string>()
 
   rows.forEach((row) => {
-    if (!row.tournamentId || !row.profileId || (row.status !== 'confirmed' && !row.checkedIn)) return
+    if (!row.tournamentId || !row.profileId || row.status !== 'confirmed') return
     const key = `${row.tournamentId}:${row.profileId}`
     if (countedPlayers.has(key)) return
     countedPlayers.add(key)
@@ -1067,7 +1067,7 @@ function groupRegisteredPlayers(rows: AppwriteRegistrationRow[], profiles: Map<s
   const groups = new Map<string, Map<string, Member & { seed?: number }>>()
 
   rows.forEach((row) => {
-    if (!row.tournamentId || !row.profileId || (row.status !== 'confirmed' && !row.checkedIn)) return
+    if (!row.tournamentId || !row.profileId || row.status !== 'confirmed') return
     const profile = profiles.get(row.profileId)
     if (!profile) return
     const list = groups.get(row.tournamentId) ?? new Map<string, Member & { seed?: number }>()
@@ -1148,6 +1148,7 @@ function mapAppwriteTournament(
     name,
     status,
     date: formatDateRange(row.startsAt, row.endsAt),
+    startsAt: row.startsAt,
     playMode: row.playMode === 'online' ? 'online' : 'inPerson',
     onlinePlatform: normalizeOnlinePlatform(row.onlinePlatform),
     location: row.playMode === 'online'

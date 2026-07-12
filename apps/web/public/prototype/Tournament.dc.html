@@ -158,43 +158,11 @@
         </sc-if>
       </div>
 
-      <!-- register modal: 6-digit code + QR -->
-      <sc-if value="{{ regModal }}" hint-placeholder-val="{{ false }}">
-        <div style="margin-top: 14px; width: 100%; max-width: 420px; background: #FFFCF4; border: 1px solid rgba(17,17,17,.16); border-radius: 14px; box-shadow: 0 6px 22px rgba(20,26,40,.10); overflow: hidden;">
-            <div style="background: #111111; color: #F5EFE3; padding: 18px 22px; display: flex; align-items: center; gap: 12px;">
-              <img src="assets/crest.png" alt="" style="width: 34px; height: 34px; object-fit: contain;">
-              <div style="display: flex; flex-direction: column; line-height: 1.2;">
-                <span style="font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 700;">Registration pass</span>
-                <span style="font-size: 11px; color: rgba(245,239,227,.7);">{{ t.name }}</span>
-              </div>
-            </div>
-            <div style="padding: 24px 24px 22px; text-align: center;">
-              <div style="font-size: 12.5px; color: rgba(17,17,17,.65); line-height: 1.5;">Show this at the check-in desk, or enter the code to confirm your seat.</div>
-
-              <!-- QR code -->
-              <div style="margin: 16px auto 0; width: 148px; height: 148px; border: 1px solid rgba(17,17,17,.15); border-radius: 12px; padding: 9px; background: #FFFFFF;">
-                <div style="display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(11, 1fr); width: 100%; height: 100%;">
-                  <sc-for list="{{ qrCells }}" as="q" hint-placeholder-count="121">
-                    <div style="background: {{ q.c }};"></div>
-                  </sc-for>
-                </div>
-              </div>
-
-              <!-- 6-digit code -->
-              <div style="font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; color: rgba(17,17,17,.5); margin-top: 20px;">Your 6-digit code</div>
-              <div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">
-                <sc-for list="{{ codeDigits }}" as="d" hint-placeholder-count="6">
-                  <span style="width: 38px; height: 48px; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; color: #7A2431; background: rgba(122,36,49,.06); border: 1px solid rgba(122,36,49,.22); border-radius: 8px;">{{ d.n }}</span>
-                </sc-for>
-              </div>
-
-              <div style="display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 16px; font-size: 12px; color: #3F6B36; font-weight: 600;">
-                <span style="width: 8px; height: 8px; border-radius: 50%; background: #3F6B36;"></span>Seat reserved for {{ authName }}
-              </div>
-
-              <button type="button" onClick="{{ cancelRegister }}" style="width: 100%; height: 44px; margin-top: 20px; background: transparent; color: #7A2431; border: 1px solid rgba(122,36,49,.4); border-radius: 8px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer;" style-hover="background: #7A2431; color: #F8F3E7; border-color: #7A2431;">Cancel registration</button>
-              <button type="button" onClick="{{ closeRegister }}" style="width: 100%; height: 38px; margin-top: 8px; background: transparent; color: rgba(17,17,17,.6); border: none; border-radius: 8px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer;" style-hover="color: #111111;">Hide pass</button>
-            </div>
+      <sc-if value="{{ registered }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 14px; width: 100%; max-width: 520px; padding: 18px 20px; background: #FFFCF4; border: 1px solid rgba(17,17,17,.16); border-radius: 14px; box-shadow: 0 6px 22px rgba(20,26,40,.08);">
+          <div style="font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 700;">Registration pending</div>
+          <div style="font-size: 12.5px; color: rgba(17,17,17,.65); line-height: 1.5; margin-top: 4px;">The admin will review your request. If accepted, JuChess will ask you to confirm attendance one hour before the tournament.</div>
+          <button type="button" onClick="{{ cancelRegister }}" style="height: 40px; margin-top: 14px; padding: 0 16px; background: transparent; color: #7A2431; border: 1px solid rgba(122,36,49,.4); border-radius: 8px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer;">Cancel registration</button>
         </div>
       </sc-if>
     </sc-if>
@@ -758,41 +726,11 @@ class Component extends DCLogic {
       tabTable: this.state.tab === 'table',
       tabGames: this.state.tab === 'games',
       leaderLine: leaderLine,
-      openRegister: function () { self.setState({ registered: true, regModal: true }); },
-      closeRegister: function () { self.setState({ regModal: false }); },
+      openRegister: function () { self.setState({ registered: true }); },
       stop: function (e) { e.stopPropagation(); },
-      cancelRegister: function () { self.setState({ registered: false, regModal: false }); },
-      regModal: !!this.state.regModal && this.state.registered,
-      codeDigits: (function () {
-        var code = self._regCode || (self._regCode = String(Math.floor(100000 + Math.random() * 900000)));
-        return code.split('').map(function (n) { return { n: n }; });
-      })(),
-      qrCells: (function () {
-        var code = self._regCode || (self._regCode = String(Math.floor(100000 + Math.random() * 900000)));
-        var seed = 7; for (var i = 0; i < code.length; i++) seed += code.charCodeAt(i) * (i + 3);
-        function inFinder(x, y) {
-          /* three 3x3 finder squares in the corners (top-left, top-right, bottom-left) */
-          var fx = [[0, 2], [8, 10], [0, 2]], fy = [[0, 2], [0, 2], [8, 10]];
-          for (var k = 0; k < 3; k++) {
-            if (x >= fx[k][0] && x <= fx[k][1] && y >= fy[k][0] && y <= fy[k][1]) {
-              var lx = x - fx[k][0], ly = y - fy[k][0];
-              var edge = (lx === 0 || lx === 2 || ly === 0 || ly === 2);
-              var center = (lx === 1 && ly === 1);
-              return { hit: true, on: edge || center };
-            }
-          }
-          return { hit: false };
-        }
-        var cells = [];
-        for (var y = 0; y < 11; y++) for (var x = 0; x < 11; x++) {
-          var f = inFinder(x, y), on;
-          if (f.hit) on = f.on;
-          else { seed = (seed * 1103515245 + 12345) & 0x7fffffff; on = (seed % 100) < 46; }
-          cells.push({ c: on ? '#111111' : 'transparent' });
-        }
-        return cells;
-      })(),
-      regLabel: this.state.registered ? 'View pass \u2713' : 'Register now',
+      cancelRegister: function () { self.setState({ registered: false }); },
+      registered: !!this.state.registered,
+      regLabel: this.state.registered ? 'Pending \u2713' : 'Register now',
       regBg: this.state.registered ? 'rgba(63,107,54,.12)' : '#7A2431',
       regCol: this.state.registered ? '#3F6B36' : '#F8F3E7',
       regBd: this.state.registered ? 'rgba(63,107,54,.5)' : '#7A2431',

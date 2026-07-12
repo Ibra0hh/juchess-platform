@@ -429,11 +429,10 @@ function registrationsFor(prefix, tournamentId, profileRows, status = 'confirmed
       profileId: profileRow.rowId,
       status,
       seed: index + 1,
-      // Never seed a check-in code here: `registrations` is world-readable.
-      // Codes live in the private `check_ins` table and are issued by
-      // admin-actions when an organizer confirms a registration.
+      // Legacy fields stay empty. Attendance lives in a private confirmation
+      // row and is never inferred from public registration data.
       checkInCode: null,
-      checkedIn: status === 'confirmed',
+      checkedIn: false,
     },
   }))
 }
