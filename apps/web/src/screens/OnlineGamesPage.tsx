@@ -71,16 +71,24 @@ function OnlineGamesPage() {
     }
   }, [])
 
-  const activeTournaments = useMemo(
+  const onlineTournaments = useMemo(
     () => tournaments.filter((tournament) => (
-      tournament.status === 'Active'
-      && tournament.playMode === 'online'
-      && tournament.onlinePlatform === 'juchess'
-    )),
+      tournament.playMode === 'online'
+      && (tournament.status === 'Upcoming' || tournament.status === 'Active')
+    )).sort((left, right) => {
+      if (left.status !== right.status) return left.status === 'Active' ? -1 : 1
+      return left.name.localeCompare(right.name)
+    }),
     [tournaments],
   )
+  const activeHostedTournaments = useMemo(
+    () => onlineTournaments.filter((tournament) => (
+      tournament.status === 'Active' && tournament.onlinePlatform === 'juchess'
+    )),
+    [onlineTournaments],
+  )
   const gameChoices = useMemo<TournamentGameChoice[]>(() => (
-    activeTournaments.flatMap((tournament) => (
+    activeHostedTournaments.flatMap((tournament) => (
       (tournament.publishedGames ?? [])
         .filter((game) => (
           (game.status === 'scheduled' || game.status === 'live')
@@ -88,7 +96,7 @@ function OnlineGamesPage() {
         ))
         .map((game) => ({ game, tournament }))
     ))
-  ), [activeTournaments])
+  ), [activeHostedTournaments])
 
   useEffect(() => {
     if (!requestedGameId) return
@@ -256,22 +264,24 @@ function OnlineGamesPage() {
             <div className="online-panel-title">
               <span><Trophy size={18} aria-hidden="true" /></span>
               <div>
-                <h2 id="play-online-title">Play online tournament</h2>
-                <p>Choose an active event, follow its boards, and enter through the tournament page.</p>
+                <h2 id="play-online-title">Online tournaments</h2>
+                <p>Register for upcoming events, then play or watch here when their boards go live.</p>
               </div>
             </div>
 
             <div className="online-event-list">
               {loading ? (
-                <div className="online-empty">Loading active tournaments...</div>
-              ) : activeTournaments.length ? activeTournaments.map((tournament) => {
+                <div className="online-empty">Loading online tournaments...</div>
+              ) : onlineTournaments.length ? onlineTournaments.map((tournament) => {
                 const choices = gameChoices.filter((choice) => choice.tournament.id === tournament.id)
+                const isHostedHere = tournament.onlinePlatform === 'juchess'
+                const isActive = tournament.status === 'Active'
                 return (
                   <section className="online-event" key={tournament.id}>
                     <div className="online-event-head">
                       <div>
                         <strong>{tournament.name}</strong>
-                        <span>{tournament.format} · {tournament.round}</span>
+                        <span>{tournament.status} · {onlinePlatformName(tournament)} · {tournament.format}</span>
                       </div>
                       <Link to={`/tournament/${tournament.id}`}>Open</Link>
                     </div>
@@ -295,12 +305,18 @@ function OnlineGamesPage() {
                         ))}
                       </div>
                     ) : (
-                      <p className="online-no-boards">Published boards will appear here when play begins.</p>
+                      <p className="online-no-boards">
+                        {!isActive
+                          ? 'Registration is open. Boards will appear here when the tournament starts.'
+                          : isHostedHere
+                            ? 'Published boards will appear here when play begins.'
+                            : `This tournament is hosted on ${onlinePlatformName(tournament)}. Open it for event details.`}
+                      </p>
                     )}
                   </section>
                 )
               }) : (
-                <div className="online-empty">No online tournament is active right now.</div>
+                <div className="online-empty">No upcoming or active online tournaments right now.</div>
               )}
             </div>
           </aside>
@@ -308,6 +324,13 @@ function OnlineGamesPage() {
       </main>
     </div>
   )
+}
+
+function onlinePlatformName(tournament: Tournament) {
+  if (tournament.onlinePlatform === 'chessCom') return 'Chess.com'
+  if (tournament.onlinePlatform === 'lichess') return 'Lichess'
+  if (tournament.onlinePlatform === 'juchess') return 'JuChess'
+  return 'Online'
 }
 
 function PlayerStrip({

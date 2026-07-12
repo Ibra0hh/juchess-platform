@@ -1180,6 +1180,8 @@ class AppwriteService {
       name: displayName,
       meta: '${_formatDate(startsAt)} · $location',
       chips: [
+        if (playMode == 'online')
+          'Online · ${_onlinePlatformLabel(onlinePlatform)}',
         roundsTotal == null
             ? displayFormat
             : '$displayFormat · $roundsTotal rounds',
@@ -5846,6 +5848,22 @@ class GamesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final onlineTournaments =
+        state.tournamentItems
+            .where(
+              (event) =>
+                  event.playMode == 'online' &&
+                  (event.status == 'upcoming' || event.status == 'active'),
+            )
+            .toList()
+          ..sort((left, right) {
+            if (left.status != right.status) {
+              return left.status == 'active' ? -1 : 1;
+            }
+            return left.name.compareTo(right.name);
+          });
+
     return AppScroll(
       children: [
         const PrototypeHeader(title: 'Games'),
@@ -5871,14 +5889,53 @@ class GamesScreen extends StatelessWidget {
         ),
         BigActionCard(
           title: 'Online Tournaments',
-          subtitle: 'Open active tournaments and live boards',
+          subtitle: 'Open upcoming events and live boards',
           icon: '♜',
           onTap: () {
             final state = context.read<AppState>();
-            state.selectTournamentFilter('active');
+            final hasActiveOnline = state.tournamentItems.any(
+              (event) => event.playMode == 'online' && event.status == 'active',
+            );
+            state.selectTournamentFilter(
+              hasActiveOnline ? 'active' : 'upcoming',
+            );
             state.selectTab(1);
           },
         ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 22, 16, 8),
+          child: Text(
+            'ONLINE TOURNAMENTS',
+            style: TextStyle(
+              color: Color(0x99111111),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.7,
+            ),
+          ),
+        ),
+        if (state.dataLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 22),
+            child: Center(
+              child: CircularProgressIndicator(color: PrototypeColors.burgundy),
+            ),
+          )
+        else if (onlineTournaments.isEmpty)
+          const PrototypeCard(
+            child: Text(
+              'No upcoming or active online tournaments right now.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0x99111111), height: 1.45),
+            ),
+          )
+        else
+          ...onlineTournaments.map(
+            (event) => Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: TournamentCard(event: event),
+            ),
+          ),
       ],
     );
   }

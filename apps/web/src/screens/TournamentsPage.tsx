@@ -9,6 +9,7 @@ import {
   Swords,
   Timer,
   Trophy,
+  Wifi,
   Zap,
   type LucideIcon,
 } from 'lucide-react'
@@ -155,6 +156,12 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
       <span className="tournament-card-main">
         <span className="tournament-title-line">
           <span className="tournament-name">{tournament.name}</span>
+          {tournament.playMode === 'online' ? (
+            <span className="mode-badge online">
+              <Wifi size={11} aria-hidden="true" />
+              Online · {onlinePlatformName(tournament)}
+            </span>
+          ) : null}
           <StatusBadge status={tournament.status} />
         </span>
         <span className="tournament-summary">
@@ -244,6 +251,13 @@ function playerLabel(tournament: Tournament) {
   }
 
   return `${tournament.participants} players`
+}
+
+function onlinePlatformName(tournament: Tournament) {
+  if (tournament.onlinePlatform === 'chessCom') return 'Chess.com'
+  if (tournament.onlinePlatform === 'lichess') return 'Lichess'
+  if (tournament.onlinePlatform === 'juchess') return 'JuChess'
+  return 'Online'
 }
 
 export default TournamentsPage

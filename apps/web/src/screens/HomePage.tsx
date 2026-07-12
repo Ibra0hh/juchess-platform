@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { ArrowRight, CalendarDays, MapPin, Trophy, Users } from 'lucide-react'
+import { ArrowRight, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { loadAnnouncements, loadTournaments, type Announcement, type Tournament } from '../lib/juchess'
@@ -266,7 +266,11 @@ function FeaturedTournamentCard({ slot, cloudError }: { slot: FeatureSlot; cloud
       <p>{tournament.format} / {tournament.timeControl}</p>
       <div className="feature-pills">
         <span><CalendarDays size={14} aria-hidden="true" />{tournament.date}</span>
-        <span><MapPin size={14} aria-hidden="true" />{tournament.location}</span>
+        {tournament.playMode === 'online' ? (
+          <span><Wifi size={14} aria-hidden="true" />Online · {tournament.location}</span>
+        ) : (
+          <span><MapPin size={14} aria-hidden="true" />{tournament.location}</span>
+        )}
         <span><Users size={14} aria-hidden="true" />{playerLabel(tournament)}</span>
       </div>
       <div className="feature-footer">
