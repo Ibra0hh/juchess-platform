@@ -150,6 +150,8 @@ type ClassificationInput = {
 
 const standardFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const engineFile = 'vendor/stockfish/stockfish-18-lite-single.js'
+const maxCachedPositions = 512
+const positionReviewCache = new Map<string, PositionReview>()
 const openingBookLines = [
   ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5', 'a7a6', 'b5a4', 'g8f6'],
   ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'g8f6', 'd2d3', 'f8c5'],
@@ -369,6 +371,10 @@ export class StockfishReviewEngine {
     this.options = options
   }
 
+  createSibling() {
+    return new StockfishReviewEngine(this.options)
+  }
+
   async initialize() {
     if (this.initialized) return
     if (this.disposed) throw new Error('The analysis engine has already been closed.')
@@ -408,6 +414,14 @@ export class StockfishReviewEngine {
     }
     if (board.isDraw()) return terminalPosition(0)
 
+    const cacheKey = `${depth}|${this.options.multiPv ?? 2}|${fen}`
+    const cached = positionReviewCache.get(cacheKey)
+    if (cached) {
+      positionReviewCache.delete(cacheKey)
+      positionReviewCache.set(cacheKey, cached)
+      return cached
+    }
+
     const position = initialFen === standardFen
       ? `position startpos${moves.length ? ` moves ${moves.join(' ')}` : ''}`
       : `position fen ${initialFen}${moves.length ? ` moves ${moves.join(' ')}` : ''}`
@@ -416,7 +430,12 @@ export class StockfishReviewEngine {
       (line) => line.startsWith('bestmove '),
       Math.max(45_000, depth * 4_000),
     )
-    return parseStockfishOutput(messages, fen)
+    const result = parseStockfishOutput(messages, fen)
+    positionReviewCache.set(cacheKey, result)
+    if (positionReviewCache.size > maxCachedPositions) {
+      positionReviewCache.delete(positionReviewCache.keys().next().value as string)
+    }
+    return result
   }
 
   dispose() {
@@ -493,18 +512,33 @@ export async function reviewGame(
   { depth = getReviewEnginePreset(defaultReviewEngineStrength).depth, onProgress, signal }: ReviewOptions = {},
 ): Promise<GameReviewResult> {
   const parsed = parseReviewGame(input)
-  const positions: PositionReview[] = []
-  await engine.newGame()
+  const positions = new Array<PositionReview>(parsed.fens.length)
+  const parallelism = parsed.fens.length >= 12 && (navigator.hardwareConcurrency ?? 2) >= 4 ? 2 : 1
+  const engines = [engine]
+  if (parallelism > 1) engines.push(engine.createSibling())
+  let nextIndex = 0
+  let completed = 0
 
-  for (let index = 0; index < parsed.fens.length; index += 1) {
-    if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
-    positions.push(await engine.evaluatePosition(
-      parsed.initialFen,
-      parsed.uciMoves.slice(0, index),
-      parsed.fens[index],
-      depth,
-    ))
-    onProgress?.(index + 1, parsed.fens.length)
+  try {
+    await Promise.all(engines.map((reviewEngine) => reviewEngine.newGame()))
+    await Promise.all(engines.map(async (reviewEngine) => {
+      while (true) {
+        if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
+        const index = nextIndex
+        nextIndex += 1
+        if (index >= parsed.fens.length) return
+        positions[index] = await reviewEngine.evaluatePosition(
+          parsed.initialFen,
+          parsed.uciMoves.slice(0, index),
+          parsed.fens[index],
+          depth,
+        )
+        completed += 1
+        onProgress?.(completed, parsed.fens.length)
+      }
+    }))
+  } finally {
+    engines.slice(1).forEach((reviewEngine) => reviewEngine.dispose())
   }
 
   const reviewedMoves = parsed.moves.map((san, index): ReviewedMove => {

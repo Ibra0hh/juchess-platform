@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:chess/chess.dart' as chess;
 import 'package:stockfish/stockfish.dart';
 
 import 'game_review_core.dart';
+
+const _maxCachedMobilePositions = 256;
+final _mobilePositionReviewCache = <String, MobilePositionReview>{};
 
 class MobileReviewCancelled implements Exception {
   const MobileReviewCancelled();
@@ -30,10 +34,12 @@ class MobileStockfishReviewEngine {
         preset ?? mobileReviewPresetFor(defaultMobileReviewStrength);
     final stockfish = await stockfishAsync();
     final engine = MobileStockfishReviewEngine._(stockfish, resolvedPreset);
+    final threads = Platform.numberOfProcessors >= 4 ? 2 : 1;
     await engine._exchange(['uci'], (line) => line == 'uciok');
     await engine._exchange([
       'setoption name MultiPV value 2',
       'setoption name Hash value ${resolvedPreset.hashMb}',
+      'setoption name Threads value $threads',
       'setoption name UCI_ShowWDL value true',
       'isready',
     ], (line) => line == 'readyok');
@@ -82,6 +88,13 @@ class MobileStockfishReviewEngine {
     }
     if (board.in_draw) return _terminalPosition(0);
 
+    final cacheKey = '$depth|2|$fen';
+    final cached = _mobilePositionReviewCache.remove(cacheKey);
+    if (cached != null) {
+      _mobilePositionReviewCache[cacheKey] = cached;
+      return cached;
+    }
+
     final position = initialFen == mobileStandardFen
         ? 'position startpos${moves.isEmpty ? '' : ' moves ${moves.join(' ')}'}'
         : 'position fen $initialFen${moves.isEmpty ? '' : ' moves ${moves.join(' ')}'}';
@@ -90,7 +103,12 @@ class MobileStockfishReviewEngine {
       (line) => line.startsWith('bestmove '),
       timeout: Duration(seconds: depth * 4 < 45 ? 45 : depth * 4),
     );
-    return parseMobileStockfishOutput(messages, fen);
+    final result = parseMobileStockfishOutput(messages, fen);
+    _mobilePositionReviewCache[cacheKey] = result;
+    if (_mobilePositionReviewCache.length > _maxCachedMobilePositions) {
+      _mobilePositionReviewCache.remove(_mobilePositionReviewCache.keys.first);
+    }
+    return result;
   }
 
   Future<List<String>> _exchange(
