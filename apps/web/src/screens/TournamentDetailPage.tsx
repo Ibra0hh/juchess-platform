@@ -23,7 +23,7 @@ import { ensureProfileForUser } from '../lib/auth'
 import {
   loadTournaments,
   parseStoredMoves,
-  subscribeToTournamentGameChanges,
+  subscribeToTournamentChanges,
   type Member,
   type PublishedBracketMatch,
   type PublishedBracketRound,
@@ -239,17 +239,36 @@ function TournamentDetailPage() {
   )
 
   useEffect(() => {
-    if (tournament?.status !== 'Active' || !tournament.rowId) return
+    if (!tournament?.rowId) return
     let alive = true
     let unsubscribe: (() => void) | undefined
-    const refreshGames = async () => {
-      const result = await loadTournaments()
-      if (!alive) return
-      setTournaments(result.tournaments)
-      setCloudError(Boolean(result.error))
+    let refreshing = false
+    let queued = false
+    const refreshTournament = async () => {
+      if (refreshing) {
+        queued = true
+        return
+      }
+      refreshing = true
+      do {
+        queued = false
+        const result = await loadTournaments()
+        if (!alive) break
+        if (!result.error) setTournaments(result.tournaments)
+        setCloudError(Boolean(result.error))
+      } while (alive && queued)
+      refreshing = false
     }
-    const timer = window.setInterval(() => void refreshGames(), 15_000)
-    void subscribeToTournamentGameChanges(tournament.rowId, () => void refreshGames())
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshTournament()
+    }
+    const timer = window.setInterval(
+      () => void refreshTournament(),
+      tournament.status === 'Active' ? 2_000 : 5_000,
+    )
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    void subscribeToTournamentChanges(tournament.rowId, () => void refreshTournament())
       .then((stop) => {
         if (alive) unsubscribe = stop
         else stop()
@@ -260,6 +279,8 @@ function TournamentDetailPage() {
     return () => {
       alive = false
       window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
       unsubscribe?.()
     }
   }, [tournament?.rowId, tournament?.status])

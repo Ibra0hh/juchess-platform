@@ -805,6 +805,7 @@ export async function loadTournamentRegistrations(tournamentRowId: string): Prom
         tableId: tableIds.registrations,
         queries: [Query.equal('tournamentId', tournamentRowId), Query.limit(500)],
         total: false,
+        ttl: 0,
       }),
       loadTournamentAttendance(tournamentRowId),
     ])
@@ -965,6 +966,7 @@ async function loadRegistrationCounts() {
       tableId: tableIds.registrations,
       queries: [Query.limit(500)],
       total: false,
+      ttl: 0,
     })
 
     response.rows.forEach((row) => {
@@ -991,12 +993,14 @@ async function loadPublishedGamesByTournament() {
         tableId: tableIds.games,
         queries: [Query.limit(1000)],
         total: false,
+        ttl: 0,
       }),
       tablesDB.listRows<AppwriteProfileRow>({
         databaseId: appwriteConfig.databaseId,
         tableId: tableIds.profiles,
         queries: [Query.limit(1000)],
         total: false,
+        ttl: 0,
       }),
     ])
     const profiles = new Map(profileResponse.rows.map((row) => [row.$id, row]))
@@ -1047,6 +1051,7 @@ async function loadStandingsByTournament() {
       tableId: tableIds.standings,
       queries: [Query.limit(1000)],
       total: false,
+      ttl: 0,
     })
 
     response.rows.forEach((row) => {

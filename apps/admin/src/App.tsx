@@ -699,6 +699,38 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!session?.allowed || screen !== 'tournaments') return
+    let alive = true
+    let refreshing = false
+
+    const refreshVisibleTournaments = async () => {
+      if (refreshing) return
+      refreshing = true
+      try {
+        const result = await loadAdminTournaments()
+        if (!alive || result.error) return
+        setTournaments(result.tournaments)
+        setDataSource(result.source)
+      } finally {
+        refreshing = false
+      }
+    }
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshVisibleTournaments()
+    }
+    const timer = window.setInterval(() => void refreshVisibleTournaments(), 2_000)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [screen, session?.allowed])
+
   if (loading) return <PrototypeLoading />
 
   if (!appwriteReady) {
@@ -1204,22 +1236,16 @@ function TournamentsScreen({
   }, [tab])
 
   useEffect(() => {
-    if (!managedTournament || managedTournament.status !== 'active' || managedTournament.onlinePlatform !== 'juchess') return
-    const timer = window.setInterval(() => void onChanged(), 1500)
-    return () => window.clearInterval(timer)
-  }, [managedTournament, onChanged])
-
-  useEffect(() => {
     let alive = true
 
-    async function loadQueue() {
+    async function loadQueue(showLoading = false) {
       if (!selectedTournamentRowId) {
         setRegistrations([])
         setRegistrationsLoading(false)
         return
       }
 
-      setRegistrationsLoading(true)
+      if (showLoading) setRegistrationsLoading(true)
       const result = await loadTournamentRegistrations(selectedTournamentRowId)
       if (!alive) return
       setRegistrations(result.registrations)
@@ -1227,24 +1253,28 @@ function TournamentsScreen({
       setRegistrationsLoading(false)
     }
 
-    void loadQueue()
+    void loadQueue(true)
+    const timer = selectedTournamentRowId
+      ? window.setInterval(() => void loadQueue(), 4_000)
+      : undefined
 
     return () => {
       alive = false
+      if (timer) window.clearInterval(timer)
     }
   }, [selectedTournamentRowId])
 
   useEffect(() => {
     let alive = true
 
-    async function loadManagedRegistrations() {
+    async function loadManagedRegistrations(showLoading = false) {
       if (!managedTournament?.rowId) {
         setManagedRegistrations([])
         setManagedRegistrationsLoading(false)
         return
       }
 
-      setManagedRegistrationsLoading(true)
+      if (showLoading) setManagedRegistrationsLoading(true)
       const result = await loadManagedTournamentParticipantRows(managedTournament.rowId)
       if (!alive) return
 
@@ -1253,10 +1283,14 @@ function TournamentsScreen({
       setManagedRegistrationsLoading(false)
     }
 
-    void loadManagedRegistrations()
+    void loadManagedRegistrations(true)
+    const timer = managedTournament?.rowId
+      ? window.setInterval(() => void loadManagedRegistrations(), 4_000)
+      : undefined
 
     return () => {
       alive = false
+      if (timer) window.clearInterval(timer)
     }
   }, [managedTournament?.rowId])
 

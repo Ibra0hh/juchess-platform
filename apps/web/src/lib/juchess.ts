@@ -851,6 +851,35 @@ export async function subscribeToTournamentGameChanges(tournamentId: string, onC
   }
 }
 
+export async function subscribeToTournamentChanges(tournamentId: string, onChange: () => void) {
+  const subscriptions = await Promise.allSettled([
+    realtime.subscribe(
+      Channel.tablesdb(appwriteConfig.databaseId).table(tableIds.tournaments).row(tournamentId),
+      onChange,
+    ),
+    realtime.subscribe(
+      Channel.tablesdb(appwriteConfig.databaseId).table(tableIds.games).row(),
+      onChange,
+      [Query.equal('tournamentId', tournamentId)],
+    ),
+    realtime.subscribe(
+      Channel.tablesdb(appwriteConfig.databaseId).table(tableIds.standings).row(),
+      onChange,
+      [Query.equal('tournamentId', tournamentId)],
+    ),
+    realtime.subscribe(
+      Channel.tablesdb(appwriteConfig.databaseId).table(tableIds.registrations).row(),
+      onChange,
+      [Query.equal('tournamentId', tournamentId)],
+    ),
+  ])
+  return () => {
+    subscriptions.forEach((subscription) => {
+      if (subscription.status === 'fulfilled') void subscription.value.unsubscribe()
+    })
+  }
+}
+
 export async function subscribeToTournamentGameRow(gameId: string, onChange: () => void) {
   const subscription = await realtime.subscribe(
     Channel.tablesdb(appwriteConfig.databaseId).table(tableIds.games).row(gameId),
@@ -890,6 +919,7 @@ async function loadTournamentRows(includeDetails: boolean): Promise<TournamentLo
       tableId: tableIds.tournaments,
       queries: [Query.limit(100)],
       total: false,
+      ttl: 0,
     })
     const registrationRows = safeListRows<AppwriteRegistrationRow>(
       tableIds.registrations,
@@ -1039,6 +1069,7 @@ async function safeListRows<T extends Models.Row>(tableId: string, queries: stri
       tableId,
       queries,
       total: false,
+      ttl: 0,
     })
 
     return response.rows
