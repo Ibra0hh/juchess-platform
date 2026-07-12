@@ -3664,6 +3664,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     final state = context.watch<AppState>();
     final event = _currentEvent(state);
     final registered = state.isRegisteredFor(event);
+    final assignedGames = findAssignedOnlineGames([event], state.profileId);
+    final assignedGame = assignedGames.isEmpty ? null : assignedGames.first;
     final tabs = _tabsFor(event);
 
     return Scaffold(
@@ -3783,6 +3785,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                         registered: registered,
                         registration: state.registrationFor(event),
                         registrationBusy: state.isRegistrationBusy(event),
+                        assignedGame: assignedGame,
                         onRegister: () async {
                           if (!state.signedIn) {
                             showAuthSheet(context);
@@ -3931,10 +3934,12 @@ class _TournamentOverview extends StatelessWidget {
     required this.onRegister,
     required this.onMain,
     required this.registrationBusy,
+    this.assignedGame,
     this.registration,
   });
 
   final TournamentSeed event;
+  final AssignedTournamentGame? assignedGame;
   final bool registered;
   final MyRegistrationInfo? registration;
   final bool registrationBusy;
@@ -3975,6 +3980,10 @@ class _TournamentOverview extends StatelessWidget {
                       : 'Registering...'
                 : completed
                 ? 'View final ${_mainTabLabel(event).toLowerCase()}'
+                : active && assignedGame != null
+                ? assignedGame!.match.status == 'live'
+                      ? 'Continue my game'
+                      : 'Play my game'
                 : active
                 ? 'View live ${_mainTabLabel(event).toLowerCase()}'
                 : !registrationOpen
@@ -3985,6 +3994,12 @@ class _TournamentOverview extends StatelessWidget {
             loading: registrationBusy,
             onTap: registrationBusy
                 ? null
+                : active && assignedGame != null
+                ? () => openTournamentGameDetail(
+                    context,
+                    assignedGame!.match,
+                    '${event.name} · ${assignedGame!.round.label}',
+                  )
                 : registrationOpen
                 ? onRegister
                 : onMain,
@@ -5888,6 +5903,10 @@ class GamesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final assignedGames = findAssignedOnlineGames(
+      state.tournamentItems,
+      state.profileId,
+    );
     final onlineTournaments =
         state.tournamentItems
             .where(
@@ -5907,6 +5926,27 @@ class GamesScreen extends StatelessWidget {
       children: [
         const PrototypeHeader(title: 'Games'),
         const SizedBox(height: 16),
+        if (assignedGames.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'YOUR ONLINE GAME',
+              style: TextStyle(
+                color: PrototypeColors.burgundy,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.7,
+              ),
+            ),
+          ),
+          ...assignedGames.map(
+            (assignment) => _AssignedOnlineGameCard(
+              assignment: assignment,
+              profileId: state.profileId!,
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
         BigActionCard(
           title: 'Game Review',
           subtitle: 'Review recent tournament games',
@@ -5976,6 +6016,69 @@ class GamesScreen extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _AssignedOnlineGameCard extends StatelessWidget {
+  const _AssignedOnlineGameCard({
+    required this.assignment,
+    required this.profileId,
+  });
+
+  final AssignedTournamentGame assignment;
+  final String profileId;
+
+  @override
+  Widget build(BuildContext context) {
+    final match = assignment.match;
+    final isWhite = match.whiteProfileId == profileId;
+    final opponent = isWhite ? match.black : match.white;
+    final side = isWhite ? 'White' : 'Black';
+    final live = match.status == 'live' || match.result.toLowerCase() == 'live';
+
+    return PrototypeCard(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: SerifText(
+                  assignment.tournament.name,
+                  size: 18,
+                  weight: FontWeight.w700,
+                ),
+              ),
+              if (live) const LivePill(small: true) else const ChipPill('Ready'),
+            ],
+          ),
+          const SizedBox(height: 9),
+          Text(
+            'vs $opponent',
+            style: const TextStyle(
+              color: PrototypeColors.black,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${assignment.round.label} · You play $side',
+            style: const TextStyle(color: Color(0x99111111), fontSize: 12.5),
+          ),
+          const SizedBox(height: 13),
+          PrototypeButton(
+            label: live ? 'Continue game' : 'Play now',
+            onTap: () => openTournamentGameDetail(
+              context,
+              match,
+              '${assignment.tournament.name} · ${assignment.round.label}',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -13211,6 +13314,64 @@ class RoundSeed {
 
   final String label;
   final List<MatchSeed> games;
+}
+
+class AssignedTournamentGame {
+  const AssignedTournamentGame({
+    required this.match,
+    required this.round,
+    required this.tournament,
+  });
+
+  final MatchSeed match;
+  final RoundSeed round;
+  final TournamentSeed tournament;
+}
+
+List<AssignedTournamentGame> findAssignedOnlineGames(
+  Iterable<TournamentSeed> tournaments,
+  String? profileId,
+) {
+  if (profileId == null || profileId.isEmpty) return const [];
+  final assignments = <AssignedTournamentGame>[];
+
+  for (final tournament in tournaments) {
+    if (tournament.status != 'active' ||
+        tournament.playMode != 'online' ||
+        tournament.onlinePlatform != 'juchess' ||
+        tournament.publishedRounds.isEmpty) {
+      continue;
+    }
+
+    final roundIndex = ((tournament.currentRound ?? 1) - 1)
+        .clamp(0, tournament.publishedRounds.length - 1)
+        .toInt();
+    final round = tournament.publishedRounds[roundIndex];
+    for (final match in round.games) {
+      final assigned = match.whiteProfileId == profileId ||
+          match.blackProfileId == profileId;
+      final playable = match.gameId != null &&
+          (match.status == 'scheduled' || match.status == 'live');
+      if (assigned && playable) {
+        assignments.add(
+          AssignedTournamentGame(
+            match: match,
+            round: round,
+            tournament: tournament,
+          ),
+        );
+      }
+    }
+  }
+
+  assignments.sort((left, right) {
+    final leftLive = left.match.status == 'live' ? 0 : 1;
+    final rightLive = right.match.status == 'live' ? 0 : 1;
+    final liveOrder = leftLive.compareTo(rightLive);
+    if (liveOrder != 0) return liveOrder;
+    return left.tournament.name.compareTo(right.tournament.name);
+  });
+  return assignments;
 }
 
 class PublishedBracketSnapshot {

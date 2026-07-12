@@ -75,6 +75,60 @@ void main() {
     );
   });
 
+  test('assigned online games expose only the active current round', () {
+    final event = TournamentSeed(
+      rowId: 'online-event',
+      id: 'online-event',
+      name: 'Online Swiss',
+      meta: '',
+      chips: const [],
+      current: 'Round 1',
+      format: 'Swiss',
+      timeControl: '5+3 Blitz',
+      players: 4,
+      location: 'JuChess',
+      playMode: 'online',
+      onlinePlatform: 'juchess',
+      description: '',
+      status: 'active',
+      currentRound: 1,
+      publishedRounds: const [
+        RoundSeed('Round 1', [
+          MatchSeed(
+            'Opponent',
+            'Current player',
+            '*',
+            gameId: 'game-1',
+            whiteProfileId: 'opponent-profile',
+            blackProfileId: 'current-profile',
+          ),
+        ]),
+        RoundSeed('Round 2', [
+          MatchSeed(
+            'Current player',
+            'Future opponent',
+            '*',
+            gameId: 'game-2',
+            whiteProfileId: 'current-profile',
+            blackProfileId: 'future-profile',
+          ),
+        ]),
+      ],
+    );
+
+    final assignments = findAssignedOnlineGames([event], 'current-profile');
+
+    expect(assignments, hasLength(1));
+    expect(assignments.single.match.gameId, 'game-1');
+    expect(assignments.single.match.blackProfileId, 'current-profile');
+    expect(assignments.single.round.label, 'Round 1');
+  });
+
+  test('upcoming online games are not playable yet', () {
+    final upcoming = _seed('online-event', 'upcoming');
+    expect(findAssignedOnlineGames([upcoming], 'current-profile'), isEmpty);
+  });
+
   testWidgets('evaluation can be removed from tournament game boards', (
     WidgetTester tester,
   ) async {
