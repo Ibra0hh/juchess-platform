@@ -6135,20 +6135,25 @@ class GamesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScroll(
       children: [
-        const PrototypeHeader(title: 'Games'),
-        const SizedBox(height: 16),
+        const PrototypeHeader(
+          title: 'Games',
+          subtitle: 'Compete online or sharpen your tactics',
+        ),
+        const SizedBox(height: 18),
         BigActionCard(
+          eyebrow: 'COMPETE',
           title: 'Online Tournaments',
           subtitle: 'Join events, play assigned games, and watch live boards',
-          icon: '♜',
+          icon: Icons.emoji_events_outlined,
           filled: true,
           onTap: () =>
               openPrototypeRoute(context, const OnlineTournamentsScreen()),
         ),
         BigActionCard(
+          eyebrow: 'TRAIN',
           title: 'Puzzles',
           subtitle: 'Solve tactics from real chess patterns',
-          icon: '♛',
+          icon: Icons.extension_outlined,
           onTap: () => openPrototypeRoute(context, const PuzzlesScreen()),
         ),
       ],
@@ -6318,25 +6323,32 @@ class ToolsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScroll(
       children: [
-        const PrototypeHeader(title: 'Tools'),
-        const SizedBox(height: 16),
-        ToolTile(
-          title: 'Chess Clock',
-          subtitle: 'Run over-the-board time controls',
-          icon: '5:00',
-          onTap: () => openPrototypeRoute(context, const ChessClockScreen()),
+        const PrototypeHeader(
+          title: 'Tools',
+          subtitle: 'Review, analyze, and play over the board',
         ),
-        ToolTile(
+        const SizedBox(height: 18),
+        BigActionCard(
+          eyebrow: 'REVIEW',
           title: 'Game Review',
           subtitle: 'Review and understand a completed game',
-          icon: '♞',
+          icon: Icons.rate_review_outlined,
+          filled: true,
           onTap: () => openPrototypeRoute(context, const GameReviewScreen()),
         ),
-        ToolTile(
+        BigActionCard(
+          eyebrow: 'ANALYZE',
           title: 'Engine Analysis',
           subtitle: 'Analyze a position, PGN, or tournament game',
-          icon: '♟',
+          icon: Icons.memory_outlined,
           onTap: () => openPrototypeRoute(context, const NewAnalysisScreen()),
+        ),
+        BigActionCard(
+          eyebrow: 'OVER THE BOARD',
+          title: 'Chess Clock',
+          subtitle: 'Run precise time controls for an in-person game',
+          icon: Icons.timer_outlined,
+          onTap: () => openPrototypeRoute(context, const ChessClockScreen()),
         ),
       ],
     );
@@ -6760,6 +6772,7 @@ String _mobileProfileResult(MobileImportedGame game, String? profileId) {
 
 class BigActionCard extends StatelessWidget {
   const BigActionCard({
+    required this.eyebrow,
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -6768,9 +6781,10 @@ class BigActionCard extends StatelessWidget {
     super.key,
   });
 
+  final String eyebrow;
   final String title;
   final String subtitle;
-  final String icon;
+  final IconData icon;
   final VoidCallback onTap;
   final bool filled;
 
@@ -6782,24 +6796,46 @@ class BigActionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+          constraints: const BoxConstraints(minHeight: 112),
+          padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
           decoration: BoxDecoration(
             color: filled ? PrototypeColors.burgundy : PrototypeColors.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: filled ? PrototypeColors.burgundy : PrototypeColors.black,
-              width: filled ? 0 : 1.5,
+              color: filled
+                  ? PrototypeColors.burgundy
+                  : const Color(0x30111111),
             ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14111111),
+                blurRadius: 8,
+                offset: Offset(0, 3),
+              ),
+            ],
           ),
           child: Row(
             children: [
-              Text(
-                icon,
-                style: TextStyle(
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: filled
+                      ? const Color(0x1ffff8e8)
+                      : const Color(0x147d2434),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: filled
+                        ? const Color(0x45fff8e8)
+                        : const Color(0x287d2434),
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  size: 25,
                   color: filled
                       ? PrototypeColors.cream
                       : PrototypeColors.burgundy,
-                  fontSize: 24,
                 ),
               ),
               const SizedBox(width: 14),
@@ -6807,110 +6843,58 @@ class BigActionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      eyebrow,
+                      style: TextStyle(
+                        color: filled
+                            ? const Color(0xbff7f1e3)
+                            : PrototypeColors.burgundy,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       title,
                       style: TextStyle(
                         color: filled
                             ? PrototypeColors.cream
                             : PrototypeColors.black,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
                       subtitle,
                       style: TextStyle(
                         color: filled
                             ? const Color(0xccf7f1e3)
                             : const Color(0x99111111),
-                        fontSize: 12,
+                        fontSize: 11.8,
+                        height: 1.3,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right,
-                color: filled ? PrototypeColors.cream : PrototypeColors.black,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class ToolTile extends StatelessWidget {
-  const ToolTile({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-    super.key,
-  });
-
-  final String title;
-  final String subtitle;
-  final String icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: cardDecoration(radius: 14),
-          child: Row(
-            children: [
+              const SizedBox(width: 8),
               Container(
-                width: 44,
-                height: 44,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: const Color(0x147d2434),
-                  border: Border.all(color: const Color(0x337d2434)),
-                  borderRadius: BorderRadius.circular(11),
+                  color: filled
+                      ? const Color(0x18fff8e8)
+                      : const Color(0x0d111111),
+                  shape: BoxShape.circle,
                 ),
-                child: Center(
-                  child: Text(
-                    icon,
-                    style: const TextStyle(
-                      color: PrototypeColors.burgundy,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 17,
+                  color: filled ? PrototypeColors.cream : PrototypeColors.black,
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: PrototypeColors.black,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Color(0x99111111),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: Color(0x66111111)),
             ],
           ),
         ),
