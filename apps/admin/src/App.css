@@ -918,6 +918,193 @@ button {
   min-width: 0;
 }
 
+.clock-time-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1.5px solid #e6dfd3;
+  border-radius: 9px;
+  background: #fff;
+  color: #111111;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 8px;
+}
+
+.clock-time-trigger:hover,
+.clock-time-trigger[aria-expanded="true"] {
+  border-color: #7d2434;
+}
+
+.clock-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: grid;
+  padding: 18px;
+  background: rgba(17, 17, 17, 0.56);
+  place-items: center;
+}
+
+.clock-picker-dialog {
+  width: min(100%, 340px);
+  overflow: hidden;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: 10px;
+  background: #fffdf8;
+  box-shadow: 0 28px 70px rgba(17, 17, 17, 0.34);
+}
+
+.clock-picker-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 106px;
+  padding: 18px 22px;
+  background: #7d2434;
+  color: #fff8e8;
+}
+
+.clock-picker-display > div:first-child {
+  display: flex;
+  align-items: center;
+  font-size: 42px;
+  font-weight: 800;
+}
+
+.clock-picker-display > div:first-child button {
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 248, 232, 0.58);
+  font: inherit;
+  cursor: pointer;
+}
+
+.clock-picker-display > div:first-child button.active {
+  color: #fff8e8;
+}
+
+.clock-period-control {
+  display: grid;
+  gap: 3px;
+}
+
+.clock-period-control button {
+  min-width: 42px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(255, 248, 232, 0.64);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.clock-period-control button.active {
+  background: rgba(255, 248, 232, 0.16);
+  color: #fff8e8;
+}
+
+.clock-picker-face {
+  position: relative;
+  width: 260px;
+  aspect-ratio: 1;
+  margin: 22px auto 14px;
+  border-radius: 50%;
+  background: #f2f0eb;
+  user-select: none;
+}
+
+.clock-picker-face.minute {
+  cursor: crosshair;
+}
+
+.clock-picker-face > button {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #111111;
+  cursor: pointer;
+  font-size: 13px;
+  place-items: center;
+}
+
+.clock-picker-face > button.active {
+  background: #7d2434;
+  color: #fff8e8;
+  font-weight: 900;
+}
+
+.clock-picker-hand {
+  position: absolute;
+  z-index: 1;
+  left: calc(50% - 1px);
+  top: 18%;
+  width: 2px;
+  height: 32%;
+  background: #7d2434;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
+
+.clock-picker-hand::after {
+  position: absolute;
+  left: -4px;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #7d2434;
+  content: "";
+}
+
+.clock-picker-hand span {
+  position: absolute;
+  left: -7px;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #7d2434;
+}
+
+.clock-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 16px 16px;
+}
+
+.clock-picker-actions button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #7d2434;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.clock-picker-actions button:last-child {
+  background: #7d2434;
+  color: #fff8e8;
+}
+
 .date-time-stepper {
   display: grid;
   grid-template-rows: repeat(2, 1fr);

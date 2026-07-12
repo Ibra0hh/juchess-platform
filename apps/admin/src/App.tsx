@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react'
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Clock3, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
 import {
   JuCapturedPieces,
@@ -115,6 +115,153 @@ function avatarColorFor(profileId: string) {
   return avatarPalette[hash % avatarPalette.length]
 }
 
+function ClockTimePicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  const initial = timePickerParts(value)
+  const [open, setOpen] = useState(false)
+  const [phase, setPhase] = useState<'hour' | 'minute'>('hour')
+  const [hour, setHour] = useState(initial.hour)
+  const [minute, setMinute] = useState(initial.minute)
+  const [period, setPeriod] = useState<'AM' | 'PM'>(initial.period)
+
+  useEffect(() => {
+    if (!open) return
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [open])
+
+  function openPicker() {
+    const next = timePickerParts(value)
+    setHour(next.hour)
+    setMinute(next.minute)
+    setPeriod(next.period)
+    setPhase('hour')
+    setOpen(true)
+  }
+
+  function chooseMinuteFromFace(event: ReactMouseEvent<HTMLDivElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const x = event.clientX - bounds.left - bounds.width / 2
+    const y = event.clientY - bounds.top - bounds.height / 2
+    const angle = (Math.atan2(y, x) * 180) / Math.PI + 90
+    setMinute(Math.round(((angle + 360) % 360) / 6) % 60)
+  }
+
+  const display = value ? formatClockTime(value) : 'Select time'
+  const handAngle = phase === 'hour' ? (hour % 12) * 30 : minute * 6
+
+  return (
+    <>
+      <button
+        type="button"
+        className="clock-time-trigger"
+        aria-label={`${label} time`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={openPicker}
+      >
+        <span>{display}</span>
+        <Clock3 size={15} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className="clock-picker-backdrop" role="presentation" onMouseDown={() => setOpen(false)}>
+          <section
+            className="clock-picker-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${label} time picker`}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="clock-picker-display">
+              <div>
+                <button type="button" className={phase === 'hour' ? 'active' : undefined} onClick={() => setPhase('hour')}>
+                  {String(hour).padStart(2, '0')}
+                </button>
+                <span>:</span>
+                <button type="button" className={phase === 'minute' ? 'active' : undefined} onClick={() => setPhase('minute')}>
+                  {String(minute).padStart(2, '0')}
+                </button>
+              </div>
+              <div className="clock-period-control" role="group" aria-label="AM or PM">
+                {(['AM', 'PM'] as const).map((item) => (
+                  <button
+                    type="button"
+                    key={item}
+                    className={period === item ? 'active' : undefined}
+                    aria-pressed={period === item}
+                    onClick={() => setPeriod(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </header>
+            <div
+              className={`clock-picker-face ${phase}`}
+              onMouseDown={phase === 'minute' ? chooseMinuteFromFace : undefined}
+            >
+              <div className="clock-picker-hand" style={{ transform: `rotate(${handAngle}deg)` }}>
+                <span />
+              </div>
+              {(phase === 'hour'
+                ? Array.from({ length: 12 }, (_, index) => index + 1)
+                : Array.from({ length: 12 }, (_, index) => index * 5)
+              ).map((number, index) => {
+                const selected = phase === 'hour' ? number === hour : number === minute
+                const angle = ((index + 1) * 30 * Math.PI) / 180
+                return (
+                  <button
+                    type="button"
+                    key={number}
+                    className={selected ? 'active' : undefined}
+                    style={{
+                      left: `calc(50% + ${Math.sin(angle) * 42}% - 18px)`,
+                      top: `calc(50% - ${Math.cos(angle) * 42}% - 18px)`,
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      if (phase === 'hour') {
+                        setHour(number || 12)
+                        setPhase('minute')
+                      } else {
+                        setMinute(number)
+                      }
+                    }}
+                  >
+                    {phase === 'minute' ? String(number).padStart(2, '0') : number}
+                  </button>
+                )
+              })}
+            </div>
+            <footer className="clock-picker-actions">
+              <button type="button" onClick={() => setOpen(false)}>Cancel</button>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(toTwentyFourHourTime(hour, minute, period))
+                  setOpen(false)
+                }}
+              >
+                Apply
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
+    </>
+  )
+}
+
 function TournamentDateTimeControl({
   label,
   value,
@@ -145,14 +292,11 @@ function TournamentDateTimeControl({
             onChange(fromLocalDateAndTime(event.target.value, timeValue || '12:00'))
           }}
         />
-        <input
-          type="time"
-          aria-label={`${label} time`}
-          step={900}
+        <ClockTimePicker
+          label={label}
           value={timeValue}
-          onChange={(event) => {
-            if (!event.target.value) return
-            onChange(fromLocalDateAndTime(dateValue || localTodayValue(), event.target.value))
+          onChange={(nextTime) => {
+            onChange(fromLocalDateAndTime(dateValue || localTodayValue(), nextTime))
           }}
         />
         <div className="date-time-stepper" role="group" aria-label={`Adjust ${label.toLowerCase()}`}>
@@ -6398,6 +6542,28 @@ function fromLocalDateAndTime(dateValue: string, timeValue: string) {
   const date = new Date(`${dateValue}T${timeValue}`)
   if (Number.isNaN(date.getTime())) return undefined
   return date.toISOString()
+}
+
+function timePickerParts(value: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(value)
+  const now = new Date()
+  const twentyFourHour = match ? Number(match[1]) : now.getHours()
+  const minute = match ? Number(match[2]) : now.getMinutes()
+  return {
+    hour: twentyFourHour % 12 || 12,
+    minute: Math.max(0, Math.min(59, minute)),
+    period: (twentyFourHour >= 12 ? 'PM' : 'AM') as 'AM' | 'PM',
+  }
+}
+
+function toTwentyFourHourTime(hour: number, minute: number, period: 'AM' | 'PM') {
+  const normalizedHour = hour % 12 + (period === 'PM' ? 12 : 0)
+  return `${String(normalizedHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+function formatClockTime(value: string) {
+  const parts = timePickerParts(value)
+  return `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')} ${parts.period}`
 }
 
 export default App
