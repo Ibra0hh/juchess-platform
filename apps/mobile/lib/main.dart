@@ -6112,6 +6112,36 @@ class GamesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return AppScroll(
+      children: [
+        const PrototypeHeader(title: 'Games'),
+        const SizedBox(height: 16),
+        BigActionCard(
+          title: 'Online Tournaments',
+          subtitle: 'Join events, play assigned games, and watch live boards',
+          icon: '♜',
+          filled: true,
+          onTap: () => openPrototypeRoute(
+            context,
+            const OnlineTournamentsScreen(),
+          ),
+        ),
+        BigActionCard(
+          title: 'Puzzles',
+          subtitle: 'Solve tactics from real chess patterns',
+          icon: '♛',
+          onTap: () => openPrototypeRoute(context, const PuzzlesScreen()),
+        ),
+      ],
+    );
+  }
+}
+
+class OnlineTournamentsScreen extends StatelessWidget {
+  const OnlineTournamentsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final assignedGames = findAssignedOnlineGames(
       state.tournamentItems,
@@ -6132,15 +6162,14 @@ class GamesScreen extends StatelessWidget {
             return left.name.compareTo(right.name);
           });
 
-    return AppScroll(
+    return PrototypeRouteScaffold(
+      title: 'Online Tournaments',
       children: [
-        const PrototypeHeader(title: 'Games'),
-        const SizedBox(height: 16),
         if (assignedGames.isNotEmpty) ...[
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
             child: Text(
-              'YOUR ONLINE GAME',
+              'YOUR ONLINE GAMES',
               style: TextStyle(
                 color: PrototypeColors.burgundy,
                 fontSize: 10.5,
@@ -6155,46 +6184,11 @@ class GamesScreen extends StatelessWidget {
               profileId: state.profileId!,
             ),
           ),
-          const SizedBox(height: 6),
         ],
-        BigActionCard(
-          title: 'Game Review',
-          subtitle: 'Review recent tournament games',
-          icon: '♞',
-          filled: true,
-          onTap: () => openPrototypeRoute(context, const GameReviewScreen()),
-        ),
-        BigActionCard(
-          title: 'Online Tournaments',
-          subtitle: 'Open upcoming events and live boards',
-          icon: '♜',
-          onTap: () {
-            final state = context.read<AppState>();
-            final hasActiveOnline = state.tournamentItems.any(
-              (event) => event.playMode == 'online' && event.status == 'active',
-            );
-            state.selectTournamentFilter(
-              hasActiveOnline ? 'active' : 'upcoming',
-            );
-            state.selectTab(1);
-          },
-        ),
-        BigActionCard(
-          title: 'Puzzles',
-          subtitle: 'Solve tactics from real chess patterns',
-          icon: '♛',
-          onTap: () => openPrototypeRoute(context, const PuzzlesScreen()),
-        ),
-        BigActionCard(
-          title: 'New Analysis',
-          subtitle: 'Set up a board and record lines',
-          icon: '♝',
-          onTap: () => openPrototypeRoute(context, const NewAnalysisScreen()),
-        ),
         const Padding(
-          padding: EdgeInsets.fromLTRB(16, 22, 16, 8),
+          padding: EdgeInsets.fromLTRB(16, 18, 16, 8),
           child: Text(
-            'ONLINE TOURNAMENTS',
+            'UPCOMING AND LIVE',
             style: TextStyle(
               color: Color(0x99111111),
               fontSize: 10.5,
@@ -6309,16 +6303,16 @@ class ToolsScreen extends StatelessWidget {
           onTap: () => openPrototypeRoute(context, const ChessClockScreen()),
         ),
         ToolTile(
-          title: 'Analysis Board',
-          subtitle: 'Set up any position and save lines',
-          icon: '♟',
-          onTap: () => openPrototypeRoute(context, const AnalysisBoardScreen()),
+          title: 'Game Review',
+          subtitle: 'Review and understand a completed game',
+          icon: '♞',
+          onTap: () => openPrototypeRoute(context, const GameReviewScreen()),
         ),
         ToolTile(
-          title: 'Saved Analyses',
-          subtitle: 'Open lines saved to your profile',
-          icon: '♜',
-          onTap: () => openPrototypeRoute(context, const SavedAnalysesScreen()),
+          title: 'Engine Analysis',
+          subtitle: 'Analyze a position, PGN, or tournament game',
+          icon: '♟',
+          onTap: () => openPrototypeRoute(context, const NewAnalysisScreen()),
         ),
       ],
     );
