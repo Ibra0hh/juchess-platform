@@ -965,8 +965,8 @@ test('hosted chess derives decisive and drawn terminal results', () => {
   assert.equal(engine.hostedResultFor(draw), '1/2-1/2')
 })
 
-test('hosted move accepts only the assigned side and advances the canonical revision', async () => {
-  const game = {
+test('hosted move alternates players and clocks while advancing the canonical revision', async () => {
+  let game = {
     $id: 'g1',
     tournamentId: 't1',
     whiteProfileId: 'white',
@@ -984,12 +984,11 @@ test('hosted move accepts only the assigned side and advances the canonical revi
     timeControl: '5+3 Blitz',
     format: 'Swiss',
   }
-  let updated
   const tablesDB = {
     getRow: async ({ tableId }) => tableId === 'games' ? game : tournament,
     updateRow: async ({ data }) => {
-      updated = { ...game, ...data }
-      return updated
+      game = { ...game, ...data }
+      return game
     },
   }
 
@@ -1007,8 +1006,22 @@ test('hosted move accepts only the assigned side and advances the canonical revi
   assert.equal(outcome.row.whiteTimeMs, 303000)
   assert.equal(outcome.row.blackTimeMs, 300000)
 
+  const reply = await engine.submitHostedTournamentMove(
+    tablesDB,
+    'juchess',
+    'g1',
+    { san: 'e5', expectedVersion: 1 },
+    { $id: 'black' },
+  )
+  assert.equal(reply.move, 'e5')
+  assert.equal(reply.row.status, 'live')
+  assert.equal(reply.row.moveVersion, 2)
+  assert.match(reply.row.pgn, /1\. e4 e5/)
+  assert.equal(reply.row.whiteTimeMs, 303000)
+  assert.ok(reply.row.blackTimeMs > 302000 && reply.row.blackTimeMs <= 303000)
+
   await assert.rejects(
-    () => engine.submitHostedTournamentMove(tablesDB, 'juchess', 'g1', { san: 'e4', expectedVersion: 0 }, { $id: 'black' }),
+    () => engine.submitHostedTournamentMove(tablesDB, 'juchess', 'g1', { san: 'e4', expectedVersion: 2 }, { $id: 'black' }),
     (error) => error.statusCode === 409 && /not your turn/i.test(error.message),
   )
   await assert.rejects(

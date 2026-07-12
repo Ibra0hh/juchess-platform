@@ -27,7 +27,7 @@
     "lint:admin": "npm --workspace apps/admin run lint",
     "mobile:analyze": "cd apps/mobile && flutter analyze",
     "mobile:test": "cd apps/mobile && flutter test",
-    "test:web-review": "node --experimental-strip-types --test apps/web/src/lib/gameReview.test.ts apps/web/src/lib/externalGames.test.ts",
+    "test:web-review": "node --experimental-strip-types --test apps/web/src/lib/gameReview.test.ts apps/web/src/lib/externalGames.test.ts apps/web/src/lib/storedMoves.test.ts",
     "test:admin-wizard": "node --experimental-strip-types --test apps/admin/test/tournamentWizard.test.mjs",
     "test:engine": "cd appwrite/functions/admin-actions && node --test test/engine.test.mjs",
     "test:functions": "node --test appwrite/functions/player-actions/test/*.test.mjs appwrite/functions/attendance-actions/test/*.test.mjs",

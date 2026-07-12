@@ -1,5 +1,8 @@
 import { Channel, Query, type Models } from 'appwrite'
 import { appwriteConfig, appwriteReady, realtime, storage, tablesDB } from './appwrite'
+import { parseStoredMoves } from './storedMoves'
+
+export { parseStoredMoves } from './storedMoves'
 
 const tournamentAssetsBucketId = 'tournament-assets'
 const tournamentMediaPrefix = 'ju-media'
@@ -823,18 +826,6 @@ function gameTimestamp(row: AppwriteGameRow) {
   const value = row.finishedAt || row.startedAt || row.$updatedAt || row.$createdAt
   const timestamp = Date.parse(value)
   return Number.isNaN(timestamp) ? 0 : timestamp
-}
-
-export function parseStoredMoves(value?: string) {
-  if (!value) return []
-
-  return value
-    .replace(/\{[^}]*\}/g, ' ')
-    .replace(/\d+\.(\.\.)?/g, ' ')
-    .replace(/\b(?:1-0|0-1|1\/2-1\/2|\*)\b/g, ' ')
-    .split(/\s+/)
-    .map((move) => move.trim())
-    .filter(Boolean)
 }
 
 export type TournamentLoadResult = {

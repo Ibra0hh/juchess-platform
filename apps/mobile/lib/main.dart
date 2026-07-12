@@ -15,6 +15,7 @@ import 'package:video_player/video_player.dart';
 
 import 'game_review_core.dart';
 import 'game_review_stockfish.dart';
+import 'stored_moves.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12156,28 +12157,7 @@ void openTournamentGameDetail(
 }
 
 List<String> _parseStoredMoves(String? value) {
-  final source = value?.trim();
-  if (source == null || source.isEmpty) return const [];
-
-  final tokens = source
-      .replaceAll(RegExp(r'\{[^}]*\}'), ' ')
-      .replaceAll(RegExp(r'\([^)]*\)'), ' ')
-      .split(RegExp(r'\s+'));
-  final moves = <String>[];
-
-  for (final rawToken in tokens) {
-    var token = rawToken.trim();
-    if (token.isEmpty) continue;
-    if (RegExp(r'^\d+\.(\.\.)?$').hasMatch(token)) continue;
-    token = token.replaceFirst(RegExp(r'^\d+\.(\.\.)?'), '');
-    if (token.isEmpty) continue;
-    if (const {'1-0', '0-1', '1/2-1/2', '*', 'live'}.contains(token)) {
-      continue;
-    }
-    moves.add(token);
-  }
-
-  return moves;
+  return parseStoredMoves(value);
 }
 
 int _mobileGameRowTime(models.Row row) {
