@@ -7139,6 +7139,119 @@ class LeaderboardRow extends StatelessWidget {
   }
 }
 
+bool _looksLikeMobilePgn(String content) {
+  return content.contains(RegExp(r'^\s*\[', multiLine: true)) ||
+      content.contains(RegExp(r'(^|\s)\d+\.(\.\.)?\s'));
+}
+
+Future<String?> _pickMobilePgnOrFenText() async {
+  final selection = await FilePicker.pickFiles(
+    allowMultiple: false,
+    allowedExtensions: const ['pgn', 'fen', 'txt'],
+    dialogTitle: 'Choose a PGN or FEN file',
+    type: FileType.custom,
+    withData: true,
+  );
+  if (selection == null || selection.files.isEmpty) return null;
+
+  final bytes = selection.files.single.bytes;
+  if (bytes == null) {
+    throw const FormatException('The selected file could not be read.');
+  }
+  final content = utf8.decode(bytes, allowMalformed: true).trim();
+  if (content.isEmpty) {
+    throw const FormatException('The selected file is empty.');
+  }
+  return content;
+}
+
+class _PgnFenEntryCard extends StatelessWidget {
+  const _PgnFenEntryCard({
+    required this.controller,
+    required this.error,
+    required this.primaryLabel,
+    required this.title,
+    required this.onPrimary,
+    required this.onUpload,
+  });
+
+  final TextEditingController controller;
+  final String error;
+  final String primaryLabel;
+  final String title;
+  final VoidCallback onPrimary;
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrototypeCard(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SerifText(title, size: 20, weight: FontWeight.w700),
+          const SizedBox(height: 6),
+          const Text(
+            'Paste notation below or choose a PGN/FEN file from your device.',
+            style: TextStyle(
+              color: Color(0x99111111),
+              fontSize: 12.5,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            minLines: 6,
+            maxLines: 10,
+            decoration: InputDecoration(
+              hintText:
+                  '[White "Player"]\n[Black "Player"]\n\n1. e4 e5 ...\n\nor paste a FEN position',
+              filled: true,
+              fillColor: const Color(0xfffbf6e8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(7),
+                borderSide: const BorderSide(color: Color(0x33111111)),
+              ),
+            ),
+            style: const TextStyle(
+              color: PrototypeColors.black,
+              fontFamily: 'monospace',
+              fontSize: 12,
+            ),
+          ),
+          if (error.isNotEmpty) ...[
+            const SizedBox(height: 9),
+            Text(
+              error,
+              style: const TextStyle(
+                color: PrototypeColors.burgundy,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: PrototypeOutlineButton(
+                  label: 'Upload file',
+                  onTap: onUpload,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: PrototypeButton(label: primaryLabel, onTap: onPrimary),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class GameReviewScreen extends StatefulWidget {
   const GameReviewScreen({super.key});
 
@@ -7147,18 +7260,6 @@ class GameReviewScreen extends StatefulWidget {
 }
 
 class _GameReviewScreenState extends State<GameReviewScreen> {
-  static const _samplePgn = '''[Event "JU Chess Club Practice"]
-[Site "University of Jordan"]
-[Date "2026.07.11"]
-[Round "1"]
-[White "Ibrahim Ahmad"]
-[Black "Sara Nasser"]
-[Result "*"]
-
-1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7
-6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7
-11. c4 c6 12. Nc3 Bb7 *''';
-
   final _pgnController = TextEditingController();
   String error = '';
 
@@ -7170,7 +7271,28 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
 
   void _openPgnReview() {
     try {
-      final parsed = MobileParsedReviewGame.fromPgn(_pgnController.text);
+      final content = _pgnController.text.trim();
+      if (content.isEmpty) {
+        throw const FormatException('Paste or upload a PGN or FEN first.');
+      }
+      if (!_looksLikeMobilePgn(content)) {
+        final fen = content.split(RegExp(r'\r?\n')).first.trim();
+        final validation = chess.Chess.validate_fen(fen);
+        if (validation['valid'] != true) {
+          throw FormatException(
+            validation['error']?.toString() ??
+                'This is not a valid PGN or FEN position.',
+          );
+        }
+        setState(() => error = '');
+        openPrototypeRoute(
+          context,
+          AnalysisBoardScreen(initialFen: fen, mode: 'analysis'),
+        );
+        return;
+      }
+
+      final parsed = MobileParsedReviewGame.fromPgn(content);
       setState(() => error = '');
       openPrototypeRoute(
         context,
@@ -7191,59 +7313,12 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
   Future<void> _pickReviewFile() async {
     setState(() => error = '');
     try {
-      final selection = await FilePicker.pickFiles(
-        allowMultiple: false,
-        allowedExtensions: const ['pgn', 'fen', 'txt'],
-        dialogTitle: 'Choose a PGN or FEN file',
-        type: FileType.custom,
-        withData: true,
-      );
-      if (!mounted || selection == null || selection.files.isEmpty) return;
-
-      final file = selection.files.single;
-      final bytes = file.bytes;
-      if (bytes == null) {
-        throw const FormatException('The selected file could not be read.');
-      }
-      final content = utf8.decode(bytes, allowMalformed: true).trim();
-      if (content.isEmpty) {
-        throw const FormatException('The selected file is empty.');
-      }
-
-      final extension = file.extension?.toLowerCase();
-      final looksLikePgn =
-          content.contains(RegExp(r'^\s*\[', multiLine: true)) ||
-          content.contains(RegExp(r'(^|\s)\d+\.(\.\.)?\s'));
-      if (extension == 'pgn' || looksLikePgn) {
-        final parsed = MobileParsedReviewGame.fromPgn(content);
-        if (!mounted) return;
-        openPrototypeRoute(
-          context,
-          MobileGameReviewWorkspace(
-            black: parsed.headers['Black'] ?? 'Black',
-            blackRating: int.tryParse(parsed.headers['BlackElo'] ?? ''),
-            game: parsed,
-            key: ValueKey('file:${file.name}:${parsed.moves.join('|')}'),
-            white: parsed.headers['White'] ?? 'White',
-            whiteRating: int.tryParse(parsed.headers['WhiteElo'] ?? ''),
-          ),
-        );
-        return;
-      }
-
-      final fen = content.split(RegExp(r'\r?\n')).first.trim();
-      final validation = chess.Chess.validate_fen(fen);
-      if (validation['valid'] != true) {
-        throw FormatException(
-          validation['error']?.toString() ??
-              'The file does not contain a valid FEN position.',
-        );
-      }
-      if (!mounted) return;
-      openPrototypeRoute(
-        context,
-        AnalysisBoardScreen(initialFen: fen, mode: 'analysis'),
-      );
+      final content = await _pickMobilePgnOrFenText();
+      if (!mounted || content == null) return;
+      setState(() {
+        _pgnController.text = content;
+        error = '';
+      });
     } on FormatException catch (exception) {
       if (mounted) setState(() => error = exception.message);
     } catch (exception) {
@@ -7262,82 +7337,6 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
       title: 'Game Review',
       children: [
         const SizedBox(height: 14),
-        PrototypeCard(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SerifText(
-                'Review a PGN',
-                size: 20,
-                weight: FontWeight.w700,
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Paste a completed game, then run the local engine review.',
-                style: TextStyle(
-                  color: Color(0x99111111),
-                  fontSize: 12.5,
-                  height: 1.45,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _pgnController,
-                minLines: 6,
-                maxLines: 10,
-                decoration: InputDecoration(
-                  hintText:
-                      '[White "Player"]\n[Black "Player"]\n\n1. e4 e5 ...',
-                  filled: true,
-                  fillColor: const Color(0xfffbf6e8),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(7),
-                    borderSide: const BorderSide(color: Color(0x33111111)),
-                  ),
-                ),
-                style: const TextStyle(
-                  color: PrototypeColors.black,
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                ),
-              ),
-              if (error.isNotEmpty) ...[
-                const SizedBox(height: 9),
-                Text(
-                  error,
-                  style: const TextStyle(
-                    color: PrototypeColors.burgundy,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: PrototypeOutlineButton(
-                      label: 'Use sample',
-                      onTap: () => setState(() {
-                        _pgnController.text = _samplePgn;
-                        error = '';
-                      }),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: PrototypeButton(
-                      label: 'Review game',
-                      onTap: _openPgnReview,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
         PrototypeOptionTile(
           title: 'Chess.com games',
           subtitle: 'Import by username',
@@ -7376,12 +7375,16 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
             ),
           ),
         ),
-        PrototypeOptionTile(
-          title: 'Upload PGN / FEN file',
-          subtitle: 'Choose a game or position from your device',
-          icon: 'FEN',
-          onTap: _pickReviewFile,
+        const SizedBox(height: 4),
+        _PgnFenEntryCard(
+          controller: _pgnController,
+          error: error,
+          primaryLabel: 'Start review',
+          title: 'Review a PGN or FEN',
+          onPrimary: _openPgnReview,
+          onUpload: _pickReviewFile,
         ),
+        const SizedBox(height: 18),
       ],
     );
   }
@@ -8949,13 +8952,88 @@ class _PuzzleBoardScreenState extends State<PuzzleBoardScreen> {
   }
 }
 
-class NewAnalysisScreen extends StatelessWidget {
+class NewAnalysisScreen extends StatefulWidget {
   const NewAnalysisScreen({super.key});
+
+  @override
+  State<NewAnalysisScreen> createState() => _NewAnalysisScreenState();
+}
+
+class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
+  final _notationController = TextEditingController();
+  String error = '';
+
+  @override
+  void dispose() {
+    _notationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAnalysisFile() async {
+    setState(() => error = '');
+    try {
+      final content = await _pickMobilePgnOrFenText();
+      if (!mounted || content == null) return;
+      setState(() {
+        _notationController.text = content;
+        error = '';
+      });
+    } on FormatException catch (exception) {
+      if (mounted) setState(() => error = exception.message);
+    } catch (exception) {
+      if (mounted) {
+        setState(
+          () => error =
+              'The file could not be opened: ${exception.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    }
+  }
+
+  void _startAnalysis() {
+    try {
+      final content = _notationController.text.trim();
+      if (content.isEmpty) {
+        throw const FormatException('Paste or upload a PGN or FEN first.');
+      }
+
+      if (_looksLikeMobilePgn(content)) {
+        final parsed = MobileParsedReviewGame.fromPgn(content);
+        setState(() => error = '');
+        openPrototypeRoute(
+          context,
+          AnalysisBoardScreen(
+            black: parsed.headers['Black'] ?? 'Black',
+            initialFen: parsed.initialFen,
+            initialMoves: parsed.moves,
+            white: parsed.headers['White'] ?? 'White',
+          ),
+        );
+        return;
+      }
+
+      final fen = content.split(RegExp(r'\r?\n')).first.trim();
+      final validation = chess.Chess.validate_fen(fen);
+      if (validation['valid'] != true) {
+        throw FormatException(
+          validation['error']?.toString() ??
+              'This is not a valid PGN or FEN position.',
+        );
+      }
+      setState(() => error = '');
+      openPrototypeRoute(
+        context,
+        AnalysisBoardScreen(initialFen: fen, mode: 'analysis'),
+      );
+    } on FormatException catch (exception) {
+      setState(() => error = exception.message);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return PrototypeRouteScaffold(
-      title: 'New Analysis',
+      title: 'Engine Analysis',
       children: [
         const SizedBox(height: 14),
         PrototypeOptionTile(
@@ -8966,18 +9044,6 @@ class NewAnalysisScreen extends StatelessWidget {
             context,
             const AnalysisBoardScreen(mode: 'empty'),
           ),
-        ),
-        PrototypeOptionTile(
-          title: 'PGN file',
-          subtitle: 'Analyze an imported game',
-          icon: 'PGN',
-          onTap: () => openPrototypeRoute(context, const AnalysisBoardScreen()),
-        ),
-        PrototypeOptionTile(
-          title: 'FEN',
-          subtitle: 'Analyze from a position string',
-          icon: 'FEN',
-          onTap: () => openPrototypeRoute(context, const AnalysisBoardScreen()),
         ),
         PrototypeOptionTile(
           title: 'Tournament game archive',
@@ -9020,6 +9086,16 @@ class NewAnalysisScreen extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 4),
+        _PgnFenEntryCard(
+          controller: _notationController,
+          error: error,
+          primaryLabel: 'Start analysis',
+          title: 'Analyze a PGN or FEN',
+          onPrimary: _startAnalysis,
+          onUpload: _pickAnalysisFile,
+        ),
+        const SizedBox(height: 18),
       ],
     );
   }
