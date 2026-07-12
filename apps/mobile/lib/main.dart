@@ -6,6 +6,7 @@ import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/enums.dart' as enums;
 import 'package:appwrite/models.dart' as models;
 import 'package:chess/chess.dart' as chess;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -6919,6 +6920,73 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
     }
   }
 
+  Future<void> _pickReviewFile() async {
+    setState(() => error = '');
+    try {
+      final selection = await FilePicker.pickFiles(
+        allowMultiple: false,
+        allowedExtensions: const ['pgn', 'fen', 'txt'],
+        dialogTitle: 'Choose a PGN or FEN file',
+        type: FileType.custom,
+        withData: true,
+      );
+      if (!mounted || selection == null || selection.files.isEmpty) return;
+
+      final file = selection.files.single;
+      final bytes = file.bytes;
+      if (bytes == null) {
+        throw const FormatException('The selected file could not be read.');
+      }
+      final content = utf8.decode(bytes, allowMalformed: true).trim();
+      if (content.isEmpty) {
+        throw const FormatException('The selected file is empty.');
+      }
+
+      final extension = file.extension?.toLowerCase();
+      final looksLikePgn = content.contains(RegExp(r'^\s*\[', multiLine: true)) ||
+          content.contains(RegExp(r'(^|\s)\d+\.(\.\.)?\s'));
+      if (extension == 'pgn' || looksLikePgn) {
+        final parsed = MobileParsedReviewGame.fromPgn(content);
+        if (!mounted) return;
+        openPrototypeRoute(
+          context,
+          MobileGameReviewWorkspace(
+            black: parsed.headers['Black'] ?? 'Black',
+            blackRating: int.tryParse(parsed.headers['BlackElo'] ?? ''),
+            game: parsed,
+            key: ValueKey('file:${file.name}:${parsed.moves.join('|')}'),
+            white: parsed.headers['White'] ?? 'White',
+            whiteRating: int.tryParse(parsed.headers['WhiteElo'] ?? ''),
+          ),
+        );
+        return;
+      }
+
+      final fen = content.split(RegExp(r'\r?\n')).first.trim();
+      final validation = chess.Chess.validate_fen(fen);
+      if (validation['valid'] != true) {
+        throw FormatException(
+          validation['error']?.toString() ??
+              'The file does not contain a valid FEN position.',
+        );
+      }
+      if (!mounted) return;
+      openPrototypeRoute(
+        context,
+        AnalysisBoardScreen(initialFen: fen, mode: 'analysis'),
+      );
+    } on FormatException catch (exception) {
+      if (mounted) setState(() => error = exception.message);
+    } catch (exception) {
+      if (mounted) {
+        setState(
+          () => error =
+              'The file could not be opened: ${exception.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PrototypeRouteScaffold(
@@ -7040,13 +7108,10 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
           ),
         ),
         PrototypeOptionTile(
-          title: 'Upload / import FEN file',
-          subtitle: 'Review from a position',
+          title: 'Upload PGN / FEN file',
+          subtitle: 'Choose a game or position from your device',
           icon: 'FEN',
-          onTap: () => openPrototypeRoute(
-            context,
-            const AnalysisBoardScreen(mode: 'review'),
-          ),
+          onTap: _pickReviewFile,
         ),
       ],
     );
@@ -7084,12 +7149,12 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
   int completed = 0;
   int analysisRun = 0;
   MobileReviewStrength strength = defaultMobileReviewStrength;
-  late int moveIndex;
+  late int currentPly;
 
   @override
   void initState() {
     super.initState();
-    moveIndex = widget.game.moves.length - 1;
+    currentPly = widget.game.moves.length;
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => unawaited(_runReview()),
     );
@@ -7105,7 +7170,7 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
         reviewStarted = false;
         error = '';
         completed = 0;
-        moveIndex = widget.game.moves.length - 1;
+        currentPly = widget.game.moves.length;
       });
     }
 
@@ -7181,11 +7246,11 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
             black: widget.black,
             blackRating: widget.blackRating,
             onStart: () => setState(() {
-              moveIndex = 0;
+              currentPly = 0;
               reviewStarted = true;
             }),
             onSelectMove: (index) => setState(() {
-              moveIndex = index;
+              currentPly = index + 1;
               reviewStarted = true;
             }),
             review: completedReview,
@@ -7197,12 +7262,12 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
       );
     }
 
-    final shownMoves = widget.game.moves.sublist(0, moveIndex + 1);
+    final shownMoves = widget.game.moves.sublist(0, currentPly);
     final boardSummary = _summarizeMobileBoard(shownMoves);
     final topColor = flipped ? 'white' : 'black';
     final bottomColor = flipped ? 'black' : 'white';
-    final selected = review?.moves[moveIndex];
-    final evaluation = review?.positions[moveIndex + 1].evaluation;
+    final selected = currentPly == 0 ? null : review?.moves[currentPly - 1];
+    final evaluation = review?.positions[currentPly].evaluation;
     final total = widget.game.fens.length;
 
     return PrototypeRouteScaffold(
@@ -7254,52 +7319,10 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
           ),
         ),
         const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _ReviewNavButton(
-                icon: Icons.first_page,
-                tooltip: 'First move',
-                onTap: () => setState(() => moveIndex = 0),
-              ),
-              _ReviewNavButton(
-                icon: Icons.chevron_left,
-                tooltip: 'Previous move',
-                onTap: () =>
-                    setState(() => moveIndex = math.max(0, moveIndex - 1)),
-              ),
-              SizedBox(
-                width: 96,
-                child: Text(
-                  '${moveIndex + 1} / ${widget.game.moves.length}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: PrototypeColors.black,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              _ReviewNavButton(
-                icon: Icons.chevron_right,
-                tooltip: 'Next move',
-                onTap: () => setState(
-                  () => moveIndex = math.min(
-                    widget.game.moves.length - 1,
-                    moveIndex + 1,
-                  ),
-                ),
-              ),
-              _ReviewNavButton(
-                icon: Icons.last_page,
-                tooltip: 'Last move',
-                onTap: () =>
-                    setState(() => moveIndex = widget.game.moves.length - 1),
-              ),
-            ],
-          ),
+        _BoardMoveControls(
+          currentPly: currentPly,
+          onChanged: (ply) => setState(() => currentPly = ply),
+          totalPlies: widget.game.moves.length,
         ),
         const SizedBox(height: 10),
         if (review == null && error.isEmpty)
@@ -7354,16 +7377,16 @@ class _MobileGameReviewWorkspaceState extends State<MobileGameReviewWorkspace> {
           ),
         if (review != null && selected != null)
           _MobileReviewSummary(
-            onSelectMove: (index) => setState(() => moveIndex = index),
+            onSelectMove: (index) => setState(() => currentPly = index + 1),
             review: review!,
             selected: selected,
           ),
         const SizedBox(height: 10),
         _MobileReviewMoves(
-          currentIndex: moveIndex,
+          currentIndex: currentPly - 1,
           game: widget.game,
           review: review,
-          onSelect: (index) => setState(() => moveIndex = index),
+          onSelect: (index) => setState(() => currentPly = index + 1),
         ),
         const SizedBox(height: 18),
       ],
@@ -7918,6 +7941,65 @@ class _MobileEvaluationGraphPainter extends CustomPainter {
   }
 }
 
+class _BoardMoveControls extends StatelessWidget {
+  const _BoardMoveControls({
+    required this.currentPly,
+    required this.onChanged,
+    required this.totalPlies,
+  });
+
+  final int currentPly;
+  final ValueChanged<int> onChanged;
+  final int totalPlies;
+
+  @override
+  Widget build(BuildContext context) {
+    final ply = currentPly.clamp(0, totalPlies);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _ReviewNavButton(
+            icon: Icons.first_page,
+            tooltip: 'Start position',
+            onTap: ply == 0 ? null : () => onChanged(0),
+          ),
+          const SizedBox(width: 4),
+          _ReviewNavButton(
+            icon: Icons.chevron_left,
+            tooltip: 'Previous move',
+            onTap: ply == 0 ? null : () => onChanged(ply - 1),
+          ),
+          SizedBox(
+            width: 88,
+            child: Text(
+              ply == 0 ? 'Start' : '$ply / $totalPlies',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: PrototypeColors.black,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          _ReviewNavButton(
+            icon: Icons.chevron_right,
+            tooltip: 'Next move',
+            onTap: ply >= totalPlies ? null : () => onChanged(ply + 1),
+          ),
+          const SizedBox(width: 4),
+          _ReviewNavButton(
+            icon: Icons.last_page,
+            tooltip: 'Latest position',
+            onTap: ply >= totalPlies ? null : () => onChanged(totalPlies),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReviewNavButton extends StatelessWidget {
   const _ReviewNavButton({
     required this.icon,
@@ -7926,7 +8008,7 @@ class _ReviewNavButton extends StatelessWidget {
   });
 
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String tooltip;
 
   @override
@@ -8923,6 +9005,7 @@ class _TournamentGameDetailScreenState
   bool _refreshing = false;
   bool _movePending = false;
   late List<String> moves;
+  late int currentPly;
   late String currentResult;
   late String currentStatus;
   late int moveVersion;
@@ -8941,6 +9024,7 @@ class _TournamentGameDetailScreenState
   void initState() {
     super.initState();
     moves = _parseStoredMoves(widget.match.pgn);
+    currentPly = moves.length;
     currentResult = widget.match.result;
     currentStatus = widget.match.status;
     moveVersion = widget.match.moveVersion;
@@ -8959,7 +9043,9 @@ class _TournamentGameDetailScreenState
         (_) => unawaited(_refreshLiveGame()),
       );
       _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted && currentStatus == 'live' && turnStartedAt != null) setState(() {});
+        if (mounted && currentStatus == 'live' && turnStartedAt != null) {
+          setState(() {});
+        }
       });
     }
   }
@@ -8988,8 +9074,12 @@ class _TournamentGameDetailScreenState
           : liveGame.blackProfileId == profileId
           ? 'black'
           : null;
+      final wasAtLatest = currentPly == moves.length;
       setState(() {
         moves = refreshedMoves;
+        currentPly = wasAtLatest
+            ? refreshedMoves.length
+            : math.min(currentPly, refreshedMoves.length);
         currentResult = liveGame.result;
         currentStatus = liveGame.status;
         moveVersion = liveGame.moveVersion;
@@ -9022,11 +9112,14 @@ class _TournamentGameDetailScreenState
       message = 'Submitting move...';
     });
     try {
-      final response = await context.read<AppState>().service.submitHostedTournamentMove(
-        gameId: gameId,
-        san: nextMoves.last,
-        expectedVersion: moveVersion,
-      );
+      final response = await context
+          .read<AppState>()
+          .service
+          .submitHostedTournamentMove(
+            gameId: gameId,
+            san: nextMoves.last,
+            expectedVersion: moveVersion,
+          );
       if (!mounted) return;
       setState(() {
         message = response['requiresTiebreak'] == true
@@ -9050,8 +9143,14 @@ class _TournamentGameDetailScreenState
         title: const Text('Resign game?'),
         content: const Text('This result cannot be undone by a player.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resign')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Resign'),
+          ),
         ],
       ),
     );
@@ -9078,17 +9177,20 @@ class _TournamentGameDetailScreenState
         ? 'black'
         : null;
     final turnColor = moves.length.isEven ? 'white' : 'black';
-    final assignedParticipant = onlinePlatform == 'juchess' &&
+    final assignedParticipant =
+        onlinePlatform == 'juchess' &&
         tournamentStatus == 'active' &&
         assignedColor != null &&
         (currentStatus == 'scheduled' || currentStatus == 'live');
-    final canMove = assignedParticipant && assignedColor == turnColor && !_movePending;
+    final canMove =
+        assignedParticipant && assignedColor == turnColor && !_movePending;
     final result = currentResult == '-'
         ? 'Scheduled'
         : currentResult == 'live'
         ? 'Live'
         : currentResult;
-    final boardSummary = _summarizeMobileBoard(moves);
+    final shownMoves = moves.sublist(0, currentPly);
+    final boardSummary = _summarizeMobileBoard(shownMoves);
 
     return PrototypeRouteScaffold(
       title: 'Tournament Game',
@@ -9154,8 +9256,8 @@ class _TournamentGameDetailScreenState
               ),
               PrototypeChessBoard(
                 flipped: flipped,
-                moves: moves,
-                readOnly: !canMove,
+                moves: shownMoves,
+                readOnly: !canMove || currentPly != moves.length,
                 showEvaluation: false,
                 onChanged: _submitMove,
               ),
@@ -9175,26 +9277,50 @@ class _TournamentGameDetailScreenState
                   blackTimeMs: blackTimeMs,
                 ),
               ),
+              const SizedBox(height: 10),
+              _BoardMoveControls(
+                currentPly: currentPly,
+                onChanged: (ply) => setState(() => currentPly = ply),
+                totalPlies: moves.length,
+              ),
               const SizedBox(height: 8),
               Text(
-                _movePending
+                currentPly != moves.length
+                    ? currentPly == 0
+                          ? 'Viewing the start position'
+                          : 'Viewing move $currentPly of ${moves.length}'
+                    : _movePending
                     ? 'Saving move...'
                     : assignedParticipant
                     ? canMove
-                        ? 'Your turn'
-                        : 'Opponent to move'
+                          ? 'Your turn'
+                          : 'Opponent to move'
                     : onlinePlatform == 'juchess'
                     ? 'Watching live tournament board'
                     : 'Tournament board',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               if (message != null) ...[
                 const SizedBox(height: 6),
-                Text(message!, textAlign: TextAlign.center, style: const TextStyle(color: PrototypeColors.burgundy, fontSize: 12, fontWeight: FontWeight.w700)),
+                Text(
+                  message!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: PrototypeColors.burgundy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
               if (assignedParticipant) ...[
                 const SizedBox(height: 8),
-                TextButton(onPressed: _movePending ? null : _resign, child: const Text('Resign game')),
+                TextButton(
+                  onPressed: _movePending ? null : _resign,
+                  child: const Text('Resign game'),
+                ),
               ],
             ],
           ),
@@ -9358,9 +9484,9 @@ String? _mobileHostedClockLabel({
   final runningSince = status == 'live' && side == turn && turnStartedAt != null
       ? DateTime.tryParse(turnStartedAt)?.millisecondsSinceEpoch
       : null;
-  final remaining = runningSince == null
-      ? stored
-      : math.max(0, stored - (DateTime.now().millisecondsSinceEpoch - runningSince));
+    final remaining = runningSince == null
+        ? stored
+        : math.max(0, stored - (DateTime.now().millisecondsSinceEpoch - runningSince));
   final totalSeconds = (remaining / 1000).ceil();
   final minutes = totalSeconds ~/ 60;
   final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
@@ -9370,6 +9496,7 @@ String? _mobileHostedClockLabel({
 class AnalysisBoardScreen extends StatefulWidget {
   const AnalysisBoardScreen({
     this.black = 'Black',
+    this.initialFen = mobileStandardFen,
     this.initialMoves = const [],
     this.mode = 'analysis',
     this.white = 'White',
@@ -9377,6 +9504,7 @@ class AnalysisBoardScreen extends StatefulWidget {
   });
 
   final String black;
+  final String initialFen;
   final List<String> initialMoves;
   final String mode;
   final String white;
@@ -9394,13 +9522,20 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
   int analysisRun = 0;
   bool flipped = false;
   late final List<String> moves;
+  late int currentPly;
   String result = 'Live';
 
   @override
   void initState() {
     super.initState();
     moves = [...widget.initialMoves];
+    currentPly = moves.length;
     WidgetsBinding.instance.addPostFrameCallback((_) => _scheduleAnalysis());
+  }
+
+  void _showPly(int ply) {
+    setState(() => currentPly = ply.clamp(0, moves.length));
+    _scheduleAnalysis();
   }
 
   void _scheduleAnalysis() {
@@ -9419,11 +9554,15 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
     analysisDebounce = Timer(const Duration(milliseconds: 300), () async {
       MobileStockfishReviewEngine? nextEngine;
       try {
-        final parsed = moves.isEmpty
+        final visibleMoves = moves.sublist(0, currentPly);
+        final parsed = visibleMoves.isEmpty
             ? null
-            : MobileParsedReviewGame.fromMoves(List<String>.from(moves));
-        final initialFen = parsed?.initialFen ?? mobileStandardFen;
-        final currentFen = parsed?.fens.last ?? mobileStandardFen;
+            : MobileParsedReviewGame.fromMoves(
+                List<String>.from(visibleMoves),
+                fen: widget.initialFen,
+              );
+        final initialFen = widget.initialFen;
+        final currentFen = parsed?.fens.last ?? initialFen;
         final uciMoves = parsed?.uciMoves ?? const <String>[];
         final preset = mobileReviewPresetFor(defaultMobileReviewStrength);
         nextEngine = await MobileStockfishReviewEngine.create(preset: preset);
@@ -9468,8 +9607,16 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final boardSummary = _summarizeMobileBoard(moves);
-    final currentFen = _mobileGameFromMoves(moves).fen;
+    final shownMoves = moves.sublist(0, currentPly);
+    final currentGame = _mobileGameFromMoves(
+      shownMoves,
+      initialFen: widget.initialFen,
+    );
+    final boardSummary = _summarizeMobileBoard(
+      shownMoves,
+      initialFen: widget.initialFen,
+    );
+    final currentFen = currentGame.fen;
     final bestLine = analysis == null
         ? const <String>[]
         : mobileUciLineAsSan(
@@ -9503,12 +9650,15 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
               PrototypeChessBoard(
                 evaluation: analysis?.evaluation ?? 0,
                 flipped: flipped,
-                moves: moves,
+                initialFen: widget.initialFen,
+                moves: shownMoves,
+                readOnly: currentPly != moves.length,
                 onChanged: (nextMoves, nextResult) {
                   setState(() {
                     moves
                       ..clear()
                       ..addAll(nextMoves);
+                    currentPly = moves.length;
                     result = nextResult;
                   });
                   _scheduleAnalysis();
@@ -9522,6 +9672,12 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 10),
+        _BoardMoveControls(
+          currentPly: currentPly,
+          onChanged: _showPly,
+          totalPlies: moves.length,
         ),
         const SizedBox(height: 12),
         PrototypeCard(
@@ -9545,7 +9701,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                   const SizedBox(width: 8),
                   Text(
                     result == 'Live'
-                        ? moves.length.isEven
+                        ? currentGame.turn == chess.Color.WHITE
                               ? 'White to move'
                               : 'Black to move'
                         : 'Result $result',
@@ -9626,7 +9782,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
               ],
               const SizedBox(height: 12),
               Text(
-                moves
+                shownMoves
                     .asMap()
                     .entries
                     .map((entry) {
@@ -9653,8 +9809,11 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                 child: PrototypeOutlineButton(
                   label: 'Undo',
                   onTap: () {
-                    if (moves.isEmpty) return;
-                    setState(() => moves.removeLast());
+                    if (moves.isEmpty || currentPly != moves.length) return;
+                    setState(() {
+                      moves.removeLast();
+                      currentPly = moves.length;
+                    });
                     _scheduleAnalysis();
                   },
                 ),
@@ -9666,6 +9825,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                   onTap: () {
                     setState(() {
                       moves.clear();
+                      currentPly = 0;
                       result = 'Live';
                     });
                     _scheduleAnalysis();
@@ -9704,6 +9864,7 @@ class PrototypeChessBoard extends StatefulWidget {
     required this.moves,
     required this.onChanged,
     this.evaluation,
+    this.initialFen = mobileStandardFen,
     this.readOnly = false,
     this.reviewClassification,
     this.reviewSquare,
@@ -9715,6 +9876,7 @@ class PrototypeChessBoard extends StatefulWidget {
   final List<String> moves;
   final void Function(List<String> moves, String result) onChanged;
   final double? evaluation;
+  final String initialFen;
   final bool readOnly;
   final MobileMoveClassification? reviewClassification;
   final String? reviewSquare;
@@ -9741,7 +9903,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
   }
 
   chess.Chess _gameFromMoves() {
-    return _mobileGameFromMoves(widget.moves);
+    return _mobileGameFromMoves(widget.moves, initialFen: widget.initialFen);
   }
 
   void _playMove(String from, String to, [String? promotion]) {
@@ -11546,8 +11708,11 @@ class _MobileBoardSummary {
   }
 }
 
-chess.Chess _mobileGameFromMoves(Iterable<String> moves) {
-  final game = chess.Chess();
+chess.Chess _mobileGameFromMoves(
+  Iterable<String> moves, {
+  String initialFen = mobileStandardFen,
+}) {
+  final game = chess.Chess.fromFEN(initialFen);
   for (final move in moves) {
     for (final token in _parseStoredMoves(move)) {
       game.move(token);
@@ -11556,8 +11721,11 @@ chess.Chess _mobileGameFromMoves(Iterable<String> moves) {
   return game;
 }
 
-_MobileBoardSummary _summarizeMobileBoard(List<String> moves) {
-  final game = _mobileGameFromMoves(moves);
+_MobileBoardSummary _summarizeMobileBoard(
+  List<String> moves, {
+  String initialFen = mobileStandardFen,
+}) {
+  final game = _mobileGameFromMoves(moves, initialFen: initialFen);
   final blackCaptures = <chess.Piece>[];
   final whiteCaptures = <chess.Piece>[];
   final history = game.getHistory({'verbose': true}).cast<Map>().toList();
