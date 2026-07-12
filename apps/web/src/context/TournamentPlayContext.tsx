@@ -9,6 +9,7 @@ import {
 } from '../lib/onlineTournament'
 import {
   clearOnlineTournamentPlayLock,
+  getOnlineTournamentPlayLock,
   setOnlineTournamentPlayLock,
 } from '../lib/onlineTournamentPlayLock'
 
@@ -35,7 +36,8 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
 
     const request = (async () => {
       try {
-        const response = await loadActiveHostedTournamentGame()
+        const currentLock = getOnlineTournamentPlayLock()
+        const response = await loadActiveHostedTournamentGame(currentLock?.gameId)
         setActiveGame(response.game)
         setActiveTournament(response.tournament)
         setError(null)

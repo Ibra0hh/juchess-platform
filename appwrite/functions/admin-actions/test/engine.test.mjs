@@ -63,6 +63,7 @@ const EXPORTED = [
   'submitGameResult',
   'submitHostedTournamentMove',
   'syncHostedGameTimeout',
+  'selectActiveHostedGame',
   'isDeletableTournamentStatus',
   'assertTournamentStatusTransition',
   'deleteTournamentRows',
@@ -1077,6 +1078,23 @@ test('hosted move alternates players and clocks while advancing the canonical re
     () => engine.submitHostedTournamentMove(tablesDB, 'juchess', 'g1', { san: 'e4', expectedVersion: 1 }, { $id: 'spectator' }),
     (error) => error.statusCode === 403 && /assigned players/i.test(error.message),
   )
+})
+
+test('active game selection keeps the player on the current board until it finishes', () => {
+  const assignments = [
+    { game: { $id: 'new-board', status: 'live' }, tournament: { $id: 't2' } },
+    { game: { $id: 'current-board', status: 'live' }, tournament: { $id: 't1' } },
+  ]
+
+  assert.equal(
+    engine.selectActiveHostedGame(assignments, 'current-board').game.$id,
+    'current-board',
+  )
+  assert.equal(
+    engine.selectActiveHostedGame(assignments, 'finished-board').game.$id,
+    'new-board',
+  )
+  assert.equal(engine.selectActiveHostedGame([], 'current-board'), null)
 })
 
 test('round robin: every planned round has balanced color assignments', () => {

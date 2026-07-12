@@ -116,8 +116,11 @@ export function resignHostedTournamentGame(gameId: string) {
   return runHostedGameAction<HostedMoveResponse>(`/player/games/${gameId}/resign`)
 }
 
-export function loadActiveHostedTournamentGame() {
-  return runHostedGameAction<ActiveHostedGameResponse>('/player/active-game')
+export function loadActiveHostedTournamentGame(gameId?: string) {
+  return runHostedGameAction<ActiveHostedGameResponse>(
+    '/player/active-game',
+    gameId ? { gameId } : {},
+  )
 }
 
 export function syncHostedTournamentGame(gameId: string) {

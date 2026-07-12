@@ -2897,6 +2897,15 @@ async function listActiveHostedGamesForPlayer(tablesDB, databaseId, profile) {
   ));
 }
 
+function selectActiveHostedGame(activeGames, preferredGameId) {
+  const preferred = String(preferredGameId ?? '').trim();
+  if (preferred) {
+    const current = activeGames.find(({ game }) => game.$id === preferred);
+    if (current) return current;
+  }
+  return activeGames[0] ?? null;
+}
+
 async function sweepHostedGameDeadlines(tablesDB, databaseId, nowMs = Date.now()) {
   let response;
   try {
@@ -3197,11 +3206,12 @@ export default async ({ req, res, log, error }) => {
     if (method === 'POST' && segments[0] === 'player' && segments[1] === 'active-game') {
       const player = await requirePlayerActor(req, tablesDB, databaseId);
       const activeGames = await listActiveHostedGamesForPlayer(tablesDB, databaseId, player);
+      const selected = selectActiveHostedGame(activeGames, body.gameId);
       return res.json({
         ok: true,
         action: 'loadActiveHostedGame',
-        game: activeGames[0]?.game ?? null,
-        tournament: activeGames[0]?.tournament ?? null,
+        game: selected?.game ?? null,
+        tournament: selected?.tournament ?? null,
       });
     }
 
