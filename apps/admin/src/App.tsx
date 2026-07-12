@@ -73,6 +73,11 @@ import {
   type TournamentMedia,
 } from './lib/adminData'
 import { type TournamentStatus } from './lib/juchess'
+import {
+  createTournamentSteps,
+  initialTournamentFormat,
+  tournamentWizardSubmitIntent,
+} from './lib/tournamentWizard'
 
 type Screen = 'dashboard' | 'tournaments' | 'players' | 'news' | 'announcements' | 'adminAccess'
 type TournamentTab = TournamentStatus
@@ -252,7 +257,6 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
 ]
 
 const tournamentTabs: TournamentTab[] = ['draft', 'upcoming', 'active', 'completed', 'archived']
-const createSteps = ['Basic information', 'Tournament format'] as const
 const formatOptions = [
   { value: 'Swiss', layout: 'Standings + current pairings' },
   { value: 'Round robin', layout: 'Standings + schedule' },
@@ -276,7 +280,7 @@ function createInitialTournamentForm(): TournamentInput {
     slug: '',
     name: '',
     status: 'draft',
-    format: 'Swiss',
+    format: initialTournamentFormat,
     timeControl: '15+10 Rapid',
     roundsTotal: 5,
     capacity: 16,
@@ -1097,6 +1101,20 @@ function TournamentsScreen({
     update('timeControl', `${minutes || '0'}+${increment || '0'} ${category}`)
   }
 
+  function advanceCreateWizard() {
+    if (!form.name.trim()) {
+      setMessage('Enter a tournament name before choosing its format.')
+      return
+    }
+    if (form.playMode === 'online' && !form.onlinePlatform) {
+      setMessage('Choose where the online tournament will be played.')
+      return
+    }
+
+    setMessage(null)
+    setCreateStep((step) => Math.min(createTournamentSteps.length - 1, step + 1))
+  }
+
   async function refreshRegistrationQueue() {
     if (!selectedTournamentRowId) {
       setRegistrations([])
@@ -1112,6 +1130,10 @@ function TournamentsScreen({
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (tournamentWizardSubmitIntent(createStep) === 'advance') {
+      advanceCreateWizard()
+      return
+    }
     if (!isEditing && !createEnabled) {
       setMessage('Create tournament is available only in Draft.')
       setShowCreate(false)
@@ -1549,7 +1571,7 @@ function TournamentsScreen({
               <button type="button" aria-label="Close create tournament" onClick={closeCreatePanel}>×</button>
             </header>
             <nav className="create-step-tabs" aria-label="Create tournament steps">
-              {createSteps.map((step, index) => (
+              {createTournamentSteps.map((step, index) => (
                 <button
                   key={step}
                   type="button"
@@ -1742,8 +1764,8 @@ function TournamentsScreen({
                 ← Back
               </button>
               <div>
-                {createStep < createSteps.length - 1 ? (
-                  <button type="button" className="dark-action" onClick={() => setCreateStep((step) => Math.min(createSteps.length - 1, step + 1))}>
+                {tournamentWizardSubmitIntent(createStep) === 'advance' ? (
+                  <button type="button" className="dark-action" onClick={advanceCreateWizard}>
                     Next →
                   </button>
                 ) : (
