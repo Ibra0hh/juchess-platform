@@ -5956,18 +5956,6 @@ class GamesScreen extends StatelessWidget {
           onTap: () => openPrototypeRoute(context, const GameReviewScreen()),
         ),
         BigActionCard(
-          title: 'Puzzles',
-          subtitle: 'Solve tactics from real chess patterns',
-          icon: '♛',
-          onTap: () => openPrototypeRoute(context, const PuzzlesScreen()),
-        ),
-        BigActionCard(
-          title: 'New Analysis',
-          subtitle: 'Set up a board and record lines',
-          icon: '♝',
-          onTap: () => openPrototypeRoute(context, const NewAnalysisScreen()),
-        ),
-        BigActionCard(
           title: 'Online Tournaments',
           subtitle: 'Open upcoming events and live boards',
           icon: '♜',
@@ -5981,6 +5969,18 @@ class GamesScreen extends StatelessWidget {
             );
             state.selectTab(1);
           },
+        ),
+        BigActionCard(
+          title: 'Puzzles',
+          subtitle: 'Solve tactics from real chess patterns',
+          icon: '♛',
+          onTap: () => openPrototypeRoute(context, const PuzzlesScreen()),
+        ),
+        BigActionCard(
+          title: 'New Analysis',
+          subtitle: 'Set up a board and record lines',
+          icon: '♝',
+          onTap: () => openPrototypeRoute(context, const NewAnalysisScreen()),
         ),
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 22, 16, 8),
