@@ -1325,6 +1325,7 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
   Map<String, PlayerSeed> profiles,
 ) {
   final groups = <String, List<PlayerSeed>>{};
+  final addedPlayers = <String>{};
 
   for (final row in rows) {
     final data = row.data;
@@ -1338,6 +1339,8 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
         !profiles.containsKey(profileId)) {
       continue;
     }
+    final registrationKey = '$tournamentId:$profileId';
+    if (!addedPlayers.add(registrationKey)) continue;
 
     final profile = profiles[profileId]!;
     final seed = _asInt(data['seed']) ?? 9999;
@@ -1366,12 +1369,19 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
 
 Map<String, int> _groupRegistrationCounts(List<models.Row> rows) {
   final groups = <String, int>{};
+  final countedPlayers = <String>{};
   for (final row in rows) {
     final data = row.data;
     final tournamentId = data['tournamentId']?.toString();
+    final profileId = data['profileId']?.toString();
     final status = data['status']?.toString();
     final checkedIn = data['checkedIn'] == true;
-    if (tournamentId == null || (status != 'confirmed' && !checkedIn)) continue;
+    if (tournamentId == null ||
+        profileId == null ||
+        (status != 'confirmed' && !checkedIn) ||
+        !countedPlayers.add('$tournamentId:$profileId')) {
+      continue;
+    }
     groups[tournamentId] = (groups[tournamentId] ?? 0) + 1;
   }
   return groups;
@@ -1566,6 +1576,7 @@ class AppState extends ChangeNotifier {
   String? error;
   List<TournamentSeed> tournamentItems = const [];
   Map<String, MyRegistrationInfo> myRegistrations = {};
+  final Set<String> _registrationMutations = {};
 
   Set<String> get registeredTournamentRowIds => myRegistrations.keys.toSet();
 
@@ -1860,6 +1871,10 @@ class AppState extends ChangeNotifier {
     return myRegistrations[event.rowId];
   }
 
+  bool isRegistrationBusy(TournamentSeed event) {
+    return _registrationMutations.contains(event.rowId);
+  }
+
   Future<bool> ensurePlayerProfile() async {
     if (profileId != null) return true;
 
@@ -1931,15 +1946,14 @@ class AppState extends ChangeNotifier {
       return true;
     }
 
-    if (!await ensurePlayerProfile()) {
-      return false;
-    }
+    if (!_registrationMutations.add(event.rowId)) return true;
 
     authLoading = true;
     error = null;
     notifyListeners();
 
     try {
+      if (!await ensurePlayerProfile()) return false;
       await service.registerForTournament(
         tournamentRowId: event.rowId,
         profileId: profileId!,
@@ -1951,6 +1965,7 @@ class AppState extends ChangeNotifier {
       error = appwriteMessage(caught);
       return false;
     } finally {
+      _registrationMutations.remove(event.rowId);
       authLoading = false;
       notifyListeners();
     }
@@ -1970,15 +1985,14 @@ class AppState extends ChangeNotifier {
       return true;
     }
 
-    if (!await ensurePlayerProfile()) {
-      return false;
-    }
+    if (!_registrationMutations.add(event.rowId)) return true;
 
     authLoading = true;
     error = null;
     notifyListeners();
 
     try {
+      if (!await ensurePlayerProfile()) return false;
       await service.cancelTournamentRegistration(
         tournamentRowId: event.rowId,
         profileId: profileId!,
@@ -1990,6 +2004,7 @@ class AppState extends ChangeNotifier {
       error = appwriteMessage(caught);
       return false;
     } finally {
+      _registrationMutations.remove(event.rowId);
       authLoading = false;
       notifyListeners();
     }
@@ -3767,6 +3782,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                         event: event,
                         registered: registered,
                         registration: state.registrationFor(event),
+                        registrationBusy: state.isRegistrationBusy(event),
                         onRegister: () async {
                           if (!state.signedIn) {
                             showAuthSheet(context);
@@ -3914,12 +3930,14 @@ class _TournamentOverview extends StatelessWidget {
     required this.registered,
     required this.onRegister,
     required this.onMain,
+    required this.registrationBusy,
     this.registration,
   });
 
   final TournamentSeed event;
   final bool registered;
   final MyRegistrationInfo? registration;
+  final bool registrationBusy;
   final VoidCallback onRegister;
   final VoidCallback onMain;
 
@@ -3935,11 +3953,27 @@ class _TournamentOverview extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (!completed && registered && registration != null) ...[
-            _RegistrationStatusCard(registration: registration!),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 420),
+              curve: Curves.easeOutBack,
+              builder: (context, value, child) => Opacity(
+                opacity: value.clamp(0.0, 1.0),
+                child: Transform.scale(
+                  scale: 0.94 + (0.06 * value),
+                  child: child,
+                ),
+              ),
+              child: _RegistrationStatusCard(registration: registration!),
+            ),
             const SizedBox(height: 12),
           ],
           PrototypeButton(
-            label: completed
+            label: registrationBusy
+                ? registered
+                      ? 'Cancelling...'
+                      : 'Registering...'
+                : completed
                 ? 'View final ${_mainTabLabel(event).toLowerCase()}'
                 : active
                 ? 'View live ${_mainTabLabel(event).toLowerCase()}'
@@ -3948,7 +3982,12 @@ class _TournamentOverview extends StatelessWidget {
                 : registered
                 ? 'Cancel registration'
                 : 'Register',
-            onTap: registrationOpen ? onRegister : onMain,
+            loading: registrationBusy,
+            onTap: registrationBusy
+                ? null
+                : registrationOpen
+                ? onRegister
+                : onMain,
           ),
         ],
       ),
@@ -8793,6 +8832,7 @@ class _TournamentGameDetailScreenState
   String? turnStartedAt;
   String? message;
   bool flipped = false;
+  bool _orientationApplied = false;
 
   @override
   void initState() {
@@ -8839,6 +8879,12 @@ class _TournamentGameDetailScreenState
       if (!mounted || liveGame == null) return;
 
       final refreshedMoves = _parseStoredMoves(liveGame.pgn);
+      final profileId = context.read<AppState>().profileId;
+      final assignedColor = liveGame.whiteProfileId == profileId
+          ? 'white'
+          : liveGame.blackProfileId == profileId
+          ? 'black'
+          : null;
       setState(() {
         moves = refreshedMoves;
         currentResult = liveGame.result;
@@ -8851,6 +8897,10 @@ class _TournamentGameDetailScreenState
         whiteTimeMs = liveGame.whiteTimeMs;
         blackTimeMs = liveGame.blackTimeMs;
         turnStartedAt = liveGame.turnStartedAt;
+        if (!_orientationApplied && assignedColor != null) {
+          flipped = assignedColor == 'black';
+          _orientationApplied = true;
+        }
       });
       if (liveGame.status != 'live' && liveGame.status != 'scheduled') {
         _liveRefreshTimer?.cancel();
@@ -11564,15 +11614,21 @@ BoxDecoration cardDecoration({double radius = 14}) {
 }
 
 class PrototypeButton extends StatelessWidget {
-  const PrototypeButton({required this.label, required this.onTap, super.key});
+  const PrototypeButton({
+    required this.label,
+    required this.onTap,
+    this.loading = false,
+    super.key,
+  });
 
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
     return FilledButton(
-      onPressed: onTap,
+      onPressed: loading ? null : onTap,
       style: FilledButton.styleFrom(
         backgroundColor: PrototypeColors.burgundy,
         foregroundColor: PrototypeColors.cream,
@@ -11580,7 +11636,27 @@ class PrototypeButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
       ),
-      child: Text(label),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        child: loading
+            ? Row(
+                key: const ValueKey('loading'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 15,
+                    height: 15,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: PrototypeColors.cream,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(label),
+                ],
+              )
+            : Text(label, key: ValueKey(label)),
+      ),
     );
   }
 }

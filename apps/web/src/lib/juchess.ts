@@ -932,9 +932,13 @@ function mapProfiles(rows: AppwriteProfileRow[]) {
 
 function groupRegistrationCounts(rows: AppwriteRegistrationRow[]) {
   const counts = new Map<string, number>()
+  const countedPlayers = new Set<string>()
 
   rows.forEach((row) => {
-    if (!row.tournamentId || (row.status !== 'confirmed' && !row.checkedIn)) return
+    if (!row.tournamentId || !row.profileId || (row.status !== 'confirmed' && !row.checkedIn)) return
+    const key = `${row.tournamentId}:${row.profileId}`
+    if (countedPlayers.has(key)) return
+    countedPlayers.add(key)
     counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
   })
 
@@ -942,20 +946,23 @@ function groupRegistrationCounts(rows: AppwriteRegistrationRow[]) {
 }
 
 function groupRegisteredPlayers(rows: AppwriteRegistrationRow[], profiles: Map<string, Member>) {
-  const groups = new Map<string, Array<Member & { seed?: number }>>()
+  const groups = new Map<string, Map<string, Member & { seed?: number }>>()
 
   rows.forEach((row) => {
     if (!row.tournamentId || !row.profileId || (row.status !== 'confirmed' && !row.checkedIn)) return
     const profile = profiles.get(row.profileId)
     if (!profile) return
-    const list = groups.get(row.tournamentId) ?? []
-    list.push({ ...profile, seed: row.seed })
+    const list = groups.get(row.tournamentId) ?? new Map<string, Member & { seed?: number }>()
+    const existing = list.get(row.profileId)
+    if (!existing || (row.seed ?? 9999) < (existing.seed ?? 9999)) {
+      list.set(row.profileId, { ...profile, seed: row.seed })
+    }
     groups.set(row.tournamentId, list)
   })
 
-  return new Map(Array.from(groups.entries()).map(([tournamentId, players]) => [
+  return new Map(Array.from(groups.entries()).map(([tournamentId, playersById]) => [
     tournamentId,
-    players
+    [...playersById.values()]
       .sort((a, b) => (a.seed ?? 9999) - (b.seed ?? 9999) || a.name.localeCompare(b.name))
       .map(({ seed: _seed, ...player }) => player),
   ]))

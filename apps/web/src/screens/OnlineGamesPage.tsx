@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FlipHorizontal2, Radio, RotateCcw, Trophy, Undo2, Users } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
@@ -43,6 +43,7 @@ function OnlineGamesPage() {
   const [movePending, setMovePending] = useState(false)
   const [message, setMessage] = useState('')
   const [, setClockTick] = useState(0)
+  const orientedGameRef = useRef<string | null>(null)
 
   const openTournamentGame = useCallback(async (gameId: string, updateUrl = true) => {
     setGameLoading(true)
@@ -124,6 +125,8 @@ function OnlineGamesPage() {
     setSelectedGameId(null)
     setBoardMoves([])
     setBoardResult('Live')
+    setFlipped(false)
+    orientedGameRef.current = null
     setSearchParams({})
   }
 
@@ -183,6 +186,12 @@ function OnlineGamesPage() {
     if (assignedParticipant && selectedGameId) setOnlineTournamentPlayLock(selectedGameId)
     else if (selectedGameId) clearOnlineTournamentPlayLock(selectedGameId)
   }, [assignedParticipant, selectedGameId])
+
+  useEffect(() => {
+    if (!selectedGameId || !assignedColor || orientedGameRef.current === selectedGameId) return
+    setFlipped(assignedColor === 'black')
+    orientedGameRef.current = selectedGameId
+  }, [assignedColor, selectedGameId])
   const boardSummary = useMemo(() => getJuChessBoardSummary(undefined, boardMoves), [boardMoves])
   const topSide = flipped ? 'white' : 'black'
   const bottomSide = flipped ? 'black' : 'white'

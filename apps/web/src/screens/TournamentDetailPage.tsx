@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  Check,
   Download,
   Image as ImageIcon,
   LayoutGrid,
   List,
+  LoaderCircle,
   ShieldCheck,
   Trophy,
 } from 'lucide-react'
@@ -448,6 +450,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   const [registrationLoading, setRegistrationLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const registrationLockRef = useRef(false)
 
   const tournamentRowId = tournament.rowId
   const profileId = profile?.$id
@@ -529,7 +532,8 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   }
 
   async function handleRegister() {
-    if (!tournamentRowId || !user || !registrationOpen) return
+    if (!tournamentRowId || !user || !registrationOpen || registrationLockRef.current) return
+    registrationLockRef.current = true
     setBusy(true)
     setMessage(null)
     try {
@@ -551,6 +555,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
         ? error.message
         : 'Could not register right now. Please try again.')
     } finally {
+      registrationLockRef.current = false
       setBusy(false)
     }
   }
@@ -573,10 +578,12 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   const status = registration?.status
   const isRegistered = Boolean(registration) && status !== 'cancelled'
 
+  const registrationSucceeded = message?.startsWith('Registration received') ?? false
+
   return (
-    <div className="register-card signed-in">
+    <div className={`register-card signed-in${registrationSucceeded ? ' registration-success' : ''}`}>
       <div className="register-icon">
-        <ShieldCheck size={24} aria-hidden="true" />
+        {registrationSucceeded ? <Check size={24} aria-hidden="true" /> : <ShieldCheck size={24} aria-hidden="true" />}
       </div>
       <div className="register-body">
         {registrationLoading ? (
@@ -612,8 +619,15 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
       </div>
       <div className="register-actions">
         {!registrationOpen ? null : !isRegistered ? (
-          <button type="button" className="primary-action" disabled={busy} onClick={handleRegister}>
-            {busy ? 'Registering...' : 'Register'}
+          <button
+            type="button"
+            className="primary-action registration-submit"
+            disabled={busy || registrationLoading}
+            aria-busy={busy}
+            onClick={handleRegister}
+          >
+            {busy || registrationLoading ? <LoaderCircle className="registration-spinner" size={16} aria-hidden="true" /> : null}
+            {registrationLoading ? 'Checking...' : busy ? 'Registering...' : 'Register'}
           </button>
         ) : checkIn?.checkedIn || registration?.checkedIn ? (
           <span className="checkin-done">Checked in</span>

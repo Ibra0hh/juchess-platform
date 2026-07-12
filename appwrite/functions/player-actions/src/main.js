@@ -1,4 +1,5 @@
-import { Account, Client, ID, Permission, Query, Role, TablesDB } from 'node-appwrite';
+import { createHash } from 'node:crypto';
+import { Account, Client, Permission, Query, Role, TablesDB } from 'node-appwrite';
 
 // Player-facing writes. Everything a signed-in student is allowed to change
 // about their own registration goes through here, so the client can never pick
@@ -83,7 +84,28 @@ async function findRegistration(tablesDB, databaseId, tournamentId, profileId) {
     total: false,
   });
 
-  return response.rows.find((row) => row.status !== 'cancelled') ?? response.rows[0] ?? null;
+  return selectCanonicalRegistration(response.rows);
+}
+
+export function registrationRowId(tournamentId, profileId) {
+  const digest = createHash('sha256')
+    .update(`${tournamentId}:${profileId}`)
+    .digest('hex')
+    .slice(0, 32);
+  return `reg_${digest}`;
+}
+
+export function selectCanonicalRegistration(rows) {
+  const statusRank = { confirmed: 4, waitlisted: 3, pending: 2, cancelled: 1 };
+  return [...rows].sort((left, right) => (
+    Number(Boolean(right.checkedIn)) - Number(Boolean(left.checkedIn))
+    || (statusRank[right.status] ?? 0) - (statusRank[left.status] ?? 0)
+    || String(left.$createdAt ?? '').localeCompare(String(right.$createdAt ?? ''))
+  ))[0] ?? null;
+}
+
+function isConflict(error) {
+  return error?.code === 409 || error?.response?.code === 409;
 }
 
 export default async ({ req, res, log, error }) => {
@@ -138,20 +160,30 @@ export default async ({ req, res, log, error }) => {
       }
 
       const data = { status: 'pending', checkedIn: false };
-      const row = existing
-        ? await tablesDB.updateRow({
+      let row;
+      if (existing) {
+        row = await tablesDB.updateRow({
           databaseId,
           tableId: tableIds.registrations,
           rowId: existing.$id,
           data,
-        })
-        : await tablesDB.createRow({
-          databaseId,
-          tableId: tableIds.registrations,
-          rowId: ID.unique(),
-          data: { tournamentId, profileId: profile.$id, ...data },
-          permissions: [Permission.read(Role.user(accountId))],
         });
+      } else {
+        try {
+          row = await tablesDB.createRow({
+            databaseId,
+            tableId: tableIds.registrations,
+            rowId: registrationRowId(tournamentId, profile.$id),
+            data: { tournamentId, profileId: profile.$id, ...data },
+            permissions: [Permission.read(Role.user(accountId))],
+          });
+        } catch (cause) {
+          if (!isConflict(cause)) throw cause;
+          row = await findRegistration(tablesDB, databaseId, tournamentId, profile.$id);
+          if (!row) throw cause;
+          return res.json({ ok: true, action: 'registerForTournament', row, unchanged: true });
+        }
+      }
 
       return res.json({ ok: true, action: 'registerForTournament', row });
     }

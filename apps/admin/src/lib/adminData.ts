@@ -697,11 +697,12 @@ export async function loadTournamentRegistrations(tournamentRowId: string): Prom
     })
     const profiles = await loadProfilesById(response.rows.map((row) => row.profileId).filter(Boolean) as string[])
 
+    const registrations = response.rows
+      .map((row) => mapRegistration(row, profiles))
+      .filter((row): row is AdminRegistration => Boolean(row))
+
     return {
-      registrations: response.rows
-        .map((row) => mapRegistration(row, profiles))
-        .filter((row): row is AdminRegistration => Boolean(row))
-        .sort(compareRegistrationRows),
+      registrations: dedupeAdminRegistrations(registrations).sort(compareRegistrationRows),
     }
   } catch (error) {
     return { registrations: [], error }
@@ -843,6 +844,7 @@ function cloudMessage(value: string) {
 
 async function loadRegistrationCounts() {
   const counts = new Map<string, number>()
+  const countedPlayers = new Set<string>()
 
   try {
     const response = await tablesDB.listRows<AppwriteRegistrationRow>({
@@ -854,6 +856,9 @@ async function loadRegistrationCounts() {
 
     response.rows.forEach((row) => {
       if (!row.tournamentId || (row.status !== 'confirmed' && !row.checkedIn)) return
+      const key = `${row.tournamentId}:${row.profileId}`
+      if (!row.profileId || countedPlayers.has(key)) return
+      countedPlayers.add(key)
       counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
     })
   } catch (error) {
@@ -1086,6 +1091,31 @@ function compareRegistrationRows(a: AdminRegistration, b: AdminRegistration) {
   return statusRank[a.status] - statusRank[b.status] ||
     (a.seed ?? 9999) - (b.seed ?? 9999) ||
     a.playerName.localeCompare(b.playerName)
+}
+
+function dedupeAdminRegistrations(rows: AdminRegistration[]) {
+  const registrations = new Map<string, AdminRegistration>()
+  const statusRank: Record<AdminRegistrationStatus, number> = {
+    confirmed: 4,
+    waitlisted: 3,
+    pending: 2,
+    cancelled: 1,
+  }
+
+  rows.forEach((row) => {
+    const key = `${row.tournamentId}:${row.profileId}`
+    const existing = registrations.get(key)
+    if (!existing) {
+      registrations.set(key, row)
+      return
+    }
+
+    const existingRank = (existing.checkedIn ? 10 : 0) + statusRank[existing.status]
+    const nextRank = (row.checkedIn ? 10 : 0) + statusRank[row.status]
+    if (nextRank > existingRank) registrations.set(key, row)
+  })
+
+  return [...registrations.values()]
 }
 
 function formatRound(row: AppwriteTournamentRow) {
