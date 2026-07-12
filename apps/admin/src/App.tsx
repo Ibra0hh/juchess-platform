@@ -1428,7 +1428,13 @@ function TournamentsScreen({
       }
 
       if (editingTournament?.rowId) {
-        await updateTournament(editingTournament.rowId, payload)
+        const savedTournament = await updateTournament(editingTournament.rowId, payload)
+        if (
+          payload.startsAt
+          && Date.parse(savedTournament.startsAt ?? '') !== Date.parse(payload.startsAt)
+        ) {
+          throw new Error('The tournament start time was not confirmed by the server. Please try again.')
+        }
         setMessage('Tournament updated.')
       } else {
         await createTournament({
@@ -1457,7 +1463,11 @@ function TournamentsScreen({
     setMessage(null)
     try {
       await updateTournament(item.rowId, { status })
-      setMessage('Tournament status updated.')
+      setMessage(
+        status === 'active' && item.playMode === 'online'
+          ? 'Online tournament started now.'
+          : 'Tournament status updated.',
+      )
       await onChanged()
     } catch (error) {
       setMessage(formatAdminError(error))
@@ -2162,7 +2172,9 @@ function TournamentActionButtons({
         <button type="button" className="mini-button dark" disabled={disabled} onClick={() => onManage(item)}>Manage</button>
         <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => onEdit(item)}>Edit</button>
         <button type="button" className="mini-button ghost" disabled={disabled} onClick={() => void onStatusChange(item, 'draft')}>Draft</button>
-        <button type="button" className="mini-button" disabled={disabled} onClick={() => void onStatusChange(item, 'active')}>Active</button>
+        <button type="button" className="mini-button" disabled={disabled} onClick={() => void onStatusChange(item, 'active')}>
+          {item.playMode === 'online' ? 'Start now' : 'Active'}
+        </button>
       </>
     )
   }

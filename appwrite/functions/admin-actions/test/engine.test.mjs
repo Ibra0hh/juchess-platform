@@ -39,6 +39,9 @@ const EXPORTED = [
   'parseHostedTimeControl',
   'hostedTimeClass',
   'firstMoveGraceMs',
+  'isTournamentActivation',
+  'tournamentLifecycleUpdate',
+  'shouldRefreshHostedSchedule',
   'hostedGameSchedule',
   'hostedGameDeadline',
   'initializedHostedClockMs',
@@ -870,10 +873,14 @@ test('hosted first-move grace follows the public time class defaults and support
 
 test('hosted deadlines distinguish the first-move grace from the running chess clock', () => {
   const now = Date.parse('2026-07-12T10:00:00.000Z')
-  const tournament = { status: 'active', startsAt: '2026-07-12T09:00:00.000Z', timeControl: '5+0' }
+  const tournament = { status: 'active', startsAt: '2026-07-12T12:00:00.000Z', timeControl: '5+0' }
   const schedule = engine.hostedGameSchedule(tournament, now)
   assert.equal(schedule.scheduledStartAt, '2026-07-12T10:00:00.000Z')
   assert.equal(schedule.firstMoveDeadlineAt, '2026-07-12T10:00:20.000Z')
+  assert.equal(
+    engine.hostedGameSchedule({ ...tournament, status: 'upcoming' }, now).scheduledStartAt,
+    '2026-07-12T12:00:00.000Z',
+  )
   assert.equal(engine.hostedGameDeadline({
     status: 'scheduled',
     scheduledStartAt: schedule.scheduledStartAt,
@@ -886,6 +893,56 @@ test('hosted deadlines distinguish the first-move grace from the running chess c
     blackTimeMs: 275000,
     turnStartedAt: '2026-07-12T10:01:00.000Z',
   }, tournament, now), Date.parse('2026-07-12T10:05:35.000Z'))
+})
+
+test('active tournament edits do not reactivate or erase lifecycle state', () => {
+  const current = { status: 'active', currentRound: 4, bracketSnapshot: '{"round":4}' }
+  const patch = { status: 'active', startsAt: '2026-07-12T12:00:00.000Z' }
+  assert.equal(engine.isTournamentActivation(current, patch), false)
+  assert.deepEqual(engine.tournamentLifecycleUpdate(current, patch), {
+    currentRound: undefined,
+    bracketSnapshot: undefined,
+  })
+
+  const upcoming = { status: 'upcoming', currentRound: 1 }
+  const activation = { currentRound: 2, bracketSnapshot: '{"round":2}' }
+  assert.equal(engine.isTournamentActivation(upcoming, { status: 'active' }), true)
+  assert.deepEqual(engine.tournamentLifecycleUpdate(upcoming, { status: 'active' }, activation), {
+    currentRound: 2,
+    bracketSnapshot: '{"round":2}',
+  })
+})
+
+test('hosted schedules refresh on activation, time edits, and legacy future starts', () => {
+  const now = Date.parse('2026-07-12T10:00:00.000Z')
+  const current = {
+    status: 'active',
+    startsAt: '2026-07-12T12:00:00.000Z',
+    timeControl: '5+0 Blitz',
+  }
+  const next = { ...current }
+  assert.equal(engine.shouldRefreshHostedSchedule(current, next, {}, [], now), false)
+  assert.equal(engine.shouldRefreshHostedSchedule(
+    { ...current, status: 'upcoming' },
+    next,
+    { status: 'active' },
+    [],
+    now,
+  ), true)
+  assert.equal(engine.shouldRefreshHostedSchedule(
+    current,
+    { ...next, startsAt: '2026-07-12T13:00:00.000Z' },
+    { startsAt: '2026-07-12T13:00:00.000Z' },
+    [],
+    now,
+  ), true)
+  assert.equal(engine.shouldRefreshHostedSchedule(
+    current,
+    next,
+    {},
+    [{ status: 'scheduled', scheduledStartAt: '2026-07-12T12:00:00.000Z' }],
+    now,
+  ), true)
 })
 
 test('scheduled hosted clocks repair legacy zero values without overwriting positive time', () => {

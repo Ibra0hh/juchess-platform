@@ -372,6 +372,9 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
         tableId: tableIds.tournaments,
         queries: [Query.limit(100)],
         total: false,
+        // Tournament edits must be reflected immediately after Save changes.
+        // Appwrite list caches are not invalidated by row updates.
+        ttl: 0,
       }),
       loadRegistrationCounts(),
       loadPublishedGamesByTournament(),

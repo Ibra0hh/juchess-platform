@@ -1377,10 +1377,44 @@ function validTimestamp(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isTournamentActivation(currentTournament, patch = {}) {
+  const nextStatus = patch.status ?? currentTournament.status;
+  return currentTournament.status !== 'active' && nextStatus === 'active';
+}
+
+function tournamentLifecycleUpdate(currentTournament, patch = {}, activation = null) {
+  const activating = isTournamentActivation(currentTournament, patch);
+  return {
+    currentRound: activating
+      ? patch.currentRound ?? activation?.currentRound ?? currentTournament.currentRound ?? 1
+      : patch.currentRound,
+    bracketSnapshot: activating
+      ? activation?.bracketSnapshot ?? null
+      : patch.bracketSnapshot,
+  };
+}
+
+function shouldRefreshHostedSchedule(currentTournament, nextTournament, patch, games, nowMs = Date.now()) {
+  if (nextTournament.status !== 'active') return false;
+  if (isTournamentActivation(currentTournament, patch)) return true;
+
+  const startChanged = patch.startsAt !== undefined
+    && validTimestamp(patch.startsAt) !== validTimestamp(currentTournament.startsAt);
+  const timeControlChanged = patch.timeControl !== undefined
+    && String(patch.timeControl) !== String(currentTournament.timeControl);
+  const hasFutureScheduledGame = games.some((game) => {
+    const scheduledStart = validTimestamp(game.scheduledStartAt);
+    return game.status === 'scheduled'
+      && scheduledStart !== null
+      && scheduledStart > nowMs;
+  });
+  return startChanged || timeControlChanged || hasFutureScheduledGame;
+}
+
 function hostedGameSchedule(tournament, nowMs = Date.now()) {
   const publishedStart = validTimestamp(tournament.startsAt);
   const scheduledStartMs = tournament.status === 'active'
-    ? Math.max(nowMs, publishedStart ?? nowMs)
+    ? nowMs
     : publishedStart ?? nowMs;
   return {
     scheduledStartAt: new Date(scheduledStartMs).toISOString(),
@@ -3616,9 +3650,11 @@ export default async ({ req, res, log, error }) => {
         ? undefined
         : validateTournamentOnlinePlatform(playMode ?? currentTournament.playMode, body.onlinePlatform ?? currentTournament.onlinePlatform);
       assertTournamentStatusTransition(currentTournament.status, body.status);
-      const activation = body.status === 'active'
+      const activating = isTournamentActivation(currentTournament, body);
+      const activation = activating
         ? await startTournamentIfNeeded(tablesDB, databaseId, segments[1], body, currentTournament)
         : null;
+      const lifecycleUpdate = tournamentLifecycleUpdate(currentTournament, body, activation);
       const row = await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.tournaments,
@@ -3629,7 +3665,7 @@ export default async ({ req, res, log, error }) => {
           status: body.status,
           format: body.format,
           timeControl: body.timeControl,
-          currentRound: body.status === 'active' ? body.currentRound ?? activation?.currentRound ?? 1 : body.currentRound,
+          currentRound: lifecycleUpdate.currentRound,
           startsAt: body.startsAt,
           endsAt: body.endsAt,
           registrationDeadline: body.registrationDeadline,
@@ -3642,9 +3678,7 @@ export default async ({ req, res, log, error }) => {
           roundsTotal: activation?.roundsTotal ?? roundsTotal,
           // Activation preserves the exact pairings and bracket snapshot that
           // the manager published while the tournament was Upcoming.
-          bracketSnapshot: body.status === 'active'
-            ? activation?.bracketSnapshot ?? null
-            : body.bracketSnapshot,
+          bracketSnapshot: lifecycleUpdate.bracketSnapshot,
         }),
       });
 
@@ -3652,7 +3686,7 @@ export default async ({ req, res, log, error }) => {
       if (row.status === 'active' && isJuChessHostedTournament(row)) {
         const hostedGames = await listRowsByTournament(tablesDB, databaseId, tableIds.games, row.$id);
         initializedGames = await initializeHostedTournamentGames(tablesDB, databaseId, row, hostedGames, {
-          refreshSchedule: currentTournament.status !== 'active' && body.status === 'active',
+          refreshSchedule: shouldRefreshHostedSchedule(currentTournament, row, body, hostedGames),
         });
       }
 
