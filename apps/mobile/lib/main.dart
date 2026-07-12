@@ -732,10 +732,14 @@ class AppwriteService {
     );
     final decoded = jsonDecode(execution.responseBody);
     if (decoded is! Map<String, dynamic>) {
-      throw AppwriteException('The JuChess game server returned an unreadable response.');
+      throw AppwriteException(
+        'The JuChess game server returned an unreadable response.',
+      );
     }
     if (execution.responseStatusCode >= 400 || decoded['ok'] == false) {
-      throw AppwriteException(decoded['error']?.toString() ?? 'The game server rejected this action.');
+      throw AppwriteException(
+        decoded['error']?.toString() ?? 'The game server rejected this action.',
+      );
     }
     return decoded;
   }
@@ -1168,7 +1172,9 @@ class AppwriteService {
         ? registeredPlayers.length
         : cloudData.playerCountsByTournament[row.$id] ?? 0;
     final displayedPlayers = players;
-    final playMode = data['playMode']?.toString() == 'online' ? 'online' : 'inPerson';
+    final playMode = data['playMode']?.toString() == 'online'
+        ? 'online'
+        : 'inPerson';
     final onlinePlatform = data['onlinePlatform']?.toString();
     final location = playMode == 'online'
         ? _onlinePlatformLabel(onlinePlatform)
@@ -3189,6 +3195,10 @@ class FeaturedTournamentCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              if (event.playMode == 'online') ...[
+                const OnlinePill(),
+                const SizedBox(width: 5),
+              ],
               if (event.status == 'active')
                 const LivePill()
               else
@@ -3578,10 +3588,19 @@ class TournamentCard extends StatelessWidget {
                     height: 1.3,
                   ),
                 ),
-                if (event.status == 'active')
-                  const LivePill(small: true)
-                else
-                  StatusPill(event.status),
+                const SizedBox(width: 8),
+                Wrap(
+                  spacing: 5,
+                  runSpacing: 5,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    if (event.playMode == 'online') const OnlinePill(),
+                    if (event.status == 'active')
+                      const LivePill(small: true)
+                    else
+                      StatusPill(event.status),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -3735,6 +3754,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                               weight: FontWeight.w700,
                             ),
                           ),
+                          if (event.playMode == 'online') ...[
+                            const OnlinePill(),
+                            const SizedBox(width: 5),
+                          ],
                           if (event.status == 'active')
                             const LivePill(small: true)
                           else
@@ -4091,10 +4114,8 @@ class _TournamentMediaGallery extends StatelessWidget {
               onView: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   fullscreenDialog: true,
-                  builder: (_) => _TournamentMediaViewer(
-                    initialIndex: index,
-                    items: items,
-                  ),
+                  builder: (_) =>
+                      _TournamentMediaViewer(initialIndex: index, items: items),
                 ),
               ),
             ),
@@ -6121,10 +6142,8 @@ class GamesScreen extends StatelessWidget {
           subtitle: 'Join events, play assigned games, and watch live boards',
           icon: '♜',
           filled: true,
-          onTap: () => openPrototypeRoute(
-            context,
-            const OnlineTournamentsScreen(),
-          ),
+          onTap: () =>
+              openPrototypeRoute(context, const OnlineTournamentsScreen()),
         ),
         BigActionCard(
           title: 'Puzzles',
@@ -6255,7 +6274,12 @@ class _AssignedOnlineGameCard extends StatelessWidget {
                   weight: FontWeight.w700,
                 ),
               ),
-              if (live) const LivePill(small: true) else const ChipPill('Ready'),
+              const OnlinePill(),
+              const SizedBox(width: 5),
+              if (live)
+                const LivePill(small: true)
+              else
+                const ChipPill('Ready'),
             ],
           ),
           const SizedBox(height: 9),
@@ -7146,7 +7170,8 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
       }
 
       final extension = file.extension?.toLowerCase();
-      final looksLikePgn = content.contains(RegExp(r'^\s*\[', multiLine: true)) ||
+      final looksLikePgn =
+          content.contains(RegExp(r'^\s*\[', multiLine: true)) ||
           content.contains(RegExp(r'(^|\s)\d+\.(\.\.)?\s'));
       if (extension == 'pgn' || looksLikePgn) {
         final parsed = MobileParsedReviewGame.fromPgn(content);
@@ -9706,9 +9731,12 @@ String? _mobileHostedClockLabel({
   final runningSince = status == 'live' && side == turn && turnStartedAt != null
       ? DateTime.tryParse(turnStartedAt)?.millisecondsSinceEpoch
       : null;
-    final remaining = runningSince == null
-        ? stored
-        : math.max(0, stored - (DateTime.now().millisecondsSinceEpoch - runningSince));
+  final remaining = runningSince == null
+      ? stored
+      : math.max(
+          0,
+          stored - (DateTime.now().millisecondsSinceEpoch - runningSince),
+        );
   final totalSeconds = (remaining / 1000).ceil();
   final minutes = totalSeconds ~/ 60;
   final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
@@ -12391,6 +12419,37 @@ class LivePill extends StatelessWidget {
   }
 }
 
+class OnlinePill extends StatelessWidget {
+  const OnlinePill({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0x12111111),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0x30111111)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.public, size: 11, color: PrototypeColors.black),
+          SizedBox(width: 4),
+          Text(
+            'Online',
+            style: TextStyle(
+              color: PrototypeColors.black,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class StatusPill extends StatelessWidget {
   const StatusPill(this.status, {super.key});
 
@@ -13740,9 +13799,11 @@ List<AssignedTournamentGame> findAssignedOnlineGames(
         .toInt();
     final round = tournament.publishedRounds[roundIndex];
     for (final match in round.games) {
-      final assigned = match.whiteProfileId == profileId ||
+      final assigned =
+          match.whiteProfileId == profileId ||
           match.blackProfileId == profileId;
-      final playable = match.gameId != null &&
+      final playable =
+          match.gameId != null &&
           (match.status == 'scheduled' || match.status == 'live');
       if (assigned && playable) {
         assignments.add(
