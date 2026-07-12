@@ -1394,6 +1394,8 @@ function tournamentLifecycleUpdate(currentTournament, patch = {}, activation = n
   };
 }
 
+const HOSTED_PRE_GAME_MS = 20_000;
+
 function shouldRefreshHostedSchedule(currentTournament, nextTournament, patch, games, nowMs = Date.now()) {
   if (nextTournament.status !== 'active') return false;
   if (isTournamentActivation(currentTournament, patch)) return true;
@@ -1406,16 +1408,17 @@ function shouldRefreshHostedSchedule(currentTournament, nextTournament, patch, g
     const scheduledStart = validTimestamp(game.scheduledStartAt);
     return game.status === 'scheduled'
       && scheduledStart !== null
-      && scheduledStart > nowMs;
+      && scheduledStart > nowMs + HOSTED_PRE_GAME_MS;
   });
   return startChanged || timeControlChanged || hasFutureScheduledGame;
 }
 
 function hostedGameSchedule(tournament, nowMs = Date.now()) {
   const publishedStart = validTimestamp(tournament.startsAt);
-  const scheduledStartMs = tournament.status === 'active'
+  const readyAtMs = tournament.status === 'active'
     ? nowMs
     : publishedStart ?? nowMs;
+  const scheduledStartMs = readyAtMs + HOSTED_PRE_GAME_MS;
   return {
     scheduledStartAt: new Date(scheduledStartMs).toISOString(),
     firstMoveDeadlineAt: new Date(scheduledStartMs + firstMoveGraceMs(tournament)).toISOString(),

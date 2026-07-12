@@ -250,7 +250,11 @@ function OnlineGamesPage() {
   const turnColor = selectedGame?.turn ?? (boardMoves.length % 2 === 0 ? 'white' : 'black')
   const isParticipant = Boolean(assignedColor && selectedGame)
   const assignedParticipant = Boolean(isParticipant && selectedGame && (selectedGame.status === 'scheduled' || selectedGame.status === 'live'))
-  const canMove = Boolean(assignedParticipant && assignedColor === turnColor && !movePending)
+  const preGameCountdown = selectedGame?.status === 'scheduled'
+    ? deadlineCountdown(selectedGame.scheduledStartAt, 'Starting…')
+    : null
+  const preGameActive = Boolean(preGameCountdown && !preGameCountdown.expired)
+  const canMove = Boolean(assignedParticipant && !preGameActive && assignedColor === turnColor && !movePending)
   const playingOnlineTournament = Boolean(dueGameId && dueGameId === selectedGameId)
 
   useFairPlayMonitor(selectedGameId, assignedParticipant)
@@ -277,7 +281,7 @@ function OnlineGamesPage() {
     side,
   })
   const firstMoveCountdown = selectedGame?.status === 'scheduled'
-    ? deadlineCountdown(selectedGame.firstMoveDeadlineAt)
+    ? deadlineCountdown(selectedGame.firstMoveDeadlineAt, 'Confirming forfeit…')
     : null
   const opponentName = assignedColor === 'white' ? selectedGame?.black : selectedGame?.white
 
@@ -317,7 +321,7 @@ function OnlineGamesPage() {
             <div className="online-board-head">
               <div>
                 <strong>{watchingTournament ? 'Tournament board' : 'Play on the board'}</strong>
-                <span>{gameLoading ? 'Loading game...' : watchingTournament ? 'Live moves update automatically' : 'Legal chess movement enabled'}</span>
+                {gameLoading ? <span>Loading game...</span> : !watchingTournament ? <span>Legal chess movement enabled</span> : null}
               </div>
               <div className="online-board-head-actions">
                 <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
@@ -329,7 +333,12 @@ function OnlineGamesPage() {
               </div>
             </div>
 
-            {firstMoveCountdown ? (
+            {preGameCountdown && !preGameCountdown.expired ? (
+              <div className="first-move-deadline" role="status">
+                <span>Get ready · game starts in</span>
+                <strong>{preGameCountdown.label}</strong>
+              </div>
+            ) : firstMoveCountdown ? (
               <div className={firstMoveCountdown.expired ? 'first-move-deadline expired' : 'first-move-deadline'}>
                 <span>White must make the first move</span>
                 <strong>{firstMoveCountdown.label}</strong>
@@ -359,6 +368,8 @@ function OnlineGamesPage() {
               <span>
                 {movePending
                   ? 'Saving move...'
+                  : preGameActive
+                    ? `Get ready · ${preGameCountdown?.label}`
                   : assignedParticipant
                     ? selectedGame?.status === 'scheduled' && assignedColor === 'black'
                       ? 'Waiting for White to begin'
@@ -569,7 +580,7 @@ function clockWarningThresholds(initialMs: number) {
   return { warningMs: 2 * 60_000, dangerMs: 60_000 }
 }
 
-function deadlineCountdown(value?: string) {
+function deadlineCountdown(value?: string, expiredLabel = '0:00') {
   if (!value) return null
   const deadline = Date.parse(value)
   if (!Number.isFinite(deadline)) return null
@@ -577,7 +588,7 @@ function deadlineCountdown(value?: string) {
   return {
     expired: seconds === 0,
     label: seconds === 0
-      ? 'Confirming forfeit…'
+      ? expiredLabel
       : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
   }
 }

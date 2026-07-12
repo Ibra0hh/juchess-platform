@@ -298,8 +298,9 @@ function pieceAsset(color: Color, type: PieceSymbol) {
 
 function buildSquares(game: Chess, flipped: boolean): BoardSquare[] {
   const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1]
+  const files = flipped ? [...FILES].reverse() : FILES
 
-  return ranks.flatMap((rank, row) => FILES.map((file, column) => {
+  return ranks.flatMap((rank, row) => files.map((file, column) => {
     const key = `${file}${rank}` as Square
     const piece = game.get(key)
     const fileIndex = FILES.indexOf(file)
@@ -337,7 +338,7 @@ function squareCenter(square: Square, flipped: boolean) {
   const file = square[0] as typeof FILES[number]
   const rank = Number(square[1])
   return {
-    x: FILES.indexOf(file) + 0.5,
+    x: (flipped ? 7 - FILES.indexOf(file) : FILES.indexOf(file)) + 0.5,
     y: (flipped ? rank - 1 : 8 - rank) + 0.5,
   }
 }

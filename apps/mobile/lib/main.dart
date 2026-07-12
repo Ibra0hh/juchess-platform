@@ -1253,6 +1253,7 @@ TournamentLiveGameState _tournamentLiveGameStateFromData(
     moveVersion: _asInt(data['moveVersion']) ?? 0,
     onlinePlatform: tournament?['onlinePlatform']?.toString(),
     pgn: data['pgn']?.toString(),
+    scheduledStartAt: data['scheduledStartAt']?.toString(),
     result: status == 'live'
         ? 'live'
         : storedResult == null || storedResult == '*'
@@ -1278,6 +1279,7 @@ class TournamentLiveGameState {
     this.moveVersion = 0,
     this.onlinePlatform,
     this.pgn,
+    this.scheduledStartAt,
     this.tournamentStatus,
     this.turn,
     this.turnStartedAt,
@@ -1294,6 +1296,7 @@ class TournamentLiveGameState {
   final int moveVersion;
   final String? onlinePlatform;
   final String? pgn;
+  final String? scheduledStartAt;
   final String? tournamentStatus;
   final String? turn;
   final String? turnStartedAt;
@@ -1502,6 +1505,7 @@ Map<String, List<RoundSeed>> _groupPublishedRounds(
       blackTimeMs: _asInt(data['blackTimeMs']),
       moveVersion: _asInt(data['moveVersion']) ?? 0,
       pgn: data['pgn']?.toString(),
+      scheduledStartAt: data['scheduledStartAt']?.toString(),
       status: status ?? 'scheduled',
       turnStartedAt: data['turnStartedAt']?.toString(),
       whiteProfileId: whiteProfileId,
@@ -9563,6 +9567,7 @@ class _TournamentGameDetailScreenState
   int? clockObservedAtMs;
   String? canonicalTurn;
   String? turnStartedAt;
+  String? scheduledStartAt;
   String? message;
   bool flipped = false;
   bool _orientationApplied = false;
@@ -9580,6 +9585,7 @@ class _TournamentGameDetailScreenState
     whiteTimeMs = widget.match.whiteTimeMs;
     blackTimeMs = widget.match.blackTimeMs;
     turnStartedAt = widget.match.turnStartedAt;
+    scheduledStartAt = widget.match.scheduledStartAt;
 
     if (widget.match.gameId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -9590,7 +9596,9 @@ class _TournamentGameDetailScreenState
         (_) => unawaited(_refreshLiveGame()),
       );
       _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted && currentStatus == 'live' && turnStartedAt != null) {
+        if (mounted &&
+            ((currentStatus == 'live' && turnStartedAt != null) ||
+                (currentStatus == 'scheduled' && scheduledStartAt != null))) {
           setState(() {});
         }
       });
@@ -9640,6 +9648,7 @@ class _TournamentGameDetailScreenState
         clockObservedAtMs = liveGame.clockObservedAtMs;
         canonicalTurn = liveGame.turn;
         turnStartedAt = liveGame.turnStartedAt;
+        scheduledStartAt = liveGame.scheduledStartAt;
         if (!_orientationApplied && assignedColor != null) {
           flipped = assignedColor == 'black';
           _orientationApplied = true;
@@ -9733,8 +9742,17 @@ class _TournamentGameDetailScreenState
         tournamentStatus == 'active' &&
         assignedColor != null &&
         (currentStatus == 'scheduled' || currentStatus == 'live');
+    final scheduledStart = DateTime.tryParse(scheduledStartAt ?? '')?.toLocal();
+    final preGameRemaining =
+        currentStatus == 'scheduled' && scheduledStart != null
+        ? scheduledStart.difference(DateTime.now())
+        : Duration.zero;
+    final preGameActive = preGameRemaining > Duration.zero;
     final canMove =
-        assignedParticipant && assignedColor == turnColor && !_movePending;
+        assignedParticipant &&
+        !preGameActive &&
+        assignedColor == turnColor &&
+        !_movePending;
     final result = currentResult == '-'
         ? 'Scheduled'
         : currentResult == 'live'
@@ -9844,6 +9862,8 @@ class _TournamentGameDetailScreenState
                           : 'Viewing move $currentPly of ${moves.length}'
                     : _movePending
                     ? 'Saving move...'
+                    : preGameActive
+                    ? 'Get ready · game starts in ${_durationClock(preGameRemaining)}'
                     : assignedParticipant
                     ? canMove
                           ? 'Your turn'
@@ -10048,6 +10068,13 @@ String? _mobileHostedClockLabel({
           stored - (DateTime.now().millisecondsSinceEpoch - runningSince),
         );
   final totalSeconds = (remaining / 1000).ceil();
+  final minutes = totalSeconds ~/ 60;
+  final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
+}
+
+String _durationClock(Duration duration) {
+  final totalSeconds = math.max(0, duration.inSeconds + 1);
   final minutes = totalSeconds ~/ 60;
   final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
@@ -10549,7 +10576,7 @@ class _PrototypeChessBoardState extends State<PrototypeChessBoard> {
     final ranks = widget.flipped
         ? const [1, 2, 3, 4, 5, 6, 7, 8]
         : const [8, 7, 6, 5, 4, 3, 2, 1];
-    final files = _files;
+    final files = widget.flipped ? _files.reversed.toList() : _files;
     final evaluation = widget.evaluation ?? _mobileMaterialEvaluation(game);
 
     return Stack(
@@ -14202,6 +14229,7 @@ class MatchSeed {
     this.moveVersion = 0,
     this.nextIndex,
     this.pgn,
+    this.scheduledStartAt,
     this.status = 'scheduled',
     this.turnStartedAt,
     this.whiteProfileId,
@@ -14218,6 +14246,7 @@ class MatchSeed {
   final int moveVersion;
   final int? nextIndex;
   final String? pgn;
+  final String? scheduledStartAt;
   final String status;
   final String? turnStartedAt;
   final String? whiteProfileId;

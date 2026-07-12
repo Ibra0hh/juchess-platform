@@ -83,7 +83,7 @@ const Query = { cursorAfter: () => 'query', equal: () => 'query', limit: () => '
 function loadEngine() {
   const source = readFileSync(join(here, '..', 'src', 'main.js'), 'utf8')
   const importLine = source.split('\n').find((line) => line.includes("from 'node-appwrite'"))
-  assert.match(importLine ?? '', /^import .* from 'node-appwrite';$/, 'expected the SDK import')
+  assert.match(importLine ?? '', /^import .* from 'node-appwrite';\r?$/, 'expected the SDK import')
   const chessImport = "import { Chess } from 'chess.js';"
   const chessModule = pathToFileURL(join(here, '..', 'node_modules', 'chess.js', 'dist', 'esm', 'chess.js')).href
 
@@ -878,11 +878,11 @@ test('hosted deadlines distinguish the first-move grace from the running chess c
   const now = Date.parse('2026-07-12T10:00:00.000Z')
   const tournament = { status: 'active', startsAt: '2026-07-12T12:00:00.000Z', timeControl: '5+0' }
   const schedule = engine.hostedGameSchedule(tournament, now)
-  assert.equal(schedule.scheduledStartAt, '2026-07-12T10:00:00.000Z')
-  assert.equal(schedule.firstMoveDeadlineAt, '2026-07-12T10:00:20.000Z')
+  assert.equal(schedule.scheduledStartAt, '2026-07-12T10:00:20.000Z')
+  assert.equal(schedule.firstMoveDeadlineAt, '2026-07-12T10:00:40.000Z')
   assert.equal(
     engine.hostedGameSchedule({ ...tournament, status: 'upcoming' }, now).scheduledStartAt,
-    '2026-07-12T12:00:00.000Z',
+    '2026-07-12T12:00:20.000Z',
   )
   assert.equal(engine.hostedGameDeadline({
     status: 'scheduled',
@@ -946,6 +946,13 @@ test('hosted schedules refresh on activation, time edits, and legacy future star
     [{ status: 'scheduled', scheduledStartAt: '2026-07-12T12:00:00.000Z' }],
     now,
   ), true)
+  assert.equal(engine.shouldRefreshHostedSchedule(
+    current,
+    next,
+    {},
+    [{ status: 'scheduled', scheduledStartAt: '2026-07-12T10:00:20.000Z' }],
+    now,
+  ), false)
 })
 
 test('scheduled hosted clocks repair legacy zero values without overwriting positive time', () => {
