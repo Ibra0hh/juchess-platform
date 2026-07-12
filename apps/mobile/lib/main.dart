@@ -923,6 +923,24 @@ class AppwriteService {
     if (!ready || gameId.trim().isEmpty) return null;
 
     try {
+      final payload = await _runHostedGameAction('/player/games/$gameId/sync');
+      final row = payload['row'];
+      if (row is Map<String, dynamic>) {
+        return _tournamentLiveGameStateFromData(
+          row,
+          tournament: payload['tournament'] is Map<String, dynamic>
+              ? payload['tournament'] as Map<String, dynamic>
+              : null,
+          clock: payload['clock'] is Map<String, dynamic>
+              ? payload['clock'] as Map<String, dynamic>
+              : null,
+        );
+      }
+    } catch (_) {
+      // Spectators cannot call the player sync endpoint; use the public row.
+    }
+
+    try {
       final row = await tablesDB.getRow(
         databaseId: AppConfig.databaseId,
         tableId: AppConfig.gamesTableId,
@@ -940,25 +958,9 @@ class AppwriteService {
           );
         } catch (_) {}
       }
-      final status = data['status']?.toString() ?? 'scheduled';
-      final storedResult = data['result']?.toString();
-      return TournamentLiveGameState(
-        blackProfileId: data['blackProfileId']?.toString(),
-        blackTimeMs: _asInt(data['blackTimeMs']),
-        lastMoveAt: data['lastMoveAt']?.toString(),
-        moveVersion: _asInt(data['moveVersion']) ?? 0,
-        onlinePlatform: tournament?.data['onlinePlatform']?.toString(),
-        pgn: data['pgn']?.toString(),
-        result: status == 'live'
-            ? 'live'
-            : storedResult == null || storedResult == '*'
-            ? '-'
-            : storedResult,
-        status: status,
-        tournamentStatus: tournament?.data['status']?.toString(),
-        turnStartedAt: data['turnStartedAt']?.toString(),
-        whiteProfileId: data['whiteProfileId']?.toString(),
-        whiteTimeMs: _asInt(data['whiteTimeMs']),
+      return _tournamentLiveGameStateFromData(
+        data,
+        tournament: tournament?.data,
       );
     } catch (_) {
       return null;
@@ -1234,17 +1236,50 @@ class AppwriteService {
   }
 }
 
+TournamentLiveGameState _tournamentLiveGameStateFromData(
+  Map<String, dynamic> data, {
+  Map<String, dynamic>? tournament,
+  Map<String, dynamic>? clock,
+}) {
+  final status = data['status']?.toString() ?? 'scheduled';
+  final storedResult = data['result']?.toString();
+  return TournamentLiveGameState(
+    blackProfileId: data['blackProfileId']?.toString(),
+    blackTimeMs: _asInt(clock?['blackTimeMs'] ?? data['blackTimeMs']),
+    clockObservedAtMs: clock == null
+        ? null
+        : DateTime.now().millisecondsSinceEpoch,
+    lastMoveAt: data['lastMoveAt']?.toString(),
+    moveVersion: _asInt(data['moveVersion']) ?? 0,
+    onlinePlatform: tournament?['onlinePlatform']?.toString(),
+    pgn: data['pgn']?.toString(),
+    result: status == 'live'
+        ? 'live'
+        : storedResult == null || storedResult == '*'
+        ? '-'
+        : storedResult,
+    status: status,
+    tournamentStatus: tournament?['status']?.toString(),
+    turn: clock?['turn']?.toString(),
+    turnStartedAt: data['turnStartedAt']?.toString(),
+    whiteProfileId: data['whiteProfileId']?.toString(),
+    whiteTimeMs: _asInt(clock?['whiteTimeMs'] ?? data['whiteTimeMs']),
+  );
+}
+
 class TournamentLiveGameState {
   const TournamentLiveGameState({
     required this.result,
     required this.status,
     this.blackProfileId,
     this.blackTimeMs,
+    this.clockObservedAtMs,
     this.lastMoveAt,
     this.moveVersion = 0,
     this.onlinePlatform,
     this.pgn,
     this.tournamentStatus,
+    this.turn,
     this.turnStartedAt,
     this.whiteProfileId,
     this.whiteTimeMs,
@@ -1254,11 +1289,13 @@ class TournamentLiveGameState {
   final String status;
   final String? blackProfileId;
   final int? blackTimeMs;
+  final int? clockObservedAtMs;
   final String? lastMoveAt;
   final int moveVersion;
   final String? onlinePlatform;
   final String? pgn;
   final String? tournamentStatus;
+  final String? turn;
   final String? turnStartedAt;
   final String? whiteProfileId;
   final int? whiteTimeMs;
@@ -9523,6 +9560,8 @@ class _TournamentGameDetailScreenState
   String? tournamentStatus;
   int? whiteTimeMs;
   int? blackTimeMs;
+  int? clockObservedAtMs;
+  String? canonicalTurn;
   String? turnStartedAt;
   String? message;
   bool flipped = false;
@@ -9547,7 +9586,7 @@ class _TournamentGameDetailScreenState
         unawaited(_refreshLiveGame());
       });
       _liveRefreshTimer = Timer.periodic(
-        const Duration(milliseconds: 1200),
+        const Duration(seconds: 1),
         (_) => unawaited(_refreshLiveGame()),
       );
       _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -9574,6 +9613,7 @@ class _TournamentGameDetailScreenState
     try {
       final liveGame = await service.loadTournamentLiveGame(gameId);
       if (!mounted || liveGame == null) return;
+      if (liveGame.moveVersion < moveVersion) return;
 
       final refreshedMoves = _parseStoredMoves(liveGame.pgn);
       final profileId = context.read<AppState>().profileId;
@@ -9597,6 +9637,8 @@ class _TournamentGameDetailScreenState
         tournamentStatus = liveGame.tournamentStatus;
         whiteTimeMs = liveGame.whiteTimeMs;
         blackTimeMs = liveGame.blackTimeMs;
+        clockObservedAtMs = liveGame.clockObservedAtMs;
+        canonicalTurn = liveGame.turn;
         turnStartedAt = liveGame.turnStartedAt;
         if (!_orientationApplied && assignedColor != null) {
           flipped = assignedColor == 'black';
@@ -9684,7 +9726,8 @@ class _TournamentGameDetailScreenState
         : blackProfileId == profileId
         ? 'black'
         : null;
-    final turnColor = moves.length.isEven ? 'white' : 'black';
+    final turnColor =
+        canonicalTurn ?? (moves.length.isEven ? 'white' : 'black');
     final assignedParticipant =
         onlinePlatform == 'juchess' &&
         tournamentStatus == 'active' &&
@@ -9757,6 +9800,7 @@ class _TournamentGameDetailScreenState
                   side: flipped ? 'white' : 'black',
                   turn: turnColor,
                   status: currentStatus,
+                  clockObservedAtMs: clockObservedAtMs,
                   turnStartedAt: turnStartedAt,
                   whiteTimeMs: whiteTimeMs,
                   blackTimeMs: blackTimeMs,
@@ -9780,6 +9824,7 @@ class _TournamentGameDetailScreenState
                   side: flipped ? 'black' : 'white',
                   turn: turnColor,
                   status: currentStatus,
+                  clockObservedAtMs: clockObservedAtMs,
                   turnStartedAt: turnStartedAt,
                   whiteTimeMs: whiteTimeMs,
                   blackTimeMs: blackTimeMs,
@@ -9983,14 +10028,18 @@ String? _mobileHostedClockLabel({
   required String side,
   required String turn,
   required String status,
+  required int? clockObservedAtMs,
   required String? turnStartedAt,
   required int? whiteTimeMs,
   required int? blackTimeMs,
 }) {
   final stored = side == 'white' ? whiteTimeMs : blackTimeMs;
   if (stored == null) return null;
-  final runningSince = status == 'live' && side == turn && turnStartedAt != null
-      ? DateTime.tryParse(turnStartedAt)?.millisecondsSinceEpoch
+  final runningSince = status == 'live' && side == turn
+      ? clockObservedAtMs ??
+            (turnStartedAt == null
+                ? null
+                : DateTime.tryParse(turnStartedAt)?.millisecondsSinceEpoch)
       : null;
   final remaining = runningSince == null
       ? stored

@@ -15,6 +15,7 @@ import { useFairPlayMonitor } from '../hooks/useFairPlayMonitor'
 import {
   loadTournamentGame,
   loadTournaments,
+  parseStoredMoves,
   subscribeToTournamentGameRow,
   type SampleGame,
   type Tournament,
@@ -28,6 +29,8 @@ import {
   resignHostedTournamentGame,
   submitHostedTournamentMove,
   syncHostedTournamentGame,
+  type HostedClockSnapshot,
+  type HostedGameRow,
 } from '../lib/onlineTournament'
 import './OnlineGamesPage.css'
 
@@ -35,6 +38,8 @@ type TournamentGameChoice = {
   game: TournamentGame
   tournament: Tournament
 }
+
+const LIVE_GAME_POLL_MS = 1_000
 
 function OnlineGamesPage() {
   const { profile } = useAuth()
@@ -58,20 +63,36 @@ function OnlineGamesPage() {
   const [message, setMessage] = useState('')
   const [, setClockTick] = useState(0)
   const orientedGameRef = useRef<string | null>(null)
+  const latestSnapshotRef = useRef<{ gameId: string; moveVersion: number } | null>(null)
   const dueGameId = activeGame?.$id
+
+  const applySelectedGame = useCallback((game: SampleGame) => {
+    const moveVersion = game.moveVersion ?? 0
+    const previous = latestSnapshotRef.current
+    if (previous?.gameId === game.id && moveVersion < previous.moveVersion) return false
+
+    latestSnapshotRef.current = { gameId: game.id, moveVersion }
+    setSelectedGame(game)
+    setSelectedGameId(game.id)
+    setBoardMoves(game.moves)
+    setBoardResult(game.result)
+    return true
+  }, [])
 
   const openTournamentGame = useCallback(async (gameId: string, updateUrl = true) => {
     setGameLoading(true)
     try {
-      if (dueGameId === gameId) {
-        await syncHostedTournamentGame(gameId).catch(() => null)
-      }
-      const game = await loadTournamentGame(gameId)
+      let game = await loadTournamentGame(gameId)
       if (game) {
-        setSelectedGame(game)
-        setSelectedGameId(gameId)
-        setBoardMoves(game.moves)
-        setBoardResult(game.result)
+        const assignedPlayer = Boolean(
+          profile?.$id
+          && (game.whiteProfileId === profile.$id || game.blackProfileId === profile.$id),
+        )
+        if (assignedPlayer && (game.status === 'scheduled' || game.status === 'live')) {
+          const snapshot = await syncHostedTournamentGame(gameId).catch(() => null)
+          if (snapshot) game = applyHostedSnapshot(game, snapshot.row, snapshot.clock)
+        }
+        applySelectedGame(game)
         if (updateUrl) setSearchParams({ game: gameId })
       } else if (dueGameId !== gameId) {
         clearOnlineTournamentPlayLock(gameId)
@@ -79,7 +100,7 @@ function OnlineGamesPage() {
     } finally {
       setGameLoading(false)
     }
-  }, [dueGameId, setSearchParams])
+  }, [applySelectedGame, dueGameId, profile?.$id, setSearchParams])
 
   useEffect(() => {
     let alive = true
@@ -131,7 +152,7 @@ function OnlineGamesPage() {
     let unsubscribe: (() => void) | undefined
     let alive = true
     const refresh = () => void openTournamentGame(selectedGameId, false)
-    const timer = window.setInterval(refresh, 5_000)
+    const timer = window.setInterval(refresh, LIVE_GAME_POLL_MS)
     void subscribeToTournamentGameRow(selectedGameId, refresh)
       .then((stop) => {
         if (alive) unsubscribe = stop
@@ -172,6 +193,7 @@ function OnlineGamesPage() {
     setBoardResult('Live')
     setFlipped(false)
     orientedGameRef.current = null
+    latestSnapshotRef.current = null
     setSearchParams({})
   }
 
@@ -185,6 +207,7 @@ function OnlineGamesPage() {
         state.lastMove,
         selectedGame.moveVersion ?? 0,
       )
+      applySelectedGame(applyHostedSnapshot(selectedGame, response.row, response.clock))
       setMessage(response.requiresTiebreak ? 'Draw recorded. The organizer must resolve the knockout tiebreak.' : '')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'The game server rejected this move.')
@@ -224,7 +247,7 @@ function OnlineGamesPage() {
     : selectedGame?.blackProfileId === profileId
     ? 'black'
     : null
-  const turnColor = boardMoves.length % 2 === 0 ? 'white' : 'black'
+  const turnColor = selectedGame?.turn ?? (boardMoves.length % 2 === 0 ? 'white' : 'black')
   const isParticipant = Boolean(assignedColor && selectedGame)
   const assignedParticipant = Boolean(isParticipant && selectedGame && (selectedGame.status === 'scheduled' || selectedGame.status === 'live'))
   const canMove = Boolean(assignedParticipant && assignedColor === turnColor && !movePending)
@@ -485,7 +508,9 @@ function hostedClockState(
   const initialMs = parseTimeControlInitialMs(game?.tournamentTimeControl)
   const base = stored ?? initialMs
   if (base === undefined) return undefined
-  const runningSince = game?.live && side === turn && game.turnStartedAt ? Date.parse(game.turnStartedAt) : Number.NaN
+  const runningSince = game?.live && side === turn
+    ? game.clockObservedAtMs ?? (game.turnStartedAt ? Date.parse(game.turnStartedAt) : Number.NaN)
+    : Number.NaN
   const remaining = Number.isFinite(runningSince) ? Math.max(0, base - (Date.now() - runningSince)) : base
   const totalSeconds = Math.ceil(remaining / 1000)
   const minutes = Math.floor(totalSeconds / 60)
@@ -496,6 +521,37 @@ function hostedClockState(
     tone: remaining <= thresholds.dangerMs
       ? 'danger'
       : remaining <= thresholds.warningMs ? 'warning' : 'normal',
+  }
+}
+
+function applyHostedSnapshot(
+  game: SampleGame,
+  row: HostedGameRow,
+  clock?: HostedClockSnapshot,
+): SampleGame {
+  const status = row.status ?? game.status
+  const moves = parseStoredMoves(row.pgn ?? game.pgn)
+  return {
+    ...game,
+    blackProfileId: row.blackProfileId ?? game.blackProfileId,
+    blackTimeMs: clock?.blackTimeMs ?? row.blackTimeMs ?? game.blackTimeMs,
+    clockDeadlineAt: row.clockDeadlineAt ?? game.clockDeadlineAt,
+    clockObservedAtMs: clock ? Date.now() : game.clockObservedAtMs,
+    firstMoveDeadlineAt: row.firstMoveDeadlineAt ?? game.firstMoveDeadlineAt,
+    forfeitedProfileId: row.forfeitedProfileId ?? game.forfeitedProfileId,
+    lastMoveAt: row.lastMoveAt ?? game.lastMoveAt,
+    live: status === 'live',
+    moveVersion: Math.max(game.moveVersion ?? 0, row.moveVersion ?? 0),
+    moves,
+    pgn: row.pgn ?? game.pgn,
+    result: status === 'live' ? 'Live' : row.result ?? game.result,
+    scheduledStartAt: row.scheduledStartAt ?? game.scheduledStartAt,
+    status,
+    terminationReason: row.terminationReason ?? game.terminationReason,
+    turn: clock?.turn ?? (moves.length % 2 === 0 ? 'white' : 'black'),
+    turnStartedAt: row.turnStartedAt ?? game.turnStartedAt,
+    whiteProfileId: row.whiteProfileId ?? game.whiteProfileId,
+    whiteTimeMs: clock?.whiteTimeMs ?? row.whiteTimeMs ?? game.whiteTimeMs,
   }
 }
 

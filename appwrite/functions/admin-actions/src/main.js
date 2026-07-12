@@ -1462,6 +1462,18 @@ function hostedClockForMove(row, tournament, turn, nowMs) {
   return { ...clocks, incrementMs: control.incrementMs, moverClockKey: key };
 }
 
+function hostedClockSnapshot(row, tournament, nowMs = Date.now()) {
+  const chess = loadHostedChessGame(row.pgn);
+  const turn = chess.turn();
+  const clock = hostedClockForMove(row, tournament, turn, nowMs);
+  return {
+    blackTimeMs: Math.round(clock.blackTimeMs),
+    observedAtMs: nowMs,
+    turn: turn === 'w' ? 'white' : 'black',
+    whiteTimeMs: Math.round(clock.whiteTimeMs),
+  };
+}
+
 function multiStageStageOneRounds(tournament, qualifierCount) {
   const knockoutRounds = Math.ceil(Math.log2(Math.max(2, qualifierCount)));
   const declared = Number(tournament.roundsTotal) || 0;
@@ -2573,20 +2585,46 @@ async function syncHostedGameTimeout(tablesDB, databaseId, game, tournament, now
   if (game.status !== 'scheduled' && game.status !== 'live') {
     return { expired: false, row: game };
   }
-  const deadline = hostedGameDeadline(game, tournament, nowMs);
-  if (deadline === null || nowMs < deadline) return { expired: false, row: game };
 
   if (game.status === 'scheduled') {
+    const opensAt = validTimestamp(game.scheduledStartAt)
+      ?? validTimestamp(tournament.startsAt)
+      ?? nowMs;
+    if (nowMs < opensAt) return { expired: false, row: game };
+
     const control = parseHostedTimeControl(tournament.timeControl);
-    const row = await finishHostedGame(tablesDB, databaseId, game, '0-1', {
-      status: 'forfeit',
-      terminationReason: 'noShow',
-      forfeitedProfileId: game.whiteProfileId,
-      whiteTimeMs: control.initialMs,
-      blackTimeMs: control.initialMs,
+    const whiteTimeMs = Math.max(0, initializedHostedClockMs(game.whiteTimeMs, control.initialMs) - (nowMs - opensAt));
+    const blackTimeMs = initializedHostedClockMs(game.blackTimeMs, control.initialMs);
+    if (whiteTimeMs <= 0) {
+      const row = await finishHostedGame(tablesDB, databaseId, game, '0-1', {
+        status: 'forfeit',
+        terminationReason: 'noShow',
+        forfeitedProfileId: game.whiteProfileId,
+        whiteTimeMs: 0,
+        blackTimeMs,
+      });
+      return { expired: true, reason: 'noShow', row };
+    }
+
+    const started = await tablesDB.updateRow({
+      databaseId,
+      tableId: tableIds.games,
+      rowId: game.$id,
+      data: {
+        status: 'live',
+        result: '*',
+        startedAt: game.startedAt || new Date(opensAt).toISOString(),
+        turnStartedAt: new Date(nowMs).toISOString(),
+        clockDeadlineAt: new Date(nowMs + whiteTimeMs).toISOString(),
+        whiteTimeMs: Math.round(whiteTimeMs),
+        blackTimeMs,
+      },
     });
-    return { expired: true, reason: 'noShow', row };
+    return { expired: false, started: true, row: started };
   }
+
+  const deadline = hostedGameDeadline(game, tournament, nowMs);
+  if (deadline === null || nowMs < deadline) return { expired: false, row: game };
 
   const chess = loadHostedChessGame(game.pgn);
   const loserProfileId = chess.turn() === 'w' ? game.whiteProfileId : game.blackProfileId;
@@ -2611,7 +2649,8 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
       ? 'The first-move deadline expired. This game was forfeited.'
       : 'The clock expired. This game was forfeited.');
   }
-  const { game: row, tournament } = context;
+  const row = timeout.row;
+  const { tournament } = context;
   const currentVersion = Math.max(0, Number(row.moveVersion) || 0);
   const expectedVersion = Number(body.expectedVersion);
   if (!Number.isInteger(expectedVersion) || expectedVersion !== currentVersion) {
@@ -2668,13 +2707,23 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
         rowId: row.$id,
         data: { ...moveData, status: 'live', result: '*', turnStartedAt: null },
       });
-      return { row: saved, move: move.san, requiresTiebreak: true };
+      return {
+        row: saved,
+        move: move.san,
+        requiresTiebreak: true,
+        clock: hostedClockSnapshot(saved, tournament),
+      };
     }
     const finished = await finishHostedGame(tablesDB, databaseId, row, result, {
       ...moveData,
       terminationReason: result === '1/2-1/2' ? 'draw' : 'checkmate',
     });
-    return { row: finished, move: move.san, requiresTiebreak: false };
+    return {
+      row: finished,
+      move: move.san,
+      requiresTiebreak: false,
+      clock: hostedClockSnapshot(finished, tournament),
+    };
   }
 
   const updated = await tablesDB.updateRow({
@@ -2691,7 +2740,12 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
       )).toISOString(),
     },
   });
-  return { row: updated, move: move.san, requiresTiebreak: false };
+  return {
+    row: updated,
+    move: move.san,
+    requiresTiebreak: false,
+    clock: hostedClockSnapshot(updated, tournament),
+  };
 }
 
 async function resignHostedTournamentGame(tablesDB, databaseId, gameId, profile) {
@@ -3179,6 +3233,7 @@ export default async ({ req, res, log, error }) => {
         reason: outcome.reason,
         row: outcome.row,
         tournament: context.tournament,
+        clock: hostedClockSnapshot(outcome.row, context.tournament),
       });
     }
 

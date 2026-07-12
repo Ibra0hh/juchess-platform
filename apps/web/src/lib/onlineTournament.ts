@@ -1,18 +1,8 @@
 import { Channel, ExecutionMethod, Query } from 'appwrite'
 import { appwriteConfig, appwriteReady, functions, realtime } from './appwrite'
 
-export type HostedMoveResponse = {
-  requiresTiebreak?: boolean
-  row: {
-    $id: string
-    moveVersion?: number
-    pgn?: string
-    result?: string
-    status?: 'scheduled' | 'live' | 'completed' | 'forfeit'
-  }
-}
-
-export type HostedGameRow = HostedMoveResponse['row'] & {
+export type HostedGameRow = {
+  $id: string
   blackProfileId?: string
   blackTimeMs?: number
   clockDeadlineAt?: string
@@ -28,6 +18,23 @@ export type HostedGameRow = HostedMoveResponse['row'] & {
   turnStartedAt?: string
   whiteProfileId?: string
   whiteTimeMs?: number
+  moveVersion?: number
+  pgn?: string
+  result?: string
+  status?: 'scheduled' | 'live' | 'completed' | 'forfeit'
+}
+
+export type HostedClockSnapshot = {
+  blackTimeMs: number
+  observedAtMs: number
+  turn: 'white' | 'black'
+  whiteTimeMs: number
+}
+
+export type HostedMoveResponse = {
+  requiresTiebreak?: boolean
+  row: HostedGameRow
+  clock?: HostedClockSnapshot
 }
 
 export type HostedTournamentRow = {
@@ -48,6 +55,7 @@ export type ActiveHostedGameResponse = {
 }
 
 export type HostedGameSyncResponse = {
+  clock?: HostedClockSnapshot
   expired: boolean
   reason?: 'timeout' | 'noShow'
   row: HostedGameRow

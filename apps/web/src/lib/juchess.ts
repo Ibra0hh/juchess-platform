@@ -110,6 +110,8 @@ type AppwriteGameRow = Models.Row & {
   lastMoveAt?: string
   whiteTimeMs?: number
   blackTimeMs?: number
+  clockObservedAtMs?: number
+  turn?: 'white' | 'black'
   turnStartedAt?: string
   scheduledStartAt?: string
   firstMoveDeadlineAt?: string
@@ -161,6 +163,8 @@ export type TournamentGame = {
   lastMoveAt?: string
   whiteTimeMs?: number
   blackTimeMs?: number
+  clockObservedAtMs?: number
+  turn?: 'white' | 'black'
   turnStartedAt?: string
   scheduledStartAt?: string
   firstMoveDeadlineAt?: string
@@ -247,6 +251,8 @@ export type SampleGame = {
   lastMoveAt?: string
   whiteTimeMs?: number
   blackTimeMs?: number
+  clockObservedAtMs?: number
+  turn?: 'white' | 'black'
   turnStartedAt?: string
   scheduledStartAt?: string
   firstMoveDeadlineAt?: string

@@ -47,6 +47,7 @@ const EXPORTED = [
   'initializedHostedClockMs',
   'hostedResultFor',
   'hostedClockForMove',
+  'hostedClockSnapshot',
   'multiStageStageOneRounds',
   'isGameDecided',
   'decisiveWinnerProfileId',
@@ -61,6 +62,7 @@ const EXPORTED = [
   'updateGamePgn',
   'submitGameResult',
   'submitHostedTournamentMove',
+  'syncHostedGameTimeout',
   'isDeletableTournamentStatus',
   'assertTournamentStatusTransition',
   'deleteTournamentRows',
@@ -952,6 +954,50 @@ test('scheduled hosted clocks repair legacy zero values without overwriting posi
   assert.equal(engine.initializedHostedClockMs(452_345.7, 900_000), 452_346)
 })
 
+test('scheduled hosted game starts White clock and exposes a canonical clock snapshot', async () => {
+  const game = {
+    $id: 'g-start',
+    tournamentId: 't-start',
+    whiteProfileId: 'white',
+    blackProfileId: 'black',
+    status: 'scheduled',
+    result: '*',
+    moveVersion: 0,
+    scheduledStartAt: '2026-07-12T10:00:00.000Z',
+  }
+  const tournament = {
+    $id: 't-start',
+    status: 'active',
+    playMode: 'online',
+    onlinePlatform: 'juchess',
+    timeControl: '5+0 Blitz',
+  }
+  let saved = game
+  const tablesDB = {
+    updateRow: async ({ data }) => {
+      saved = { ...saved, ...data }
+      return saved
+    },
+  }
+
+  const now = Date.parse('2026-07-12T10:00:05.000Z')
+  const outcome = await engine.syncHostedGameTimeout(tablesDB, 'juchess', game, tournament, now)
+  assert.equal(outcome.expired, false)
+  assert.equal(outcome.started, true)
+  assert.equal(outcome.row.status, 'live')
+  assert.equal(outcome.row.whiteTimeMs, 295000)
+  assert.equal(outcome.row.blackTimeMs, 300000)
+  assert.equal(outcome.row.turnStartedAt, '2026-07-12T10:00:05.000Z')
+
+  const clock = engine.hostedClockSnapshot(outcome.row, tournament, now + 1000)
+  assert.deepEqual(clock, {
+    blackTimeMs: 300000,
+    observedAtMs: now + 1000,
+    turn: 'white',
+    whiteTimeMs: 294000,
+  })
+})
+
 test('hosted chess derives decisive and drawn terminal results', () => {
   const mate = new Chess()
   mate.move('f3')
@@ -1003,8 +1049,10 @@ test('hosted move alternates players and clocks while advancing the canonical re
   assert.equal(outcome.row.status, 'live')
   assert.equal(outcome.row.moveVersion, 1)
   assert.match(outcome.row.pgn, /1\. e4/)
-  assert.equal(outcome.row.whiteTimeMs, 303000)
+  assert.ok(outcome.row.whiteTimeMs > 302000 && outcome.row.whiteTimeMs <= 303000)
   assert.equal(outcome.row.blackTimeMs, 300000)
+  assert.equal(outcome.clock.turn, 'black')
+  const whiteAfterFirstMove = outcome.row.whiteTimeMs
 
   const reply = await engine.submitHostedTournamentMove(
     tablesDB,
@@ -1017,8 +1065,9 @@ test('hosted move alternates players and clocks while advancing the canonical re
   assert.equal(reply.row.status, 'live')
   assert.equal(reply.row.moveVersion, 2)
   assert.match(reply.row.pgn, /1\. e4 e5/)
-  assert.equal(reply.row.whiteTimeMs, 303000)
+  assert.equal(reply.row.whiteTimeMs, whiteAfterFirstMove)
   assert.ok(reply.row.blackTimeMs > 302000 && reply.row.blackTimeMs <= 303000)
+  assert.equal(reply.clock.turn, 'white')
 
   await assert.rejects(
     () => engine.submitHostedTournamentMove(tablesDB, 'juchess', 'g1', { san: 'e4', expectedVersion: 2 }, { $id: 'black' }),
