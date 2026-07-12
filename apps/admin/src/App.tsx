@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Clock3, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
 import {
@@ -76,6 +76,7 @@ import { type TournamentStatus } from './lib/juchess'
 import {
   createTournamentSteps,
   initialTournamentFormat,
+  nextTournamentWizardStep,
   tournamentWizardSubmitIntent,
 } from './lib/tournamentWizard'
 
@@ -133,11 +134,16 @@ function ClockTimePicker({
 
   useEffect(() => {
     if (!open) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') setOpen(false)
     }
     window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
   }, [open])
 
   function openPicker() {
@@ -149,7 +155,7 @@ function ClockTimePicker({
     setOpen(true)
   }
 
-  function chooseMinuteFromFace(event: ReactMouseEvent<HTMLDivElement>) {
+  function chooseMinuteFromFace(event: ReactPointerEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect()
     const x = event.clientX - bounds.left - bounds.width / 2
     const y = event.clientY - bounds.top - bounds.height / 2
@@ -159,6 +165,21 @@ function ClockTimePicker({
 
   const display = value ? formatClockTime(value) : 'Select time'
   const handAngle = phase === 'hour' ? (hour % 12) * 30 : minute * 6
+
+  function handleClockKeyboard(event: ReactKeyboardEvent<HTMLElement>) {
+    const direction = event.key === 'ArrowUp' || event.key === 'ArrowRight'
+      ? 1
+      : event.key === 'ArrowDown' || event.key === 'ArrowLeft'
+        ? -1
+        : 0
+    if (!direction) return
+    event.preventDefault()
+    if (phase === 'hour') {
+      setHour((current) => ((current - 1 + direction + 12) % 12) + 1)
+    } else {
+      setMinute((current) => (current + direction + 60) % 60)
+    }
+  }
 
   return (
     <>
@@ -181,6 +202,7 @@ function ClockTimePicker({
             aria-modal="true"
             aria-label={`${label} time picker`}
             onMouseDown={(event) => event.stopPropagation()}
+            onKeyDown={handleClockKeyboard}
           >
             <header className="clock-picker-display">
               <div>
@@ -208,7 +230,7 @@ function ClockTimePicker({
             </header>
             <div
               className={`clock-picker-face ${phase}`}
-              onMouseDown={phase === 'minute' ? chooseMinuteFromFace : undefined}
+              onPointerDown={phase === 'minute' ? chooseMinuteFromFace : undefined}
             >
               <div className="clock-picker-hand" style={{ transform: `rotate(${handAngle}deg)` }}>
                 <span />
@@ -224,6 +246,8 @@ function ClockTimePicker({
                     type="button"
                     key={number}
                     className={selected ? 'active' : undefined}
+                    aria-label={phase === 'hour' ? `${number} o'clock` : `${number} minutes`}
+                    aria-pressed={selected}
                     style={{
                       left: `calc(50% + ${Math.sin(angle) * 42}% - 18px)`,
                       top: `calc(50% - ${Math.cos(angle) * 42}% - 18px)`,
@@ -244,6 +268,19 @@ function ClockTimePicker({
               })}
             </div>
             <footer className="clock-picker-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date()
+                  const next = timePickerParts(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
+                  setHour(next.hour)
+                  setMinute(next.minute)
+                  setPeriod(next.period)
+                  setPhase('minute')
+                }}
+              >
+                Now
+              </button>
               <button type="button" onClick={() => setOpen(false)}>Cancel</button>
               <button
                 type="button"
@@ -1130,6 +1167,7 @@ function TournamentsScreen({
   const [shuffleSeeds, setShuffleSeeds] = useState<Record<string, number>>({})
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const createBackdropRef = useRef<HTMLDivElement | null>(null)
 
   const counts: Record<TournamentTab, number> = {
     draft: tournaments.filter((item) => item.status === 'draft').length,
@@ -1314,6 +1352,14 @@ function TournamentsScreen({
     update('timeControl', `${minutes || '0'}+${increment || '0'} ${category}`)
   }
 
+  function goToCreateStep(step: number) {
+    const target = Math.max(0, Math.min(createTournamentSteps.length - 1, step))
+    setCreateStep(target)
+    window.requestAnimationFrame(() => {
+      createBackdropRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    })
+  }
+
   function advanceCreateWizard() {
     if (!form.name.trim()) {
       setMessage('Enter a tournament name before choosing its format.')
@@ -1325,7 +1371,7 @@ function TournamentsScreen({
     }
 
     setMessage(null)
-    setCreateStep((step) => Math.min(createTournamentSteps.length - 1, step + 1))
+    goToCreateStep(nextTournamentWizardStep(createStep))
   }
 
   async function refreshRegistrationQueue() {
@@ -1782,7 +1828,7 @@ function TournamentsScreen({
         </button>
       </div>
       {showCreate ? (
-        <div className="create-modal-backdrop" onClick={closeCreatePanel}>
+        <div ref={createBackdropRef} className="create-modal-backdrop" onClick={closeCreatePanel}>
           <form className="create-modal" onClick={(event) => event.stopPropagation()} onSubmit={handleCreate}>
             <header className="create-modal-head">
               <div>
@@ -1797,7 +1843,8 @@ function TournamentsScreen({
                   key={step}
                   type="button"
                   className={createStep === index ? 'active' : undefined}
-                  onClick={() => setCreateStep(index)}
+                  aria-current={createStep === index ? 'step' : undefined}
+                  onClick={() => goToCreateStep(index)}
                 >
                   {step}
                 </button>
@@ -1960,7 +2007,7 @@ function TournamentsScreen({
                 type="button"
                 className="secondary-action"
                 disabled={createStep === 0}
-                onClick={() => setCreateStep((step) => Math.max(0, step - 1))}
+                onClick={() => goToCreateStep(createStep - 1)}
               >
                 ← Back
               </button>
