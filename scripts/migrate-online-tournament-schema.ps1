@@ -24,9 +24,11 @@ function Get-Columns([string]$TableId) {
 
 function Ensure-EnumColumn([string]$TableId, [string]$Key, [string[]]$Elements) {
   if ((Get-Columns $TableId).key -contains $Key) { Write-Host "$TableId.$Key already exists."; return }
-  & appwrite tables-db create-enum-column --database-id $DatabaseId --table-id $TableId --key $Key --elements $Elements --required false --array false | Out-Null
+  $commandArgs = @('tables-db', 'create-enum-column', '--database-id', $DatabaseId, '--table-id', $TableId, '--key', $Key, '--elements') +
+    $Elements + @('--required', 'false', '--array', 'false')
+  & appwrite @commandArgs | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Could not create $TableId.$Key." }
-  Write-Host "Created $TableId.$Key."
+  Write-Host "Created $TableId.$Key with: $($Elements -join ', ')."
 }
 
 function Ensure-IntegerColumn([string]$TableId, [string]$Key, [int]$Minimum, [int]$Maximum, [string]$DefaultValue = '') {
