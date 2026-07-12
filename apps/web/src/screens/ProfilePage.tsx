@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { loadProfileGameHistory, type SampleGame } from '../lib/juchess'
 import './ClubScreens.css'
 

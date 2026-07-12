@@ -8,7 +8,7 @@ import {
 } from '../components/JuChessBoard'
 import { getJuChessBoardSummary, type JuCapturedPiece } from '../components/JuChessRules'
 import SiteHeader from '../components/SiteHeader'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import {
   loadTournamentGame,
   loadTournaments,

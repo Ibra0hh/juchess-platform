@@ -1,9 +1,17 @@
 import { Account, Client, Functions, Storage, TablesDB } from 'appwrite'
 
+// These client identifiers are public. Defaults keep the static admin build
+// connected when local environment files are intentionally excluded from Git.
+const defaultAppwriteConfig = {
+  endpoint: 'https://cloud.appwrite.io/v1',
+  projectId: 'juchess-platform',
+  databaseId: 'juchess',
+}
+
 export const appwriteConfig = {
-  endpoint: import.meta.env.VITE_APPWRITE_ENDPOINT ?? '',
-  projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID ?? '',
-  databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID ?? '',
+  endpoint: import.meta.env.VITE_APPWRITE_ENDPOINT || defaultAppwriteConfig.endpoint,
+  projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID || defaultAppwriteConfig.projectId,
+  databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID || defaultAppwriteConfig.databaseId,
 }
 
 export const appwriteReady = Boolean(

@@ -82,6 +82,12 @@
       }
     },
     "games": {
+      "indexes": {
+        "game_status": "key:status",
+        "white_profile_status": "key:whiteProfileId,status",
+        "black_profile_status": "key:blackProfileId,status",
+        "tournament_status": "key:tournamentId,status"
+      },
       "fields": {
         "tournamentId": "string|required",
         "round": "integer|required",

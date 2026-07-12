@@ -1,9 +1,18 @@
 import { Account, Client, Functions, Storage, TablesDB } from 'appwrite'
 
+// Appwrite endpoint, project, and database IDs are public client configuration,
+// not secrets. Keep production-safe defaults so static GitHub Pages builds do
+// not silently lose cloud access when the ignored local .env file is absent.
+const defaultAppwriteConfig = {
+  endpoint: 'https://cloud.appwrite.io/v1',
+  projectId: 'juchess-platform',
+  databaseId: 'juchess',
+}
+
 export const appwriteConfig = {
-  endpoint: import.meta.env.VITE_APPWRITE_ENDPOINT ?? '',
-  projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID ?? '',
-  databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID ?? '',
+  endpoint: import.meta.env.VITE_APPWRITE_ENDPOINT || defaultAppwriteConfig.endpoint,
+  projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID || defaultAppwriteConfig.projectId,
+  databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID || defaultAppwriteConfig.databaseId,
   accessGuardFunctionId: import.meta.env.VITE_APPWRITE_ACCESS_GUARD_FUNCTION_ID ?? 'access-guards',
   adminFunctionId: import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions',
   playerFunctionId: import.meta.env.VITE_APPWRITE_PLAYER_FUNCTION_ID ?? 'player-actions',

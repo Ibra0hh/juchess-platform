@@ -36,7 +36,7 @@ import {
 } from '../lib/gameReview'
 import { loadExternalGames } from '../lib/externalGames'
 import type { AuthProfile } from '../lib/auth'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import './ClubScreens.css'
 
 type GameMode = 'review' | 'analysis'

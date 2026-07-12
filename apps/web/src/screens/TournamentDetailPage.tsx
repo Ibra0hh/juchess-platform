@@ -17,7 +17,7 @@ import {
 import QRCode from 'qrcode'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { ensureProfileForUser } from '../lib/auth'
 import {
   loadTournaments,

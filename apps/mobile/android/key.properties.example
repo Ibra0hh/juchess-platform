@@ -1,0 +1,5 @@
+# Copy this file to key.properties and keep the real values out of source control.
+storePassword=replace-with-keystore-password
+keyPassword=replace-with-key-password
+keyAlias=upload
+storeFile=C:/secure/path/to/juchess-upload-keystore.jks

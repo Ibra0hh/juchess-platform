@@ -18,6 +18,7 @@
     "migrate:procedure": "powershell -ExecutionPolicy Bypass -File scripts/migrate-procedure-schema.ps1",
     "migrate:online-tournaments": "powershell -ExecutionPolicy Bypass -File scripts/migrate-online-tournament-schema.ps1",
     "migrate:registration-integrity": "powershell -ExecutionPolicy Bypass -File scripts/migrate-registration-integrity.ps1",
+    "migrate:game-query-indexes": "powershell -ExecutionPolicy Bypass -File scripts/migrate-game-query-indexes.ps1",
     "migrate:profile-usernames": "powershell -ExecutionPolicy Bypass -File scripts/migrate-profile-game-usernames.ps1",
     "lint:web": "npm --workspace apps/web run lint",
     "lint:admin": "npm --workspace apps/admin run lint",
@@ -25,6 +26,10 @@
     "mobile:test": "cd apps/mobile && flutter test",
     "test:web-review": "node --experimental-strip-types --test apps/web/src/lib/gameReview.test.ts apps/web/src/lib/externalGames.test.ts",
     "test:engine": "cd appwrite/functions/admin-actions && node --test test/engine.test.mjs",
-    "check:functions": "node --check appwrite/functions/admin-actions/src/main.js && node --check appwrite/functions/player-actions/src/main.js && node --check appwrite/functions/access-guards/src/main.js"
+    "test:functions": "node --test appwrite/functions/player-actions/test/*.test.mjs",
+    "check:functions": "node --check appwrite/functions/admin-actions/src/main.js && node --check appwrite/functions/player-actions/src/main.js && node --check appwrite/functions/access-guards/src/main.js",
+    "check:web": "npm run lint:web && npm run build:web && npm run test:web-review",
+    "check:admin": "npm run lint:admin && npm run build:admin && npm run test:engine",
+    "check:all": "npm run check:functions && npm run test:functions && npm run check:web && npm run check:admin && npm run mobile:analyze && npm run mobile:test"
   }
 }

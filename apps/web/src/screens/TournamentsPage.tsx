@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { loadTournaments, type Tournament, type TournamentStatus } from '../lib/juchess'
+import { loadTournamentSummaries, type Tournament, type TournamentStatus } from '../lib/juchess'
 import './TournamentsPage.css'
 
 type ViewMode = 'list' | 'grid'
@@ -33,7 +33,7 @@ function TournamentsPage() {
   useEffect(() => {
     let alive = true
 
-    loadTournaments().then((result) => {
+    loadTournamentSummaries().then((result) => {
       if (!alive) return
       setTournaments(result.tournaments)
       setCloudError(Boolean(result.error))

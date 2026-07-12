@@ -1,12 +1,11 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
+import { AuthContext, type AuthContextValue } from './authContextValue'
 import { appwriteReady } from '../lib/appwrite'
 import {
   formatAppwriteError,
@@ -22,28 +21,10 @@ import {
 } from '../lib/auth'
 import type { Models } from 'appwrite'
 
-type AuthContextValue = {
-  ready: boolean
-  loading: boolean
-  user: Models.User | null
-  profile: AuthProfile | null
-  error: string | null
-  refresh: () => Promise<void>
-  signIn: (input: SignInInput) => Promise<void>
-  signUp: (input: SignUpInput) => Promise<void>
-  signOut: () => Promise<void>
-  linkExternalGameUsername: (
-    source: 'chess.com' | 'lichess',
-    username: string,
-  ) => Promise<void>
-}
-
 type PreviewAuthSession = {
   user: Models.User
   profile: AuthProfile
 }
-
-const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const previewSession = useMemo(() => createPreviewSessionFromUrl(), [])
@@ -226,12 +207,4 @@ function displayNameFromEmail(email: string) {
     .join(' ')
 
   return displayName || 'Preview Member'
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used inside AuthProvider.')
-  }
-  return context
 }

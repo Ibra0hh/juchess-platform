@@ -558,12 +558,7 @@ export async function loadTournamentGameArchive(): Promise<SampleGame[]> {
 
   try {
     const [games, profiles, tournaments] = await Promise.all([
-      tablesDB.listRows<AppwriteGameRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.games,
-        queries: [Query.limit(1000)],
-        total: false,
-      }),
+      listVisibleGameRows(),
       tablesDB.listRows<AppwriteProfileRow>({
         databaseId: appwriteConfig.databaseId,
         tableId: tableIds.profiles,
@@ -579,7 +574,7 @@ export async function loadTournamentGameArchive(): Promise<SampleGame[]> {
     ])
     const profileMap = mapProfiles(profiles.rows)
     const tournamentNames = mapTournamentNames(tournaments.rows)
-    const mapped = games.rows
+    const mapped = games
       .filter((row) => (
         row.blackProfileId !== 'system_bye'
         && (row.status === 'live' || row.status === 'completed' || row.status === 'forfeit')
@@ -600,12 +595,7 @@ export async function loadProfileGameHistory(profileId: string | null | undefine
 
   try {
     const [games, profiles, tournaments] = await Promise.all([
-      tablesDB.listRows<AppwriteGameRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.games,
-        queries: [Query.limit(1000)],
-        total: false,
-      }),
+      listVisibleGameRows(profileId),
       tablesDB.listRows<AppwriteProfileRow>({
         databaseId: appwriteConfig.databaseId,
         tableId: tableIds.profiles,
@@ -622,7 +612,7 @@ export async function loadProfileGameHistory(profileId: string | null | undefine
     const profileMap = mapProfiles(profiles.rows)
     const tournamentNames = mapTournamentNames(tournaments.rows)
 
-    return games.rows
+    return games
       .filter((row) => (
         row.blackProfileId !== 'system_bye'
         && (row.whiteProfileId === profileId || row.blackProfileId === profileId)
@@ -634,6 +624,38 @@ export async function loadProfileGameHistory(profileId: string | null | undefine
   } catch (error) {
     console.warn('JuChess player game history read failed.', error)
     throw new Error('Tournament game history is unavailable right now.')
+  }
+}
+
+async function listVisibleGameRows(profileId?: string) {
+  const statusQuery = Query.equal('status', ['live', 'completed', 'forfeit'])
+  const profileQuery = profileId
+    ? Query.or([
+        Query.equal('whiteProfileId', profileId),
+        Query.equal('blackProfileId', profileId),
+      ])
+    : null
+  const queries = [profileQuery, statusQuery, Query.limit(1000)].filter(
+    (query): query is string => Boolean(query),
+  )
+
+  try {
+    const response = await tablesDB.listRows<AppwriteGameRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.games,
+      queries,
+      total: false,
+    })
+    return response.rows
+  } catch (error) {
+    console.warn('Indexed game query is unavailable; using the compatibility scan.', error)
+    const response = await tablesDB.listRows<AppwriteGameRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.games,
+      queries: [Query.limit(1000)],
+      total: false,
+    })
+    return response.rows
   }
 }
 
@@ -766,7 +788,15 @@ export type AnnouncementLoadResult = {
   error?: unknown
 }
 
+export async function loadTournamentSummaries(): Promise<TournamentLoadResult> {
+  return loadTournamentRows(false)
+}
+
 export async function loadTournaments(): Promise<TournamentLoadResult> {
+  return loadTournamentRows(true)
+}
+
+async function loadTournamentRows(includeDetails: boolean): Promise<TournamentLoadResult> {
   if (!appwriteReady) {
     return {
       tournaments: [],
@@ -776,25 +806,40 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
   }
 
   try {
-    const response = await tablesDB.listRows<AppwriteTournamentRow>({
+    const tournamentRows = tablesDB.listRows<AppwriteTournamentRow>({
       databaseId: appwriteConfig.databaseId,
       tableId: tableIds.tournaments,
       queries: [Query.limit(100)],
       total: false,
     })
+    const registrationRows = safeListRows<AppwriteRegistrationRow>(
+      tableIds.registrations,
+      [Query.limit(1000)],
+      'registrations',
+    )
+    const profileRows = includeDetails
+      ? safeListRows<AppwriteProfileRow>(tableIds.profiles, [Query.limit(1000)], 'profiles')
+      : Promise.resolve<AppwriteProfileRow[]>([])
+    const gameRows = includeDetails
+      ? safeListRows<AppwriteGameRow>(tableIds.games, [Query.limit(1000)], 'games')
+      : Promise.resolve<AppwriteGameRow[]>([])
+    const mediaFiles = includeDetails
+      ? safeListTournamentMedia()
+      : Promise.resolve<Models.File[]>([])
 
-    const [registrationRows, profileRows, gameRows, mediaFiles] = await Promise.all([
-      safeListRows<AppwriteRegistrationRow>(tableIds.registrations, [Query.limit(1000)], 'registrations'),
-      safeListRows<AppwriteProfileRow>(tableIds.profiles, [Query.limit(1000)], 'profiles'),
-      safeListRows<AppwriteGameRow>(tableIds.games, [Query.limit(1000)], 'games'),
-      safeListTournamentMedia(),
+    const [response, registrations, profilesResponse, gamesResponse, mediaResponse] = await Promise.all([
+      tournamentRows,
+      registrationRows,
+      profileRows,
+      gameRows,
+      mediaFiles,
     ])
 
-    const profiles = mapProfiles(profileRows)
-    const playersByTournament = groupRegisteredPlayers(registrationRows, profiles)
-    const gamesByTournament = groupPublishedGames(gameRows, profiles)
-    const participantCounts = groupRegistrationCounts(registrationRows)
-    const mediaByTournament = groupTournamentMedia(mediaFiles)
+    const profiles = mapProfiles(profilesResponse)
+    const playersByTournament = groupRegisteredPlayers(registrations, profiles)
+    const gamesByTournament = groupPublishedGames(gamesResponse, profiles)
+    const participantCounts = groupRegistrationCounts(registrations)
+    const mediaByTournament = groupTournamentMedia(mediaResponse)
 
     const rows = uniqueTournamentsByFormat(response.rows
       .map((row) => mapAppwriteTournament(row, participantCounts, playersByTournament, gamesByTournament, mediaByTournament))

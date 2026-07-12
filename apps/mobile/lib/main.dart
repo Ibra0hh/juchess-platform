@@ -2386,7 +2386,7 @@ class _JuChessSplashGateState extends State<JuChessSplashGate>
     )..repeat();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _dismissTimer = Timer(const Duration(milliseconds: 1750), () {
+      _dismissTimer = Timer(const Duration(milliseconds: 650), () {
         if (mounted) setState(() => _dismissing = true);
       });
     });
@@ -2409,10 +2409,11 @@ class _JuChessSplashGateState extends State<JuChessSplashGate>
           IgnorePointer(
             child: AnimatedOpacity(
               opacity: _dismissing ? 0 : 1,
-              duration: const Duration(milliseconds: 420),
+              duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
               onEnd: () {
                 if (_dismissing && mounted) {
+                  _controller.stop();
                   setState(() => _visible = false);
                 }
               },

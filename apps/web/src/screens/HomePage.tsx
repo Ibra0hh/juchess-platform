@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ArrowRight, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { loadAnnouncements, loadTournaments, type Announcement, type Tournament } from '../lib/juchess'
+import { loadAnnouncements, loadTournamentSummaries, type Announcement, type Tournament } from '../lib/juchess'
 import './HomePage.css'
 
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
@@ -71,7 +71,7 @@ function HomePage() {
   useEffect(() => {
     let alive = true
 
-    Promise.all([loadTournaments(), loadAnnouncements()]).then(([tournamentResult, announcementResult]) => {
+    Promise.all([loadTournamentSummaries(), loadAnnouncements()]).then(([tournamentResult, announcementResult]) => {
       if (!alive) return
       setTournaments(tournamentResult.tournaments)
       setAnnouncements(announcementResult.announcements)

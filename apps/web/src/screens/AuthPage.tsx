@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { formatAppwriteError } from '../lib/auth'
 import './AuthPage.css'
 

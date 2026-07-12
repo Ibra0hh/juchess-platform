@@ -7,6 +7,29 @@ export default defineConfig({
   build: {
     outDir: process.env.GITHUB_PAGES === 'true' ? '../../docs/admin' : 'dist',
     emptyOutDir: true,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'react-vendor',
+              test: /node_modules[\\/](?:react|react-dom|react-router|react-router-dom)[\\/]/,
+              priority: 30,
+            },
+            {
+              name: 'appwrite-vendor',
+              test: /node_modules[\\/]appwrite[\\/]/,
+              priority: 20,
+            },
+            {
+              name: 'icons-vendor',
+              test: /node_modules[\\/]lucide-react[\\/]/,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
   },
   plugins: [react()],
 })
