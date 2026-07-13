@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Radio, RotateCcw, Settings2, ShieldAlert, Trophy, Undo2, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings2, ShieldAlert, SkipBack, SkipForward, Trophy, Users } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { BoardSettingsPanel } from '../components/BoardSettingsPanel'
 import {
@@ -60,8 +60,8 @@ function OnlineGamesPage() {
   const [selectedGame, setSelectedGame] = useState<SampleGame | null>(null)
   const [selectedGameId, setSelectedGameId] = useState<string | null>(requestedGameId)
   const [boardMoves, setBoardMoves] = useState<string[]>([])
+  const [viewedPly, setViewedPly] = useState<number | null>(null)
   const [boardResult, setBoardResult] = useState('Live')
-  const [gameLoading, setGameLoading] = useState(Boolean(requestedGameId))
   const [flipped, setFlipped] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { boardTheme, pieceTheme, setBoardTheme, setPieceTheme } = useBoardPreferences()
@@ -89,25 +89,20 @@ function OnlineGamesPage() {
   }, [])
 
   const openTournamentGame = useCallback(async (gameId: string, updateUrl = true) => {
-    setGameLoading(true)
-    try {
-      let game = await loadTournamentGame(gameId)
-      if (game) {
-        const assignedPlayer = Boolean(
-          profile?.$id
-          && (game.whiteProfileId === profile.$id || game.blackProfileId === profile.$id),
-        )
-        if (assignedPlayer && (game.status === 'scheduled' || game.status === 'live')) {
-          const snapshot = await syncHostedTournamentGame(gameId).catch(() => null)
-          if (snapshot) game = applyHostedSnapshot(game, snapshot.row, snapshot.clock)
-        }
-        applySelectedGame(game)
-        if (updateUrl) setSearchParams({ game: gameId })
-      } else if (dueGameId !== gameId) {
-        clearOnlineTournamentPlayLock(gameId)
+    let game = await loadTournamentGame(gameId)
+    if (game) {
+      const assignedPlayer = Boolean(
+        profile?.$id
+        && (game.whiteProfileId === profile.$id || game.blackProfileId === profile.$id),
+      )
+      if (assignedPlayer && (game.status === 'scheduled' || game.status === 'live')) {
+        const snapshot = await syncHostedTournamentGame(gameId).catch(() => null)
+        if (snapshot) game = applyHostedSnapshot(game, snapshot.row, snapshot.clock)
       }
-    } finally {
-      setGameLoading(false)
+      applySelectedGame(game)
+      if (updateUrl) setSearchParams({ game: gameId })
+    } else if (dueGameId !== gameId) {
+      clearOnlineTournamentPlayLock(gameId)
     }
   }, [applySelectedGame, dueGameId, profile?.$id, setSearchParams])
 
@@ -190,22 +185,6 @@ function OnlineGamesPage() {
     }
   }, [dueGameId, refreshActiveGame, selectedGame?.status, selectedGameId])
 
-  function startFreeBoard() {
-    if (activeGame) {
-      setMessage('Your tournament pairing is due now. Finish that game before opening a free board.')
-      return
-    }
-    clearOnlineTournamentPlayLock()
-    setSelectedGame(null)
-    setSelectedGameId(null)
-    setBoardMoves([])
-    setBoardResult('Live')
-    setFlipped(false)
-    orientedGameRef.current = null
-    latestSnapshotRef.current = null
-    setSearchParams({})
-  }
-
   async function updateBoard(state: JuChessBoardChange) {
     if (!selectedGameId || !selectedGame || movePending || !state.lastMove) return
     const gameId = selectedGameId
@@ -261,12 +240,6 @@ function OnlineGamesPage() {
     }
   }
 
-  function undoMove() {
-    if (selectedGame || !boardMoves.length) return
-    setBoardMoves((moves) => moves.slice(0, -1))
-    setBoardResult('Live')
-  }
-
   const watchingTournament = Boolean(selectedGame)
   const profileId = profile?.$id
   const assignedColor = selectedGame?.whiteProfileId === profileId
@@ -296,7 +269,13 @@ function OnlineGamesPage() {
     setFlipped(assignedColor === 'black')
     orientedGameRef.current = selectedGameId
   }, [assignedColor, selectedGameId])
-  const boardSummary = useMemo(() => getJuChessBoardSummary(undefined, boardMoves), [boardMoves])
+  useEffect(() => {
+    setViewedPly(null)
+  }, [selectedGameId])
+  const displayedPly = viewedPly === null ? boardMoves.length : Math.min(viewedPly, boardMoves.length)
+  const displayedMoves = useMemo(() => boardMoves.slice(0, displayedPly), [boardMoves, displayedPly])
+  const boardSummary = useMemo(() => getJuChessBoardSummary(undefined, displayedMoves), [displayedMoves])
+  const viewingLatest = displayedPly === boardMoves.length
   const topSide = flipped ? 'white' : 'black'
   const bottomSide = flipped ? 'black' : 'white'
 
@@ -304,7 +283,6 @@ function OnlineGamesPage() {
     captured: boardSummary.captured[side],
     clock: hostedClockState(selectedGame, side, turnColor),
     name: side === 'white' ? selectedGame?.white ?? 'White' : selectedGame?.black ?? 'Black',
-    rating: side === 'white' ? selectedGame?.wRating : selectedGame?.bRating,
     side,
   })
   const firstMoveCountdown = selectedGame?.status === 'scheduled'
@@ -316,18 +294,6 @@ function OnlineGamesPage() {
     <div className="club-screen online-games-screen" data-screen-label="Games">
       <SiteHeader active="games" toolsDisabled={playingOnlineTournament} />
       <main className="online-games-main">
-        <header className="online-games-heading">
-          <div>
-            <span>Club play</span>
-            <h1>Games</h1>
-            <p>Play an assigned tournament game or watch any published board move by move.</p>
-          </div>
-          <div className={watchingTournament ? 'online-status live' : 'online-status'}>
-            <Radio size={15} aria-hidden="true" />
-            {watchingTournament ? selectedGame?.round || 'Tournament game' : 'Free board'}
-          </div>
-        </header>
-
         {playingOnlineTournament ? (
           <div className="forced-game-banner" role="status">
             <ShieldAlert size={19} aria-hidden="true" />
@@ -345,11 +311,7 @@ function OnlineGamesPage() {
 
         <div className="online-games-layout">
           <section className="online-board-station" aria-label="Chess board">
-            <div className="online-board-head">
-              <div>
-                <strong>{watchingTournament ? 'Tournament board' : 'Play on the board'}</strong>
-                {gameLoading ? <span>Loading game...</span> : !watchingTournament ? <span>Legal chess movement enabled</span> : null}
-              </div>
+            <div className="online-board-toolbar">
               <div className="online-board-head-actions">
                 <button
                   type="button"
@@ -361,9 +323,6 @@ function OnlineGamesPage() {
                 >
                   <Settings2 size={17} aria-hidden="true" />
                 </button>
-                {watchingTournament && !playingOnlineTournament ? (
-                  <button type="button" onClick={startFreeBoard}>Free board</button>
-                ) : null}
               </div>
             </div>
 
@@ -398,24 +357,25 @@ function OnlineGamesPage() {
               boardTheme={boardTheme}
               className="online-ju-board"
               flipped={flipped}
-              interactive={watchingTournament ? canMove : true}
-              moves={boardMoves}
-              onChange={watchingTournament ? updateBoard : (state) => {
-                setBoardMoves(state.moves)
-                setBoardResult(state.result)
-              }}
+              interactive={Boolean(watchingTournament && viewingLatest && canMove)}
+              moves={displayedMoves}
+              onChange={updateBoard}
               pieceTheme={pieceTheme}
               showEvaluation={false}
             />
             <PlayerStrip {...playerFor(bottomSide)} edge="bottom" pieceTheme={pieceTheme} />
 
             <div className="online-board-controls">
-              <button type="button" disabled={watchingTournament || !boardMoves.length} onClick={undoMove}>
-                <Undo2 size={16} aria-hidden="true" />
-                Undo
+              <button type="button" aria-label="Go to first move" disabled={displayedPly === 0} onClick={() => setViewedPly(0)} title="Go to start">
+                <SkipBack size={18} aria-hidden="true" />
+              </button>
+              <button type="button" aria-label="Previous move" disabled={displayedPly === 0} onClick={() => setViewedPly(Math.max(0, displayedPly - 1))} title="Previous move">
+                <ChevronLeft size={19} aria-hidden="true" />
               </button>
               <span>
-                {movePending
+                {!viewingLatest
+                  ? `Move ${displayedPly} of ${boardMoves.length}`
+                  : movePending
                   ? 'Saving move...'
                   : preGameActive
                     ? `Get ready · ${preGameCountdown?.label}`
@@ -425,18 +385,18 @@ function OnlineGamesPage() {
                       : canMove ? 'Your turn' : 'Opponent to move'
                     : `${boardMoves.length} moves · ${boardResult}`}
               </span>
+              <button type="button" aria-label="Next move" disabled={viewingLatest} onClick={() => {
+                const nextPly = Math.min(boardMoves.length, displayedPly + 1)
+                setViewedPly(nextPly === boardMoves.length ? null : nextPly)
+              }} title="Next move">
+                <ChevronRight size={19} aria-hidden="true" />
+              </button>
+              <button type="button" aria-label="Go to latest move" disabled={viewingLatest} onClick={() => setViewedPly(null)} title="Go to latest move">
+                <SkipForward size={18} aria-hidden="true" />
+              </button>
               {assignedParticipant ? (
                 <button type="button" disabled={movePending} onClick={() => void resignGame()}>Resign</button>
               ) : null}
-              <button
-                type="button"
-                disabled={playingOnlineTournament || (watchingTournament && gameLoading)}
-                onClick={startFreeBoard}
-                title={playingOnlineTournament ? 'Finish your assigned tournament game first' : undefined}
-              >
-                <RotateCcw size={16} aria-hidden="true" />
-                New game
-              </button>
             </div>
             {message ? <p className="online-game-message" role="status">{message}</p> : null}
           </section>
@@ -530,7 +490,6 @@ function PlayerStrip({
   edge,
   name,
   pieceTheme,
-  rating,
   side,
 }: {
   captured: JuCapturedPiece[]
@@ -538,7 +497,6 @@ function PlayerStrip({
   edge: 'bottom' | 'top'
   name: string
   pieceTheme: JuPieceTheme
-  rating?: number
   side: 'white' | 'black'
 }) {
   return (
@@ -549,8 +507,7 @@ function PlayerStrip({
         <JuCapturedPieces pieces={captured} pieceTheme={pieceTheme} />
       </div>
       <div className="online-player-meta">
-        {clock ? <time className={clock.tone}>{clock.label}</time> : null}
-        <small>{rating ?? 'Unrated'}</small>
+        <time className={clock?.tone ?? 'normal'}>{clock?.label ?? '--:--'}</time>
       </div>
     </div>
   )

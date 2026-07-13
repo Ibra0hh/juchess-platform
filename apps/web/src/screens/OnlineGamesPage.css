@@ -6,58 +6,7 @@
 .online-games-main {
   width: min(100% - 40px, 1720px);
   margin: 0 auto;
-  padding: 34px 0 52px;
-}
-
-.online-games-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.online-games-heading > div:first-child > span {
-  color: #7a2431;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.online-games-heading h1 {
-  margin: 3px 0 4px;
-  color: #111111;
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 42px;
-  letter-spacing: 0;
-  line-height: 1;
-}
-
-.online-games-heading p {
-  max-width: 650px;
-  margin: 0;
-  color: rgba(17, 17, 17, 0.68);
-  font-size: 14px;
-}
-
-.online-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  flex: none;
-  border: 1px solid rgba(17, 17, 17, 0.2);
-  border-radius: 7px;
-  background: #fffdf8;
-  color: #111111;
-  padding: 9px 12px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.online-status.live {
-  border-color: rgba(122, 36, 49, 0.34);
-  color: #7a2431;
+  padding: 18px 0 52px;
 }
 
 .forced-game-banner {
@@ -103,7 +52,6 @@
   gap: 24px;
 }
 
-.online-board-station,
 .online-tournament-panel {
   overflow: hidden;
   border: 1px solid rgba(17, 17, 17, 0.16);
@@ -113,11 +61,11 @@
 }
 
 .online-board-station {
-  --online-board-size: min(100%, 800px, calc(100dvh - 350px));
-  padding: 18px;
+  --online-board-size: min(100%, 800px, calc(100dvh - 220px));
+  position: relative;
+  min-width: 0;
 }
 
-.online-board-head,
 .online-event-head,
 .online-board-controls {
   display: flex;
@@ -126,8 +74,12 @@
   gap: 12px;
 }
 
-.online-board-head {
-  margin-bottom: 14px;
+.online-board-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  width: var(--online-board-size);
+  min-height: 34px;
+  margin: 0 auto 8px;
 }
 
 .first-move-deadline {
@@ -155,21 +107,6 @@
   color: #8e1f31;
 }
 
-.online-board-head > div {
-  display: grid;
-  gap: 2px;
-}
-
-.online-board-head strong {
-  color: #111111;
-  font-size: 15px;
-}
-
-.online-board-head span {
-  color: rgba(17, 17, 17, 0.58);
-  font-size: 11.5px;
-}
-
 .online-board-head-actions {
   display: flex;
   align-items: center;
@@ -187,7 +124,7 @@
   color: #ffffff;
 }
 
-.online-board-head button,
+.online-board-head-actions button,
 .online-board-controls button {
   display: inline-flex;
   align-items: center;
@@ -204,7 +141,7 @@
   font-weight: 700;
 }
 
-.online-board-head button:hover,
+.online-board-head-actions button:hover,
 .online-board-controls button:hover:not(:disabled) {
   border-color: #7a2431;
   color: #7a2431;
@@ -271,12 +208,6 @@
   white-space: nowrap;
 }
 
-.online-player-strip small {
-  color: rgba(17, 17, 17, 0.58);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-}
-
 .online-player-meta {
   display: flex;
   align-items: center;
@@ -322,6 +253,8 @@
 }
 
 .online-board-controls {
+  display: grid;
+  grid-template-columns: 42px 42px minmax(120px, 1fr) 42px 42px auto;
   width: var(--online-board-size);
   margin: 13px auto 0;
 }
@@ -336,6 +269,10 @@
 .online-board-controls button:disabled {
   cursor: default;
   opacity: 0.4;
+}
+
+.online-board-controls button[aria-label] {
+  padding: 0;
 }
 
 .online-game-message {
@@ -705,22 +642,12 @@
     padding-top: 22px;
   }
 
-  .online-games-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .online-games-heading h1 {
-    font-size: 34px;
-  }
-
   .online-board-station {
-    padding: 12px;
+    --online-board-size: min(100%, 800px, calc(100dvh - 210px));
   }
 
   .online-board-controls {
-    align-items: stretch;
-    flex-wrap: wrap;
+    grid-template-columns: 38px 38px minmax(92px, 1fr) 38px 38px;
   }
 
   .online-board-controls span {
@@ -729,7 +656,7 @@
   }
 
   .online-board-controls button {
-    flex: 1;
+    min-width: 0;
   }
 
   .online-player-meta {
@@ -742,8 +669,8 @@
     font-size: 12px;
   }
 
-  .online-player-meta small {
-    display: none;
+  .online-board-controls > button:last-child:not([aria-label]) {
+    grid-column: 1 / -1;
   }
 }
 
