@@ -1847,8 +1847,8 @@ function TournamentsScreen({
         </button>
       </div>
       {showCreate ? (
-        <div ref={createBackdropRef} className="create-modal-backdrop" onClick={closeCreatePanel}>
-          <form className="create-modal" onClick={(event) => event.stopPropagation()} onSubmit={handleCreate}>
+        <div ref={createBackdropRef} className="create-modal-backdrop">
+          <form className="create-modal" onSubmit={handleCreate}>
             <header className="create-modal-head">
               <div>
                 <strong>{isEditing ? 'Edit tournament' : 'Create tournament'}</strong>
