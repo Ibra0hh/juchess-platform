@@ -1,297 +1,908 @@
-# JuChess Next Chat Handoff
+# JuChess Complete New-Chat Handoff
 
-Read this file first when continuing the JuChess project in a new Codex chat.
+Last updated: July 13, 2026
 
-## July 12, 2026: JuChess-Hosted Online Tournaments
+This file is both a complete project handoff and a copy-paste prompt for a new
+AI chat. It describes the intended product, the actual implementation, the
+backend contract, deployment state, known limitations, and the working rules
+that must not be lost between chats.
 
-- Admin tournament creation now stores `playMode` plus one explicit online
-  platform: `chessCom`, `lichess`, or `juchess`.
-- Only `juchess` means games are played inside this product. Chess.com and
-  Lichess remain external tournament platforms.
-- JuChess-hosted tournaments use published rounds/brackets and do not expose a
-  Procedure tab. Procedure remains for physical venue boards.
-- Signed-in players play only the game row where their profile is assigned as
-  White or Black. The server validates side to move and legality with
-  `chess.js`; spectators receive the same public game row but cannot move.
-- Authoritative moves are handled by `admin-actions` routes
-  `POST /player/games/:id/move` and `POST /player/games/:id/resign`. The
-  function is executable by signed-in users, but every admin route still
-  passes `requireAdminActor`.
-- Game rows now carry `moveVersion`, `lastMoveAt`, `whiteTimeMs`,
-  `blackTimeMs`, and `turnStartedAt`. Clients submit an expected revision and
-  poll the canonical row every 1.2-1.5 seconds.
-- Checkmate, stalemate, automatic draws, resignation, standings, and next-round
-  advancement reuse the existing server tournament engine. A drawn knockout
-  position is saved live and flagged for organizer tiebreak resolution because
-  knockout advancement requires a winner.
-- Live schema migration: `scripts/migrate-online-tournament-schema.ps1`.
-- Live Appwrite deployment `6a52c1c711c2292c877f` was ready and activated on
-  July 12, 2026.
-- Verification at implementation time: 47 backend tests, 14 web review tests,
-  18 Flutter tests, Flutter analyze, web build, admin build, function syntax,
-  desktop browser render, legal free-board interaction, and 390x844 responsive
-  render all passed.
+## Copy-Paste Prompt For The New Chat
 
-## Core Rule
+```text
+You are continuing the JuChess platform. Work as the implementation engineer,
+not as a consultant. Inspect the real repository and current deployed state
+before changing anything, then implement, test, deploy, and verify requested
+changes end to end.
 
-The prototypes are the design source of truth. Do not invent a new UI.
+Repository:
+C:\Users\ibra_\Downloads\juchess-platform
 
-Locked prototype references:
+GitHub:
+https://github.com/Ibra0hh/juchess-platform
+
+Required first file:
+C:\Users\ibra_\Downloads\juchess-platform\docs\NEXT_CHAT_HANDOFF.md
+
+Public website:
+https://ibra0hh.github.io/juchess-platform/web/
+
+Admin website:
+https://ibra0hh.github.io/juchess-platform/admin/
+
+Shared backend:
+Appwrite Cloud endpoint https://cloud.appwrite.io/v1
+Project ID juchess-platform
+Database ID juchess
+
+Start by running:
+1. cd C:\Users\ibra_\Downloads\juchess-platform
+2. git status --short
+3. git log -8 --oneline
+4. read docs/NEXT_CHAT_HANDOFF.md completely
+5. inspect the specific source files for the user's newest request
+
+Non-negotiable rules:
+- The prototype UI and the user's screenshots are the design source of truth.
+- Do not redesign the product or invent a generic dashboard.
+- Use real Appwrite data for live product behavior. Do not hide broken data
+  flow behind mock data.
+- Preserve unrelated user changes and untracked folders.
+- Never expose or commit an Appwrite API key. Use environment variables or the
+  authenticated Appwrite CLI. Do not repeat any key from an old chat.
+- Admin-only writes go through server Functions.
+- Tournament results, clocks, pairings, standings, and brackets must agree on
+  web, admin, and mobile. A UI-only approximation is not complete.
+- For visual work, inspect the real rendered page/app and take screenshots.
+- For mobile work, install and verify on a connected phone/emulator when one is
+  available. If adb has no device, say so instead of claiming installation.
+- Do not claim completion after only a build. Run the relevant tests, deploy
+  the relevant backend/frontend, and verify the user flow.
+
+Read the rest of this handoff before doing any work. It contains current
+architecture, tournament rules, hosted online-game state, deployments, known
+gaps, and test commands.
+```
+
+## 1. Product Mission
+
+JuChess is the University of Jordan Chess Club platform. It has three real
+clients sharing one Appwrite backend:
+
+1. A public member website.
+2. An admin control center for tournament organizers.
+3. A Flutter mobile/tablet app.
+
+The product covers club accounts, tournaments, participant registration,
+pairings, brackets, physical tournament procedure, online tournament play,
+live boards, standings, announcements, completed-event media, game review,
+analysis, puzzles, and member history.
+
+The user is actively testing the product with real accounts and friends. Data
+consistency and tournament logic matter more than demo appearance.
+
+## 2. Source Of Truth And Design Contract
+
+The existing prototypes and user-provided screenshots are the visual source of
+truth:
 
 - `docs/prototypes/web`
 - `docs/prototypes/mobile`
 - `docs/prototypes/admin`
 
-The real apps must preserve the prototype layout, colors, labels, navigation,
-cards, buttons, density, and behavior. Appwrite is the backend underneath the
-same UI, not a reason to redesign the product.
+Do not create a different visual language. Preserve the JuChess identity:
 
-## Repo And Git
+- Black replaces the old navy color.
+- Burgundy/wine is the primary accent.
+- Cream/off-white is the main surface color.
+- Gold is a restrained secondary accent.
+- Use the transparent JuChess crest/logo assets already in the apps.
+- The chessboard uses the burgundy/cream/gold piece style already implemented.
+- Cards should stay compact and operational, not marketing-style.
+- Do not add decorative gradients, orbs, huge hero cards, or emoji format icons.
+- Do not put visible implementation explanations inside the product UI.
 
-- Repo path on this machine: `C:\Users\ibra_\Downloads\juchess-platform`
-- GitHub repo: `Ibra0hh/juchess-platform`
-- Current main branch is pushed.
-- GitHub Pages output is built from the real React apps into `docs/web` and
-  `docs/admin`. Prototype references remain under `docs/prototypes`.
-- Public website: `https://ibra0hh.github.io/juchess-platform/web/`
-- Admin website: `https://ibra0hh.github.io/juchess-platform/admin/`
-- Root URL redirects to the public website:
-  `https://ibra0hh.github.io/juchess-platform/`
+When a screenshot and current code disagree, inspect the screenshot and the
+latest user wording. Fix the real screen instead of rationalizing the mismatch.
+
+## 3. Repository And Git State
+
+- Local repo: `C:\Users\ibra_\Downloads\juchess-platform`
+- Remote: `https://github.com/Ibra0hh/juchess-platform.git`
+- Primary branch: `main`
+- Current handoff baseline commit: `c20c8c3`
+- Current remote was pushed through `c20c8c3` when this handoff was written.
 
 Recent important commits:
 
-- `cf3ffc5 Make tournament creation draft-only`
-- `5439bf7 Fix GitHub Pages links`
-- `8495ecb Update admin tournament status workflow`
-- `2270110 Add stage tabs to tournament rounds`
-- `649ba09 Match web tournament tabs to mobile`
-- `2e22d72 Add mobile splash animation and logo icon`
-- `f5e0e5f Refine mobile bracket connectors`
-- `252e610 Add mobile bracket connector lines`
-- `40d7f0d Fix mobile tournament bracket UI`
-- `b8c604c Fix mobile tournament registration tab`
-- `e0559f3 Port mobile prototype screens to Flutter`
-- `7656b9a Make mobile tournaments open real details`
-- `23ca78e Make tournaments cloud-backed across apps`
+- `c20c8c3` Fix board orientation and add pregame countdown
+- `9364c91` Auto-refresh tournament data without page reloads
+- `6e9cff8` Keep players on their current live board
+- `433dc5e` Make online game turns server authoritative
+- `abd7675` Fix online tournament turn handoff
+- `903c27c` Preserve cached site bundles during deploy
+- `5ea2f9c` Start online tournaments immediately
+- `96199d5` Deploy tournament standings fix
+- `27c26a5` Use cloud standings on tournament pages
+- `96188b2` Add online Swiss showcase seeder
 
-## App Structure
+The worktree can contain unrelated untracked `.claude/` and `graphify-out/`
+files. Do not delete, revert, stage, or commit them unless the user explicitly
+asks. Always run `git status --short` before editing and before committing.
 
-- `apps/web`: public React + TypeScript + Vite app.
-- `apps/admin`: admin React + TypeScript + Vite app.
-- `apps/mobile`: Flutter mobile/tablet app.
-- `appwrite`: Appwrite schema and Functions.
-- `docs/appwrite-schema.md`: backend contract.
-- `docs/prototype-screen-checklist.md`: screen acceptance checklist.
-- `graphify-out/GRAPH_REPORT.md`: generated codebase graph report if a future
-  chat needs architecture exploration.
+At the moment this handoff was written, there was also an unrelated uncommitted
+change in `apps/admin/src/App.tsx` around the create-tournament modal backdrop:
+the backdrop/form click-to-close handlers were removed. This handoff did not
+create, stage, revert, or commit that change. Inspect and preserve it unless the
+user explicitly asks to change that behavior.
 
-## Backend Boundary
+## 4. Repository Map
 
-Appwrite project:
+### Public web
+
+- Root: `apps/web`
+- Stack: React, TypeScript, Vite, React Router, Appwrite Web SDK, `chess.js`.
+- Entry/routes: `apps/web/src/App.tsx`
+- Appwrite/data adapter: `apps/web/src/lib/juchess.ts`
+- Auth: `apps/web/src/lib/auth.ts`, `apps/web/src/context`
+- Tournament detail: `apps/web/src/screens/TournamentDetailPage.tsx`
+- Hosted online games: `apps/web/src/screens/OnlineGamesPage.tsx`
+- Game review/analysis: `apps/web/src/screens/GamesPage.tsx`
+- Shared board: `apps/web/src/components/JuChessBoard.tsx`
+- Stockfish review engine: `apps/web/src/lib/gameReview.ts`
+- External imports: `apps/web/src/lib/externalGames.ts`
+- Hosted-game API: `apps/web/src/lib/onlineTournament.ts`
+- Tournament play lock: `apps/web/src/context/TournamentPlayProvider.tsx`
+
+Public routes:
+
+- `/home`
+- `/tournaments`
+- `/tournament/:id`
+- `/attendance-confirm`
+- `/sign-in`
+- `/sign-up`
+- `/forgot-password`
+- `/games` for hosted tournament play/free board
+- `/tools` for game review and analysis entry
+- `/leaderboard`
+- `/profile`
+
+### Admin web
+
+- Root: `apps/admin`
+- Stack: React, TypeScript, Vite, Appwrite Web SDK, `chess.js`.
+- Main UI is currently a large single file: `apps/admin/src/App.tsx`.
+- Backend adapter: `apps/admin/src/lib/adminData.ts`.
+- Shared admin board: `apps/admin/src/components/JuChessBoard.tsx`.
+- Tournament wizard state: `apps/admin/src/lib/tournamentWizard.ts`.
+
+Admin top-level screens in current code:
+
+- Dashboard
+- Tournaments
+- Players
+- News
+- Announcements
+- Admin Access
+
+`App Windows` was removed and must not be reintroduced.
+
+### Flutter mobile/tablet
+
+- Root: `apps/mobile`
+- Stack: Flutter/Dart, Appwrite Flutter SDK, Dart `chess` package.
+- Main implementation is currently monolithic:
+  `apps/mobile/lib/main.dart`.
+- Game review helpers/tests live under `apps/mobile/lib` and
+  `apps/mobile/test`.
+- Android package: `edu.ju.chess.juchess_mobile`.
+
+Phone orientation is portrait-locked; tablet layouts may rotate. Preserve the
+existing prototype structure when splitting the monolith in the future.
+
+### Backend and infrastructure
+
+- Appwrite config: `appwrite/functions.json`, `appwrite/schema.json`
+- Admin/tournament engine: `appwrite/functions/admin-actions`
+- Player registration writes: `appwrite/functions/player-actions`
+- Attendance email-link responses: `appwrite/functions/attendance-actions`
+- Identity/IP access check: `appwrite/functions/access-guards`
+- Schema migrations: `scripts/migrate-*.ps1`
+- Demo/seeding: `scripts/seed-appwrite-demo-data.mjs` and
+  `scripts/seed-online-swiss-showcase.ps1`
+- GitHub Pages build: `scripts/build-pages.mjs`
+- Generated deployed web/admin: `docs/web`, `docs/admin`
+
+`graphify-out/graph.json` exists and can be queried for architecture, but it may
+lag recent commits. Source code and this handoff override stale graph output.
+
+## 5. Deployment URLs And Live Appwrite State
+
+Public URLs:
+
+- Root redirect: `https://ibra0hh.github.io/juchess-platform/`
+- Public web: `https://ibra0hh.github.io/juchess-platform/web/`
+- Admin: `https://ibra0hh.github.io/juchess-platform/admin/`
+
+Appwrite:
 
 - Endpoint: `https://cloud.appwrite.io/v1`
 - Project ID: `juchess-platform`
 - Database ID: `juchess`
-- Public access guard Function ID: `access-guards`
-- Admin Function ID: `admin-actions`
+- Storage buckets: `avatars`, `tournament-assets`
+- Teams: `admin_super_admins`, `admin_staff`, plus legacy
+  `admins`, `organizers`, `members`
+
+Live Function IDs and latest ready deployments at handoff time:
+
+- `admin-actions`: deployment `6a53f0e9b1889b81b5d3`, ready and active
+- `player-actions`: deployment `6a53cd5bc66a6a6eabd1`, ready and active
+- `attendance-actions`: deployment `6a53cd75ade72590f33d`, ready and active
+- `access-guards`: deployment `6a4adc00dbe3a387a814`, ready and active
+
+`admin-actions` is scheduled every minute for attendance processing and also
+serves the tournament engine and hosted online-game endpoints.
+
+Never place an Appwrite API key in source, Markdown, chat output, client env, or
+Git. Use the authenticated Appwrite CLI or an `APPWRITE_API_KEY` environment
+variable only. A key was pasted in an older conversation; do not repeat it and
+rotate it if it has not already been rotated.
+
+## 6. Appwrite Auth And Security Boundary
+
+Player identity and admin identity are deliberately separate.
+
+Player web/mobile:
+
+- Appwrite Account handles sessions.
+- Player profiles live in `profiles`.
+- Sign-up/sign-in checks call `access-guards`.
+- Blocked email, University ID, phone, user, profile, or IP must be rejected.
+
+Admin:
+
+- Admin access lives in private `admin_profiles`.
+- Admin authorization requires membership in `admin_super_admins` or
+  `admin_staff` and an active admin profile.
+- Do not authorize the admin app from `profiles.role`.
+- Admin mutations go through `admin-actions` using the short account JWT header
+  implemented in `apps/admin/src/lib/adminData.ts`.
+- Super admins can create/suspend admin access.
+- Admin actions are written to `admin_audit` where implemented.
+
+Client apps may use public/member Appwrite reads and owner-scoped writes where
+the schema permits. They must never contain server API keys.
+
+## 7. Core Data Model
+
+Machine-readable contract: `appwrite/schema.json`.
 
 Important tables:
 
-- Player-facing: `profiles`, `tournaments`, `registrations`, `games`,
-  `standings`, `announcements`
-- Admin-facing: `admin_profiles`, `admin_audit`, `identity_blocks`, `ip_blocks`
+- `admin_profiles`: private admin identities and role/status.
+- `profiles`: member identity, rating, avatar, Chess.com and Lichess usernames.
+- `tournaments`: status, format, rounds, mode/platform, dates, bracket snapshot,
+  procedure settings, hosted-game policy.
+- `registrations`: one player/tournament registration, status, seed.
+- `attendance_confirmations`: one-hour Yes/No attendance responses.
+- `games`: canonical pairing, colors, result, PGN, online clock and procedure.
+- `game_messages`: private game chat.
+- `fair_play_events`: player-side tournament telemetry.
+- `fair_play_reviews`: organizer review summaries/decisions.
+- `standings`: canonical tournament ranking snapshot.
+- `announcements`: club broadcasts.
+- `admin_audit`: operational audit log.
+- `identity_blocks`, `ip_blocks`: access controls.
+- `check_ins`: legacy table; the current flow uses attendance confirmation.
 
-Important security rule:
+Important `tournaments` fields:
 
-- Admin app identity is separate from player identity.
-- Admin app uses `admin_profiles` plus admin-only teams:
-  `admin_super_admins` and `admin_staff`.
-- Admin-only mutations go through Appwrite Functions, not frontend secrets.
-- Web/mobile sign-in/sign-up call `access-guards` so blocked email,
-  University ID, phone, and IP values are rejected.
+- `status`: `draft`, `upcoming`, `active`, `completed`, `archived`
+- `format`
+- `timeControl`
+- `roundsTotal`, `currentRound`
+- `startsAt`, `registrationDeadline`
+- `playMode`: `inPerson` or `online`
+- `onlinePlatform`: `chessCom`, `lichess`, `juchess`
+- `bracketSnapshot`: canonical published knockout JSON
+- `physicalBoards`
+- `firstMoveGraceSeconds`, `disconnectGraceSeconds`
+- `chatPolicy`, `fairPlayMode`
 
-## Current Working State
+Important `games` fields:
 
-Implemented/working:
+- pairing: tournament, round, board, White profile, Black profile
+- state: `scheduled`, `live`, `completed`, `forfeit`
+- result: `1-0`, `0-1`, `1/2-1/2`, `*`
+- `pgn`, `moveVersion`, `lastMoveAt`
+- `whiteTimeMs`, `blackTimeMs`, `turnStartedAt`
+- `scheduledStartAt`, `firstMoveDeadlineAt`, `clockDeadlineAt`
+- `terminationReason`, `forfeitedProfileId`
+- procedure: wave, physical board, queue position, start/finish timestamps
 
-- Appwrite wrappers exist for web, admin, and Flutter.
-- Web sign-in, sign-up, password recovery, tournament reads, and profile session
-  state are wired with prototype fallback data.
-- Admin app has separated admin access through `admin_profiles`.
-- Admin can manage identity/IP blocks through server Functions.
-- Admin tournament list tabs must be:
-  Draft, Upcoming, Active, Completed, Archived.
-- Admin create tournament is intentionally enabled only on the Draft tab.
-- Admin create tournament currently saves every new tournament as `draft`.
-- Admin create tournament should have only two steps:
-  Basic information and Tournament format. Time control lives inside the
-  Tournament format window, under the format cards.
-- Admin create tournament should not show Preview or Review steps.
-- Admin create tournament Basic information step must stay simple:
-  tournament name, description, number of players, typed location/platform,
-  start date/time, registration deadline, and tournament design image placeholder.
-- Admin create tournament Basic information step must not show:
-  end date/time, Chess.com/Lichess.com/Main Campus chips, visibility controls,
-  or access controls.
-- Admin Tournaments must follow the prototype table/action pattern. Do not use
-  an inline edit form under the tournament table. Tournament Edit opens the
-  same Create/Edit modal populated with the selected tournament. Active
-  tournament Manage uses a separate prototype-style management view with a back
-  button, title/status, controls, nav tabs, and a centered panel.
-- Admin Upcoming tournament rows expose Manage, Edit, Draft, and Active
-  actions. Shuffle and Publish must exist only inside the Upcoming tournament
-  management screen.
-- Admin Upcoming tournament management can shuffle pairings/brackets until the
-  admin clicks Publish. After Publish, shuffle is locked for knockout brackets
-  and for all other tournament formats.
-- Admin knockout tournament management must label the play tab as Bracket
-  instead of Rounds and must reuse the website rich bracket structure/classes:
-  `.bracket-panel.rich-bracket-panel`, `.bracket-round-nav`, SVG connector
-  lines, `.bracket-match.rich`, live tags, and website-style player rows.
-  Non-knockout formats keep Rounds.
-- Admin knockout bracket progression must be logically coherent:
-  setup/upcoming shows real Round of 16 pairings and downstream `Winner R16-*`,
-  `Winner QF-*`, and `Winner SF-*` slots; active advances completed Round of
-  16 winners into live quarterfinal boards; completed fills winners through the
-  final. Round navigation must scroll to the matching column without resetting.
-  A Round of 16 must always render 8 first-round matches; if the demo/admin data
-  has fewer registered players, pad the missing games as `Open seed` slots
-  instead of collapsing the bracket to fewer matches.
-- Admin Active tournament management includes a digital chess board powered by
-  `chess.js` for legal move entry, live move recording, result selection, undo,
-  reset, and board save actions.
-- In active knockout management, clicking a playable/live bracket match selects
-  the same match in the digital chess board. The board list must come from the
-  actual live bracket matches, and move/result state is stored per board so
-  switching matches does not erase already-entered moves.
-- The chessboard is now a core shared UI/behavior target. Admin and web use the
-  `JuChessBoard` React component backed by `chess.js`; mobile uses the Dart
-  `chess` package. Keep the wine/cream/gold board style, legal move dots,
-  selected/last/check states, promotion picker, undo/reset, and SAN move lists
-  consistent across all platforms.
-- Admin Procedure now asks for physical board count and generates waves:
-  `Round/Match -> physical Board -> status -> next queued match`. This is the
-  starting point for planning Swiss, arena, knockout, and other format logistics
-  when match count exceeds available boards.
-- Completed and Archived tournament tabs should not show the Registration queue.
-- Flutter app has Appwrite session detection, sign-in, sign-up, sign-out,
-  tournament reads, tournament details, registration/cancel behavior, and
-  prototype-style mobile screens.
-- Mobile orientation is locked to portrait on phone; tablets can rotate.
-- Mobile tournament Registration tab was corrected to show only the register or
-  cancel action, matching the latest prototype request.
-- Mobile tournament Bracket tab now uses prototype-style columns with:
-  round chips, winner checkmarks, faded eliminated/TBD rows, live strips, and
-  web-style bracket connector lines.
-- Mobile splash now uses the JuChess logo, grid wash, warm glow, and falling
-  chess pieces inspired by the web homepage.
-- Android native launch screen and launcher icon use the club logo.
-- Bottom Home tab in the Flutter app uses the club logo.
+The `games` row is the canonical source for live moves and clocks. Clients must
+not decide authoritative turns or outcomes locally.
 
-Registration and check-in flow (added Jul 9, 2026):
+## 8. Tournament Lifecycle
 
-- Player registrations are created as `pending` from web and mobile; players
-  never self-confirm. Rows are created with per-user read/update permissions so
-  players can cancel their own registration.
-- The admin function `POST /registrations/:id/confirm|status` generates a
-  `checkInCode` (format `JU-XXXXXX`, unambiguous alphabet) the first time a
-  registration is confirmed. Requires redeploying `admin-actions` after pulling.
-- Web tournament detail Registration tab is auth-aware: guests see the sign-in
-  prompt; signed-in players get one-tap Register, pending/waitlist status
-  panels, and a check-in pass (code + QR via the `qrcode` npm package) once
-  confirmed. QR payload format: `JUCHESS-CHECKIN:<registrationRowId>:<code>`.
-- Mobile Registration tab mirrors this with `MyRegistrationInfo` state and
-  `qr_flutter`. Same QR payload format.
-- Admin registration queue shows the check-in code under the Check-in column
-  for confirmed players.
+The admin tournament status navbar is exactly:
 
-Round progression engine (added Jul 9, 2026 — server-side in admin-actions):
+1. Draft
+2. Upcoming
+3. Active
+4. Completed
+5. Archived
 
-- All format progression lives in `advanceTournamentIfReady` in
-  `appwrite/functions/admin-actions/src/main.js`. It runs automatically after
-  every completed game result, and manually via
-  `POST /tournaments/:id/rounds/next` (admin "Advance round" button).
-- Swiss: real score-group pairing with rematch avoidance and FIDE-style colour
-  allocation (`buildSwissPairings`). The first round draws one initial colour
-  and applies it by pairing-number parity. Later rounds use each player's colour
-  difference and history, avoid a third consecutive same colour where possible,
-  grant stronger preferences first, then use recent opposite-colour history and
-  ranking as tie-breakers. Odd fields get a rotating full-point bye recorded as
-  a completed game against the `system_bye` profile (auto-created, no colour).
-- Round robin / double round robin: full schedule at activation; rounds go
-  live one at a time as the previous round finishes; auto-completes.
-- Single + double elimination: `buildKnockoutStructure` derives the whole
-  bracket (byes, losers bracket, grand final + reset) from the entrant order
-  frozen in the snapshot at activation/publish. Next-round games are created
-  when resolvable; the bracketSnapshot is REGENERATED from real results on
-  every advancement, so admin/web/mobile brackets update live. Loser round
-  labels come out as "Round of 16 Qualifier"..."Final Qualifier"/"Final".
-- Multi-stage: Swiss stage one (`roundsTotal - knockout rounds` rounds, min 3
-  when unset), then auto-cutover seeding the top 8 from real standings into a
-  single-elim stage two (snapshot carries `stageTwoFromRound`).
-- Arena: rolling Swiss re-pairing each round, never auto-completes (admin uses
-  Complete tournament). Team: single generic round until a team model exists.
-- Standings are recalculated into the `standings` table after every result,
-  including one-sided (bye/withdrawal) games.
-- Engine dry-run harness: scratchpad `engine-dryrun.mjs` pattern — extracts the
-  pure functions and simulates SE6/SE8/DE8/DE20/Swiss5; all checks pass.
-- Admin Procedure is now an authoritative venue scheduler. The board count is
-  persisted on the tournament, every game receives a wave, physical board and
-  queue position, and new games remain `scheduled` until the manager presses
-  Start. A physical board cannot start a later lane game while an earlier one
-  is unresolved, and two live games cannot occupy the same venue board.
-- Procedure shows physical-board lanes, a round/wave schedule, byes, progress,
-  and completed games. Only live games open for result entry; completed games
-  remain selectable so the manager can add or replace PGN later without
-  changing the result or advancing the tournament again.
-- Result entry does not require PGN. The manager may start a game, choose a
-  result and save with zero moves, then return later to replay moves on the
-  digital board or paste/import PGN. New routes:
-  `POST /tournaments/:id/procedure/configure`, `POST /games/:id/start`, and
-  `POST /games/:id/pgn`.
-- Live migration is additive and repeatable:
-  `npm run migrate:procedure`, followed by an `admin-actions` deployment. The
-  migration adds `tournaments.physicalBoards` and the `games.procedureWave`,
-  `games.physicalBoard`, and `games.queuePosition` columns. It accepts an
-  existing Appwrite large-text `games.pgn` column or expands a short string
-  column to 50,000 characters.
-- DEPLOYED (Jul 10, 2026): the Procedure migration is live in project
-  `juchess-platform`; all four new columns report `available`. Deployment
-  `6a50f32e8f44a439697a` is active and `ready`. Its live health execution
-  returned the new configure, start, and deferred-PGN routes. Local verification
-  passes 25 engine/workflow tests, function syntax checks, admin lint with only
-  three pre-existing prototype warnings, and the full GitHub Pages build.
-- LIVE SWISS STATE (Jul 10, 2026): the seeded Swiss tournament has six confirmed
-  players, four rounds and three physical boards. Round 1 has three scheduled
-  games. The live initial-colour draw selected Black, so seeds 1, 3 and 5 are
-  Black while seeds 2, 4 and 6 are White. All three games are in wave 1.
-- VERIFIED LIVE (Jul 9, 2026): deployed and smoke-tested against production.
-  Activating the seeded Swiss generated 10 round-1 games; saving the last
-  result via the admin digital board auto-paired round 2 with correct score
-  groups, color flips, and no rematches; the manual "Advance round" button
-  paired round 3; standings recalculated after every result; the public web
-  showed "Round 3 of 7" with identical pairings. The seeded Swiss was left in
-  that active round-3 state — run `npm run seed:appwrite-demo` (needs
-  APPWRITE_API_KEY env) to restore pristine demo data.
+Lifecycle behavior:
 
-Tournament detail tab rules:
+- Create Tournament is available only in Draft.
+- New tournaments are created as Draft.
+- Draft can be deleted.
+- Archived can be deleted.
+- Upcoming is the pairing preparation/publish stage.
+- Active is the tournament operation stage.
+- Completed can move back one step to Active.
+- Active can move back one step to Upcoming.
+- Do not jump Completed directly to Upcoming; rollback is one step at a time.
+- Completed and Archived do not show a registration queue.
+- Registration queue belongs only to Upcoming.
+- Players cannot register for Active or Completed tournaments.
+- Duplicate registration is rejected server-side and the UI must show a
+  pending/loading state after one tap.
 
-- Public website and Flutter mobile should match.
-- Tournament detail tabs should be:
-  Registration, Players, Rounds, Games, Standings.
-- Single elimination and double elimination use bracket-style Rounds content.
-- Swiss, Arena, League, Round robin, and similar formats keep the same top tabs
-  but change the content inside Rounds/Games/Standings as appropriate.
-- Multi-stage Rounds content should include a small inner nav with:
-  Stage one and Stage two.
+Pairings/brackets are not public until the organizer publishes them. Do not
+show text blaming or mentioning the admin; simply say rounds/bracket are not
+published yet.
 
-Most recent phone verification:
+## 9. Tournament Creation Contract
 
-- Device used: `SM A346E`, adb id `RZCW30XCC4Z`
-- Installed with `flutter run -d RZCW30XCC4Z ...`
-- Verified splash, Home tab logo, and mobile bracket visually by screenshots.
+The create/edit tournament modal uses the admin prototype and has two logical
+steps, not Preview or Review:
 
-## Commands
+1. Basic information.
+2. Tournament format.
+
+Basic information includes:
+
+- Tournament name
+- Description
+- Player capacity
+- Typed location/platform information where applicable
+- Start date and start time
+- Registration deadline date and time
+- In-person or online selection
+- Tournament image placeholder/upload surface where present in the prototype
+
+Do not restore these removed controls:
+
+- End date in the create form
+- Visibility
+- Access
+- Delay
+- Games per match
+- Chess.com/Lichess/Main Campus chips
+- Emoji icons above formats
+- Preview/Review wizard steps
+
+Date and time:
+
+- Date uses the date picker.
+- Start and deadline have a separate analog-style 12-hour clock picker beside
+  the date picker, with hour/minute and AM/PM controls.
+- The wizard Next button must always visit Tournament Format; it must not skip
+  the format step.
+
+Online tournament platforms are exactly:
+
+- Chess.com (`chessCom`)
+- Lichess (`lichess`)
+- JuChess (`juchess`), meaning played inside this platform
+
+## 10. Supported Tournament Formats And Current Engine Behavior
+
+Admin format order:
+
+1. Swiss
+2. Round robin
+3. Double round robin
+4. Single elimination
+5. Double elimination
+6. Multi-stage
+7. Team
+8. Arena
+
+### Swiss
+
+- `roundsTotal` is explicitly chosen between 1 and 50.
+- Only round 1 is created/published before play.
+- Later rounds are generated after the current round completes.
+- Pairings group players by score, avoid rematches where possible, and rotate a
+  full-point bye so a player does not receive a second bye while another has
+  none.
+- Current user rule for colors: every pairing uses an independent random White
+  and Black draw. Do not force alternation. A player may receive Black twice in
+  a row. Ranking must not receive color priority.
+- Public rounds are displayed newest first, so the latest round is visible at
+  the top.
+
+### Round robin
+
+- Full schedule is predetermined.
+- All rounds are generated from the participant set.
+- Color allocation is balanced across the schedule.
+- Procedure can plan the full tournament.
+
+### Double round robin
+
+- Each pair meets twice.
+- The return game reverses White and Black.
+- Full schedule is predetermined.
+
+### Single elimination
+
+- Bracket size is based on actual confirmed participants and the next power of
+  two, with byes where required.
+- Round order is logical: Round of 32, Round of 16, Quarterfinal, Semifinal,
+  Final as required by field size.
+- Winners feed the exact next match.
+- Draws cannot resolve knockout advancement; an organizer tiebreak decision is
+  required.
+- No standings tab is intended for a pure knockout tournament.
+
+### Double elimination
+
+- Uses Winners, Losers, and Final views.
+- The lower bracket is generated from the server bracket structure, not from a
+  manually invented set of labels.
+- Losers drop from the correct winners match into the correct lower match.
+- Grand final/reset logic exists in the backend structure.
+- No standings tab is intended for a pure knockout tournament.
+- The canonical post-publish source is `bracketSnapshot` plus real game rows.
+
+### Multi-stage
+
+- Phase One is Swiss.
+- Phase Two is a single-elimination final bracket.
+- The admin management nav uses Phase One and Phase Two.
+- Public/mobile rounds include Stage One and Stage Two inner navigation where
+  applicable.
+- Current server cutover seeds the top eight when enough qualifiers exist.
+
+### Arena
+
+- Current implementation uses rolling Swiss-style re-pairing.
+- It does not auto-complete; the organizer completes the event.
+- This is not yet a full Lichess-style continuous Arena engine with streak and
+  berserk logic. Treat that as a known limitation.
+
+### Team
+
+- The UI format exists.
+- The server currently supports only a generic single round because there is
+  no complete team/roster/match-point data model yet.
+- Do not claim Team is fully implemented until the team model exists.
+
+## 11. Tournament Tab Contracts
+
+There is historical inconsistency here. Preserve the latest product intent and
+fix clients deliberately rather than guessing.
+
+Current intended public/mobile behavior:
+
+- Knockout: Registration, Players, Bracket. No Standings.
+- Non-knockout: Registration, Players, Rounds, Standings.
+- Completed adds Photos after the final tournament-data tab.
+- Multi-stage Rounds contains Stage One and Stage Two navigation.
+- Do not create a redundant Games tab when the same games already live inside
+  Bracket or Rounds.
+
+Actual current implementation at handoff time:
+
+- Mobile follows the compact contract above.
+- Web still renders a separate Games tab for both knockout and non-knockout
+  tournament details. This is a known cross-platform consistency gap.
+- Web knockout currently orders Registration, Players, Games, Bracket.
+- Web non-knockout currently orders Registration, Players, Rounds, Games,
+  Standings.
+
+Do not silently describe web and mobile as identical until this gap is fixed
+and visually verified.
+
+Admin management tabs are different because they are operational:
+
+- Knockout: Participants, Bracket, optional Procedure or Fair Play.
+- Non-knockout: Participants, Rounds, optional Procedure or Fair Play,
+  Standings.
+- Multi-stage: Participants, Phase One, Phase Two, optional Procedure or Fair
+  Play, Standings.
+- Procedure exists only for in-person Active or Completed tournaments.
+- JuChess-hosted online tournaments have no Procedure; they use Fair Play.
+
+## 12. Publish, Unpublish, Shuffle, And Real Data
+
+- Shuffle and Publish live inside Upcoming tournament management, not as row
+  actions on every status.
+- Before Publish, the organizer may shuffle participants/pairings/colors.
+- Publish persists exact game rows and a bracket snapshot where applicable.
+- Public web and mobile must render those same persisted names, colors, rounds,
+  and bracket positions.
+- After Publish, shuffle is locked.
+- Unpublish removes public rounds/brackets and returns the event to editable
+  pairing preparation.
+- Unpublishing must remove the public view on both web and mobile.
+- Activation must preserve the exact published pairings; it must not regenerate
+  a different bracket.
+- Participants and player counts are derived from real registration rows.
+- Duplicate profile registrations must be deduplicated in reads as well as
+  prevented in writes.
+
+Do not use random display names or mock brackets to fill a live tournament.
+Fake test users are acceptable only when they are real Appwrite rows created by
+an explicit seed script.
+
+## 13. In-Person Procedure
+
+Procedure is the organizer's physical-board scheduler.
+
+The organizer enters the number of physical boards. The backend assigns every
+match:
+
+- Tournament round
+- Match/board number
+- Procedure wave
+- Physical board
+- Queue position
+- Scheduled/live/completed state
+
+Example: eight Round-of-16 games and three physical boards create three waves.
+The first three games use boards 1-3, then the next queued games take a board
+after it becomes free.
+
+Rules:
+
+- Procedure is available only for in-person Active and Completed tournaments.
+- Upcoming may publish pairings but does not run games.
+- Only a started live match can accept a normal result.
+- A physical board cannot host two live games.
+- A later queue item cannot jump an unresolved earlier lane item.
+- Result entry does not require PGN.
+- The organizer may save a result first, then later add/correct PGN without
+  advancing the tournament a second time.
+- Completed Procedure remains editable for game/PGN correction.
+- Procedure UI should resemble Rounds, but grouped clearly by physical board
+  and wave.
+- Active procedure matches are clickable and open the digital board.
+
+Important backend routes:
+
+- `POST /tournaments/:id/procedure/configure`
+- `POST /games/:id/start`
+- `POST /games/:id/result`
+- `POST /games/:id/pgn`
+- `POST /tournaments/:id/rounds/next`
+
+## 14. JuChess-Hosted Online Tournaments
+
+`playMode=online` and `onlinePlatform=juchess` means players play inside the
+platform. Chess.com and Lichess options currently identify external platforms;
+they do not provide the same internal authoritative board flow.
+
+Hosted online tournament flow:
+
+1. Organizer creates and publishes a tournament/pairings.
+2. Tournament becomes Active.
+3. Each assigned player is routed to only their current unfinished game.
+4. The same public game row is available to spectators.
+5. Both players receive a 20-second pre-game ready window.
+6. After `scheduledStartAt`, White's server-owned clock starts.
+7. White submits a legal move with expected `moveVersion`.
+8. Server validates identity, side to move, legality, revision, and time.
+9. Server saves canonical PGN/version/clocks and starts Black's clock.
+10. Black can then move; the process repeats.
+11. Checkmate/draw/resignation/timeout saves the result, recalculates standings,
+    and advances the tournament when appropriate.
+
+The server is authoritative. Clients must never let two browsers independently
+decide whose clock is running.
+
+Important hosted routes in `admin-actions`:
+
+- `POST /player/active-game`
+- `POST /player/games/:id/sync`
+- `POST /player/games/:id/move`
+- `POST /player/games/:id/resign`
+- `POST /player/games/:id/messages/list`
+- `POST /player/games/:id/messages/send`
+- `POST /player/games/:id/fair-play`
+- Admin report: `POST /fair-play/report`
+
+Current clock behavior:
+
+- Server stores remaining White/Black milliseconds.
+- Only the side to move loses time.
+- Increment is applied after a legal move.
+- A 20-second pre-game countdown is separate from first-move grace.
+- During pre-game, status remains scheduled and clients disable board input.
+- At start, White's clock begins.
+- Undo/save behavior for organizer-entered games publishes canonical PGN.
+
+Current client synchronization:
+
+- Web uses Realtime when available plus a one-second polling fallback.
+- Tournament data/standings auto-refresh without a full browser refresh.
+- Admin tournament state auto-refreshes without reloading the whole page.
+- The player-game lock keeps a player on their own current game even if another
+  tournament match starts.
+- A player assigned Black automatically sees the board rotated 180 degrees.
+
+Do not reintroduce the removed text `Live moves update automatically` above the
+tournament board.
+
+## 15. Chessboard Contract Across All Platforms
+
+Web/admin use `JuChessBoard` with `chess.js`. Mobile uses `PrototypeChessBoard`
+with the Dart `chess` package.
+
+Required board behavior:
+
+- Legal chess movement including castling, en passant, promotion, check,
+  checkmate, stalemate, and draws as supported by the chess library.
+- Pieces centered in their squares with no movement animation that shifts them
+  outside the square.
+- Stable responsive 1:1 sizing; the whole board must remain visible.
+- Player name and clock on the side corresponding to their color.
+- Captured pieces under the relevant player strip.
+- Coordinates shown correctly.
+- Board flip is a true 180-degree rotation: both ranks and files reverse, pieces
+  and arrows rotate with it, and square colors remain chess-correct.
+- Normal orientation corners: top-left `a8`, bottom-left `a1`.
+- Flipped orientation corners: top-left `h1`, bottom-left `h8`.
+- `a1` is a dark square.
+- Analysis boards may support right-click arrows and red square marking.
+- Tournament online play disables analysis/evaluation assistance.
+- Evaluation bar belongs to Tools/analysis/review, not competitive online play.
+- Move navigation controls: start, previous, play/next, end wherever a reviewed
+  or recorded board is shown.
+
+Latest board fix is in commit `c20c8c3` and was visually verified on the
+published web page with no console warnings/errors.
+
+## 16. Public Website State
+
+Primary navigation:
+
+- Home
+- Tournaments
+- Tools
+- Games
+- Leaderboard
+- Profile
+
+Home should follow the provided real prototype and include News. Tournament
+cards must use live Appwrite tournaments and clearly indicate online events.
+
+Tournament detail:
+
+- Registration is auth-aware.
+- Registration is allowed only while Upcoming and before the deadline.
+- Players and participant count come from real registrations.
+- Rounds/bracket appear only after publish.
+- Standings use the `standings` table, not local guessed scores.
+- Completed events expose Photos and videos with a full viewer/lightbox,
+  previous/next/swipe, and download.
+
+Games (`/games`):
+
+- Free legal board when not assigned to a tournament.
+- Hosted tournament board for players and spectators.
+- Assigned-game lock disables review/analysis navigation during a live online
+  tournament game.
+- No evaluation bar in competitive online play.
+
+Tools (`/tools`) and review workspace:
+
+- Game review
+- Analysis board
+- Additional current tool cards exist, but the user's mobile intent is more
+  focused. Do not assume the web Tools card set is final.
+
+## 17. Mobile App State
+
+Mobile bottom-level product split currently includes tournament browsing,
+Tools, and Games surfaces.
+
+Latest requested mobile organization:
+
+- Tools: Chess Clock, Game Review, Engine Analysis.
+- Games: Online Tournaments, Puzzles.
+- Do not show tournament cards directly on Games; show them inside Online
+  Tournaments.
+- Online tournament cards need an obvious Online indicator.
+
+Mobile hosted play:
+
+- Finds games assigned to the signed-in profile.
+- Opens the tournament game detail board.
+- Rotates automatically for Black.
+- Polls canonical state.
+- Shows live clocks and disables input outside the player's turn.
+- Shows the 20-second pre-game countdown.
+- Includes board history navigation.
+
+Mobile completed-event media:
+
+- Gallery can view images/videos.
+- Viewer supports navigation/swipe.
+- Download must save through the app/device flow, not send the user to a web
+  download page.
+
+At the handoff moment `adb devices -l` showed no connected device, so commit
+`c20c8c3` was not installed on a phone. The code passed Flutter analyze/tests,
+but the next mobile change should be installed and visually checked when a
+device/emulator is available.
+
+## 18. Registration And Attendance
+
+Registration:
+
+- Player taps Register once.
+- UI immediately shows loading/progress to prevent repeat taps.
+- `player-actions` creates at most one registration per player/tournament.
+- Admin sees the registration queue only in Upcoming.
+- Admin can accept, waitlist, cancel/reject according to current controls.
+- Admin can also Add Participant from the management screen.
+- Player management supports real deletion through the server, with safety
+  checks for historical tournament/admin data.
+
+Attendance confirmation:
+
+- Accepted registrations receive a one-hour pre-event Yes/No attendance
+  request.
+- In-app response is supported.
+- Secure email links use `attendance-actions`.
+- Raw attendance tokens are never stored.
+- Email/push delivery depends on configured Appwrite providers and secrets.
+- Do not describe provider-dependent push/email as guaranteed when providers
+  are not configured.
+
+## 19. Completed Tournament Media
+
+Storage bucket: `tournament-assets`.
+
+Admin Completed tournament media supports:
+
+- Upload photos/videos
+- View files
+- Delete individual files
+- Select multiple/all
+- Sort/filter by name/date/type where implemented
+- Tags and tag updates
+
+Public web/mobile Completed tournament adds Photos after tournament data tabs:
+
+- View full media
+- Navigate/swipe through gallery
+- Download original file
+
+The UI and storage row/file cleanup must stay synchronized so deleting media
+actually releases storage.
+
+## 20. Announcements, Broadcasts, News, And Admin Access
+
+Admin navigation includes Admin Access after Announcements.
+
+Admin Access:
+
+- Separate admin profiles and teams.
+- Super-admin-only create/suspend controls.
+
+Announcements/broadcast intent:
+
+- Audience selection should be All Users or participants in an Upcoming/Active
+  tournament.
+- Club Members and Specific Players audience choices were explicitly removed.
+- Channel selection should allow any combination of App, Email, and SMS.
+- A tournament audience button may expand to let the organizer select the
+  tournament.
+
+Check the actual implementation before claiming every broadcast channel is
+fully delivered; provider integrations may still be incomplete.
+
+## 21. Game Review And Analysis
+
+Web implementation:
+
+- `GamesPage.tsx` hosts review and analysis modes.
+- Stockfish 18 lite runs in the browser.
+- Engine strengths: Quick, Balanced, Deep, Maximum.
+- PGN and FEN parsing use `chess.js`.
+- Review is scoped to the exact selected game identity.
+- Switching games cancels/disposes the previous engine session.
+- Move classifications include Brilliant, Great, Book, Best, Excellent, Good,
+  Inaccuracy, Mistake, Miss, Blunder, and Forced.
+- Accuracy, evaluation graph, critical move points, game rating, and
+  Opening/Middlegame/Endgame summaries exist.
+- Critical graph points should jump to the corresponding move.
+- Review markers/colors must match the screenshot-driven icon system.
+
+Mobile has corresponding review/import/analysis flows and tests.
+
+Important honesty boundary:
+
+- Game Rating is JuChess's heuristic estimate, not an official Chess.com rating
+  or a FIDE performance rating.
+- Move classification is Stockfish-based but depends on selected depth,
+  position cache, device speed, and heuristic thresholds.
+- Review can be slow, especially Deep/Maximum and on mobile.
+- Evaluation must always be normalized to White's perspective before rendering
+  the evaluation bar.
+
+Known import limitation:
+
+- Chess.com currently loads recent archives until 20 games.
+- Lichess currently calls `max=20`.
+- The user's request for all history/pagination is not implemented yet.
+- Implement pagination/lazy loading rather than attempting an unbounded import
+  that freezes the client or violates provider limits.
+
+Profile usernames:
+
+- `profiles` includes `chessComUsername` and `lichessUsername`.
+- Successful provider username use should remain linked to the signed-in
+  profile.
+- Profile tournament history should use real internal game rows.
+
+## 22. Backend Function Routes
+
+### `admin-actions`
+
+Major route groups:
+
+- Admin session/admin management
+- Blocks and unblock actions
+- Tournament create/update/delete/lifecycle
+- Publish/unpublish pairings
+- Add participants and registration status
+- Attendance reads
+- Procedure configure/start/PGN/result
+- Round advancement
+- Player profile role/status/delete
+- Announcements
+- Hosted online-game active game, sync, move, resign, chat, fair-play
+
+Read route handling near the bottom of
+`appwrite/functions/admin-actions/src/main.js` before changing contracts.
+
+### `player-actions`
+
+- Health
+- Register for tournament
+- Cancel registration
+- Attendance response entry
+
+### `attendance-actions`
+
+- Health
+- Resolve secure attendance token
+- Respond through secure attendance token
+
+### `access-guards`
+
+- Health
+- `POST /check` for identity/IP admission
+
+When adding a field, update all of these where relevant:
+
+1. `appwrite/schema.json`
+2. additive migration script
+3. Function validation/write
+4. web/admin TypeScript types and mappers
+5. Flutter model/mapping
+6. tests
+7. deploy Function and verify schema/deployment readiness
+
+## 23. Local Commands
 
 From repo root:
 
@@ -302,167 +913,197 @@ npm run dev:admin
 npm run build:web
 npm run build:admin
 npm run build:pages
+npm run check:functions
+npm run test:functions
+npm run test:engine
+npm run check:web
+npm run check:admin
 npm run mobile:analyze
 npm run mobile:test
 ```
 
-Build and publish GitHub Pages after web/admin React changes:
+Full check command:
+
+```powershell
+npm run check:all
+```
+
+On this Windows machine, a July 13 `check:all` run reached `mobile:test` and
+then hung without returning output. It was terminated. Prefer the individual
+commands above if the aggregate runner hangs; do not leave child Flutter/Node
+processes running.
+
+Run web locally on a phone-visible address when needed:
+
+```powershell
+npm --workspace apps/web run dev -- --host 0.0.0.0 --port 8062
+```
+
+Flutter with Appwrite:
+
+```powershell
+cd apps/mobile
+flutter run -d <DEVICE_ID> `
+  --dart-define=APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 `
+  --dart-define=APPWRITE_PROJECT_ID=juchess-platform `
+  --dart-define=APPWRITE_DATABASE_ID=juchess `
+  --dart-define=APPWRITE_ACCESS_GUARD_FUNCTION_ID=access-guards
+```
+
+Wi-Fi Android workflow:
+
+```powershell
+adb devices -l
+adb pair <PHONE_IP>:<PAIR_PORT>
+adb connect <PHONE_IP>:<ADB_PORT>
+flutter devices
+flutter run -d <DEVICE_ID> ...
+```
+
+Do not assume old device ID `RZCW30XCC4Z` is connected. Discover the device
+each time.
+
+## 24. Deployment Commands
+
+Build and publish GitHub Pages:
 
 ```powershell
 npm run build:pages
 git status --short
 git add apps/web apps/admin docs
-git commit -m "<message>"
+git commit -m "<specific message>"
 git push origin main
 ```
 
-Run Flutter mobile with Appwrite config:
+`scripts/build-pages.mjs` intentionally retains prior hashed assets so cached
+clients do not receive 404s while GitHub Pages updates. Do not casually delete
+old bundles.
+
+Redeploy admin/tournament backend:
 
 ```powershell
-cd apps/mobile
-flutter run `
-  --dart-define=APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 `
-  --dart-define=APPWRITE_PROJECT_ID=juchess-platform `
-  --dart-define=APPWRITE_DATABASE_ID=juchess `
-  --dart-define=APPWRITE_ACCESS_GUARD_FUNCTION_ID=access-guards `
-  --dart-define=APPWRITE_RECOVERY_URL=https://juchess.ju.edu.jo/reset-password
+appwrite functions create-deployment `
+  --function-id admin-actions `
+  --code appwrite/functions/admin-actions `
+  --activate true `
+  --entrypoint src/main.js `
+  --commands "npm install"
 ```
 
-Run on a specific Android device or emulator:
+Equivalent commands apply to `player-actions`, `attendance-actions`, and
+`access-guards` with their own source folders.
 
-```powershell
-flutter devices
-flutter run -d <DEVICE_ID> `
-  --dart-define=APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 `
-  --dart-define=APPWRITE_PROJECT_ID=juchess-platform `
-  --dart-define=APPWRITE_DATABASE_ID=juchess `
-  --dart-define=APPWRITE_ACCESS_GUARD_FUNCTION_ID=access-guards `
-  --dart-define=APPWRITE_RECOVERY_URL=https://juchess.ju.edu.jo/reset-password
-```
+After deployment, poll/get the deployment until `status=ready`. Do not report a
+waiting/building deployment as complete.
 
-Take an Android screenshot:
+Available migrations:
 
-```powershell
-adb exec-out screencap -p > C:\Users\ibra_\AppData\Local\Temp\juchess-screen.png
-```
+- `npm run migrate:procedure`
+- `npm run migrate:online-tournaments`
+- `npm run migrate:registration-integrity`
+- `npm run migrate:attendance`
+- `npm run migrate:game-query-indexes`
+- `npm run migrate:tournament-live`
+- `npm run migrate:profile-usernames`
+- `npm run migrate:registration-deadline`
 
-Dump Android UI tree:
+Migrations are additive and should be repeatable. Read the script before
+running it against production.
 
-```powershell
-adb shell uiautomator dump /sdcard/juchess.xml
-adb pull /sdcard/juchess.xml C:\Users\ibra_\AppData\Local\Temp\juchess.xml
-```
+## 25. Latest Verified Behavior
 
-## Android Studio Emulator Workflow
+At commit `c20c8c3`, the following individual checks passed:
 
-If the physical phone is not available, Codex can still test Flutter using an
-Android Studio emulator, as long as the emulator is running on the same Windows
-machine where Codex is running.
+- Function JavaScript syntax checks
+- 56 tournament engine/workflow tests
+- Web lint/build and 17 review/import/stored-move tests
+- Admin lint/build, 3 wizard tests, and engine tests
+- Flutter analyze
+- 23 Flutter tests
+- Appwrite `admin-actions` deployment reached ready
+- Published web page loaded with meaningful content and no console warnings or
+  errors
+- Flip Board changed orientation from `a8...h1` to `h1...a8` correctly
+- The tournament-board auto-update label was removed
 
-What the user should do before leaving:
+Earlier live production tests also verified:
 
-1. Open Android Studio.
-2. Open the project folder if useful:
-   `C:\Users\ibra_\Downloads\juchess-platform\apps\mobile`
-   or the full repo folder:
-   `C:\Users\ibra_\Downloads\juchess-platform`
-3. Open Device Manager.
-4. Create or start an Android Virtual Device.
-   A Pixel phone profile is fine, for example Pixel 7 or Pixel 8.
-5. Use an API level already installed on the machine, preferably API 35 or 36.
-6. Keep the emulator running.
-7. Keep Android Studio / emulator / Codex machine awake and reachable remotely.
+- Two-player online move sequence and alternating server clocks
+- Current-game lock when another match starts
+- Public standings auto-update without full page reload
+- Admin tournament counts/state auto-update without full page reload
 
-What Codex can do after the emulator is running:
+Re-run the relevant flow after any related code change. Old evidence is not a
+substitute for new verification.
 
-```powershell
-adb devices
-flutter devices
-flutter run -d <EMULATOR_ID> ...
-adb exec-out screencap -p > C:\Users\ibra_\AppData\Local\Temp\emulator.png
-adb shell input tap <x> <y>
-adb shell input swipe <x1> <y1> <x2> <y2> <durationMs>
-```
+## 26. Known Gaps And Risks
 
-Codex does not need the user to open a special folder in Android Studio to see
-the emulator. The key requirement is that the Android emulator process is
-running and visible to `adb devices` / `flutter devices`.
+These are real limitations, not optional wording issues:
 
-If no emulator appears:
+1. Web tournament tabs still include a redundant Games tab, unlike mobile and
+   the latest compact tournament-tab intent.
+2. Team format does not yet have a full team/roster/board/match-point engine.
+3. Arena is rolling Swiss-like, not a complete continuous Arena implementation.
+4. Chess.com/Lichess import is limited to 20 recent games; full history needs
+   pagination/lazy loading.
+5. Stockfish review performance can be slow on Deep/Maximum and mobile.
+6. Game Rating is heuristic, not an official external-provider rating.
+7. Fair-play telemetry is not a complete anti-cheat system and must not be
+   presented as proof of cheating.
+8. External Chess.com/Lichess tournament options do not provide JuChess-hosted
+   board/clock authority.
+9. Admin `App.tsx` and mobile `main.dart` are very large; refactoring is useful
+   only if behavior and prototype fidelity remain unchanged.
+10. Some docs such as `docs/PROJECT_STATUS.md` and parts of
+    `docs/appwrite-schema.md` are older than the live implementation. Use
+    `appwrite/schema.json`, source code, deployment status, and this handoff.
+11. The latest mobile board/pre-game change has not been visually installed on
+    a phone because no adb device was connected at handoff time.
+12. Provider-dependent Email/SMS/Push broadcast delivery may be incomplete;
+    inspect credentials/provider code before claiming it works.
 
-```powershell
-flutter doctor
-adb kill-server
-adb start-server
-adb devices
-```
+## 27. Recommended Next Work
 
-If the Android SDK path is missing, Android Studio usually fixes it after
-opening Settings > Languages & Frameworks > Android SDK and installing:
+Do not start this list blindly; the user's newest request always wins. If the
+new chat asks for general continuation, use this order:
 
-- Android SDK Platform
-- Android SDK Platform-Tools
-- Android Emulator
-- Android SDK Command-line Tools
+1. Reconcile public web tournament tabs with the mobile/product contract and
+   verify all formats.
+2. Install the current Flutter app on a connected device and verify board flip,
+   Black orientation, clocks, and 20-second pre-game countdown with two real
+   player accounts.
+3. Run a complete six-player JuChess-hosted Swiss tournament end to end:
+   registration, publish, activation, four rounds, live play, standings,
+   completion, photos.
+4. Add provider-history pagination/lazy loading for Chess.com and Lichess.
+5. Profile and optimize Stockfish review without reducing default accuracy.
+6. Implement a real Team data model/engine only after agreeing on team rules.
+7. Upgrade Arena only after specifying scoring, streaks, re-pair interval,
+   withdrawals, late join, and finish conditions.
+8. Split large admin/mobile files incrementally with tests, not as an unrelated
+   rewrite.
 
-## Current Priorities / Next Work
+## 28. Working Style For The Next AI
 
-Recommended next steps:
+For every task:
 
-1. Preserve the latest admin create tournament contract above.
-2. Continue Flutter mobile UI fidelity screen-by-screen from
-   `docs/prototypes/mobile/JuChess.mobile.dc.html`.
-3. Keep connecting real Appwrite data after each screen matches the prototype.
-4. Continue porting web screens from prototype to real React:
-   Home, Games, Leaderboard, Profile, Sign In, Sign Up, Forgot Password.
-5. Continue improving admin app while preserving the admin prototype layout.
-6. Build out real tournament management:
-   participants, rounds, procedure, standings, games/results, announcements.
-7. Add chess features later:
-   PGN upload, review, analysis, move quality badges, then engine/Stockfish.
+1. Read the newest user message twice.
+2. Inspect `git status` and current source.
+3. Identify whether the change affects web, admin, mobile, backend, schema, or
+   more than one surface.
+4. Trace the canonical data flow before editing UI.
+5. State a short implementation update.
+6. Make focused edits; preserve unrelated work.
+7. Add/adjust tests proportional to risk.
+8. Run relevant checks.
+9. Deploy the backend if server behavior changed.
+10. Build/push Pages if web/admin changed.
+11. Install mobile if mobile changed and a device exists.
+12. Verify the real rendered behavior, including mobile viewport where relevant.
+13. Report exactly what passed, what was deployed, and what remains unverified.
 
-## Important User Preferences
-
-- The user strongly wants exact prototype fidelity.
-- Do not redesign unless explicitly asked.
-- If the user says something is wrong visually, inspect the real screen or
-  screenshot and fix the specific mismatch.
-- When mobile work is changed, install it on the Android target and verify with
-  screenshots when possible.
-- Avoid showing Appwrite/cloud wording to end users inside the app. User-facing
-  copy should say normal product phrases such as "No tournaments published yet."
-- The user often asks to see screenshots in the Android emulator or hosted web.
-  Inspect the real screen before saying a visual change is done.
-
-## Known Verification Status
-
-Latest verified commands on July 7, 2026:
-
-```powershell
-npm run build:admin
-npm run lint:admin
-npm run build:pages
-```
-
-Status:
-
-- `npm run build:admin` passed.
-- `npm run build:pages` passed and rebuilt `docs/web` plus `docs/admin`.
-- `npm run lint:admin` passed with existing warnings in
-  `apps/admin/public/prototype/support.js`.
-
-Earlier mobile verification commands:
-
-```powershell
-npm run mobile:analyze
-npm run mobile:test
-```
-
-Both passed after the mobile splash/logo work.
-
-For web/admin, run before claiming a new change is complete:
-
-```powershell
-npm run build:web
-npm run build:admin
-```
+Do not respond to an implementation request with only a plan. Do not solve a
+backend consistency bug with mock UI. Do not call something real-time when it
+updates only after a full refresh. Do not regenerate published pairings on a
+client. Keep working until the requested behavior is genuinely handled or a
+specific external blocker remains.
