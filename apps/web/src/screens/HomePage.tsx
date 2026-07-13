@@ -467,16 +467,21 @@ function AppSection() {
         <div className="app-copy">
           <span>Contact the club</span>
           <h2 id="contact-title">Get in touch with us.</h2>
-          <p>Questions about membership, tournaments, or club activities? Our email and Instagram details will be added here shortly.</p>
-          <div className="contact-options" aria-label="Contact details coming soon">
-            <div>
+          <p>Questions about membership, tournaments, or club activities? Contact the JuChess team by email or Instagram.</p>
+          <div className="contact-options" aria-label="Club contact details">
+            <a href="mailto:Juchess180@gmail.com" aria-label="Email JuChess at Juchess180@gmail.com">
               <Mail aria-hidden="true" size={20} />
-              <span><small>Email</small><strong>Coming soon</strong></span>
-            </div>
-            <div>
+              <span><small>Email</small><strong>Juchess180@gmail.com</strong></span>
+            </a>
+            <a
+              href="https://www.instagram.com/ju.chess?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open JuChess on Instagram"
+            >
               <AtSign aria-hidden="true" size={20} />
-              <span><small>Instagram</small><strong>Coming soon</strong></span>
-            </div>
+              <span><small>Instagram</small><strong>@ju.chess</strong></span>
+            </a>
           </div>
         </div>
       </div>
