@@ -4,7 +4,7 @@
 }
 
 .online-games-main {
-  width: min(100% - 40px, 1240px);
+  width: min(100% - 40px, 1720px);
   margin: 0 auto;
   padding: 34px 0 52px;
 }
@@ -98,7 +98,7 @@
 
 .online-games-layout {
   display: grid;
-  grid-template-columns: minmax(420px, 620px) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 24vw, 440px);
   align-items: start;
   gap: 24px;
 }
@@ -133,7 +133,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: min(100%, 580px);
+  width: min(100%, 800px);
   margin: 0 auto 8px;
   border: 1px solid rgba(161, 91, 27, 0.28);
   border-radius: 7px;
@@ -208,7 +208,7 @@
   grid-template-columns: 26px 1fr auto;
   align-items: center;
   gap: 9px;
-  width: min(100%, 580px);
+  width: min(100%, 800px);
   min-height: 50px;
   margin: 0 auto;
   border: 1px solid rgba(17, 17, 17, 0.16);
@@ -300,8 +300,14 @@
 }
 
 .online-ju-board {
-  width: min(100%, 580px);
+  width: min(100%, 800px);
   margin: 0 auto;
+}
+
+.online-ju-board.ju-chess-board-shell,
+.online-ju-board.ju-chess-board-shell.without-evaluation {
+  width: min(100%, 800px);
+  max-width: none;
 }
 
 .online-ju-board .ju-chess-board {
@@ -309,7 +315,7 @@
 }
 
 .online-board-controls {
-  width: min(100%, 580px);
+  width: min(100%, 800px);
   margin: 13px auto 0;
 }
 
@@ -334,7 +340,12 @@
 }
 
 .online-tournament-panel {
+  position: sticky;
+  top: 76px;
+  max-height: calc(100dvh - 92px);
+  overflow-y: auto;
   padding-bottom: 16px;
+  scrollbar-gutter: stable;
 }
 
 .online-panel-title {
@@ -669,9 +680,15 @@
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1120px) {
   .online-games-layout {
     grid-template-columns: 1fr;
+  }
+
+  .online-tournament-panel {
+    position: static;
+    max-height: none;
+    overflow: hidden;
   }
 }
 

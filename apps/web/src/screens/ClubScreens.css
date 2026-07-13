@@ -751,10 +751,10 @@
 
 .games-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 26px;
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 24vw, 440px);
+  gap: 24px;
   align-items: start;
-  max-width: 1240px;
+  max-width: 1720px;
   margin: 0 auto;
   padding: clamp(14px, 2.4dvh, 28px) 24px 64px;
 }
@@ -961,7 +961,7 @@
   display: flex;
   align-self: center;
   flex-direction: column;
-  width: min(100%, 590px, calc(100dvh - 220px));
+  width: min(100%, 836px);
   min-width: 0;
   margin-top: 16px;
 }
@@ -1055,6 +1055,7 @@
 
 .board-wrap {
   display: block;
+  width: 100%;
   min-width: 0;
 }
 
@@ -1062,6 +1063,12 @@
   width: 100%;
   min-width: 240px;
   max-width: 100%;
+}
+
+.games-ju-board.ju-chess-board-shell,
+.games-ju-board.ju-chess-board-shell.without-evaluation {
+  width: 100%;
+  max-width: none;
 }
 
 .board-player-frame .games-ju-board .ju-chess-board {
@@ -1155,9 +1162,14 @@
 
 .game-rail {
   display: flex;
+  position: sticky;
+  top: 76px;
   flex-direction: column;
   gap: 14px;
+  max-height: calc(100dvh - 92px);
   min-width: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .mode-toggle {
@@ -2209,6 +2221,23 @@
   .eval-bar span,
   .tool-card {
     transition: none;
+  }
+}
+
+@media (max-width: 1120px) {
+  .games-main {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .board-player-frame {
+    width: min(100%, 800px);
+  }
+
+  .game-rail {
+    position: static;
+    max-height: none;
+    overflow: visible;
   }
 }
 
