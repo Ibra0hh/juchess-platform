@@ -2,6 +2,7 @@ import { createContext } from 'react'
 import type { Models } from 'appwrite'
 import type {
   AuthProfile,
+  AuthSession,
   ProfileMediaKind,
   ProfileUpdateInput,
   SignInInput,
@@ -16,6 +17,7 @@ export type AuthContextValue = {
   profile: AuthProfile | null
   error: string | null
   refresh: () => Promise<void>
+  completeOAuth: (userId: string, secret: string) => Promise<AuthSession>
   signIn: (input: SignInInput) => Promise<void>
   signUp: (input: SignUpInput) => Promise<void>
   signOut: () => Promise<void>

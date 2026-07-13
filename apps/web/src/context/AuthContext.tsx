@@ -8,6 +8,7 @@ import {
 import { AuthContext, type AuthContextValue } from './authContextValue'
 import { appwriteReady } from '../lib/appwrite'
 import {
+  completeOAuthTokenSession,
   formatAppwriteError,
   getCurrentSession,
   loadPreviewProfileByEmail,
@@ -91,6 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session.user)
     setProfile(session.profile)
   }, [previewSession])
+
+  const completeOAuth = useCallback(async (userId: string, secret: string) => {
+    setError(null)
+    const session = await completeOAuthTokenSession(userId, secret)
+    setUser(session.user)
+    setProfile(session.profile)
+    return session
+  }, [])
 
   const signUp = useCallback(async (input: SignUpInput) => {
     if (previewSession) {
@@ -200,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       error,
+      completeOAuth,
       linkExternalGameUsername,
       removeProfileImage,
       saveBoardPreferences,
@@ -210,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
     }),
-    [error, linkExternalGameUsername, loading, previewSession, profile, refresh, removeProfileImage, saveBoardPreferences, signIn, signOut, signUp, updateProfile, uploadProfileImage, user],
+    [completeOAuth, error, linkExternalGameUsername, loading, previewSession, profile, refresh, removeProfileImage, saveBoardPreferences, signIn, signOut, signUp, updateProfile, uploadProfileImage, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

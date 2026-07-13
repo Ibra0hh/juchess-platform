@@ -13,6 +13,8 @@ const GamesPage = lazy(() => import('./screens/GamesPage'))
 const HomePage = lazy(() => import('./screens/HomePage'))
 const LeaderboardPage = lazy(() => import('./screens/LeaderboardPage'))
 const OnlineGamesPage = lazy(() => import('./screens/OnlineGamesPage'))
+const OAuthCallbackPage = lazy(() => import('./screens/OAuthCallbackPage'))
+const CompleteProfilePage = lazy(() => import('./screens/CompleteProfilePage'))
 const ProfilePage = lazy(() => import('./screens/ProfilePage'))
 const TournamentDetailPage = lazy(() => import('./screens/TournamentDetailPage'))
 const TournamentsPage = lazy(() => import('./screens/TournamentsPage'))
@@ -54,6 +56,8 @@ function App() {
               <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
               <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/auth/callback" element={<OAuthCallbackPage />} />
+              <Route path="/complete-profile" element={<CompleteProfilePage />} />
               <Route path="/games" element={<OnlineGamesPage />} />
               <Route path="/tools" element={<ToolsRoute />} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />

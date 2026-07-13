@@ -144,11 +144,29 @@ export async function signUpWithEmail(input: SignUpInput): Promise<AuthSession> 
 export function startOAuthSession(provider: SocialAuthProvider) {
   requireAppwriteReady()
 
-  account.createOAuth2Session({
+  account.createOAuth2Token({
     provider: provider === 'apple' ? OAuthProvider.Apple : OAuthProvider.Google,
-    success: appUrl('/profile'),
+    success: appUrl('/auth/callback'),
     failure: appUrl(`/sign-in?oauth=failed&provider=${provider}`),
   })
+}
+
+export async function completeOAuthTokenSession(userId: string, secret: string): Promise<AuthSession> {
+  requireAppwriteReady()
+
+  await account.createSession({ userId, secret })
+  const session = await getCurrentSession()
+  if (!session) {
+    throw new Error('Google sign-in succeeded, but the JuChess session could not be loaded.')
+  }
+
+  return session
+}
+
+export function profileNeedsCompletion(profile: AuthProfile | null) {
+  return !profile?.displayName?.trim()
+    || !profile.universityId?.trim()
+    || !profile.phone?.trim()
 }
 
 export async function signOutCurrentUser() {
