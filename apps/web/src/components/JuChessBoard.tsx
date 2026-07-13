@@ -1,8 +1,10 @@
-import { useEffect, useId, useMemo, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js'
 import {
   boardThemeAssetPath,
+  getAnnotationColorOption,
   pieceThemeAssetPath,
+  type JuAnnotationColor,
   type JuBoardTheme,
   type JuPieceTheme,
 } from '../lib/boardAppearance'
@@ -55,12 +57,14 @@ type BoardSquare = {
 
 type JuChessBoardProps = {
   annotationsEnabled?: boolean
+  arrowColor?: JuAnnotationColor
   boardTheme?: JuBoardTheme
   className?: string
   evaluation?: number
   fen?: string
   flipped?: boolean
   interactive?: boolean
+  markColor?: JuAnnotationColor
   moves?: string[]
   onChange?: (state: JuChessBoardChange) => void
   pieceTheme?: JuPieceTheme
@@ -85,12 +89,14 @@ const PIECE_NAMES: Record<PieceSymbol, string> = {
 }
 export function JuChessBoard({
   annotationsEnabled = true,
+  arrowColor = 'red',
   boardTheme = 'juchess',
   className,
   evaluation,
   fen,
   flipped = false,
   interactive = true,
+  markColor = 'red',
   moves = [],
   onChange,
   pieceTheme = 'juchess',
@@ -116,6 +122,13 @@ export function JuChessBoard({
   const evaluationName = evaluation === undefined ? 'Material evaluation' : 'Engine evaluation'
   const whiteShare = Math.max(4, Math.min(96, 50 + evaluationScore * 7))
   const boardAsset = boardThemeAssetPath(boardTheme)
+  const arrowColorOption = getAnnotationColorOption(arrowColor)
+  const markColorOption = getAnnotationColorOption(markColor)
+  const boardStyle = {
+    ...(boardAsset ? { backgroundImage: `url(${import.meta.env.BASE_URL}${boardAsset})` } : {}),
+    '--ju-arrow-color': arrowColorOption.arrow,
+    '--ju-mark-color': markColorOption.mark,
+  } as CSSProperties
 
   useEffect(() => {
     if (annotationsEnabled) return
@@ -314,9 +327,7 @@ export function JuChessBoard({
         data-board-theme={boardTheme}
         data-flipped={flipped ? 'true' : 'false'}
         ref={boardRef}
-        style={boardAsset
-          ? { backgroundImage: `url(${import.meta.env.BASE_URL}${boardAsset})` }
-          : undefined}
+        style={boardStyle}
       >
         {squares.map((square) => {
           const selectedSquare = selected === square.key
@@ -329,7 +340,7 @@ export function JuChessBoard({
             <button
               type="button"
               aria-disabled={!interactive}
-              aria-label={`Square ${square.key}${marked ? ', marked red' : ''}${badge ? `, ${badge.label}` : ''}`}
+              aria-label={`Square ${square.key}${marked ? `, marked ${markColorOption.label.toLocaleLowerCase()}` : ''}${badge ? `, ${badge.label}` : ''}`}
               className={[
                 'ju-chess-square',
                 square.dark ? 'dark' : 'light',

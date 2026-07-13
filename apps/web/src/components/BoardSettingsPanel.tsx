@@ -1,36 +1,46 @@
-import { FlipHorizontal2, Search, Settings2, X } from 'lucide-react'
-import { useId, useState, type ReactNode } from 'react'
+import { FlipHorizontal2, Palette, Search, Settings2, X } from 'lucide-react'
+import { useId, useState, type CSSProperties, type ReactNode } from 'react'
 import {
+  annotationColorOptions,
   boardThemeOptions,
   pieceThemeAssetPath,
   pieceThemeOptions,
+  type JuAnnotationColor,
   type JuBoardTheme,
   type JuPieceTheme,
 } from '../lib/boardAppearance'
 import './BoardSettingsPanel.css'
 
 type BoardSettingsPanelProps = {
+  arrowColor: JuAnnotationColor
   boardTheme: JuBoardTheme
   children?: ReactNode
   className?: string
   flipped: boolean
+  markColor: JuAnnotationColor
+  onArrowColorChange: (color: JuAnnotationColor) => void
   onBoardThemeChange: (theme: JuBoardTheme) => void
   onClose: () => void
   onFlip: () => void
+  onMarkColorChange: (color: JuAnnotationColor) => void
   onPieceThemeChange: (theme: JuPieceTheme) => void
   pieceTheme: JuPieceTheme
 }
 
-type SettingsTab = 'boards' | 'pieces' | 'engine'
+type SettingsTab = 'boards' | 'pieces' | 'annotations' | 'engine'
 
 export function BoardSettingsPanel({
+  arrowColor,
   boardTheme,
   children,
   className,
   flipped,
+  markColor,
+  onArrowColorChange,
   onBoardThemeChange,
   onClose,
   onFlip,
+  onMarkColorChange,
   onPieceThemeChange,
   pieceTheme,
 }: BoardSettingsPanelProps) {
@@ -73,7 +83,7 @@ export function BoardSettingsPanel({
         <Settings2 aria-hidden="true" />
         <div>
           <strong>Board settings</strong>
-          <span>Appearance and orientation</span>
+          <span>Appearance, colors and orientation</span>
         </div>
         <button type="button" aria-label="Close board settings" title="Close" onClick={onClose}>
           <X aria-hidden="true" />
@@ -94,6 +104,7 @@ export function BoardSettingsPanel({
       <div className="board-settings-tabs" role="tablist" aria-label="Board settings sections">
         {tab('boards', `Boards (${boardThemeOptions.length})`)}
         {tab('pieces', `Pieces (${pieceThemeOptions.length})`)}
+        {tab('annotations', 'Annotations')}
         {children ? tab('engine', 'Engine') : null}
       </div>
 
@@ -200,6 +211,32 @@ export function BoardSettingsPanel({
         </div>
       ) : null}
 
+      {activeTab === 'annotations' ? (
+        <div
+          aria-labelledby={`${panelId}-annotations-tab`}
+          className="annotation-color-panel"
+          id={`${panelId}-annotations-panel`}
+          role="tabpanel"
+        >
+          <div className="annotation-color-intro">
+            <Palette aria-hidden="true" />
+            <span>Choose separate colors for arrows and square marks.</span>
+          </div>
+          <AnnotationColorSetting
+            label="Arrow color"
+            onChange={onArrowColorChange}
+            selected={arrowColor}
+            type="arrow"
+          />
+          <AnnotationColorSetting
+            label="Mark color"
+            onChange={onMarkColorChange}
+            selected={markColor}
+            type="mark"
+          />
+        </div>
+      ) : null}
+
       {activeTab === 'engine' && children ? (
         <div
           aria-labelledby={`${panelId}-engine-tab`}
@@ -210,5 +247,43 @@ export function BoardSettingsPanel({
         </div>
       ) : null}
     </section>
+  )
+}
+
+function AnnotationColorSetting({
+  label,
+  onChange,
+  selected,
+  type,
+}: {
+  label: string
+  onChange: (color: JuAnnotationColor) => void
+  selected: JuAnnotationColor
+  type: 'arrow' | 'mark'
+}) {
+  return (
+    <fieldset className="annotation-color-setting">
+      <legend>{label}</legend>
+      <div className="annotation-color-options">
+        {annotationColorOptions.map((option) => (
+          <button
+            type="button"
+            aria-label={`Use ${option.label} ${type} color`}
+            aria-pressed={selected === option.id}
+            className={selected === option.id ? 'active' : undefined}
+            key={option.id}
+            onClick={() => onChange(option.id)}
+            title={option.label}
+          >
+            <i
+              aria-hidden="true"
+              className={type === 'arrow' ? 'annotation-arrow-swatch' : 'annotation-mark-swatch'}
+              style={{ '--annotation-swatch': type === 'arrow' ? option.arrow : option.mark } as CSSProperties}
+            />
+            <span>{option.label}</span>
+          </button>
+        ))}
+      </div>
+    </fieldset>
   )
 }

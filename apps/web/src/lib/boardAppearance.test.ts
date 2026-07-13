@@ -12,6 +12,7 @@ import {
 
 test('board appearance accepts the supported experimental themes', () => {
   assert.deepEqual(normalizeBoardPreferences({ boardTheme: 'brown', pieceTheme: 'alpha' }), {
+    ...defaultBoardPreferences,
     boardTheme: 'brown',
     pieceTheme: 'alpha',
   })
@@ -20,6 +21,7 @@ test('board appearance accepts the supported experimental themes', () => {
 test('board appearance exposes the full board catalogue', () => {
   assert.equal(boardThemeOptions.length, 84)
   assert.deepEqual(normalizeBoardPreferences({ boardTheme: 'lichess-wood4', pieceTheme: 'juchess' }), {
+    ...defaultBoardPreferences,
     boardTheme: 'lichess-wood4',
     pieceTheme: 'juchess',
   })
@@ -34,6 +36,7 @@ test('board appearance exposes the full board catalogue', () => {
 test('board appearance exposes every complete piece catalogue', () => {
   assert.equal(pieceThemeOptions.length, 90)
   assert.deepEqual(normalizeBoardPreferences({ boardTheme: 'juchess', pieceTheme: 'lichess-monarchy' }), {
+    ...defaultBoardPreferences,
     boardTheme: 'juchess',
     pieceTheme: 'lichess-monarchy',
   })
@@ -56,8 +59,21 @@ test('board appearance rejects stale or unknown saved themes', () => {
 test('profile appearance merges partial cloud preferences over the local fallback', () => {
   const local = normalizeBoardPreferences({ boardTheme: 'brown', pieceTheme: 'alpha' })
   assert.deepEqual(mergeBoardPreferences(local, { boardTheme: 'lichess-wood4' }), {
+    ...local,
     boardTheme: 'lichess-wood4',
-    pieceTheme: 'alpha',
   })
   assert.deepEqual(mergeBoardPreferences(local, { boardTheme: 'unknown', pieceTheme: 'missing' }), local)
+})
+
+test('annotation colors normalize and merge independently', () => {
+  const customized = normalizeBoardPreferences({ arrowColor: 'blue', markColor: 'gold' })
+  assert.deepEqual(customized, {
+    ...defaultBoardPreferences,
+    arrowColor: 'blue',
+    markColor: 'gold',
+  })
+  assert.deepEqual(mergeBoardPreferences(customized, { arrowColor: 'purple', markColor: 'unknown' }), {
+    ...customized,
+    arrowColor: 'purple',
+  })
 })

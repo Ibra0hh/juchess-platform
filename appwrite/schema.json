@@ -30,7 +30,9 @@
         "chessComUsername": "string|unique",
         "lichessUsername": "string|unique",
         "boardTheme": "string",
-        "pieceTheme": "string"
+        "pieceTheme": "string",
+        "arrowColor": "string",
+        "markColor": "string"
       }
     },
     "tournaments": {

@@ -5,6 +5,7 @@ import {
   mergeBoardPreferences,
   normalizeBoardPreferences,
   type BoardPreferences,
+  type JuAnnotationColor,
   type JuBoardTheme,
   type JuPieceTheme,
 } from '../lib/boardAppearance'
@@ -62,11 +63,17 @@ export function useBoardPreferences() {
 
   return {
     ...preferences,
+    setArrowColor: (arrowColor: JuAnnotationColor) => {
+      updatePreferences({ arrowColor })
+    },
     setBoardTheme: (boardTheme: JuBoardTheme) => {
       updatePreferences({ boardTheme })
     },
     setPieceTheme: (pieceTheme: JuPieceTheme) => {
       updatePreferences({ pieceTheme })
+    },
+    setMarkColor: (markColor: JuAnnotationColor) => {
+      updatePreferences({ markColor })
     },
   }
 }

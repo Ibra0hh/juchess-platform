@@ -14,6 +14,15 @@ export type PieceThemeOption = {
   path: string
 }
 
+export const annotationColorOptions = [
+  { arrow: '#992635', id: 'red', label: 'Red', mark: '#b82b37' },
+  { arrow: '#d06a24', id: 'orange', label: 'Orange', mark: '#e0782f' },
+  { arrow: '#b58721', id: 'gold', label: 'Gold', mark: '#c99a2d' },
+  { arrow: '#3f8248', id: 'green', label: 'Green', mark: '#4c9657' },
+  { arrow: '#286db0', id: 'blue', label: 'Blue', mark: '#347fc5' },
+  { arrow: '#7049a2', id: 'purple', label: 'Purple', mark: '#825ab6' },
+] as const
+
 const chessComBoardIds = [
   '8_bit', 'bases', 'blue', 'brown', 'bubblegum', 'burled_wood', 'dark_wood', 'dash',
   'glass', 'graffiti', 'green', 'icy_sea', 'light', 'lolz', 'marble', 'metal', 'neon',
@@ -183,14 +192,19 @@ export const pieceThemeOptions = [
 
 export type JuBoardTheme = typeof boardThemeOptions[number]['id']
 export type JuPieceTheme = typeof pieceThemeOptions[number]['id']
+export type JuAnnotationColor = typeof annotationColorOptions[number]['id']
 
 export type BoardPreferences = {
+  arrowColor: JuAnnotationColor
   boardTheme: JuBoardTheme
+  markColor: JuAnnotationColor
   pieceTheme: JuPieceTheme
 }
 
 export const defaultBoardPreferences: BoardPreferences = {
+  arrowColor: 'red',
   boardTheme: 'juchess',
+  markColor: 'red',
   pieceTheme: 'juchess',
 }
 
@@ -200,6 +214,9 @@ const boardThemeById = new Map<string, BoardThemeOption>(
 const pieceThemeById = new Map<string, PieceThemeOption>(
   pieceThemeOptions.map((option) => [option.id, option]),
 )
+const annotationColorById = new Map<string, typeof annotationColorOptions[number]>(
+  annotationColorOptions.map((option) => [option.id, option]),
+)
 
 export function getBoardThemeOption(theme: string) {
   return boardThemeById.get(theme) ?? boardThemeById.get(defaultBoardPreferences.boardTheme)!
@@ -207,6 +224,10 @@ export function getBoardThemeOption(theme: string) {
 
 export function getPieceThemeOption(theme: string) {
   return pieceThemeById.get(theme) ?? pieceThemeById.get(defaultBoardPreferences.pieceTheme)!
+}
+
+export function getAnnotationColorOption(color: string) {
+  return annotationColorById.get(color) ?? annotationColorById.get(defaultBoardPreferences.arrowColor)!
 }
 
 export function boardThemeAssetPath(theme: JuBoardTheme) {
@@ -233,9 +254,15 @@ export function mergeBoardPreferences(
   if (!value || typeof value !== 'object') return current
   const candidate = value as Partial<BoardPreferences>
   return {
+    arrowColor: annotationColorById.has(String(candidate.arrowColor))
+      ? candidate.arrowColor as JuAnnotationColor
+      : current.arrowColor,
     boardTheme: boardThemeById.has(String(candidate.boardTheme))
       ? candidate.boardTheme as JuBoardTheme
       : current.boardTheme,
+    markColor: annotationColorById.has(String(candidate.markColor))
+      ? candidate.markColor as JuAnnotationColor
+      : current.markColor,
     pieceTheme: pieceThemeById.has(String(candidate.pieceTheme))
       ? candidate.pieceTheme as JuPieceTheme
       : current.pieceTheme,

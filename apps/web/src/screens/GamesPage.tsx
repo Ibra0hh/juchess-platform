@@ -39,7 +39,7 @@ import { loadExternalGames } from '../lib/externalGames'
 import type { AuthProfile } from '../lib/auth'
 import { useAuth } from '../context/useAuth'
 import { useBoardPreferences } from '../hooks/useBoardPreferences'
-import type { JuBoardTheme, JuPieceTheme } from '../lib/boardAppearance'
+import type { JuAnnotationColor, JuBoardTheme, JuPieceTheme } from '../lib/boardAppearance'
 import './ClubScreens.css'
 
 type GameMode = 'review' | 'analysis'
@@ -121,7 +121,16 @@ function GamesPage() {
   const [saved, setSaved] = useState(false)
   const [ran, setRan] = useState(false)
   const [flipped, setFlipped] = useState(false)
-  const { boardTheme, pieceTheme, setBoardTheme, setPieceTheme } = useBoardPreferences()
+  const {
+    arrowColor,
+    boardTheme,
+    markColor,
+    pieceTheme,
+    setArrowColor,
+    setBoardTheme,
+    setMarkColor,
+    setPieceTheme,
+  } = useBoardPreferences()
   const [reviewSession, setReviewSession] = useState<ScopedGameReview | null>(null)
   const [reviewStarted, setReviewStarted] = useState(false)
   const [reviewError, setReviewError] = useState('')
@@ -626,12 +635,16 @@ function GamesPage() {
 
           {settingsOpen ? (
             <GameSettingsPanel
+              arrowColor={arrowColor}
               boardTheme={boardTheme}
               flipped={flipped}
+              markColor={markColor}
+              onArrowColorChange={setArrowColor}
               onBoardThemeChange={setBoardTheme}
               strength={engineStrength}
               onClose={() => setSettingsOpen(false)}
               onFlip={() => setFlipped((current) => !current)}
+              onMarkColorChange={setMarkColor}
               onPieceThemeChange={setPieceTheme}
               onStrengthChange={setEngineStrength}
               pieceTheme={pieceTheme}
@@ -655,14 +668,16 @@ function GamesPage() {
 
             <div className="board-wrap">
               <JuChessBoard
+                arrowColor={arrowColor}
+                boardTheme={boardTheme}
                 className="games-ju-board"
                 evaluation={evalNow}
                 fen={boardFen}
                 flipped={flipped}
                 interactive={!inReview}
+                markColor={markColor}
                 moves={boardMoves}
                 onChange={inWorkspace ? updateWorkspaceBoard : inReview ? undefined : startAnalysisFromBoard}
-                boardTheme={boardTheme}
                 pieceTheme={pieceTheme}
                 squareBadge={reviewSquareBadge}
               />
@@ -861,21 +876,29 @@ function GamesPage() {
 }
 
 function GameSettingsPanel({
+  arrowColor,
   boardTheme,
   flipped,
+  markColor,
+  onArrowColorChange,
   onBoardThemeChange,
   onClose,
   onFlip,
+  onMarkColorChange,
   onPieceThemeChange,
   onStrengthChange,
   pieceTheme,
   strength,
 }: {
+  arrowColor: JuAnnotationColor
   boardTheme: JuBoardTheme
   flipped: boolean
+  markColor: JuAnnotationColor
+  onArrowColorChange: (color: JuAnnotationColor) => void
   onBoardThemeChange: (theme: JuBoardTheme) => void
   onClose: () => void
   onFlip: () => void
+  onMarkColorChange: (color: JuAnnotationColor) => void
   onPieceThemeChange: (theme: JuPieceTheme) => void
   onStrengthChange: (strength: ReviewEngineStrength) => void
   pieceTheme: JuPieceTheme
@@ -883,12 +906,16 @@ function GameSettingsPanel({
 }) {
   return (
     <BoardSettingsPanel
+      arrowColor={arrowColor}
       boardTheme={boardTheme}
       className="games-board-settings"
       flipped={flipped}
+      markColor={markColor}
+      onArrowColorChange={onArrowColorChange}
       onBoardThemeChange={onBoardThemeChange}
       onClose={onClose}
       onFlip={onFlip}
+      onMarkColorChange={onMarkColorChange}
       onPieceThemeChange={onPieceThemeChange}
       pieceTheme={pieceTheme}
     >

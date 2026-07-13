@@ -20,6 +20,8 @@ export type AuthProfile = Models.Row & {
   lichessUsername?: string
   boardTheme?: string
   pieceTheme?: string
+  arrowColor?: string
+  markColor?: string
 }
 
 export type AuthSession = {
@@ -212,6 +214,8 @@ export async function saveBoardAppearance(
     data: {
       boardTheme: preferences.boardTheme,
       pieceTheme: preferences.pieceTheme,
+      arrowColor: preferences.arrowColor,
+      markColor: preferences.markColor,
     },
   })
 }

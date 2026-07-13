@@ -64,7 +64,16 @@ function OnlineGamesPage() {
   const [boardResult, setBoardResult] = useState('Live')
   const [flipped, setFlipped] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const { boardTheme, pieceTheme, setBoardTheme, setPieceTheme } = useBoardPreferences()
+  const {
+    arrowColor,
+    boardTheme,
+    markColor,
+    pieceTheme,
+    setArrowColor,
+    setBoardTheme,
+    setMarkColor,
+    setPieceTheme,
+  } = useBoardPreferences()
   const [movePending, setMovePending] = useState(false)
   const [message, setMessage] = useState('')
   const [, setClockTick] = useState(0)
@@ -328,12 +337,16 @@ function OnlineGamesPage() {
 
             {settingsOpen ? (
               <BoardSettingsPanel
+                arrowColor={arrowColor}
                 boardTheme={boardTheme}
                 className="online-board-settings"
                 flipped={flipped}
+                markColor={markColor}
+                onArrowColorChange={setArrowColor}
                 onBoardThemeChange={setBoardTheme}
                 onClose={() => setSettingsOpen(false)}
                 onFlip={() => setFlipped((current) => !current)}
+                onMarkColorChange={setMarkColor}
                 onPieceThemeChange={setPieceTheme}
                 pieceTheme={pieceTheme}
               />
@@ -354,10 +367,12 @@ function OnlineGamesPage() {
             <PlayerStrip {...playerFor(topSide)} edge="top" pieceTheme={pieceTheme} />
             <JuChessBoard
               annotationsEnabled={!playingOnlineTournament}
+              arrowColor={arrowColor}
               boardTheme={boardTheme}
               className="online-ju-board"
               flipped={flipped}
               interactive={Boolean(watchingTournament && viewingLatest && canMove)}
+              markColor={markColor}
               moves={displayedMoves}
               onChange={updateBoard}
               pieceTheme={pieceTheme}

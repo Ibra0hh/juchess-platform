@@ -23,7 +23,7 @@ function Get-ProfileColumns {
 }
 
 $columns = Get-ProfileColumns
-foreach ($key in @('boardTheme', 'pieceTheme')) {
+foreach ($key in @('boardTheme', 'pieceTheme', 'arrowColor', 'markColor')) {
   if ($columns.key -contains $key) {
     Write-Host "profiles.$key already exists."
     continue
@@ -38,7 +38,7 @@ $deadline = (Get-Date).AddSeconds(90)
 do {
   Start-Sleep -Seconds 2
   $columns = Get-ProfileColumns
-  $ready = @('boardTheme', 'pieceTheme') | ForEach-Object {
+  $ready = @('boardTheme', 'pieceTheme', 'arrowColor', 'markColor') | ForEach-Object {
     $column = $columns | Where-Object key -eq $_
     $column -and $column.status -eq 'available'
   }
