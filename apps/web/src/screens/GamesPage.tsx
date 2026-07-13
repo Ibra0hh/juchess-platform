@@ -702,19 +702,20 @@ function GamesPage() {
             />
           ) : null}
 
+          <div className="board-control-stack">
+            <button
+              type="button"
+              aria-expanded={settingsOpen}
+              aria-label="Board settings"
+              className={settingsOpen ? 'active' : undefined}
+              title="Board settings"
+              onClick={() => setSettingsOpen((current) => !current)}
+            >
+              <Settings2 aria-hidden="true" />
+            </button>
+          </div>
+
           <div className="board-player-frame">
-            <div className="board-control-stack">
-              <button
-                type="button"
-                aria-expanded={settingsOpen}
-                aria-label="Board settings"
-                className={settingsOpen ? 'active' : undefined}
-                title="Board settings"
-                onClick={() => setSettingsOpen((current) => !current)}
-              >
-                <Settings2 aria-hidden="true" />
-              </button>
-            </div>
             <PlayerBar {...topPlayer} edge="top" pieceTheme={pieceTheme} />
 
             <div className="board-wrap">

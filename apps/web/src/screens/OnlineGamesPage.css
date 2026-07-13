@@ -87,15 +87,14 @@
 .online-board-toolbar {
   position: absolute;
   z-index: 14;
-  top: 50%;
-  left: 50%;
+  top: 9px;
+  right: -16px;
   display: flex;
   justify-content: flex-end;
-  width: var(--online-board-size);
+  width: 34px;
   height: 34px;
   margin: 0;
   pointer-events: none;
-  transform: translate(-50%, -50%);
 }
 
 .first-move-deadline {
@@ -128,7 +127,6 @@
   align-items: center;
   gap: 7px;
   pointer-events: auto;
-  transform: translateX(44px);
 }
 
 .online-board-head-actions button[aria-label="Board settings"] {
@@ -723,6 +721,12 @@
     height: auto;
     min-height: calc(100dvh - 66px);
     padding-top: 22px;
+  }
+
+  .online-board-toolbar {
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
   }
 
   .online-games-layout {

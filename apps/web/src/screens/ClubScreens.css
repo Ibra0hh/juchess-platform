@@ -942,12 +942,11 @@
 .board-control-stack {
   position: absolute;
   z-index: 15;
-  top: 50%;
-  right: -44px;
+  top: 9px;
+  right: -16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transform: translateY(-50%);
 }
 
 .board-control-stack button {
@@ -2343,6 +2342,7 @@
   }
 
   .board-control-stack {
+    top: 50%;
     right: 4px;
     transform: translateY(-50%);
   }
