@@ -1115,22 +1115,23 @@
 .mode-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 4px;
+  gap: 7px;
+  padding: 7px;
   background: rgba(17, 17, 17, 0.07);
-  border-radius: 9px;
+  border-radius: 12px;
 }
 
 .mode-toggle button {
-  height: 38px;
+  min-height: 54px;
+  padding: 10px 14px;
   color: var(--ink);
   background: transparent;
   border: 0;
-  border-radius: 7px;
+  border-radius: 9px;
   cursor: pointer;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .mode-toggle button.active {

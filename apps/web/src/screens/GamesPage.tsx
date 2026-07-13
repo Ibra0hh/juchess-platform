@@ -614,12 +614,14 @@ function GamesPage() {
         <section className="board-column" aria-label="Board area">
           <div className="board-title-row">
             <h1>{inReview ? 'Game review' : inWorkspace ? 'Analysis board' : isReviewMode ? 'Review room' : 'Analysis room'}</h1>
-            <div className="board-title-actions">
-              <span>
-                {boardGame ? boardGame.round || boardGame.date : 'Standard position'}
-                {inReview || (inWorkspace && ran) ? <small>Stockfish 18 · {enginePreset.label}</small> : null}
-              </span>
-            </div>
+            {boardGame || inReview || (inWorkspace && ran) ? (
+              <div className="board-title-actions">
+                <span>
+                  {boardGame ? boardGame.round || boardGame.date : null}
+                  {inReview || (inWorkspace && ran) ? <small>Stockfish 18 · {enginePreset.label}</small> : null}
+                </span>
+              </div>
+            ) : null}
           </div>
 
           {settingsOpen ? (
