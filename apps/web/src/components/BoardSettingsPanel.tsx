@@ -1,5 +1,5 @@
-import { FlipHorizontal2, Settings2, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { FlipHorizontal2, Search, Settings2, X } from 'lucide-react'
+import { useId, useState, type ReactNode } from 'react'
 import {
   boardThemeOptions,
   pieceThemeOptions,
@@ -20,6 +20,8 @@ type BoardSettingsPanelProps = {
   pieceTheme: JuPieceTheme
 }
 
+type SettingsTab = 'boards' | 'pieces' | 'engine'
+
 export function BoardSettingsPanel({
   boardTheme,
   children,
@@ -31,6 +33,27 @@ export function BoardSettingsPanel({
   onPieceThemeChange,
   pieceTheme,
 }: BoardSettingsPanelProps) {
+  const panelId = useId()
+  const [activeTab, setActiveTab] = useState<SettingsTab>('boards')
+  const [boardQuery, setBoardQuery] = useState('')
+  const normalizedQuery = boardQuery.trim().toLocaleLowerCase()
+  const visibleBoards = normalizedQuery
+    ? boardThemeOptions.filter((option) => option.label.toLocaleLowerCase().includes(normalizedQuery))
+    : boardThemeOptions
+
+  const tab = (id: SettingsTab, label: string) => (
+    <button
+      type="button"
+      aria-controls={`${panelId}-${id}-panel`}
+      aria-selected={activeTab === id}
+      id={`${panelId}-${id}-tab`}
+      role="tab"
+      onClick={() => setActiveTab(id)}
+    >
+      {label}
+    </button>
+  )
+
   return (
     <section
       aria-label="Board settings"
@@ -58,57 +81,102 @@ export function BoardSettingsPanel({
         </button>
       </div>
 
-      <fieldset className="board-theme-options">
-        <legend>Board</legend>
-        {boardThemeOptions.map((option) => (
-          <button
-            type="button"
-            aria-label={`Use ${option.label} board`}
-            aria-pressed={boardTheme === option.id}
-            className={boardTheme === option.id ? 'active' : undefined}
-            key={option.id}
-            onClick={() => onBoardThemeChange(option.id)}
-          >
-            <i
-              aria-hidden="true"
-              className={`board-theme-swatch ${option.id}`}
-              style={option.id === 'brown'
-                ? { backgroundImage: `url(${import.meta.env.BASE_URL}chess-boards/brown.png)` }
-                : undefined}
-            />
-            <span>
-              <strong>{option.label}</strong>
-              <small>{option.description}</small>
-            </span>
-          </button>
-        ))}
-      </fieldset>
+      <div className="board-settings-tabs" role="tablist" aria-label="Board settings sections">
+        {tab('boards', `Boards (${boardThemeOptions.length})`)}
+        {tab('pieces', 'Pieces')}
+        {children ? tab('engine', 'Engine') : null}
+      </div>
 
-      <fieldset className="piece-theme-options">
-        <legend>Pieces</legend>
-        {pieceThemeOptions.map((option) => (
-          <button
-            type="button"
-            aria-label={`Use ${option.label} pieces`}
-            aria-pressed={pieceTheme === option.id}
-            className={pieceTheme === option.id ? 'active' : undefined}
-            key={option.id}
-            onClick={() => onPieceThemeChange(option.id)}
-          >
-            <img
-              alt=""
-              aria-hidden="true"
-              src={`${import.meta.env.BASE_URL}chess-pieces/${option.id === 'alpha' ? 'alpha/' : ''}wk.png`}
+      {activeTab === 'boards' ? (
+        <div
+          aria-labelledby={`${panelId}-boards-tab`}
+          className="board-theme-panel"
+          id={`${panelId}-boards-panel`}
+          role="tabpanel"
+        >
+          <label className="board-theme-search">
+            <Search aria-hidden="true" />
+            <input
+              aria-label="Search boards"
+              placeholder="Search boards…"
+              type="search"
+              value={boardQuery}
+              onChange={(event) => setBoardQuery(event.target.value)}
             />
-            <span>
-              <strong>{option.label}</strong>
-              <small>{option.description}</small>
-            </span>
-          </button>
-        ))}
-      </fieldset>
+            <span>{visibleBoards.length}</span>
+          </label>
+          <div className="board-theme-options">
+            {visibleBoards.map((option) => (
+              <button
+                type="button"
+                aria-label={`Use ${option.label} board`}
+                aria-pressed={boardTheme === option.id}
+                className={boardTheme === option.id ? 'active' : undefined}
+                key={option.id}
+                onClick={() => onBoardThemeChange(option.id)}
+              >
+                {option.id === 'juchess' ? (
+                  <i aria-hidden="true" className="board-theme-swatch juchess" />
+                ) : (
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    decoding="async"
+                    loading="lazy"
+                    src={`${import.meta.env.BASE_URL}chess-boards/thumbs/${option.id}.jpg`}
+                  />
+                )}
+                <span>
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+          {visibleBoards.length === 0 ? <p className="board-theme-empty">No matching boards.</p> : null}
+        </div>
+      ) : null}
 
-      {children}
+      {activeTab === 'pieces' ? (
+        <div
+          aria-labelledby={`${panelId}-pieces-tab`}
+          id={`${panelId}-pieces-panel`}
+          role="tabpanel"
+        >
+          <div className="piece-theme-options">
+            {pieceThemeOptions.map((option) => (
+              <button
+                type="button"
+                aria-label={`Use ${option.label} pieces`}
+                aria-pressed={pieceTheme === option.id}
+                className={pieceTheme === option.id ? 'active' : undefined}
+                key={option.id}
+                onClick={() => onPieceThemeChange(option.id)}
+              >
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  src={`${import.meta.env.BASE_URL}chess-pieces/${option.id === 'alpha' ? 'alpha/' : ''}wk.png`}
+                />
+                <span>
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === 'engine' && children ? (
+        <div
+          aria-labelledby={`${panelId}-engine-tab`}
+          id={`${panelId}-engine-panel`}
+          role="tabpanel"
+        >
+          {children}
+        </div>
+      ) : null}
     </section>
   )
 }

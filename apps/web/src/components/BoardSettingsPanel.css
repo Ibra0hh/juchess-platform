@@ -1,21 +1,27 @@
 .board-settings-panel {
-  z-index: 4;
-  width: min(100%, 440px);
-  margin: 8px 0 14px auto;
+  position: absolute;
+  z-index: 12;
+  width: min(calc(100% - 16px), 460px);
+  max-height: min(650px, calc(100dvh - 118px));
+  margin: 0;
   padding: 14px;
+  overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid rgba(17, 17, 17, 0.2);
-  border-radius: 8px;
-  background: #fffdf8;
-  box-shadow: 0 12px 28px rgba(17, 17, 17, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 253, 248, 0.98);
+  box-shadow: 0 18px 46px rgba(17, 17, 17, 0.22);
+  backdrop-filter: blur(12px);
 }
 
 .games-board-settings {
-  align-self: flex-end;
+  top: 48px;
+  right: 0;
 }
 
 .online-board-settings {
-  width: min(100%, 800px);
-  margin: 0 auto 14px;
+  top: 42px;
+  right: max(8px, calc((100% - var(--online-board-size)) / 2));
 }
 
 .board-settings-head {
@@ -43,8 +49,11 @@
 .board-orientation-setting strong,
 .board-theme-options strong,
 .piece-theme-options strong {
+  overflow: hidden;
   color: #111111;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-settings-head span,
@@ -52,8 +61,11 @@
 .board-theme-options small,
 .piece-theme-options small {
   margin-top: 1px;
+  overflow: hidden;
   color: rgba(17, 17, 17, 0.56);
   font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-settings-head > button {
@@ -79,7 +91,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 12px;
-  padding: 10px;
+  padding: 9px 10px;
   border: 1px solid rgba(17, 17, 17, 0.14);
   border-radius: 7px;
   background: #fbf6e8;
@@ -112,20 +124,100 @@
   height: 15px;
 }
 
+.board-settings-tabs {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 3px;
+  margin-top: 12px;
+  padding: 3px;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 8px;
+  background: #f2eee6;
+}
+
+.board-settings-tabs button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(17, 17, 17, 0.62);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.board-settings-tabs button[aria-selected="true"] {
+  background: #ffffff;
+  color: #7a2431;
+  box-shadow: 0 1px 4px rgba(17, 17, 17, 0.12);
+}
+
+.board-theme-panel {
+  margin-top: 10px;
+}
+
+.board-theme-search {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.board-theme-search svg {
+  width: 15px;
+  height: 15px;
+  color: rgba(17, 17, 17, 0.48);
+}
+
+.board-theme-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111111;
+  font: inherit;
+  font-size: 11px;
+}
+
+.board-theme-search > span {
+  color: rgba(17, 17, 17, 0.48);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+}
+
 .board-theme-options,
 .piece-theme-options,
-.board-settings-panel > fieldset {
+.engine-strength-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   padding: 0;
   border: 0;
 }
 
-.board-theme-options legend,
-.piece-theme-options legend,
-.board-settings-panel > fieldset legend {
+.board-theme-options {
+  max-height: 320px;
+  padding-right: 3px;
+  overflow-y: auto;
+  scrollbar-color: rgba(122, 36, 49, 0.45) transparent;
+  scrollbar-width: thin;
+}
+
+.engine-strength-options legend {
   margin-bottom: 6px;
   color: rgba(17, 17, 17, 0.58);
   font-size: 10px;
@@ -136,56 +228,68 @@
 
 .board-theme-options button,
 .piece-theme-options button,
-.board-settings-panel > fieldset button {
+.engine-strength-options button {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 48px;
-  padding: 7px;
+  min-height: 54px;
+  padding: 6px;
   border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 7px;
   background: #ffffff;
   color: #111111;
   text-align: left;
   cursor: pointer;
+  content-visibility: auto;
+  contain-intrinsic-size: 54px;
 }
 
 .board-theme-options button.active,
 .piece-theme-options button.active,
-.board-settings-panel > fieldset button.active {
+.engine-strength-options button.active {
   border-color: #7a2431;
   box-shadow: inset 0 0 0 1px #7a2431;
   background: #fff7f5;
 }
 
-.board-theme-swatch {
+.board-theme-options button > img,
+.board-theme-swatch,
+.piece-theme-options img {
   display: block;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(17, 17, 17, 0.18);
+  width: 40px;
+  height: 40px;
+  flex: none;
   border-radius: 5px;
+  object-fit: cover;
+}
+
+.board-theme-options button > img,
+.board-theme-swatch {
+  border: 1px solid rgba(17, 17, 17, 0.18);
+}
+
+.board-theme-swatch.juchess {
   background-color: #f0d8b0;
   background-image:
     linear-gradient(45deg, #602830 25%, transparent 25%),
     linear-gradient(-45deg, #602830 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, #602830 75%),
     linear-gradient(-45deg, transparent 75%, #602830 75%);
-  background-position: 0 0, 0 17px, 17px -17px, -17px 0;
-  background-size: 34px 34px;
-}
-
-.board-theme-swatch.brown {
-  background-position: center;
-  background-size: cover;
+  background-position: 0 0, 0 20px, 20px -20px, -20px 0;
+  background-size: 40px 40px;
 }
 
 .piece-theme-options img {
-  display: block;
-  width: 34px;
-  height: 34px;
   object-fit: contain;
+}
+
+.board-theme-empty {
+  margin: 18px 0 8px;
+  color: rgba(17, 17, 17, 0.56);
+  font-size: 11px;
+  text-align: center;
 }
 
 .engine-strength-options button > strong,
@@ -206,7 +310,14 @@
 
 @media (max-width: 620px) {
   .board-settings-panel {
-    width: 100%;
+    right: 8px;
+    width: calc(100% - 16px);
+    max-height: min(650px, calc(100dvh - 92px));
+  }
+
+  .games-board-settings,
+  .online-board-settings {
+    top: 42px;
   }
 
   .board-orientation-setting {
@@ -216,5 +327,17 @@
 
   .board-orientation-setting > button {
     justify-content: center;
+  }
+
+  .board-theme-options {
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 390px) {
+  .board-theme-options,
+  .piece-theme-options,
+  .engine-strength-options {
+    grid-template-columns: 1fr;
   }
 }

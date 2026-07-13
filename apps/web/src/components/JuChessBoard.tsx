@@ -214,8 +214,8 @@ export function JuChessBoard({
         className="ju-chess-board"
         data-board-theme={boardTheme}
         data-flipped={flipped ? 'true' : 'false'}
-        style={boardTheme === 'brown'
-          ? { backgroundImage: `url(${import.meta.env.BASE_URL}chess-boards/brown.png)` }
+        style={boardTheme !== 'juchess'
+          ? { backgroundImage: `url(${import.meta.env.BASE_URL}chess-boards/${boardTheme}.png)` }
           : undefined}
       >
         {squares.map((square) => {
