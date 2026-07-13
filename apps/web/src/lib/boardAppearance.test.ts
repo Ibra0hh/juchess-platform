@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   boardThemeOptions,
   defaultBoardPreferences,
+  mergeBoardPreferences,
   normalizeBoardPreferences,
   pieceThemeAssetPath,
   pieceThemeOptions,
@@ -50,4 +51,13 @@ test('board appearance exposes every complete piece catalogue', () => {
 test('board appearance rejects stale or unknown saved themes', () => {
   assert.deepEqual(normalizeBoardPreferences({ boardTheme: 'unknown', pieceTheme: 'missing' }), defaultBoardPreferences)
   assert.deepEqual(normalizeBoardPreferences(null), defaultBoardPreferences)
+})
+
+test('profile appearance merges partial cloud preferences over the local fallback', () => {
+  const local = normalizeBoardPreferences({ boardTheme: 'brown', pieceTheme: 'alpha' })
+  assert.deepEqual(mergeBoardPreferences(local, { boardTheme: 'lichess-wood4' }), {
+    boardTheme: 'lichess-wood4',
+    pieceTheme: 'alpha',
+  })
+  assert.deepEqual(mergeBoardPreferences(local, { boardTheme: 'unknown', pieceTheme: 'missing' }), local)
 })

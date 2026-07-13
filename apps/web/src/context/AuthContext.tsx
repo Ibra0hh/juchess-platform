@@ -11,6 +11,7 @@ import {
   formatAppwriteError,
   getCurrentSession,
   loadPreviewProfileByEmail,
+  saveBoardAppearance,
   saveExternalGameUsername,
   signInWithEmail,
   signOutCurrentUser,
@@ -19,6 +20,7 @@ import {
   type SignInInput,
   type SignUpInput,
 } from '../lib/auth'
+import type { BoardPreferences } from '../lib/boardAppearance'
 import type { Models } from 'appwrite'
 
 type PreviewAuthSession = {
@@ -130,6 +132,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(updated)
   }, [previewSession, profile])
 
+  const saveBoardPreferences = useCallback(async (preferences: BoardPreferences) => {
+    if (!profile) return
+
+    if (previewSession || profile.$id.startsWith('preview-')) {
+      setProfile({ ...profile, ...preferences } as AuthProfile)
+      return
+    }
+
+    const updated = await saveBoardAppearance(profile.$id, preferences)
+    setProfile(updated)
+  }, [previewSession, profile])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       ready: Boolean(previewSession) || appwriteReady,
@@ -138,12 +152,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       error,
       linkExternalGameUsername,
+      saveBoardPreferences,
       refresh,
       signIn,
       signUp,
       signOut,
     }),
-    [error, linkExternalGameUsername, loading, previewSession, profile, refresh, signIn, signOut, signUp, user],
+    [error, linkExternalGameUsername, loading, previewSession, profile, refresh, saveBoardPreferences, signIn, signOut, signUp, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

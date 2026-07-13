@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Square } from 'chess.js'
 import { BookOpen, Check, ChevronLeft, ChevronRight, Settings2, SkipBack, SkipForward, Star, ThumbsUp, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
@@ -666,41 +666,30 @@ function GamesPage() {
               />
             </div>
 
-            <PlayerBar {...bottomPlayer} edge="bottom" pieceTheme={pieceTheme} />
+            <PlayerBar
+              {...bottomPlayer}
+              edge="bottom"
+              pieceTheme={pieceTheme}
+              center={inReview && game && reviewStarted ? (
+                game.moves.length > 0 ? (
+                  <div className="move-navigation" aria-label="Move controls">
+                    <button type="button" aria-label="Go to start" disabled={moveIdx === 0} onClick={() => setMoveIdx(0)}>
+                      <SkipBack aria-hidden="true" />
+                    </button>
+                    <button type="button" aria-label="Previous move" disabled={moveIdx === 0} onClick={() => setMoveIdx((current) => Math.max(0, current - 1))}>
+                      <ChevronLeft aria-hidden="true" />
+                    </button>
+                    <button type="button" aria-label="Next move" disabled={moveIdx === game.moves.length - 1} onClick={() => setMoveIdx((current) => Math.min(game.moves.length - 1, current + 1))}>
+                      <ChevronRight aria-hidden="true" />
+                    </button>
+                    <button type="button" aria-label="Go to end" disabled={moveIdx === game.moves.length - 1} onClick={() => setMoveIdx(game.moves.length - 1)}>
+                      <SkipForward aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : <span className="move-empty">No moves</span>
+              ) : undefined}
+            />
           </div>
-
-          {inReview && game && reviewStarted ? (
-            game.moves.length > 0 ? (
-              <div className="move-controls" aria-label="Move controls">
-                <div className="move-navigation">
-                  <button type="button" aria-label="Go to start" disabled={moveIdx === 0} onClick={() => setMoveIdx(0)}>
-                    <SkipBack aria-hidden="true" />
-                  </button>
-                  <button type="button" aria-label="Previous move" disabled={moveIdx === 0} onClick={() => setMoveIdx((current) => Math.max(0, current - 1))}>
-                    <ChevronLeft aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Next move"
-                    disabled={moveIdx === game.moves.length - 1}
-                    onClick={() => setMoveIdx((current) => Math.min(game.moves.length - 1, current + 1))}
-                  >
-                    <ChevronRight aria-hidden="true" />
-                  </button>
-                  <button type="button" aria-label="Go to end" disabled={moveIdx === game.moves.length - 1} onClick={() => setMoveIdx(game.moves.length - 1)}>
-                    <SkipForward aria-hidden="true" />
-                  </button>
-                </div>
-                <span>
-                  Move {moveIdx + 1} / {game.moves.length}
-                </span>
-              </div>
-            ) : (
-              <div className="move-controls" aria-label="Move controls">
-                <span>No moves saved yet</span>
-              </div>
-            )
-          ) : null}
         </section>
 
         <aside className="game-rail" aria-label="Game tools">
@@ -924,6 +913,7 @@ function PlayerBar({
   badge,
   captured,
   color,
+  center,
   edge,
   name,
   pieceTheme,
@@ -932,13 +922,14 @@ function PlayerBar({
   badge: string
   captured: JuCapturedPiece[]
   color: 'black' | 'white'
+  center?: ReactNode
   edge: 'bottom' | 'top'
   name: string
   pieceTheme: JuPieceTheme
   rating?: number
 }) {
   return (
-    <div className={`player-bar ${color} ${edge}`} aria-label={`${color === 'white' ? 'White' : 'Black'} player: ${name}`}>
+    <div className={`player-bar ${color} ${edge}${center ? ' has-center' : ''}`} aria-label={`${color === 'white' ? 'White' : 'Black'} player: ${name}`}>
       <div className="player-bar-person">
         <i className={color} aria-hidden="true" />
         <div>
@@ -948,6 +939,7 @@ function PlayerBar({
         </div>
         {rating ? <em>{rating}</em> : null}
       </div>
+      {center ? <div className="player-bar-center">{center}</div> : null}
       <strong>{badge}</strong>
     </div>
   )

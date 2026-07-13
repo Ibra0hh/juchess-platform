@@ -1,6 +1,7 @@
 import { ExecutionMethod, ID, Permission, Query, Role, type Models } from 'appwrite'
 import { account, appwriteConfig, appwriteReady, functions, tablesDB } from './appwrite'
 import { tableIds } from './juchess'
+import type { BoardPreferences } from './boardAppearance'
 
 export type ProfileRole = 'member' | 'organizer' | 'admin'
 export type ProfileStatus = 'pending' | 'active' | 'suspended'
@@ -17,6 +18,8 @@ export type AuthProfile = Models.Row & {
   avatarFileId?: string
   chessComUsername?: string
   lichessUsername?: string
+  boardTheme?: string
+  pieceTheme?: string
 }
 
 export type AuthSession = {
@@ -193,6 +196,22 @@ export async function saveExternalGameUsername(
     rowId: profileId,
     data: {
       [source === 'chess.com' ? 'chessComUsername' : 'lichessUsername']: normalized,
+    },
+  })
+}
+
+export async function saveBoardAppearance(
+  profileId: string,
+  preferences: BoardPreferences,
+) {
+  requireAppwriteReady()
+  return await tablesDB.updateRow<AuthProfile>({
+    databaseId: appwriteConfig.databaseId,
+    tableId: tableIds.profiles,
+    rowId: profileId,
+    data: {
+      boardTheme: preferences.boardTheme,
+      pieceTheme: preferences.pieceTheme,
     },
   })
 }

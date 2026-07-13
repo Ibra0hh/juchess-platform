@@ -28,7 +28,9 @@
         "status": "enum:pending,active,suspended",
         "avatarFileId": "string",
         "chessComUsername": "string|unique",
-        "lichessUsername": "string|unique"
+        "lichessUsername": "string|unique",
+        "boardTheme": "string",
+        "pieceTheme": "string"
       }
     },
     "tournaments": {

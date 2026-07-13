@@ -223,14 +223,21 @@ export function pieceThemeAssetPath(
 }
 
 export function normalizeBoardPreferences(value: unknown): BoardPreferences {
-  if (!value || typeof value !== 'object') return defaultBoardPreferences
+  return mergeBoardPreferences(defaultBoardPreferences, value)
+}
+
+export function mergeBoardPreferences(
+  current: BoardPreferences,
+  value: unknown,
+): BoardPreferences {
+  if (!value || typeof value !== 'object') return current
   const candidate = value as Partial<BoardPreferences>
   return {
     boardTheme: boardThemeById.has(String(candidate.boardTheme))
       ? candidate.boardTheme as JuBoardTheme
-      : defaultBoardPreferences.boardTheme,
+      : current.boardTheme,
     pieceTheme: pieceThemeById.has(String(candidate.pieceTheme))
       ? candidate.pieceTheme as JuPieceTheme
-      : defaultBoardPreferences.pieceTheme,
+      : current.pieceTheme,
   }
 }

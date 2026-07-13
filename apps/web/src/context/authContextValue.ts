@@ -1,6 +1,7 @@
 import { createContext } from 'react'
 import type { Models } from 'appwrite'
 import type { AuthProfile, SignInInput, SignUpInput } from '../lib/auth'
+import type { BoardPreferences } from '../lib/boardAppearance'
 
 export type AuthContextValue = {
   ready: boolean
@@ -16,6 +17,7 @@ export type AuthContextValue = {
     source: 'chess.com' | 'lichess',
     username: string,
   ) => Promise<void>
+  saveBoardPreferences: (preferences: BoardPreferences) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

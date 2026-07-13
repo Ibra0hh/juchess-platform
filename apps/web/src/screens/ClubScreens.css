@@ -891,10 +891,6 @@
   margin-top: 0;
 }
 
-.board-column:has(.move-controls) .board-player-frame {
-  width: min(100cqw, 836px, calc(100cqh - 158px));
-}
-
 .board-player-frame .player-bar {
   width: 100%;
   border: 1px solid rgba(17, 17, 17, 0.16);
@@ -988,6 +984,19 @@
   min-width: 0;
 }
 
+.player-bar.has-center {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.player-bar.has-center > strong {
+  justify-self: end;
+}
+
+.player-bar-center {
+  justify-self: center;
+}
+
 .games-ju-board {
   width: 100%;
   min-width: 240px;
@@ -1046,43 +1055,28 @@
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.2);
 }
 
-.move-controls {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 8px;
-}
-
-.move-controls span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .move-navigation {
   display: grid;
-  grid-template-columns: repeat(4, 42px);
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid rgba(17, 17, 17, 0.16);
-  border-radius: 7px;
-  background: rgba(255, 253, 248, 0.92);
-  box-shadow: 0 5px 16px rgba(17, 17, 17, 0.08);
+  grid-template-columns: repeat(4, 30px);
+  gap: 3px;
 }
 
 .move-navigation button {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   color: var(--ink);
   background: var(--surface);
   border: 1px solid rgba(17, 17, 17, 0.22);
   border-radius: 7px;
   cursor: pointer;
+}
+
+.move-empty {
+  color: rgba(17, 17, 17, 0.56);
+  font-size: 11px;
 }
 
 .move-navigation button svg {

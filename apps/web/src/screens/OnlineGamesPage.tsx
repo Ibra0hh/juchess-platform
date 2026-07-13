@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, Settings2, ShieldAlert, SkipBack, SkipForward, Trophy, Users } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { BoardSettingsPanel } from '../components/BoardSettingsPanel'
@@ -363,26 +363,32 @@ function OnlineGamesPage() {
               pieceTheme={pieceTheme}
               showEvaluation={false}
             />
-            <PlayerStrip {...playerFor(bottomSide)} edge="bottom" pieceTheme={pieceTheme} />
+            <PlayerStrip
+              {...playerFor(bottomSide)}
+              edge="bottom"
+              pieceTheme={pieceTheme}
+              center={(
+                <div className="online-move-navigation" aria-label="Move navigation">
+                  <button type="button" aria-label="Go to first move" disabled={displayedPly === 0} onClick={() => setViewedPly(0)} title="Go to start">
+                    <SkipBack size={18} aria-hidden="true" />
+                  </button>
+                  <button type="button" aria-label="Previous move" disabled={displayedPly === 0} onClick={() => setViewedPly(Math.max(0, displayedPly - 1))} title="Previous move">
+                    <ChevronLeft size={19} aria-hidden="true" />
+                  </button>
+                  <button type="button" aria-label="Next move" disabled={viewingLatest} onClick={() => {
+                    const nextPly = Math.min(boardMoves.length, displayedPly + 1)
+                    setViewedPly(nextPly === boardMoves.length ? null : nextPly)
+                  }} title="Next move">
+                    <ChevronRight size={19} aria-hidden="true" />
+                  </button>
+                  <button type="button" aria-label="Go to latest move" disabled={viewingLatest} onClick={() => setViewedPly(null)} title="Go to latest move">
+                    <SkipForward size={18} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+            />
 
             <div className="online-board-controls">
-              <div className="online-move-navigation" aria-label="Move navigation">
-                <button type="button" aria-label="Go to first move" disabled={displayedPly === 0} onClick={() => setViewedPly(0)} title="Go to start">
-                  <SkipBack size={18} aria-hidden="true" />
-                </button>
-                <button type="button" aria-label="Previous move" disabled={displayedPly === 0} onClick={() => setViewedPly(Math.max(0, displayedPly - 1))} title="Previous move">
-                  <ChevronLeft size={19} aria-hidden="true" />
-                </button>
-                <button type="button" aria-label="Next move" disabled={viewingLatest} onClick={() => {
-                  const nextPly = Math.min(boardMoves.length, displayedPly + 1)
-                  setViewedPly(nextPly === boardMoves.length ? null : nextPly)
-                }} title="Next move">
-                  <ChevronRight size={19} aria-hidden="true" />
-                </button>
-                <button type="button" aria-label="Go to latest move" disabled={viewingLatest} onClick={() => setViewedPly(null)} title="Go to latest move">
-                  <SkipForward size={18} aria-hidden="true" />
-                </button>
-              </div>
               <span>
                 {!viewingLatest
                   ? `Move ${displayedPly} of ${boardMoves.length}`
@@ -488,6 +494,7 @@ function onlinePlatformName(tournament: Tournament) {
 
 function PlayerStrip({
   captured,
+  center,
   clock,
   edge,
   name,
@@ -495,6 +502,7 @@ function PlayerStrip({
   side,
 }: {
   captured: JuCapturedPiece[]
+  center?: ReactNode
   clock?: HostedClockState
   edge: 'bottom' | 'top'
   name: string
@@ -502,12 +510,15 @@ function PlayerStrip({
   side: 'white' | 'black'
 }) {
   return (
-    <div className={`online-player-strip ${side} ${edge}`}>
-      <span>{side === 'white' ? 'W' : 'B'}</span>
-      <div className="online-player-copy">
-        <strong>{name}</strong>
-        <JuCapturedPieces pieces={captured} pieceTheme={pieceTheme} />
+    <div className={`online-player-strip ${side} ${edge}${center ? ' has-center' : ''}`}>
+      <div className="online-player-identity">
+        <span>{side === 'white' ? 'W' : 'B'}</span>
+        <div className="online-player-copy">
+          <strong>{name}</strong>
+          <JuCapturedPieces pieces={captured} pieceTheme={pieceTheme} />
+        </div>
       </div>
+      {center ? <div className="online-player-center">{center}</div> : null}
       <div className="online-player-meta">
         <time className={clock?.tone ?? 'normal'}>{clock?.label ?? '--:--'}</time>
       </div>
