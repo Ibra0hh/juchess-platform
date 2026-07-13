@@ -87,12 +87,12 @@
 .online-board-toolbar {
   position: absolute;
   z-index: 14;
-  top: 9px;
+  top: 48px;
   right: -16px;
   display: flex;
   justify-content: flex-end;
   width: 34px;
-  height: 34px;
+  height: 74px;
   margin: 0;
   pointer-events: none;
 }
@@ -125,11 +125,13 @@
 .online-board-head-actions {
   display: flex;
   align-items: center;
+  flex-direction: column;
   gap: 7px;
   pointer-events: auto;
 }
 
-.online-board-head-actions button[aria-label="Board settings"] {
+.online-board-head-actions button[aria-label="Board settings"],
+.online-board-head-actions button[aria-label="Flip board"] {
   width: 34px;
   padding: 0;
 }

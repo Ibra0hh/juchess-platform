@@ -1,4 +1,4 @@
-import { FlipHorizontal2, Palette, Search, Settings2, X } from 'lucide-react'
+import { Palette, Search, Settings2, X } from 'lucide-react'
 import { useId, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   annotationColorOptions,
@@ -16,12 +16,10 @@ type BoardSettingsPanelProps = {
   boardTheme: JuBoardTheme
   children?: ReactNode
   className?: string
-  flipped: boolean
   markColor: JuAnnotationColor
   onArrowColorChange: (color: JuAnnotationColor) => void
   onBoardThemeChange: (theme: JuBoardTheme) => void
   onClose: () => void
-  onFlip: () => void
   onMarkColorChange: (color: JuAnnotationColor) => void
   onPieceThemeChange: (theme: JuPieceTheme) => void
   pieceTheme: JuPieceTheme
@@ -34,12 +32,10 @@ export function BoardSettingsPanel({
   boardTheme,
   children,
   className,
-  flipped,
   markColor,
   onArrowColorChange,
   onBoardThemeChange,
   onClose,
-  onFlip,
   onMarkColorChange,
   onPieceThemeChange,
   pieceTheme,
@@ -83,23 +79,12 @@ export function BoardSettingsPanel({
         <Settings2 aria-hidden="true" />
         <div>
           <strong>Board settings</strong>
-          <span>Appearance, colors and orientation</span>
+          <span>Appearance, colors and pieces</span>
         </div>
         <button type="button" aria-label="Close board settings" title="Close" onClick={onClose}>
           <X aria-hidden="true" />
         </button>
       </header>
-
-      <div className="board-orientation-setting">
-        <div>
-          <strong>Orientation</strong>
-          <span>{flipped ? 'Black at the bottom' : 'White at the bottom'}</span>
-        </div>
-        <button type="button" aria-label="Flip board" onClick={onFlip}>
-          <FlipHorizontal2 aria-hidden="true" />
-          Flip board
-        </button>
-      </div>
 
       <div className="board-settings-tabs" role="tablist" aria-label="Board settings sections">
         {tab('boards', `Boards (${boardThemeOptions.length})`)}

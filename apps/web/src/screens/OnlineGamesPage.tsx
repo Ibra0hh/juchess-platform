@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Settings2, ShieldAlert, SkipBack, SkipForward, Trophy, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FlipHorizontal2, Settings2, ShieldAlert, SkipBack, SkipForward, Trophy, Users } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { BoardSettingsPanel } from '../components/BoardSettingsPanel'
 import {
@@ -335,6 +335,15 @@ function OnlineGamesPage() {
                 >
                   <Settings2 size={17} aria-hidden="true" />
                 </button>
+                <button
+                  type="button"
+                  aria-label="Flip board"
+                  aria-pressed={flipped}
+                  title="Flip board"
+                  onClick={() => setFlipped((current) => !current)}
+                >
+                  <FlipHorizontal2 size={17} aria-hidden="true" />
+                </button>
               </div>
             </div>
 
@@ -343,12 +352,10 @@ function OnlineGamesPage() {
                 arrowColor={arrowColor}
                 boardTheme={boardTheme}
                 className="online-board-settings"
-                flipped={flipped}
                 markColor={markColor}
                 onArrowColorChange={setArrowColor}
                 onBoardThemeChange={setBoardTheme}
                 onClose={() => setSettingsOpen(false)}
-                onFlip={() => setFlipped((current) => !current)}
                 onMarkColorChange={setMarkColor}
                 onPieceThemeChange={setPieceTheme}
                 pieceTheme={pieceTheme}

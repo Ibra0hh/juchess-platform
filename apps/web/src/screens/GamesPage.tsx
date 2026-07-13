@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Square } from 'chess.js'
-import { BookOpen, Check, ChevronLeft, ChevronRight, Settings2, SkipBack, SkipForward, Star, ThumbsUp, X } from 'lucide-react'
+import { BookOpen, Check, ChevronLeft, ChevronRight, FlipHorizontal2, Settings2, SkipBack, SkipForward, Star, ThumbsUp, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import chessComLogo from '../assets/providers/chess-com.png'
 import lichessLogo from '../assets/providers/lichess.png'
@@ -120,6 +120,7 @@ function GamesPage() {
   const [searchNotice, setSearchNotice] = useState('')
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false)
   const [workspaceMoves, setWorkspaceMoves] = useState<string[]>([])
+  const [workspaceViewedPly, setWorkspaceViewedPly] = useState<number | null>(null)
   const [workspaceResult, setWorkspaceResult] = useState('Live')
   const [saved, setSaved] = useState(false)
   const [ran, setRan] = useState(false)
@@ -157,6 +158,14 @@ function GamesPage() {
   const workspaceAnalysisAbortRef = useRef<AbortController | null>(null)
   const workspaceAnalysisEngineRef = useRef<StockfishReviewEngine | null>(null)
   const workspaceInitialFen = game?.fen || startFen
+  const displayedWorkspacePly = workspaceViewedPly === null
+    ? workspaceMoves.length
+    : Math.min(workspaceViewedPly, workspaceMoves.length)
+  const displayedWorkspaceMoves = useMemo(
+    () => workspaceMoves.slice(0, displayedWorkspacePly),
+    [displayedWorkspacePly, workspaceMoves],
+  )
+  const workspaceViewingLatest = displayedWorkspacePly === workspaceMoves.length
 
   const resetReviewState = () => {
     reviewRunRef.current += 1
@@ -372,7 +381,7 @@ function GamesPage() {
       workspaceAnalysisEngineRef.current = engine
 
       void analyzePosition(
-        { fen: workspaceInitialFen, moves: workspaceMoves },
+        { fen: workspaceInitialFen, moves: displayedWorkspaceMoves },
         engine,
         enginePreset.depth,
         controller.signal,
@@ -411,7 +420,7 @@ function GamesPage() {
     ran,
     step,
     workspaceInitialFen,
-    workspaceMoves,
+    displayedWorkspaceMoves,
   ])
 
   useEffect(() => {
@@ -461,7 +470,7 @@ function GamesPage() {
   const boardMoves = inReview && game
     ? game.moves.slice(0, moveIdx + 1)
     : inWorkspace
-      ? workspaceMoves
+      ? displayedWorkspaceMoves
       : []
   const boardFen = boardMoves.length ? undefined : boardGame?.fen || startFen
   const boardSummary = getJuChessBoardSummary(boardFen, boardMoves)
@@ -566,6 +575,7 @@ function GamesPage() {
     setRan(mode === 'analysis')
     setWorkspaceLoaded(mode === 'analysis')
     setWorkspaceMoves(mode === 'analysis' ? selectedGame.moves : [])
+    setWorkspaceViewedPly(null)
     setWorkspaceResult(selectedGame.result)
     setStep(mode === 'review' ? 'review' : 'workspace')
   }
@@ -574,6 +584,7 @@ function GamesPage() {
     setGame(null)
     setWorkspaceLoaded(false)
     setWorkspaceMoves([])
+    setWorkspaceViewedPly(null)
     setWorkspaceResult('Live')
     setSaved(false)
     setRan(true)
@@ -628,6 +639,7 @@ function GamesPage() {
       setGame(importedGame)
       setWorkspaceLoaded(true)
       setWorkspaceMoves(importedGame.moves)
+      setWorkspaceViewedPly(null)
       setWorkspaceResult(importedGame.result)
       setWorkspaceError('')
       setRan(true)
@@ -638,6 +650,7 @@ function GamesPage() {
 
   const updateWorkspaceBoard = (state: JuChessBoardChange) => {
     setWorkspaceMoves(state.moves)
+    setWorkspaceViewedPly(null)
     setWorkspaceResult(state.result)
     setWorkspaceLoaded(true)
   }
@@ -649,6 +662,7 @@ function GamesPage() {
     setGame(null)
     setWorkspaceLoaded(true)
     setWorkspaceMoves(state.moves)
+    setWorkspaceViewedPly(null)
     setWorkspaceResult(state.result)
     setWorkspaceError('')
     setSaved(false)
@@ -688,13 +702,11 @@ function GamesPage() {
             <GameSettingsPanel
               arrowColor={arrowColor}
               boardTheme={boardTheme}
-              flipped={flipped}
               markColor={markColor}
               onArrowColorChange={setArrowColor}
               onBoardThemeChange={setBoardTheme}
               strength={engineStrength}
               onClose={() => setSettingsOpen(false)}
-              onFlip={() => setFlipped((current) => !current)}
               onMarkColorChange={setMarkColor}
               onPieceThemeChange={setPieceTheme}
               onStrengthChange={setEngineStrength}
@@ -713,6 +725,15 @@ function GamesPage() {
             >
               <Settings2 aria-hidden="true" />
             </button>
+            <button
+              type="button"
+              aria-label="Flip board"
+              aria-pressed={flipped}
+              title="Flip board"
+              onClick={() => setFlipped((current) => !current)}
+            >
+              <FlipHorizontal2 aria-hidden="true" />
+            </button>
           </div>
 
           <div className="board-player-frame">
@@ -726,7 +747,7 @@ function GamesPage() {
                 evaluation={evalNow}
                 fen={boardFen}
                 flipped={flipped}
-                interactive={!inReview}
+                interactive={!inReview && (!inWorkspace || workspaceViewingLatest)}
                 markColor={markColor}
                 moves={boardMoves}
                 onChange={inWorkspace ? updateWorkspaceBoard : inReview ? undefined : startAnalysisFromBoard}
@@ -739,24 +760,21 @@ function GamesPage() {
               {...bottomPlayer}
               edge="bottom"
               pieceTheme={pieceTheme}
-              center={inReview && game && reviewStarted ? (
-                game.moves.length > 0 ? (
-                  <div className="move-navigation" aria-label="Move controls">
-                    <button type="button" aria-label="Go to start" disabled={moveIdx === 0} onClick={() => setMoveIdx(0)}>
-                      <SkipBack aria-hidden="true" />
-                    </button>
-                    <button type="button" aria-label="Previous move" disabled={moveIdx === 0} onClick={() => setMoveIdx((current) => Math.max(0, current - 1))}>
-                      <ChevronLeft aria-hidden="true" />
-                    </button>
-                    <button type="button" aria-label="Next move" disabled={moveIdx === game.moves.length - 1} onClick={() => setMoveIdx((current) => Math.min(game.moves.length - 1, current + 1))}>
-                      <ChevronRight aria-hidden="true" />
-                    </button>
-                    <button type="button" aria-label="Go to end" disabled={moveIdx === game.moves.length - 1} onClick={() => setMoveIdx(game.moves.length - 1)}>
-                      <SkipForward aria-hidden="true" />
-                    </button>
-                  </div>
-                ) : <span className="move-empty">No moves</span>
-              ) : undefined}
+              center={inReview && game ? (
+                <MoveNavigation
+                  current={game.moves.length > 0 ? moveIdx : 0}
+                  last={Math.max(0, game.moves.length - 1)}
+                  onChange={setMoveIdx}
+                />
+              ) : inWorkspace ? (
+                <MoveNavigation
+                  current={displayedWorkspacePly}
+                  last={workspaceMoves.length}
+                  onChange={(ply) => setWorkspaceViewedPly(ply === workspaceMoves.length ? null : ply)}
+                />
+              ) : (
+                <MoveNavigation current={0} last={0} onChange={() => undefined} />
+              )}
             />
           </div>
         </section>
@@ -774,6 +792,7 @@ function GamesPage() {
                 setSelectedKey(null)
                 setSource(null)
                 setWorkspaceMoves([])
+                setWorkspaceViewedPly(null)
                 setWorkspaceResult('Live')
               }}
             >
@@ -790,6 +809,7 @@ function GamesPage() {
                 setSelectedKey(null)
                 setSource(null)
                 setWorkspaceMoves([])
+                setWorkspaceViewedPly(null)
                 setWorkspaceResult('Live')
               }}
             >
@@ -897,6 +917,7 @@ function GamesPage() {
                 setGame(null)
                 setWorkspaceLoaded(false)
                 setWorkspaceMoves([])
+                setWorkspaceViewedPly(null)
                 setWorkspaceResult('Live')
                 setRan(false)
               }}
@@ -906,6 +927,7 @@ function GamesPage() {
                 setGame(null)
                 setPgnText('')
                 setWorkspaceMoves([])
+                setWorkspaceViewedPly(null)
                 setWorkspaceResult('Live')
                 setSaved(false)
                 setRan(true)
@@ -932,12 +954,10 @@ function GamesPage() {
 function GameSettingsPanel({
   arrowColor,
   boardTheme,
-  flipped,
   markColor,
   onArrowColorChange,
   onBoardThemeChange,
   onClose,
-  onFlip,
   onMarkColorChange,
   onPieceThemeChange,
   onStrengthChange,
@@ -946,12 +966,10 @@ function GameSettingsPanel({
 }: {
   arrowColor: JuAnnotationColor
   boardTheme: JuBoardTheme
-  flipped: boolean
   markColor: JuAnnotationColor
   onArrowColorChange: (color: JuAnnotationColor) => void
   onBoardThemeChange: (theme: JuBoardTheme) => void
   onClose: () => void
-  onFlip: () => void
   onMarkColorChange: (color: JuAnnotationColor) => void
   onPieceThemeChange: (theme: JuPieceTheme) => void
   onStrengthChange: (strength: ReviewEngineStrength) => void
@@ -963,12 +981,10 @@ function GameSettingsPanel({
       arrowColor={arrowColor}
       boardTheme={boardTheme}
       className="games-board-settings"
-      flipped={flipped}
       markColor={markColor}
       onArrowColorChange={onArrowColorChange}
       onBoardThemeChange={onBoardThemeChange}
       onClose={onClose}
-      onFlip={onFlip}
       onMarkColorChange={onMarkColorChange}
       onPieceThemeChange={onPieceThemeChange}
       pieceTheme={pieceTheme}
@@ -989,6 +1005,33 @@ function GameSettingsPanel({
         ))}
       </fieldset>
     </BoardSettingsPanel>
+  )
+}
+
+function MoveNavigation({
+  current,
+  last,
+  onChange,
+}: {
+  current: number
+  last: number
+  onChange: (ply: number) => void
+}) {
+  return (
+    <div className="move-navigation" aria-label="Move navigation">
+      <button type="button" aria-label="Go to start" disabled={current <= 0} onClick={() => onChange(0)} title="Go to start">
+        <SkipBack aria-hidden="true" />
+      </button>
+      <button type="button" aria-label="Previous move" disabled={current <= 0} onClick={() => onChange(Math.max(0, current - 1))} title="Previous move">
+        <ChevronLeft aria-hidden="true" />
+      </button>
+      <button type="button" aria-label="Next move" disabled={current >= last} onClick={() => onChange(Math.min(last, current + 1))} title="Next move">
+        <ChevronRight aria-hidden="true" />
+      </button>
+      <button type="button" aria-label="Go to end" disabled={current >= last} onClick={() => onChange(last)} title="Go to end">
+        <SkipForward aria-hidden="true" />
+      </button>
+    </div>
   )
 }
 

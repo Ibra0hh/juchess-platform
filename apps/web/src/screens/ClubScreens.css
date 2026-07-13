@@ -942,7 +942,7 @@
 .board-control-stack {
   position: absolute;
   z-index: 15;
-  top: 9px;
+  top: 48px;
   right: -16px;
   display: flex;
   flex-direction: column;
