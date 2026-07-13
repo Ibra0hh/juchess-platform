@@ -16,6 +16,7 @@ function ForgotPasswordPage() {
   const isReset = Boolean(userId && secret)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -38,6 +39,12 @@ function ForgotPasswordPage() {
 
     try {
       if (isReset) {
+        if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+          throw new Error('Use at least 8 characters with one uppercase letter and one number.')
+        }
+        if (password !== confirmPassword) {
+          throw new Error('Passwords do not match.')
+        }
         await completePasswordRecovery(userId, secret, password)
         setDone(true)
         setMessage('Password updated. You can sign in now.')
@@ -74,18 +81,37 @@ function ForgotPasswordPage() {
 
           <form className="auth-form" onSubmit={handleSubmit}>
             {isReset ? (
-              <label>
-                New password
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  placeholder="••••••••"
-                />
-              </label>
+              <>
+                <label>
+                  New password
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                  />
+                </label>
+                <div className="auth-password-rules" aria-label="Password requirements">
+                  <span className={password.length >= 8 ? 'met' : ''}>8+ characters</span>
+                  <span className={/[A-Z]/.test(password) ? 'met' : ''}>1 uppercase letter</span>
+                  <span className={/[0-9]/.test(password) ? 'met' : ''}>1 number</span>
+                </div>
+                <label>
+                  Confirm new password
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                  />
+                </label>
+              </>
             ) : (
               <label>
                 Email

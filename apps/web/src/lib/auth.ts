@@ -1,4 +1,4 @@
-import { ExecutionMethod, ID, Permission, Query, Role, type Models } from 'appwrite'
+import { ExecutionMethod, ID, OAuthProvider, Permission, Query, Role, type Models } from 'appwrite'
 import { account, appwriteConfig, appwriteReady, functions, storage, tablesDB } from './appwrite'
 import { tableIds } from './juchess'
 import type { BoardPreferences } from './boardAppearance'
@@ -51,7 +51,11 @@ export type SignUpInput = SignInInput & {
   fullName: string
   universityId?: string
   phone?: string
+  chessComUsername?: string
+  lichessUsername?: string
 }
+
+export type SocialAuthProvider = 'apple' | 'google'
 
 type AccessGuardInput = {
   email?: string
@@ -135,6 +139,16 @@ export async function signUpWithEmail(input: SignUpInput): Promise<AuthSession> 
   }
 
   return session
+}
+
+export function startOAuthSession(provider: SocialAuthProvider) {
+  requireAppwriteReady()
+
+  account.createOAuth2Session({
+    provider: provider === 'apple' ? OAuthProvider.Apple : OAuthProvider.Google,
+    success: appUrl('/profile'),
+    failure: appUrl(`/sign-in?oauth=failed&provider=${provider}`),
+  })
 }
 
 export async function signOutCurrentUser() {
@@ -373,6 +387,8 @@ async function createProfileForUser(user: Models.User, input: Partial<SignUpInpu
         universityId: input.universityId?.trim() || undefined,
         phone: normalizeJordanPhone(input.phone),
         email: input.email,
+        chessComUsername: optionalUsername(input.chessComUsername),
+        lichessUsername: optionalUsername(input.lichessUsername),
         rating: 1200,
         role: 'member',
         status: 'pending',

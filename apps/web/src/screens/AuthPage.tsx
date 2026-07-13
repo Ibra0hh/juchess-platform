@@ -1,9 +1,12 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
-import SiteHeader from '../components/SiteHeader'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
-import { formatAppwriteError } from '../lib/auth'
+import {
+  formatAppwriteError,
+  startOAuthSession,
+  type SocialAuthProvider,
+} from '../lib/auth'
 import './AuthPage.css'
 
 type AuthPageProps = {
@@ -13,45 +16,62 @@ type AuthPageProps = {
 function AuthPage({ mode }: AuthPageProps) {
   const { ready, signIn, signUp } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const isSignup = mode === 'sign-up'
   const [fullName, setFullName] = useState('')
   const [universityId, setUniversityId] = useState('')
   const [phone, setPhone] = useState('')
+  const [chessComUsername, setChessComUsername] = useState('')
+  const [lichessUsername, setLichessUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const [oauthProvider, setOauthProvider] = useState<SocialAuthProvider | null>(null)
+  const [message, setMessage] = useState<string | null>(() => (
+    searchParams.get('oauth') === 'failed'
+      ? `${providerName(searchParams.get('provider'))} sign-in could not be completed. Try again or use your email.`
+      : null
+  ))
 
-  const title = isSignup ? 'Create your club account' : 'Sign in to JuChess'
-  const subtitle = isSignup
-    ? 'Join the tournament system with your University of Jordan chess profile.'
-    : 'Open your registrations, games, saved analyses and profile.'
-
-  const passwordHint = useMemo(() => {
-    if (!isSignup) return null
-    return password.length >= 8 ? 'Password length is ready.' : 'Use at least 8 characters.'
-  }, [isSignup, password.length])
+  const passwordRules = useMemo(() => ({
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    number: /[0-9]/.test(password),
+  }), [password])
+  const passwordReady = passwordRules.length && passwordRules.uppercase && passwordRules.number
+  const passwordsMatch = confirmPassword.length > 0 && confirmPassword === password
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setSubmitting(true)
     setMessage(null)
 
+    if (isSignup && !passwordReady) {
+      setMessage('Use at least 8 characters with one uppercase letter and one number.')
+      return
+    }
+    if (isSignup && !passwordsMatch) {
+      setMessage('Passwords do not match.')
+      return
+    }
+
+    setSubmitting(true)
     try {
       if (isSignup) {
         await signUp({
           fullName: fullName.trim(),
           universityId: universityId.trim(),
           phone: phone.trim(),
+          chessComUsername: chessComUsername.trim(),
+          lichessUsername: lichessUsername.trim(),
           email: email.trim(),
           password,
         })
-        navigate('/profile')
       } else {
         await signIn({ email: email.trim(), password })
-        navigate('/profile')
       }
+      navigate('/profile')
     } catch (error) {
       setMessage(formatAppwriteError(error))
     } finally {
@@ -59,18 +79,29 @@ function AuthPage({ mode }: AuthPageProps) {
     }
   }
 
+  function handleOAuth(provider: SocialAuthProvider) {
+    setMessage(null)
+    setOauthProvider(provider)
+    try {
+      startOAuthSession(provider)
+    } catch (error) {
+      setOauthProvider(null)
+      setMessage(formatAppwriteError(error))
+    }
+  }
+
+  const busy = submitting || oauthProvider !== null
+
   return (
     <div className="auth-screen" data-screen-label={isSignup ? 'Sign Up' : 'Sign In'}>
-      <SiteHeader active="profile" />
-      <main className="auth-main">
-        <section className="auth-panel" aria-labelledby="auth-title">
-          <div className="auth-brand">
-            <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="Chess Club JU logo" />
-            <span>Chess Club JU</span>
+      <AuthSiteHeader />
+      <main className={`auth-main prototype-auth-main ${isSignup ? 'signup' : 'signin'}`}>
+        <section className={`auth-panel prototype-auth-panel ${isSignup ? 'signup' : 'signin'}`} aria-labelledby="auth-title">
+          <div className="auth-intro">
+            {!isSignup ? <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="" /> : null}
+            <h1 id="auth-title">{isSignup ? 'Create Player Club Account' : 'Welcome back'}</h1>
+            <p>{isSignup ? 'Join the University of Jordan Chess Club roster' : 'Sign in to your player club account'}</p>
           </div>
-
-          <h1 id="auth-title">{title}</h1>
-          <p>{subtitle}</p>
 
           {!ready ? (
             <div className="auth-note" role="status">
@@ -78,108 +109,196 @@ function AuthPage({ mode }: AuthPageProps) {
             </div>
           ) : null}
 
-          <form className="auth-form" onSubmit={handleSubmit}>
+          <SocialSignIn
+            busy={busy}
+            oauthProvider={oauthProvider}
+            ready={ready}
+            onSelect={handleOAuth}
+          />
+
+          <div className="auth-divider" aria-hidden="true">
+            <span />
+            <small>or with email</small>
+            <span />
+          </div>
+
+          <form className="auth-form prototype-auth-form" onSubmit={handleSubmit}>
             {isSignup ? (
               <>
-                <label>
-                  Full name
-                  <input
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                    required
-                    autoComplete="name"
-                    placeholder="Ibrahim Ahmad"
-                  />
-                </label>
-                <label>
-                  University ID
-                  <input
-                    value={universityId}
-                    onChange={(event) => setUniversityId(event.target.value)}
-                    autoComplete="username"
-                    placeholder="2026xxxxx"
-                  />
-                </label>
-                <label>
-                  Phone number
-                  <input
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    autoComplete="tel"
-                    inputMode="tel"
-                    placeholder="0791234567"
-                  />
-                </label>
-              </>
-            ) : null}
+                <AuthField label="Full name">
+                  <input value={fullName} onChange={(event) => setFullName(event.target.value)} required autoComplete="name" placeholder="e.g. Ibrahim Ahmad" />
+                </AuthField>
 
-            <label>
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-                autoComplete="email"
-                placeholder="student@ju.edu.jo"
-              />
-            </label>
+                <div className="auth-two-column">
+                  <AuthField label="Email">
+                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="you@ju.edu.jo" />
+                  </AuthField>
+                  <AuthField label="Phone number">
+                    <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" inputMode="tel" placeholder="+962 7X XXX XXXX" />
+                  </AuthField>
+                </div>
 
-            <label>
-              <span className="auth-label-row">
-                Password
-                {!isSignup ? <Link to="/forgot-password">Forgot?</Link> : null}
-              </span>
-              <span className="auth-password-field">
-                <input
-                  type={showPassword ? 'text' : 'password'}
+                <AuthField label="University ID" help="Used for club verification only - never shown publicly.">
+                  <input value={universityId} onChange={(event) => setUniversityId(event.target.value)} autoComplete="username" placeholder="e.g. 0201234" />
+                </AuthField>
+
+                <div className="auth-two-column">
+                  <AuthField label={<span>Chess.com username <em>(optional)</em></span>}>
+                    <input value={chessComUsername} onChange={(event) => setChessComUsername(event.target.value)} placeholder="username" />
+                  </AuthField>
+                  <AuthField label={<span>Lichess username <em>(optional)</em></span>}>
+                    <input value={lichessUsername} onChange={(event) => setLichessUsername(event.target.value)} placeholder="username" />
+                  </AuthField>
+                </div>
+
+                <PasswordField
+                  label="Password"
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  minLength={8}
-                  autoComplete={isSignup ? 'new-password' : 'current-password'}
-                  placeholder="••••••••"
+                  showPassword={showPassword}
+                  onChange={setPassword}
+                  onToggle={() => setShowPassword((visible) => !visible)}
+                  autoComplete="new-password"
                 />
-                <button
-                  type="button"
-                  className="auth-password-toggle"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  aria-pressed={showPassword}
-                  onClick={() => setShowPassword((visible) => !visible)}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </span>
-            </label>
 
-            {passwordHint ? <small className="auth-hint">{passwordHint}</small> : null}
+                <div className="auth-password-rules" aria-label="Password requirements">
+                  <PasswordRule met={passwordRules.length}>8+ characters</PasswordRule>
+                  <PasswordRule met={passwordRules.uppercase}>1 uppercase letter</PasswordRule>
+                  <PasswordRule met={passwordRules.number}>1 number</PasswordRule>
+                </div>
 
-            {message ? (
-              <div className="auth-error" role="alert">
-                {message}
-              </div>
-            ) : null}
-
-            <button className="auth-submit-button" type="submit" disabled={!ready || submitting}>
-              {submitting ? 'Working...' : isSignup ? 'Create account' : 'Sign in'}
-            </button>
-          </form>
-
-          <div className="auth-switch">
-            {isSignup ? (
-              <>
-                Do you have an account? <Link to="/sign-in">Sign in</Link>
+                <PasswordField
+                  label="Confirm password"
+                  value={confirmPassword}
+                  showPassword={showPassword}
+                  onChange={setConfirmPassword}
+                  onToggle={() => setShowPassword((visible) => !visible)}
+                  autoComplete="new-password"
+                />
+                {confirmPassword && !passwordsMatch ? <small className="auth-mismatch">Passwords do not match yet.</small> : null}
               </>
             ) : (
               <>
-                New to the club? <Link to="/sign-up">Create account</Link>
+                <AuthField label="Email">
+                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="you@ju.edu.jo" />
+                </AuthField>
+                <PasswordField
+                  label={<span className="auth-label-row"><span>Password</span><Link to="/forgot-password">Forgot password?</Link></span>}
+                  value={password}
+                  showPassword={showPassword}
+                  onChange={setPassword}
+                  onToggle={() => setShowPassword((visible) => !visible)}
+                  autoComplete="current-password"
+                />
               </>
             )}
-          </div>
+
+            {message ? <div className="auth-error" role="alert">{message}</div> : null}
+
+            <button className="auth-submit-button" type="submit" disabled={!ready || busy}>
+              {submitting ? 'Working...' : isSignup ? 'Create Account' : 'Sign In'}
+            </button>
+
+            {!isSignup ? (
+              <>
+                <Link className="auth-secondary-button" to="/sign-up">Sign Up</Link>
+                <Link className="auth-guest-link" to="/home">Enter as guest <span aria-hidden="true">&rarr;</span></Link>
+              </>
+            ) : null}
+          </form>
+
+          {isSignup ? (
+            <div className="auth-switch">Do you have an account? <Link to="/sign-in">Sign in</Link></div>
+          ) : null}
         </section>
       </main>
+      {!isSignup ? <footer className="auth-footer">University of Jordan Chess Club &middot; 2026</footer> : null}
     </div>
   )
+}
+
+function AuthSiteHeader() {
+  return (
+    <header className="auth-site-header">
+      <Link to="/home">
+        <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="Chess Club JU crest" />
+        <span>JuChess</span>
+      </Link>
+    </header>
+  )
+}
+
+function SocialSignIn({ busy, oauthProvider, onSelect, ready }: {
+  busy: boolean
+  oauthProvider: SocialAuthProvider | null
+  onSelect: (provider: SocialAuthProvider) => void
+  ready: boolean
+}) {
+  return (
+    <div className="auth-social-row">
+      <button type="button" className="auth-social apple" disabled={!ready || busy} onClick={() => onSelect('apple')}>
+        <AppleLogo />
+        <span>{oauthProvider === 'apple' ? 'Connecting...' : 'Continue with Apple'}</span>
+      </button>
+      <button type="button" className="auth-social google" disabled={!ready || busy} onClick={() => onSelect('google')}>
+        <GoogleLogo />
+        <span>{oauthProvider === 'google' ? 'Connecting...' : 'Continue with Google'}</span>
+      </button>
+    </div>
+  )
+}
+
+function AuthField({ children, help, label }: { children: ReactNode; help?: string; label: ReactNode }) {
+  return (
+    <label className="auth-field">
+      <span className="auth-field-label">{label}</span>
+      {children}
+      {help ? <small>{help}</small> : null}
+    </label>
+  )
+}
+
+function PasswordField({ autoComplete, label, onChange, onToggle, showPassword, value }: {
+  autoComplete: 'current-password' | 'new-password'
+  label: ReactNode
+  onChange: (value: string) => void
+  onToggle: () => void
+  showPassword: boolean
+  value: string
+}) {
+  return (
+    <AuthField label={label}>
+      <span className="auth-password-field">
+        <input
+          type={showPassword ? 'text' : 'password'}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          required
+          minLength={8}
+          autoComplete={autoComplete}
+          placeholder="••••••••"
+        />
+        <button type="button" className="auth-password-toggle" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={onToggle}>
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </span>
+    </AuthField>
+  )
+}
+
+function PasswordRule({ children, met }: { children: ReactNode; met: boolean }) {
+  return <span className={met ? 'met' : ''}>{children}</span>
+}
+
+function AppleLogo() {
+  return <svg width="16" height="19" viewBox="0 0 170 210" fill="currentColor" aria-hidden="true"><path d="M150.4 71.6c-1 .8-19.7 11.3-19.7 34.7 0 27 23.7 36.6 24.4 36.8-.1.6-3.8 13-12.5 25.6-7.8 11.1-16 22.2-28.4 22.2s-15.6-7.2-29.9-7.2c-14 0-19 7.4-30.4 7.4S34.7 180.8 26 168.4C15.9 154 7.7 131.7 7.7 110.5c0-34 22.1-52 43.8-52 11.6 0 21.2 7.6 28.5 7.6 6.9 0 17.7-8.1 30.9-8.1 5 .1 23 .5 34.9 17.2l4.6-3.6zM108.7 33.2c5.7-6.7 9.7-16.1 9.7-25.5 0-1.3-.1-2.6-.3-3.7-9.2.3-20.2 6.1-26.8 13.8-5.2 5.9-10 15.3-10 24.8 0 1.4.2 2.9.3 3.3.6.1 1.5.2 2.5.2 8.3.1 18.7-5.4 24.6-12.9z" /></svg>
+}
+
+function GoogleLogo() {
+  return <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.4 17.7 9.5 24 9.5z" /><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z" /><path fill="#FBBC05" d="M10.5 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.6 10.8l7.9-6.2z" /><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.6-5.7l-7.7-6c-2.1 1.4-4.8 2.3-7.9 2.3-6.3 0-11.6-3.9-13.5-9.8l-7.9 6.2C6.5 42.6 14.6 48 24 48z" /></svg>
+}
+
+function providerName(provider: string | null) {
+  return provider === 'apple' ? 'Apple' : 'Google'
 }
 
 export default AuthPage
