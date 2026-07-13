@@ -308,6 +308,23 @@
   text-align: center;
 }
 
+.online-board-controls > div {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.online-board-controls small {
+  max-width: min(520px, 75vw);
+  overflow: hidden;
+  color: #7a2431;
+  font-size: 10px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .online-board-controls button:disabled {
   cursor: default;
   opacity: 0.4;

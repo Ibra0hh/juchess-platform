@@ -14,6 +14,7 @@ import { useAuth } from '../context/useAuth'
 import { useTournamentPlay } from '../context/useTournamentPlay'
 import { useBoardPreferences } from '../hooks/useBoardPreferences'
 import { useFairPlayMonitor } from '../hooks/useFairPlayMonitor'
+import { useOpeningIdentity } from '../hooks/useOpeningIdentity'
 import type { JuPieceTheme } from '../lib/boardAppearance'
 import {
   loadTournamentGame,
@@ -44,6 +45,7 @@ type TournamentGameChoice = {
 }
 
 const LIVE_GAME_POLL_MS = 1_000
+const STANDARD_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
 function OnlineGamesPage() {
   const { profile } = useAuth()
@@ -284,6 +286,7 @@ function OnlineGamesPage() {
   const displayedPly = viewedPly === null ? boardMoves.length : Math.min(viewedPly, boardMoves.length)
   const displayedMoves = useMemo(() => boardMoves.slice(0, displayedPly), [boardMoves, displayedPly])
   const boardSummary = useMemo(() => getJuChessBoardSummary(undefined, displayedMoves), [displayedMoves])
+  const opening = useOpeningIdentity(STANDARD_FEN, displayedMoves)
   const viewingLatest = displayedPly === boardMoves.length
   const topSide = flipped ? 'white' : 'black'
   const bottomSide = flipped ? 'black' : 'white'
@@ -404,19 +407,22 @@ function OnlineGamesPage() {
             />
 
             <div className="online-board-controls">
-              <span>
-                {!viewingLatest
-                  ? `Move ${displayedPly} of ${boardMoves.length}`
-                  : movePending
-                  ? 'Saving move...'
-                  : preGameActive
-                    ? `Get ready · ${preGameCountdown?.label}`
-                  : assignedParticipant
-                    ? selectedGame?.status === 'scheduled' && assignedColor === 'black'
-                      ? 'Waiting for White to begin'
-                      : canMove ? 'Your turn' : 'Opponent to move'
-                    : `${boardMoves.length} moves · ${boardResult}`}
-              </span>
+              <div>
+                <span>
+                  {!viewingLatest
+                    ? `Move ${displayedPly} of ${boardMoves.length}`
+                    : movePending
+                    ? 'Saving move...'
+                    : preGameActive
+                      ? `Get ready · ${preGameCountdown?.label}`
+                    : assignedParticipant
+                      ? selectedGame?.status === 'scheduled' && assignedColor === 'black'
+                        ? 'Waiting for White to begin'
+                        : canMove ? 'Your turn' : 'Opponent to move'
+                      : `${boardMoves.length} moves · ${boardResult}`}
+                </span>
+                {opening ? <small>{opening.eco} · {opening.name}</small> : null}
+              </div>
               {assignedParticipant ? (
                 <button className="online-resign-button" type="button" disabled={movePending} onClick={() => void resignGame()}>Resign</button>
               ) : null}

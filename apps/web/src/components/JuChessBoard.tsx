@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js'
 import {
+  annotationColorForModifiers,
   boardThemeAssetPath,
   getAnnotationColorOption,
   pieceThemeAssetPath,
@@ -28,8 +29,14 @@ type PendingPromotion = {
 }
 
 type BoardArrow = {
+  color: JuAnnotationColor
   from: Square
   to: Square
+}
+
+type RightDrag = {
+  color: JuAnnotationColor
+  from: Square
 }
 
 type PieceDrag = {
@@ -109,7 +116,7 @@ export function JuChessBoard({
   const suppressClickRef = useRef(false)
   const [selected, setSelected] = useState<Square | null>(null)
   const [pendingPromotion, setPendingPromotion] = useState<PendingPromotion | null>(null)
-  const [rightDragFrom, setRightDragFrom] = useState<Square | null>(null)
+  const [rightDrag, setRightDrag] = useState<RightDrag | null>(null)
   const [arrows, setArrows] = useState<BoardArrow[]>([])
   const [markedSquares, setMarkedSquares] = useState<Set<Square>>(() => new Set())
   const [pieceDrag, setPieceDrag] = useState<PieceDrag | null>(null)
@@ -134,7 +141,7 @@ export function JuChessBoard({
     if (annotationsEnabled) return
     setArrows([])
     setMarkedSquares(new Set())
-    setRightDragFrom(null)
+    setRightDrag(null)
   }, [annotationsEnabled])
 
   function emit(nextGame: Chess, nextMoves: string[], lastMoveSan: string) {
@@ -167,7 +174,7 @@ export function JuChessBoard({
     if (!annotationsEnabled) return
     setArrows([])
     setMarkedSquares(new Set())
-    setRightDragFrom(null)
+    setRightDrag(null)
   }
 
   function handleSquareClick(square: Square) {
@@ -276,14 +283,14 @@ export function JuChessBoard({
   function handleRightMouseDown(event: MouseEvent<HTMLButtonElement>, square: Square) {
     if (!annotationsEnabled || event.button !== 2) return
     event.preventDefault()
-    setRightDragFrom(square)
+    setRightDrag({ color: annotationColorForModifiers(event, arrowColor), from: square })
   }
 
   function handleRightMouseUp(event: MouseEvent<HTMLButtonElement>, square: Square) {
-    if (!annotationsEnabled || event.button !== 2 || !rightDragFrom) return
+    if (!annotationsEnabled || event.button !== 2 || !rightDrag) return
     event.preventDefault()
 
-    if (rightDragFrom === square) {
+    if (rightDrag.from === square) {
       setMarkedSquares((current) => {
         const next = new Set(current)
         if (next.has(square)) next.delete(square)
@@ -291,22 +298,27 @@ export function JuChessBoard({
         return next
       })
     } else {
-      const nextArrow = { from: rightDragFrom, to: square }
+      const nextArrow = { color: rightDrag.color, from: rightDrag.from, to: square }
       setArrows((current) => {
         const existing = current.findIndex((arrow) => arrow.from === nextArrow.from && arrow.to === nextArrow.to)
-        if (existing >= 0) return current.filter((_, index) => index !== existing)
+        if (existing >= 0) {
+          if (current[existing].color === nextArrow.color) {
+            return current.filter((_, index) => index !== existing)
+          }
+          return current.map((arrow, index) => index === existing ? nextArrow : arrow)
+        }
         return [...current, nextArrow]
       })
     }
 
-    setRightDragFrom(null)
+    setRightDrag(null)
   }
 
   return (
     <div
       className={['ju-chess-board-shell', showEvaluation ? '' : 'without-evaluation', className].filter(Boolean).join(' ')}
       onContextMenu={annotationsEnabled ? (event) => event.preventDefault() : undefined}
-      onMouseLeave={() => setRightDragFrom(null)}
+      onMouseLeave={() => setRightDrag(null)}
     >
       {showEvaluation ? (
         <div
@@ -390,16 +402,28 @@ export function JuChessBoard({
         {annotationsEnabled && arrows.length ? (
           <svg className="ju-board-arrows" viewBox="0 0 8 8" aria-hidden="true">
             <defs>
-              <marker id={markerId} markerHeight="4" markerWidth="4" orient="auto" refX="3.2" refY="2" viewBox="0 0 4 4">
-                <path d="M0,0 L4,2 L0,4 Z" />
-              </marker>
+              {Array.from(new Set(arrows.map((arrow) => arrow.color))).map((color) => (
+                <marker
+                  id={`${markerId}-${color}`}
+                  key={color}
+                  markerHeight="4"
+                  markerWidth="4"
+                  orient="auto"
+                  refX="3.2"
+                  refY="2"
+                  viewBox="0 0 4 4"
+                >
+                  <path d="M0,0 L4,2 L0,4 Z" fill={getAnnotationColorOption(color).arrow} />
+                </marker>
+              ))}
             </defs>
             {arrows.map((arrow) => (
               <path
                 className="ju-board-arrow"
                 d={arrowPath(arrow, flipped)}
-                key={`${arrow.from}-${arrow.to}`}
-                markerEnd={`url(#${markerId})`}
+                key={`${arrow.from}-${arrow.to}-${arrow.color}`}
+                markerEnd={`url(#${markerId}-${arrow.color})`}
+                style={{ '--ju-arrow-color': getAnnotationColorOption(arrow.color).arrow } as CSSProperties}
               />
             ))}
           </svg>

@@ -842,6 +842,31 @@
   font-weight: 700;
 }
 
+.board-title-actions > .board-opening-label {
+  display: inline-flex;
+  max-width: min(310px, 38vw);
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  overflow: hidden;
+  border: 1px solid rgba(122, 36, 49, 0.18);
+  border-radius: 999px;
+  background: #fff8f5;
+  color: rgba(17, 17, 17, 0.68);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 10.5px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-opening-label strong {
+  flex: none;
+  color: var(--wine);
+  font-size: 9.5px;
+}
+
 .board-control-stack {
   position: absolute;
   z-index: 15;

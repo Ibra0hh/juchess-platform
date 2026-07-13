@@ -230,6 +230,16 @@ export function getAnnotationColorOption(color: string) {
   return annotationColorById.get(color) ?? annotationColorById.get(defaultBoardPreferences.arrowColor)!
 }
 
+export function annotationColorForModifiers(
+  modifiers: { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean },
+  fallback: JuAnnotationColor,
+): JuAnnotationColor {
+  if (modifiers.ctrlKey || modifiers.metaKey) return 'gold'
+  if (modifiers.altKey) return 'blue'
+  if (modifiers.shiftKey) return 'red'
+  return fallback
+}
+
 export function boardThemeAssetPath(theme: JuBoardTheme) {
   return getBoardThemeOption(theme).asset
 }

@@ -1,4 +1,5 @@
 import { Chess, type Color, type Square } from 'chess.js'
+import { probeTablebase, type TablebaseProbe } from './tablebase.ts'
 
 export type ReviewClassification =
   | 'Brilliant'
@@ -102,6 +103,8 @@ export type ReviewPhaseSummary = {
 
 export type PositionAnalysisResult = PositionReview & {
   bestLineSan: string[]
+  source: 'stockfish' | 'tablebase'
+  tablebase?: TablebaseProbe
 }
 
 type ReviewInput = {
@@ -487,8 +490,16 @@ export async function analyzePosition(
   input: PositionAnalysisInput,
   engine: StockfishReviewEngine,
   depth = getReviewEnginePreset(defaultReviewEngineStrength).depth,
+  signal?: AbortSignal,
 ): Promise<PositionAnalysisResult> {
   const parsed = parseAnalysisPosition(input)
+  try {
+    const tablebase = await probeTablebase(parsed.currentFen, { signal })
+    if (tablebase) return tablebaseAnalysisResult(tablebase)
+  } catch (error) {
+    if (signal?.aborted) throw error
+  }
+
   await engine.newGame()
   const result = await engine.evaluatePosition(
     parsed.initialFen,
@@ -503,6 +514,34 @@ export async function analyzePosition(
       parsed.currentFen,
       result.lines[0]?.moves ?? [],
     ),
+    source: 'stockfish',
+  }
+}
+
+function tablebaseAnalysisResult(tablebase: TablebaseProbe): PositionAnalysisResult {
+  const evaluation = tablebase.winner === 'white'
+    ? 100
+    : tablebase.winner === 'black' ? -100 : 0
+  const expectedScore = tablebase.winner === 'white'
+    ? 1
+    : tablebase.winner === 'black' ? 0 : 0.5
+  const bestMove = tablebase.moves[0]
+
+  return {
+    bestLineSan: bestMove ? [bestMove.san] : [],
+    bestMove: bestMove?.uci,
+    depth: 0,
+    evaluation,
+    lines: [{
+      depth: 0,
+      evaluation,
+      moves: bestMove ? [bestMove.uci] : [],
+      multiPv: 1,
+      whiteExpectedScore: expectedScore,
+    }],
+    source: 'tablebase',
+    tablebase,
+    whiteExpectedScore: expectedScore,
   }
 }
 

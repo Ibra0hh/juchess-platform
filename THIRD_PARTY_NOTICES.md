@@ -13,6 +13,24 @@ JuChess uses Stockfish to evaluate chess positions for Game Review.
 The distributed engine license is included with the browser assets and with the
 Flutter package. JuChess does not modify the Stockfish engine.
 
+## Lichess Chess Openings
+
+JuChess includes a generated, lazily loaded opening-name index based on the
+Lichess chess-openings dataset.
+
+- Source: https://github.com/lichess-org/chess-openings
+- License: CC0 1.0 Universal / public domain dedication
+- Included data: ECO codes, English opening names, move sequences, and derived
+  standard-position keys
+
+## Lichess Tablebase API
+
+JuChess analysis can query the public Lichess tablebase HTTP API for supported
+standard-chess endgames. No lila-tablebase server source is bundled into JuChess.
+
+- API documentation: https://github.com/lichess-org/lila-tablebase#http-api
+- Endpoint: https://tablebase.lichess.org/standard
+
 ## Chesskit Reference Boundary
 
 Chesskit was reviewed only to understand the high-level product flow of a local

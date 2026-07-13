@@ -302,7 +302,6 @@
 }
 
 .ju-board-arrows marker path {
-  fill: var(--ju-arrow-color, #992635);
   fill-opacity: 0.86;
 }
 

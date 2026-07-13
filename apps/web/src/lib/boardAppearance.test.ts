@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import test from 'node:test'
 import {
+  annotationColorForModifiers,
   boardThemeOptions,
   defaultBoardPreferences,
   mergeBoardPreferences,
@@ -76,4 +77,12 @@ test('annotation colors normalize and merge independently', () => {
     ...customized,
     arrowColor: 'purple',
   })
+})
+
+test('annotation modifier shortcuts select independent arrow colors', () => {
+  assert.equal(annotationColorForModifiers({}, 'purple'), 'purple')
+  assert.equal(annotationColorForModifiers({ shiftKey: true }, 'purple'), 'red')
+  assert.equal(annotationColorForModifiers({ altKey: true }, 'purple'), 'blue')
+  assert.equal(annotationColorForModifiers({ ctrlKey: true }, 'purple'), 'gold')
+  assert.equal(annotationColorForModifiers({ metaKey: true }, 'purple'), 'gold')
 })

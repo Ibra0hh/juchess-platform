@@ -234,6 +234,9 @@ export function BoardSettingsPanel({
             selected={markColor}
             type="mark"
           />
+          <p className="annotation-modifier-help">
+            Arrow shortcuts: Shift + right-drag red, Alt + right-drag blue, Ctrl/Command + right-drag gold.
+          </p>
         </div>
       ) : null}
 

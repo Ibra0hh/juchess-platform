@@ -22,6 +22,7 @@ import {
 import {
   analyzePosition,
   estimateGameRating,
+  parseAnalysisPosition,
   parseReviewGame,
   reviewGame,
   reviewGameIdentity,
@@ -39,7 +40,9 @@ import { loadExternalGames } from '../lib/externalGames'
 import type { AuthProfile } from '../lib/auth'
 import { useAuth } from '../context/useAuth'
 import { useBoardPreferences } from '../hooks/useBoardPreferences'
+import { useOpeningIdentity } from '../hooks/useOpeningIdentity'
 import type { JuAnnotationColor, JuBoardTheme, JuPieceTheme } from '../lib/boardAppearance'
+import type { OpeningIdentity } from '../lib/openingBook'
 import './ClubScreens.css'
 
 type GameMode = 'review' | 'analysis'
@@ -151,6 +154,7 @@ function GamesPage() {
   const reviewAbortRef = useRef<AbortController | null>(null)
   const reviewEngineRef = useRef<StockfishReviewEngine | null>(null)
   const workspaceAnalysisRunRef = useRef(0)
+  const workspaceAnalysisAbortRef = useRef<AbortController | null>(null)
   const workspaceAnalysisEngineRef = useRef<StockfishReviewEngine | null>(null)
   const workspaceInitialFen = game?.fen || startFen
 
@@ -342,6 +346,8 @@ function GamesPage() {
 
   useEffect(() => {
     const run = ++workspaceAnalysisRunRef.current
+    workspaceAnalysisAbortRef.current?.abort()
+    workspaceAnalysisAbortRef.current = null
     workspaceAnalysisEngineRef.current?.dispose()
     workspaceAnalysisEngineRef.current = null
 
@@ -357,16 +363,19 @@ function GamesPage() {
     setWorkspaceAnalysisLoading(true)
 
     const timer = window.setTimeout(() => {
+      const controller = new AbortController()
       const engine = new StockfishReviewEngine({
         hashMb: enginePreset.hashMb,
         multiPv: 1,
       })
+      workspaceAnalysisAbortRef.current = controller
       workspaceAnalysisEngineRef.current = engine
 
       void analyzePosition(
         { fen: workspaceInitialFen, moves: workspaceMoves },
         engine,
         enginePreset.depth,
+        controller.signal,
       ).then((result) => {
         if (run !== workspaceAnalysisRunRef.current) return
         setWorkspaceAnalysis(result)
@@ -380,6 +389,9 @@ function GamesPage() {
         setWorkspaceAnalysisLoading(false)
       }).finally(() => {
         engine.dispose()
+        if (workspaceAnalysisAbortRef.current === controller) {
+          workspaceAnalysisAbortRef.current = null
+        }
         if (workspaceAnalysisEngineRef.current === engine) {
           workspaceAnalysisEngineRef.current = null
         }
@@ -388,6 +400,8 @@ function GamesPage() {
 
     return () => {
       window.clearTimeout(timer)
+      workspaceAnalysisAbortRef.current?.abort()
+      workspaceAnalysisAbortRef.current = null
       workspaceAnalysisEngineRef.current?.dispose()
       workspaceAnalysisEngineRef.current = null
     }
@@ -451,6 +465,7 @@ function GamesPage() {
       : []
   const boardFen = boardMoves.length ? undefined : boardGame?.fen || startFen
   const boardSummary = getJuChessBoardSummary(boardFen, boardMoves)
+  const currentOpening = useOpeningIdentity(boardGame?.fen || startFen, boardMoves)
   const playerData = {
     black: {
       badge: inWorkspace ? workspaceResult : boardGame ? boardGame.result : '',
@@ -568,27 +583,51 @@ function GamesPage() {
   const loadPgn = () => {
     if (!pgnText.trim()) return
     try {
-      const parsed = parseReviewGame({ pgn: pgnText })
+      const input = pgnText.trim()
       const importedId = `imported-${Date.now()}`
-      const importedGame: SampleGame = {
-        bRating: parseRating(parsed.headers.BlackElo),
-        black: parsed.headers.Black || 'Black',
-        date: formatPgnDate(parsed.headers.Date),
-        fen: parsed.initialFen,
-        id: importedId,
-        key: importedId,
-        moves: parsed.moves,
-        opening: parsed.headers.Opening || parsed.headers.ECO || 'Imported PGN',
-        pgn: pgnText,
-        result: parsed.headers.Result || '*',
-        round: parsed.headers.Round ? `Round ${parsed.headers.Round}` : 'Imported game',
-        source: 'tournament',
-        wRating: parseRating(parsed.headers.WhiteElo),
-        white: parsed.headers.White || 'White',
-      }
+      const fenInput = input.includes('/') && input.split(/\s+/).length >= 4
+      const importedGame: SampleGame = fenInput
+        ? (() => {
+            const parsed = parseAnalysisPosition({ fen: input })
+            return {
+              black: 'Black',
+              bRating: 0,
+              date: 'Custom position',
+              fen: parsed.currentFen,
+              id: importedId,
+              key: importedId,
+              moves: [],
+              opening: 'Custom position',
+              pgn: '',
+              result: '*',
+              round: 'Local analysis',
+              source: 'tournament',
+              wRating: 0,
+              white: 'White',
+            }
+          })()
+        : (() => {
+            const parsed = parseReviewGame({ pgn: input })
+            return {
+              bRating: parseRating(parsed.headers.BlackElo),
+              black: parsed.headers.Black || 'Black',
+              date: formatPgnDate(parsed.headers.Date),
+              fen: parsed.initialFen,
+              id: importedId,
+              key: importedId,
+              moves: parsed.moves,
+              opening: parsed.headers.Opening || parsed.headers.ECO || 'Imported PGN',
+              pgn: input,
+              result: parsed.headers.Result || '*',
+              round: parsed.headers.Round ? `Round ${parsed.headers.Round}` : 'Imported game',
+              source: 'tournament',
+              wRating: parseRating(parsed.headers.WhiteElo),
+              white: parsed.headers.White || 'White',
+            }
+          })()
       setGame(importedGame)
       setWorkspaceLoaded(true)
-      setWorkspaceMoves(parsed.moves)
+      setWorkspaceMoves(importedGame.moves)
       setWorkspaceResult(importedGame.result)
       setWorkspaceError('')
       setRan(true)
@@ -625,9 +664,21 @@ function GamesPage() {
             <h1>{inReview ? 'Game review' : inWorkspace ? 'Analysis board' : isReviewMode ? 'Review room' : 'Analysis room'}</h1>
             {boardGame || inReview || (inWorkspace && ran) ? (
               <div className="board-title-actions">
+                {currentOpening ? (
+                  <span className="board-opening-label">
+                    <strong>{currentOpening.eco}</strong>
+                    {currentOpening.name}
+                  </span>
+                ) : null}
                 <span>
                   {boardGame ? boardGame.round || boardGame.date : null}
-                  {inReview || (inWorkspace && ran) ? <small>Stockfish 18 · {enginePreset.label}</small> : null}
+                  {inReview || (inWorkspace && ran) ? (
+                    <small>
+                      {inWorkspace && workspaceAnalysis?.source === 'tablebase'
+                        ? `${workspaceAnalysis.tablebase?.exact ? 'Exact ' : ''}Lichess tablebase`
+                        : `Stockfish 18 · ${enginePreset.label}`}
+                    </small>
+                  ) : null}
                 </span>
               </div>
             ) : null}
@@ -804,6 +855,7 @@ function GamesPage() {
               game={game}
               loading={reviewLoading}
               moveRows={reviewRows}
+              opening={currentOpening}
               onSelectMove={(index) => {
                 setMoveIdx(index)
                 setReviewStarted(true)
@@ -833,6 +885,7 @@ function GamesPage() {
               game={workspaceGame}
               error={workspaceError || workspaceAnalysisError}
               loaded={workspaceLoaded}
+              opening={currentOpening}
               pgnText={pgnText}
               ran={ran}
               rows={workspaceRows}
@@ -1162,6 +1215,7 @@ function ReviewPanel({
   game,
   loading,
   moveRows,
+  opening,
   onExit,
   onSelectMove,
   onStart,
@@ -1177,6 +1231,7 @@ function ReviewPanel({
   game: SampleGame
   loading: boolean
   moveRows: ReturnType<typeof buildMoveRows>
+  opening: OpeningIdentity | null
   onExit: () => void
   onSelectMove: (index: number) => void
   onStart: () => void
@@ -1310,7 +1365,7 @@ function ReviewPanel({
 
       {review && started ? (
         <section className="moves-panel">
-          <h2>Moves - {game.opening}</h2>
+          <h2>Moves - {opening ? `${opening.eco} ${opening.name}` : game.opening}</h2>
           <div className="move-list-scroll" ref={moveListRef}>
             {moveRows.map((row) => (
               <div className="move-row" key={row.number}>
@@ -1451,6 +1506,7 @@ function WorkspacePanel({
   error,
   game,
   loaded,
+  opening,
   onClose,
   onLoad,
   onNew,
@@ -1468,6 +1524,7 @@ function WorkspacePanel({
   error: string
   game: SampleGame | null
   loaded: boolean
+  opening: OpeningIdentity | null
   onClose: () => void
   onLoad: () => void
   onNew: () => void
@@ -1491,6 +1548,8 @@ function WorkspacePanel({
     ? 'Press Run to start Stockfish'
     : analysisLoading
       ? 'Evaluating the current position...'
+      : analysis?.source === 'tablebase'
+        ? formatTablebaseLine(analysis)
       : analysis?.bestLineSan.length
         ? analysis.bestLineSan.slice(0, 10).join(' ')
         : analysis
@@ -1509,13 +1568,21 @@ function WorkspacePanel({
         <div className="engine-line">
           <div>
             <strong>{engineEval}</strong>
-            <span>{analysis ? `depth ${analysis.depth}` : 'Stockfish 18'}</span>
+            <span>
+              {analysis?.source === 'tablebase'
+                ? `${analysis.tablebase?.exact ? 'Exact tablebase' : 'Tablebase'} · ${analysis.tablebase?.pieceCount ?? 7} pieces`
+                : analysis ? `depth ${analysis.depth}` : 'Stockfish 18'}
+            </span>
           </div>
           <p>{engineLine}</p>
         </div>
         <div className="workspace-opening">
-          <strong>{loaded && game ? game.opening : 'Starting position'}</strong>
-          <span>{loaded && game ? sourceName(game.source) : 'Standard'}</span>
+          <strong>{opening?.name || (loaded && game ? game.opening : 'Starting position')}</strong>
+          <span>
+            {opening?.eco || (loaded && game
+              ? game.opening === 'Custom position' ? 'FEN' : sourceName(game.source)
+              : 'Standard')}
+          </span>
         </div>
         <div className="workspace-actions">
           <button type="button" onClick={onNew}>
@@ -1732,8 +1799,26 @@ function formatEvaluation(value: number) {
 }
 
 function formatAnalysisEvaluation(analysis: PositionAnalysisResult) {
+  if (analysis.source === 'tablebase') {
+    if (analysis.tablebase?.winner === 'white') return 'White wins'
+    if (analysis.tablebase?.winner === 'black') return 'Black wins'
+    if (analysis.tablebase?.winner === 'draw') return 'Draw'
+    return 'Tablebase'
+  }
   if (analysis.mate !== undefined) return `M${analysis.mate > 0 ? '+' : ''}${analysis.mate}`
   return formatEvaluation(analysis.evaluation)
+}
+
+function formatTablebaseLine(analysis: PositionAnalysisResult) {
+  const tablebase = analysis.tablebase
+  const bestMove = analysis.bestLineSan[0]
+  const decisive = tablebase?.winner === 'white' || tablebase?.winner === 'black'
+  const distance = decisive && tablebase?.dtm !== null && tablebase?.dtm !== undefined
+    ? ` · mate in ${Math.ceil(Math.abs(tablebase.dtm) / 2)}`
+    : tablebase?.dtz !== null && tablebase?.dtz !== undefined
+      ? ` · zeroing move in ${Math.abs(tablebase.dtz)} plies`
+      : ''
+  return `${bestMove ? `Best ${bestMove}` : 'No legal continuation'}${distance}`
 }
 
 function buildWorkspaceRows(moves: string[]) {
