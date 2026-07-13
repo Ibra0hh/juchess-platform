@@ -594,6 +594,19 @@ function GamesPage() {
     setWorkspaceLoaded(true)
   }
 
+  const startAnalysisFromBoard = (state: JuChessBoardChange) => {
+    resetReviewState()
+    setMode('analysis')
+    setStep('workspace')
+    setGame(null)
+    setWorkspaceLoaded(true)
+    setWorkspaceMoves(state.moves)
+    setWorkspaceResult(state.result)
+    setWorkspaceError('')
+    setSaved(false)
+    setRan(true)
+  }
+
   return (
     <div className="club-screen games-screen" data-screen-label="Tools Workspace">
       <SiteHeader active="tools" />
@@ -606,18 +619,6 @@ function GamesPage() {
                 {boardGame ? boardGame.round || boardGame.date : 'Standard position'}
                 {inReview || (inWorkspace && ran) ? <small>Stockfish 18 · {enginePreset.label}</small> : null}
               </span>
-              <div className="board-control-stack">
-                <button
-                  type="button"
-                  aria-expanded={settingsOpen}
-                  aria-label="Board settings"
-                  className={settingsOpen ? 'active' : undefined}
-                  title="Board settings"
-                  onClick={() => setSettingsOpen((current) => !current)}
-                >
-                  <Settings2 aria-hidden="true" />
-                </button>
-              </div>
             </div>
           </div>
 
@@ -636,6 +637,18 @@ function GamesPage() {
           ) : null}
 
           <div className="board-player-frame">
+            <div className="board-control-stack">
+              <button
+                type="button"
+                aria-expanded={settingsOpen}
+                aria-label="Board settings"
+                className={settingsOpen ? 'active' : undefined}
+                title="Board settings"
+                onClick={() => setSettingsOpen((current) => !current)}
+              >
+                <Settings2 aria-hidden="true" />
+              </button>
+            </div>
             <PlayerBar {...topPlayer} edge="top" pieceTheme={pieceTheme} />
 
             <div className="board-wrap">
@@ -644,9 +657,9 @@ function GamesPage() {
                 evaluation={evalNow}
                 fen={boardFen}
                 flipped={flipped}
-                interactive={inWorkspace}
+                interactive={!inReview}
                 moves={boardMoves}
-                onChange={inWorkspace ? updateWorkspaceBoard : undefined}
+                onChange={inWorkspace ? updateWorkspaceBoard : inReview ? undefined : startAnalysisFromBoard}
                 boardTheme={boardTheme}
                 pieceTheme={pieceTheme}
                 squareBadge={reviewSquareBadge}

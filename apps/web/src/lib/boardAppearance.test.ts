@@ -5,6 +5,8 @@ import {
   boardThemeOptions,
   defaultBoardPreferences,
   normalizeBoardPreferences,
+  pieceThemeAssetPath,
+  pieceThemeOptions,
 } from './boardAppearance.ts'
 
 test('board appearance accepts the supported experimental themes', () => {
@@ -15,16 +17,33 @@ test('board appearance accepts the supported experimental themes', () => {
 })
 
 test('board appearance exposes the full board catalogue', () => {
-  assert.equal(boardThemeOptions.length, 31)
-  assert.deepEqual(normalizeBoardPreferences({ boardTheme: 'parchment', pieceTheme: 'juchess' }), {
-    boardTheme: 'parchment',
+  assert.equal(boardThemeOptions.length, 84)
+  assert.deepEqual(normalizeBoardPreferences({ boardTheme: 'lichess-wood4', pieceTheme: 'juchess' }), {
+    boardTheme: 'lichess-wood4',
     pieceTheme: 'juchess',
   })
 
   for (const option of boardThemeOptions) {
-    if (option.id === 'juchess') continue
-    assert.equal(existsSync(new URL(`../../public/chess-boards/${option.id}.png`, import.meta.url)), true)
-    assert.equal(existsSync(new URL(`../../public/chess-boards/thumbs/${option.id}.jpg`, import.meta.url)), true)
+    if (option.asset === null || option.thumbnail === null) continue
+    assert.equal(existsSync(new URL(`../../public/${option.asset}`, import.meta.url)), true, option.asset)
+    assert.equal(existsSync(new URL(`../../public/${option.thumbnail}`, import.meta.url)), true, option.thumbnail)
+  }
+})
+
+test('board appearance exposes every complete piece catalogue', () => {
+  assert.equal(pieceThemeOptions.length, 90)
+  assert.deepEqual(normalizeBoardPreferences({ boardTheme: 'juchess', pieceTheme: 'lichess-monarchy' }), {
+    boardTheme: 'juchess',
+    pieceTheme: 'lichess-monarchy',
+  })
+
+  for (const option of pieceThemeOptions) {
+    for (const color of ['b', 'w'] as const) {
+      for (const type of ['b', 'k', 'n', 'p', 'q', 'r'] as const) {
+        const asset = pieceThemeAssetPath(option.id, color, type)
+        assert.equal(existsSync(new URL(`../../public/${asset}`, import.meta.url)), true, asset)
+      }
+    }
   }
 })
 

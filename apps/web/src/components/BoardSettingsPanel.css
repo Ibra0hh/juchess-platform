@@ -1,7 +1,7 @@
 .board-settings-panel {
   position: absolute;
   z-index: 12;
-  width: min(calc(100% - 16px), 460px);
+  width: min(calc(100% - 16px), 400px);
   max-height: min(650px, calc(100dvh - 118px));
   margin: 0;
   padding: 14px;
@@ -15,13 +15,15 @@
 }
 
 .games-board-settings {
-  top: 48px;
-  right: -10px;
+  top: 50%;
+  left: calc(50% + min(50cqw, 418px, calc(50cqh - 105px)) + 52px);
+  transform: translateY(-50%);
 }
 
 .online-board-settings {
-  top: 0;
-  right: max(8px, calc((100% - var(--online-board-size)) / 2 - 10px));
+  top: 50%;
+  left: calc(50% + min(50cqw, 400px, calc(50cqh - 80px)) + 52px);
+  transform: translateY(-50%);
 }
 
 .board-settings-head {
@@ -159,7 +161,8 @@
   box-shadow: 0 1px 4px rgba(17, 17, 17, 0.12);
 }
 
-.board-theme-panel {
+.board-theme-panel,
+.piece-theme-panel {
   margin-top: 10px;
 }
 
@@ -209,7 +212,8 @@
   border: 0;
 }
 
-.board-theme-options {
+.board-theme-options,
+.piece-theme-options {
   max-height: 320px;
   padding-right: 3px;
   overflow-y: auto;
@@ -255,8 +259,7 @@
 }
 
 .board-theme-options button > img,
-.board-theme-swatch,
-.piece-theme-options img {
+.board-theme-swatch {
   display: block;
   width: 40px;
   height: 40px;
@@ -281,8 +284,30 @@
   background-size: 40px 40px;
 }
 
-.piece-theme-options img {
+.piece-theme-preview {
+  position: relative;
+  display: block;
+  width: 46px;
+  height: 40px;
+  flex: none;
+}
+
+.piece-theme-preview img {
+  position: absolute;
+  display: block;
+  width: 31px;
+  height: 31px;
   object-fit: contain;
+}
+
+.piece-theme-preview img:first-child {
+  top: 0;
+  left: 0;
+}
+
+.piece-theme-preview img:last-child {
+  right: 0;
+  bottom: 0;
 }
 
 .board-theme-empty {
@@ -308,6 +333,22 @@
   font-size: 8.5px;
 }
 
+@media (max-width: 1350px) {
+  .games-board-settings {
+    top: 48px;
+    right: max(8px, calc(50% - min(50cqw, 418px, calc(50cqh - 105px))));
+    left: auto;
+    transform: none;
+  }
+
+  .online-board-settings {
+    top: 0;
+    right: max(8px, calc(50% - min(50cqw, 400px, calc(50cqh - 80px))));
+    left: auto;
+    transform: none;
+  }
+}
+
 @media (max-width: 620px) {
   .board-settings-panel {
     right: 8px;
@@ -319,6 +360,8 @@
   .online-board-settings {
     top: 42px;
     right: 8px;
+    left: auto;
+    transform: none;
   }
 
   .board-orientation-setting {
@@ -330,7 +373,8 @@
     justify-content: center;
   }
 
-  .board-theme-options {
+  .board-theme-options,
+  .piece-theme-options {
     max-height: 300px;
   }
 }

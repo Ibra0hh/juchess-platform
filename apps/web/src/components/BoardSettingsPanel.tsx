@@ -2,6 +2,7 @@ import { FlipHorizontal2, Search, Settings2, X } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
 import {
   boardThemeOptions,
+  pieceThemeAssetPath,
   pieceThemeOptions,
   type JuBoardTheme,
   type JuPieceTheme,
@@ -36,10 +37,19 @@ export function BoardSettingsPanel({
   const panelId = useId()
   const [activeTab, setActiveTab] = useState<SettingsTab>('boards')
   const [boardQuery, setBoardQuery] = useState('')
-  const normalizedQuery = boardQuery.trim().toLocaleLowerCase()
-  const visibleBoards = normalizedQuery
-    ? boardThemeOptions.filter((option) => option.label.toLocaleLowerCase().includes(normalizedQuery))
+  const [pieceQuery, setPieceQuery] = useState('')
+  const normalizedBoardQuery = boardQuery.trim().toLocaleLowerCase()
+  const normalizedPieceQuery = pieceQuery.trim().toLocaleLowerCase()
+  const visibleBoards = normalizedBoardQuery
+    ? boardThemeOptions.filter((option) => (
+        `${option.label} ${option.description}`.toLocaleLowerCase().includes(normalizedBoardQuery)
+      ))
     : boardThemeOptions
+  const visiblePieces = normalizedPieceQuery
+    ? pieceThemeOptions.filter((option) => (
+        `${option.label} ${option.description}`.toLocaleLowerCase().includes(normalizedPieceQuery)
+      ))
+    : pieceThemeOptions
 
   const tab = (id: SettingsTab, label: string) => (
     <button
@@ -83,7 +93,7 @@ export function BoardSettingsPanel({
 
       <div className="board-settings-tabs" role="tablist" aria-label="Board settings sections">
         {tab('boards', `Boards (${boardThemeOptions.length})`)}
-        {tab('pieces', 'Pieces')}
+        {tab('pieces', `Pieces (${pieceThemeOptions.length})`)}
         {children ? tab('engine', 'Engine') : null}
       </div>
 
@@ -115,7 +125,7 @@ export function BoardSettingsPanel({
                 key={option.id}
                 onClick={() => onBoardThemeChange(option.id)}
               >
-                {option.id === 'juchess' ? (
+                {option.thumbnail === null ? (
                   <i aria-hidden="true" className="board-theme-swatch juchess" />
                 ) : (
                   <img
@@ -123,7 +133,7 @@ export function BoardSettingsPanel({
                     aria-hidden="true"
                     decoding="async"
                     loading="lazy"
-                    src={`${import.meta.env.BASE_URL}chess-boards/thumbs/${option.id}.jpg`}
+                    src={`${import.meta.env.BASE_URL}${option.thumbnail}`}
                   />
                 )}
                 <span>
@@ -140,11 +150,23 @@ export function BoardSettingsPanel({
       {activeTab === 'pieces' ? (
         <div
           aria-labelledby={`${panelId}-pieces-tab`}
+          className="piece-theme-panel"
           id={`${panelId}-pieces-panel`}
           role="tabpanel"
         >
+          <label className="board-theme-search">
+            <Search aria-hidden="true" />
+            <input
+              aria-label="Search pieces"
+              placeholder="Search pieces…"
+              type="search"
+              value={pieceQuery}
+              onChange={(event) => setPieceQuery(event.target.value)}
+            />
+            <span>{visiblePieces.length}</span>
+          </label>
           <div className="piece-theme-options">
-            {pieceThemeOptions.map((option) => (
+            {visiblePieces.map((option) => (
               <button
                 type="button"
                 aria-label={`Use ${option.label} pieces`}
@@ -153,11 +175,20 @@ export function BoardSettingsPanel({
                 key={option.id}
                 onClick={() => onPieceThemeChange(option.id)}
               >
-                <img
-                  alt=""
-                  aria-hidden="true"
-                  src={`${import.meta.env.BASE_URL}chess-pieces/${option.id === 'alpha' ? 'alpha/' : ''}wk.png`}
-                />
+                <i aria-hidden="true" className="piece-theme-preview">
+                  <img
+                    alt=""
+                    decoding="async"
+                    loading="lazy"
+                    src={`${import.meta.env.BASE_URL}${pieceThemeAssetPath(option.id, 'w', 'k')}`}
+                  />
+                  <img
+                    alt=""
+                    decoding="async"
+                    loading="lazy"
+                    src={`${import.meta.env.BASE_URL}${pieceThemeAssetPath(option.id, 'b', 'n')}`}
+                  />
+                </i>
                 <span>
                   <strong>{option.label}</strong>
                   <small>{option.description}</small>
@@ -165,6 +196,7 @@ export function BoardSettingsPanel({
               </button>
             ))}
           </div>
+          {visiblePieces.length === 0 ? <p className="board-theme-empty">No matching pieces.</p> : null}
         </div>
       ) : null}
 

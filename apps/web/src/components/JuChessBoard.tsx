@@ -1,6 +1,11 @@
-import { useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js'
-import type { JuBoardTheme, JuPieceTheme } from '../lib/boardAppearance'
+import {
+  boardThemeAssetPath,
+  pieceThemeAssetPath,
+  type JuBoardTheme,
+  type JuPieceTheme,
+} from '../lib/boardAppearance'
 import './JuChessBoard.css'
 import { buildChessGame, deriveResult, getMaterialEvaluation, type JuCapturedPiece } from './JuChessRules'
 
@@ -23,6 +28,18 @@ type PendingPromotion = {
 type BoardArrow = {
   from: Square
   to: Square
+}
+
+type PieceDrag = {
+  color: Color
+  from: Square
+  moved: boolean
+  pointerId: number
+  startX: number
+  startY: number
+  type: PieceSymbol
+  x: number
+  y: number
 }
 
 type BoardSquare = {
@@ -82,11 +99,14 @@ export function JuChessBoard({
 }: JuChessBoardProps) {
   const game = useMemo(() => buildChessGame(fen, moves), [fen, moves])
   const markerId = `ju-arrow-${useId().replaceAll(':', '')}`
+  const boardRef = useRef<HTMLDivElement | null>(null)
+  const suppressClickRef = useRef(false)
   const [selected, setSelected] = useState<Square | null>(null)
   const [pendingPromotion, setPendingPromotion] = useState<PendingPromotion | null>(null)
   const [rightDragFrom, setRightDragFrom] = useState<Square | null>(null)
   const [arrows, setArrows] = useState<BoardArrow[]>([])
   const [markedSquares, setMarkedSquares] = useState<Set<Square>>(() => new Set())
+  const [pieceDrag, setPieceDrag] = useState<PieceDrag | null>(null)
   const legalMoves = selected ? game.moves({ square: selected, verbose: true }) : []
   const legalTargets = new Set(legalMoves.map((move) => move.to))
   const lastMove = game.history({ verbose: true }).at(-1)
@@ -95,6 +115,7 @@ export function JuChessBoard({
   const evaluationScore = evaluation ?? getMaterialEvaluation(game)
   const evaluationName = evaluation === undefined ? 'Material evaluation' : 'Engine evaluation'
   const whiteShare = Math.max(4, Math.min(96, 50 + evaluationScore * 7))
+  const boardAsset = boardThemeAssetPath(boardTheme)
 
   useEffect(() => {
     if (annotationsEnabled) return
@@ -129,7 +150,16 @@ export function JuChessBoard({
     }
   }
 
+  function clearAnnotations() {
+    if (!annotationsEnabled) return
+    setArrows([])
+    setMarkedSquares(new Set())
+    setRightDragFrom(null)
+  }
+
   function handleSquareClick(square: Square) {
+    if (suppressClickRef.current) return
+    clearAnnotations()
     if (!interactive || pendingPromotion) return
     const piece = game.get(square)
 
@@ -158,6 +188,75 @@ export function JuChessBoard({
       return
     }
 
+    setSelected(null)
+  }
+
+  function handlePiecePointerDown(event: ReactPointerEvent<HTMLButtonElement>, square: Square) {
+    if (event.button !== 0) return
+    clearAnnotations()
+    if (!interactive || pendingPromotion) return
+    const piece = game.get(square)
+    const board = boardRef.current
+    if (!piece || piece.color !== game.turn() || !board) return
+
+    const bounds = board.getBoundingClientRect()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setPieceDrag({
+      color: piece.color,
+      from: square,
+      moved: false,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      type: piece.type,
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    })
+  }
+
+  function handlePiecePointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!pieceDrag || pieceDrag.pointerId !== event.pointerId || !boardRef.current) return
+    const bounds = boardRef.current.getBoundingClientRect()
+    const moved = pieceDrag.moved || Math.hypot(event.clientX - pieceDrag.startX, event.clientY - pieceDrag.startY) > 4
+    if (moved && !pieceDrag.moved) setSelected(pieceDrag.from)
+    setPieceDrag((current) => current && current.pointerId === event.pointerId ? {
+      ...current,
+      moved,
+      x: Math.max(0, Math.min(bounds.width, event.clientX - bounds.left)),
+      y: Math.max(0, Math.min(bounds.height, event.clientY - bounds.top)),
+    } : current)
+  }
+
+  function handlePiecePointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!pieceDrag || pieceDrag.pointerId !== event.pointerId) return
+    const drag = pieceDrag
+    setPieceDrag(null)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    if (!drag.moved) return
+
+    suppressClickRef.current = true
+    window.setTimeout(() => {
+      suppressClickRef.current = false
+    }, 0)
+    const targetElement = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-square]')
+    const target = targetElement?.dataset.square as Square | undefined
+    const move = target ? game.moves({ square: drag.from, verbose: true }).find((candidate) => candidate.to === target) : null
+    if (!target || !move) {
+      setSelected(null)
+      return
+    }
+    if (move.isPromotion()) {
+      setPendingPromotion({ color: game.turn(), from: drag.from, to: target })
+      return
+    }
+    playMove(drag.from, target)
+  }
+
+  function handlePiecePointerCancel(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!pieceDrag || pieceDrag.pointerId !== event.pointerId) return
+    setPieceDrag(null)
     setSelected(null)
   }
 
@@ -214,8 +313,9 @@ export function JuChessBoard({
         className="ju-chess-board"
         data-board-theme={boardTheme}
         data-flipped={flipped ? 'true' : 'false'}
-        style={boardTheme !== 'juchess'
-          ? { backgroundImage: `url(${import.meta.env.BASE_URL}chess-boards/${boardTheme}.png)` }
+        ref={boardRef}
+        style={boardAsset
+          ? { backgroundImage: `url(${import.meta.env.BASE_URL}${boardAsset})` }
           : undefined}
       >
         {squares.map((square) => {
@@ -237,11 +337,16 @@ export function JuChessBoard({
                 lastMoveSquare ? 'last-move' : '',
                 target ? 'target' : '',
                 check ? 'check' : '',
+                pieceDrag?.from === square.key ? 'dragging-source' : '',
               ].filter(Boolean).join(' ')}
               data-square={square.key}
               onClick={() => handleSquareClick(square.key)}
               onMouseDown={(event) => handleRightMouseDown(event, square.key)}
               onMouseUp={(event) => handleRightMouseUp(event, square.key)}
+              onPointerCancel={handlePiecePointerCancel}
+              onPointerDown={(event) => handlePiecePointerDown(event, square.key)}
+              onPointerMove={handlePiecePointerMove}
+              onPointerUp={handlePiecePointerUp}
               tabIndex={interactive ? 0 : -1}
               key={square.key}
             >
@@ -262,6 +367,15 @@ export function JuChessBoard({
             </button>
           )
         })}
+        {pieceDrag ? (
+          <span
+            aria-hidden="true"
+            className="ju-dragged-piece"
+            style={{ left: pieceDrag.x, top: pieceDrag.y }}
+          >
+            <PieceGlyph color={pieceDrag.color} pieceTheme={pieceTheme} type={pieceDrag.type} />
+          </span>
+        ) : null}
         {annotationsEnabled && arrows.length ? (
           <svg className="ju-board-arrows" viewBox="0 0 8 8" aria-hidden="true">
             <defs>
@@ -338,8 +452,7 @@ function PieceGlyph({
 }
 
 function pieceAsset(color: Color, type: PieceSymbol, pieceTheme: JuPieceTheme) {
-  const themePath = pieceTheme === 'alpha' ? 'alpha/' : ''
-  return `${import.meta.env.BASE_URL}chess-pieces/${themePath}${color}${type}.png`
+  return `${import.meta.env.BASE_URL}${pieceThemeAssetPath(pieceTheme, color, type)}`
 }
 
 function buildSquares(game: Chess, flipped: boolean): BoardSquare[] {

@@ -86,7 +86,7 @@
 .online-board-toolbar {
   position: absolute;
   z-index: 14;
-  top: 0;
+  top: 50%;
   left: 50%;
   display: flex;
   justify-content: flex-end;
@@ -94,7 +94,7 @@
   height: 34px;
   margin: 0;
   pointer-events: none;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
 }
 
 .first-move-deadline {
@@ -127,7 +127,7 @@
   align-items: center;
   gap: 7px;
   pointer-events: auto;
-  transform: translateX(10px);
+  transform: translateX(44px);
 }
 
 .online-board-head-actions button[aria-label="Board settings"] {
