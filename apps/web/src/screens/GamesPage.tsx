@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Square } from 'chess.js'
-import { BookOpen, Check, Settings2, Star, ThumbsUp, X } from 'lucide-react'
+import { BookOpen, Check, ChevronLeft, ChevronRight, Settings2, SkipBack, SkipForward, Star, ThumbsUp, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import chessComLogo from '../assets/providers/chess-com.png'
 import lichessLogo from '../assets/providers/lichess.png'
@@ -659,25 +659,28 @@ function GamesPage() {
           {inReview && game && reviewStarted ? (
             game.moves.length > 0 ? (
               <div className="move-controls" aria-label="Move controls">
-                <button type="button" aria-label="Go to start" onClick={() => setMoveIdx(0)}>
-                  &laquo;
-                </button>
-                <button type="button" aria-label="Previous move" onClick={() => setMoveIdx((current) => Math.max(0, current - 1))}>
-                  &lsaquo;
-                </button>
+                <div className="move-navigation">
+                  <button type="button" aria-label="Go to start" disabled={moveIdx === 0} onClick={() => setMoveIdx(0)}>
+                    <SkipBack aria-hidden="true" />
+                  </button>
+                  <button type="button" aria-label="Previous move" disabled={moveIdx === 0} onClick={() => setMoveIdx((current) => Math.max(0, current - 1))}>
+                    <ChevronLeft aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next move"
+                    disabled={moveIdx === game.moves.length - 1}
+                    onClick={() => setMoveIdx((current) => Math.min(game.moves.length - 1, current + 1))}
+                  >
+                    <ChevronRight aria-hidden="true" />
+                  </button>
+                  <button type="button" aria-label="Go to end" disabled={moveIdx === game.moves.length - 1} onClick={() => setMoveIdx(game.moves.length - 1)}>
+                    <SkipForward aria-hidden="true" />
+                  </button>
+                </div>
                 <span>
                   Move {moveIdx + 1} / {game.moves.length}
                 </span>
-                <button
-                  type="button"
-                  aria-label="Next move"
-                  onClick={() => setMoveIdx((current) => Math.min(game.moves.length - 1, current + 1))}
-                >
-                  &rsaquo;
-                </button>
-                <button type="button" aria-label="Go to end" onClick={() => setMoveIdx(game.moves.length - 1)}>
-                  &raquo;
-                </button>
               </div>
             ) : (
               <div className="move-controls" aria-label="Move controls">

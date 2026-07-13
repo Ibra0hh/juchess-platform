@@ -285,6 +285,7 @@
 }
 
 .online-move-navigation {
+  align-self: center;
   display: grid;
   grid-template-columns: repeat(4, 42px);
   gap: 4px;
@@ -293,6 +294,8 @@
   border-radius: 7px;
   background: rgba(255, 253, 248, 0.92);
   box-shadow: 0 5px 16px rgba(17, 17, 17, 0.08);
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .online-move-navigation button {
