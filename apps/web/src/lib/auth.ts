@@ -9,6 +9,7 @@ export type ProfileStatus = 'pending' | 'active' | 'suspended'
 export type AuthProfile = Models.Row & {
   accountId: string
   displayName: string
+  university?: string | null
   universityId?: string | null
   phone?: string | null
   email: string
@@ -27,6 +28,7 @@ export type AuthProfile = Models.Row & {
 
 export type ProfileUpdateInput = {
   displayName: string
+  university?: string
   universityId?: string
   phone?: string
   chessComUsername?: string
@@ -49,6 +51,7 @@ export type SignInInput = {
 
 export type SignUpInput = SignInInput & {
   fullName: string
+  university: string
   universityId?: string
   phone?: string
   chessComUsername?: string
@@ -165,6 +168,7 @@ export async function completeOAuthTokenSession(userId: string, secret: string):
 
 export function profileNeedsCompletion(profile: AuthProfile | null) {
   return !profile?.displayName?.trim()
+    || !profile.university?.trim()
     || !profile.universityId?.trim()
     || !profile.phone?.trim()
 }
@@ -251,6 +255,8 @@ export async function saveProfileDetails(profileId: string, input: ProfileUpdate
   requireAppwriteReady()
   const displayName = input.displayName.trim()
   if (!displayName) throw new Error('Display name is required.')
+  const university = input.university?.trim()
+  if (!university) throw new Error('University is required.')
 
   return await tablesDB.updateRow<AuthProfile>({
     databaseId: appwriteConfig.databaseId,
@@ -258,6 +264,7 @@ export async function saveProfileDetails(profileId: string, input: ProfileUpdate
     rowId: profileId,
     data: {
       displayName,
+      university,
       universityId: optionalValue(input.universityId),
       phone: normalizeJordanPhone(input.phone) ?? null,
       chessComUsername: optionalUsername(input.chessComUsername),
@@ -402,6 +409,7 @@ async function createProfileForUser(user: Models.User, input: Partial<SignUpInpu
       data: {
         accountId: user.$id,
         displayName: input.fullName?.trim() || user.name || input.email,
+        university: input.university?.trim() || undefined,
         universityId: input.universityId?.trim() || undefined,
         phone: normalizeJordanPhone(input.phone),
         email: input.email,

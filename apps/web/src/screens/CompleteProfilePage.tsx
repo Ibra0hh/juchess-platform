@@ -1,11 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
+import UniversityField from '../components/UniversityField'
 import { formatAppwriteError } from '../lib/auth'
 import './AuthPage.css'
 
 type CompletionForm = {
   displayName: string
+  university: string
   universityId: string
   phone: string
   chessComUsername: string
@@ -30,8 +32,8 @@ export default function CompleteProfilePage() {
     event.preventDefault()
     setMessage(null)
 
-    if (!form.displayName.trim() || !form.universityId.trim() || !form.phone.trim()) {
-      setMessage('Full name, University ID, and phone number are required.')
+    if (!form.displayName.trim() || !form.university.trim() || !form.universityId.trim() || !form.phone.trim()) {
+      setMessage('Full name, university, University ID, and phone number are required.')
       return
     }
 
@@ -68,6 +70,7 @@ export default function CompleteProfilePage() {
 
           <form className="auth-form prototype-auth-form" onSubmit={handleSubmit}>
             <AuthInput label="Full name" required value={form.displayName} onChange={(value) => setForm({ ...form, displayName: value })} placeholder="e.g. Ibrahim Ahmad" autoComplete="name" />
+            <UniversityField required value={form.university} onChange={(university) => setForm({ ...form, university })} />
             <div className="auth-two-column">
               <AuthInput label="University ID" required value={form.universityId} onChange={(value) => setForm({ ...form, universityId: value })} placeholder="e.g. 0201234" autoComplete="username" />
               <AuthInput label="Phone number" required value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} placeholder="+962 7X XXX XXXX" autoComplete="tel" type="tel" />
@@ -125,6 +128,7 @@ function CompletionStatus() {
 function createForm(profile: ReturnType<typeof useAuth>['profile'], accountName?: string): CompletionForm {
   return {
     displayName: profile?.displayName || accountName || '',
+    university: profile?.university || '',
     universityId: profile?.universityId || '',
     phone: profile?.phone || '',
     chessComUsername: profile?.chessComUsername || '',

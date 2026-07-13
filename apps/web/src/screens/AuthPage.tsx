@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
+import UniversityField from '../components/UniversityField'
 import {
   formatAppwriteError,
   startOAuthSession,
@@ -19,6 +20,7 @@ function AuthPage({ mode }: AuthPageProps) {
   const [searchParams] = useSearchParams()
   const isSignup = mode === 'sign-up'
   const [fullName, setFullName] = useState('')
+  const [university, setUniversity] = useState('')
   const [universityId, setUniversityId] = useState('')
   const [phone, setPhone] = useState('')
   const [chessComUsername, setChessComUsername] = useState('')
@@ -61,6 +63,7 @@ function AuthPage({ mode }: AuthPageProps) {
       if (isSignup) {
         await signUp({
           fullName: fullName.trim(),
+          university: university.trim(),
           universityId: universityId.trim(),
           phone: phone.trim(),
           chessComUsername: chessComUsername.trim(),
@@ -137,6 +140,8 @@ function AuthPage({ mode }: AuthPageProps) {
                     <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" inputMode="tel" placeholder="+962 7X XXX XXXX" />
                   </AuthField>
                 </div>
+
+                <UniversityField required value={university} onChange={setUniversity} />
 
                 <AuthField label="University ID" help="Used for club verification only - never shown publicly.">
                   <input value={universityId} onChange={(event) => setUniversityId(event.target.value)} autoComplete="username" placeholder="e.g. 0201234" />

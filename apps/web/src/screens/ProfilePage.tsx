@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from '
 import { Camera, Edit3, ImagePlus, LogOut, Trash2, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
+import UniversityField from '../components/UniversityField'
 import { useAuth } from '../context/useAuth'
 import { formatAppwriteError, profileMediaUrl, type ProfileMediaKind } from '../lib/auth'
 import { loadProfileGameHistory, type SampleGame } from '../lib/juchess'
@@ -13,6 +14,7 @@ type ProfileForm = {
   displayName: string
   lichessUsername: string
   phone: string
+  university: string
   universityId: string
 }
 
@@ -248,6 +250,7 @@ function ProfilePage() {
                 <span>Display name</span>
                 <input required maxLength={128} value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} />
               </label>
+              <UniversityField required value={form.university} onChange={(university) => setForm({ ...form, university })} />
               <label>
                 <span>University ID</span>
                 <input maxLength={64} value={form.universityId} onChange={(event) => setForm({ ...form, universityId: event.target.value })} />
@@ -294,6 +297,7 @@ function ProfilePage() {
               <FactRow label="Losses" value={String(stats.losses)} />
               <FactRow label="Games as White" value={String(stats.asWhite)} />
               <FactRow label="Games as Black" value={String(stats.asBlack)} />
+              {profile?.university ? <FactRow label="University" value={profile.university} /> : null}
               {profile?.chessComUsername ? <FactRow label="Chess.com" value={profile.chessComUsername} /> : null}
               {profile?.lichessUsername ? <FactRow label="Lichess" value={profile.lichessUsername} /> : null}
             </div>
@@ -399,6 +403,7 @@ function profileForm(profile: ReturnType<typeof useAuth>['profile']): ProfileFor
     displayName: profile?.displayName || '',
     lichessUsername: profile?.lichessUsername || '',
     phone: profile?.phone || '',
+    university: profile?.university || '',
     universityId: profile?.universityId || '',
   }
 }

@@ -281,6 +281,7 @@
 }
 
 .auth-field,
+.university-field,
 .auth-form > label {
   display: grid;
   gap: 6px;
@@ -298,6 +299,18 @@
 .auth-field > small {
   color: rgba(17, 17, 17, 0.55);
   font-size: 11.5px;
+  font-weight: 400;
+}
+
+.university-field > small {
+  color: rgba(17, 17, 17, 0.55);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+.university-field > span em {
+  color: rgba(17, 17, 17, 0.5);
+  font-style: normal;
   font-weight: 400;
 }
 
@@ -323,7 +336,9 @@
 }
 
 .auth-form input,
-.auth-field input {
+.auth-field input,
+.auth-form select,
+.university-field select {
   box-sizing: border-box;
   width: 100%;
   height: 44px;
@@ -338,7 +353,9 @@
 }
 
 .auth-form input:focus,
-.auth-field input:focus {
+.auth-field input:focus,
+.auth-form select:focus,
+.university-field select:focus {
   border-color: #7a2431;
   box-shadow: 0 0 0 3px rgba(122, 36, 49, 0.12);
 }
