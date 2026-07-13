@@ -1087,6 +1087,51 @@ test('hosted move alternates players and clocks while advancing the canonical re
   )
 })
 
+test('hosted move stops the mover clock at request receipt before database processing', async () => {
+  let game = {
+    $id: 'g-latency',
+    tournamentId: 't-latency',
+    whiteProfileId: 'white',
+    blackProfileId: 'black',
+    status: 'live',
+    result: '*',
+    moveVersion: 0,
+    round: 1,
+    whiteTimeMs: 300_000,
+    blackTimeMs: 300_000,
+    turnStartedAt: '2026-07-13T10:00:00.000Z',
+  }
+  const tournament = {
+    $id: 't-latency',
+    status: 'active',
+    playMode: 'online',
+    onlinePlatform: 'juchess',
+    timeControl: '5+0 Blitz',
+    format: 'Swiss',
+  }
+  const tablesDB = {
+    getRow: async ({ tableId }) => tableId === 'games' ? game : tournament,
+    updateRow: async ({ data }) => {
+      game = { ...game, ...data }
+      return game
+    },
+  }
+
+  const receivedAtMs = Date.parse('2026-07-13T10:00:01.250Z')
+  const outcome = await engine.submitHostedTournamentMove(
+    tablesDB,
+    'juchess',
+    game.$id,
+    { san: 'e4', expectedVersion: 0 },
+    { $id: 'white' },
+    receivedAtMs,
+  )
+
+  assert.equal(outcome.row.whiteTimeMs, 298_750)
+  assert.equal(outcome.row.lastMoveAt, '2026-07-13T10:00:01.250Z')
+  assert.equal(outcome.row.turnStartedAt, '2026-07-13T10:00:01.250Z')
+})
+
 test('active game selection keeps the player on the current board until it finishes', () => {
   const assignments = [
     { game: { $id: 'new-board', status: 'live' }, tournament: { $id: 't2' } },

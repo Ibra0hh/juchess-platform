@@ -32,6 +32,7 @@ import {
   type HostedClockSnapshot,
   type HostedGameRow,
 } from '../lib/onlineTournament'
+import { applyOptimisticHostedMove } from '../lib/onlineTournamentOptimism'
 import './OnlineGamesPage.css'
 
 type TournamentGameChoice = {
@@ -64,12 +65,15 @@ function OnlineGamesPage() {
   const [, setClockTick] = useState(0)
   const orientedGameRef = useRef<string | null>(null)
   const latestSnapshotRef = useRef<{ gameId: string; moveVersion: number } | null>(null)
+  const pendingMoveRef = useRef<{ expectedVersion: number; gameId: string } | null>(null)
   const dueGameId = activeGame?.$id
 
   const applySelectedGame = useCallback((game: SampleGame) => {
     const moveVersion = game.moveVersion ?? 0
     const previous = latestSnapshotRef.current
     if (previous?.gameId === game.id && moveVersion < previous.moveVersion) return false
+    const pending = pendingMoveRef.current
+    if (pending?.gameId === game.id && moveVersion <= pending.expectedVersion) return false
 
     latestSnapshotRef.current = { gameId: game.id, moveVersion }
     setSelectedGame(game)
@@ -199,21 +203,39 @@ function OnlineGamesPage() {
 
   async function updateBoard(state: JuChessBoardChange) {
     if (!selectedGameId || !selectedGame || movePending || !state.lastMove) return
+    const gameId = selectedGameId
+    const expectedVersion = selectedGame.moveVersion ?? 0
+    const optimisticGame = applyOptimisticHostedMove(
+      selectedGame,
+      state.moves,
+      state.result,
+      Date.now(),
+    )
+    setSelectedGame(optimisticGame)
+    setBoardMoves(state.moves)
+    setBoardResult(state.result)
+    pendingMoveRef.current = { expectedVersion, gameId }
     setMovePending(true)
-    setMessage('Submitting move...')
+    setMessage('')
     try {
       const response = await submitHostedTournamentMove(
-        selectedGameId,
+        gameId,
         state.lastMove,
-        selectedGame.moveVersion ?? 0,
+        expectedVersion,
       )
-      applySelectedGame(applyHostedSnapshot(selectedGame, response.row, response.clock))
+      pendingMoveRef.current = null
+      const canonicalGame = applyHostedSnapshot(optimisticGame, response.row, response.clock)
+      applySelectedGame(canonicalGame)
       setMessage(response.requiresTiebreak ? 'Draw recorded. The organizer must resolve the knockout tiebreak.' : '')
+      if (response.row.status === 'completed' || response.row.status === 'forfeit') {
+        await refreshActiveGame()
+      }
     } catch (error) {
+      pendingMoveRef.current = null
       setMessage(error instanceof Error ? error.message : 'The game server rejected this move.')
-    } finally {
-      await openTournamentGame(selectedGameId, false)
+      await openTournamentGame(gameId, false)
       await refreshActiveGame()
+    } finally {
       setMovePending(false)
     }
   }

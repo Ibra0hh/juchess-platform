@@ -9622,38 +9622,9 @@ class _TournamentGameDetailScreenState
       final liveGame = await service.loadTournamentLiveGame(gameId);
       if (!mounted || liveGame == null) return;
       if (liveGame.moveVersion < moveVersion) return;
+      if (_movePending && liveGame.moveVersion <= moveVersion) return;
 
-      final refreshedMoves = _parseStoredMoves(liveGame.pgn);
-      final profileId = context.read<AppState>().profileId;
-      final assignedColor = liveGame.whiteProfileId == profileId
-          ? 'white'
-          : liveGame.blackProfileId == profileId
-          ? 'black'
-          : null;
-      final wasAtLatest = currentPly == moves.length;
-      setState(() {
-        moves = refreshedMoves;
-        currentPly = wasAtLatest
-            ? refreshedMoves.length
-            : math.min(currentPly, refreshedMoves.length);
-        currentResult = liveGame.result;
-        currentStatus = liveGame.status;
-        moveVersion = liveGame.moveVersion;
-        whiteProfileId = liveGame.whiteProfileId;
-        blackProfileId = liveGame.blackProfileId;
-        onlinePlatform = liveGame.onlinePlatform;
-        tournamentStatus = liveGame.tournamentStatus;
-        whiteTimeMs = liveGame.whiteTimeMs;
-        blackTimeMs = liveGame.blackTimeMs;
-        clockObservedAtMs = liveGame.clockObservedAtMs;
-        canonicalTurn = liveGame.turn;
-        turnStartedAt = liveGame.turnStartedAt;
-        scheduledStartAt = liveGame.scheduledStartAt;
-        if (!_orientationApplied && assignedColor != null) {
-          flipped = assignedColor == 'black';
-          _orientationApplied = true;
-        }
-      });
+      _applyLiveGameState(liveGame);
       if (liveGame.status != 'live' && liveGame.status != 'scheduled') {
         _liveRefreshTimer?.cancel();
         _clockTimer?.cancel();
@@ -9663,12 +9634,65 @@ class _TournamentGameDetailScreenState
     }
   }
 
-  Future<void> _submitMove(List<String> nextMoves, String _) async {
+  void _applyLiveGameState(
+    TournamentLiveGameState liveGame, {
+    bool forceLatest = false,
+  }) {
+    final refreshedMoves = _parseStoredMoves(liveGame.pgn);
+    final profileId = context.read<AppState>().profileId;
+    final assignedColor = liveGame.whiteProfileId == profileId
+        ? 'white'
+        : liveGame.blackProfileId == profileId
+        ? 'black'
+        : null;
+    final wasAtLatest = currentPly == moves.length;
+    setState(() {
+      moves = refreshedMoves;
+      currentPly = forceLatest || wasAtLatest
+          ? refreshedMoves.length
+          : math.min(currentPly, refreshedMoves.length);
+      currentResult = liveGame.result;
+      currentStatus = liveGame.status;
+      moveVersion = liveGame.moveVersion;
+      whiteProfileId = liveGame.whiteProfileId;
+      blackProfileId = liveGame.blackProfileId;
+      onlinePlatform = liveGame.onlinePlatform;
+      tournamentStatus = liveGame.tournamentStatus;
+      whiteTimeMs = liveGame.whiteTimeMs;
+      blackTimeMs = liveGame.blackTimeMs;
+      clockObservedAtMs = liveGame.clockObservedAtMs;
+      canonicalTurn = liveGame.turn;
+      turnStartedAt = liveGame.turnStartedAt;
+      scheduledStartAt = liveGame.scheduledStartAt;
+      if (!_orientationApplied && assignedColor != null) {
+        flipped = assignedColor == 'black';
+        _orientationApplied = true;
+      }
+    });
+  }
+
+  Future<void> _submitMove(List<String> nextMoves, String nextResult) async {
     final gameId = widget.match.gameId;
     if (gameId == null || _movePending || nextMoves.isEmpty) return;
+    final expectedVersion = moveVersion;
+    final movedAt = DateTime.now();
+    final mover = canonicalTurn ?? (moves.length.isEven ? 'white' : 'black');
+    final moverTimeMs = _optimisticMoverTimeMs(mover, movedAt);
     setState(() {
       _movePending = true;
-      message = 'Submitting move...';
+      moves = nextMoves;
+      currentPly = nextMoves.length;
+      currentResult = nextResult;
+      currentStatus = 'live';
+      canonicalTurn = mover == 'white' ? 'black' : 'white';
+      clockObservedAtMs = movedAt.millisecondsSinceEpoch;
+      turnStartedAt = movedAt.toUtc().toIso8601String();
+      if (mover == 'white') {
+        whiteTimeMs = moverTimeMs;
+      } else {
+        blackTimeMs = moverTimeMs;
+      }
+      message = null;
     });
     try {
       final response = await context
@@ -9677,8 +9701,27 @@ class _TournamentGameDetailScreenState
           .submitHostedTournamentMove(
             gameId: gameId,
             san: nextMoves.last,
-            expectedVersion: moveVersion,
+            expectedVersion: expectedVersion,
           );
+      if (!mounted) return;
+      final row = response['row'];
+      if (row is Map<String, dynamic>) {
+        _applyLiveGameState(
+          _tournamentLiveGameStateFromData(
+            row,
+            tournament: {
+              'onlinePlatform': onlinePlatform,
+              'status': tournamentStatus,
+            },
+            clock: response['clock'] is Map<String, dynamic>
+                ? response['clock'] as Map<String, dynamic>
+                : null,
+          ),
+          forceLatest: true,
+        );
+      } else {
+        await _refreshLiveGame();
+      }
       if (!mounted) return;
       setState(() {
         message = response['requiresTiebreak'] == true
@@ -9686,11 +9729,27 @@ class _TournamentGameDetailScreenState
             : null;
       });
     } catch (error) {
-      if (mounted) setState(() => message = appwriteMessage(error));
+      if (mounted) {
+        setState(() {
+          _movePending = false;
+          message = appwriteMessage(error);
+        });
+        await _refreshLiveGame();
+      }
     } finally {
-      await _refreshLiveGame();
       if (mounted) setState(() => _movePending = false);
     }
+  }
+
+  int? _optimisticMoverTimeMs(String mover, DateTime movedAt) {
+    final base = mover == 'white' ? whiteTimeMs : blackTimeMs;
+    if (base == null) return null;
+    final observedAt = clockObservedAtMs != null
+        ? DateTime.fromMillisecondsSinceEpoch(clockObservedAtMs!)
+        : DateTime.tryParse(turnStartedAt ?? scheduledStartAt ?? '');
+    if (observedAt == null) return base;
+    final elapsed = math.max(0, movedAt.difference(observedAt).inMilliseconds);
+    return math.max(0, base - elapsed);
   }
 
   Future<void> _resign() async {

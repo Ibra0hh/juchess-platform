@@ -2540,11 +2540,11 @@ async function loadHostedGameContext(
   return { game, tournament };
 }
 
-async function loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile) {
+async function loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile, nowMs = Date.now()) {
   const context = await loadHostedGameContext(tablesDB, databaseId, gameId, profile);
   const opensAt = validTimestamp(context.game.scheduledStartAt)
     ?? validTimestamp(context.tournament.startsAt);
-  if (context.game.status === 'scheduled' && opensAt !== null && opensAt > Date.now()) {
+  if (context.game.status === 'scheduled' && opensAt !== null && opensAt > nowMs) {
     throw new HttpError(409, `This board opens at ${new Date(opensAt).toISOString()}.`);
   }
   return context;
@@ -2644,9 +2644,15 @@ async function syncHostedGameTimeout(tablesDB, databaseId, game, tournament, now
   return { expired: true, reason: 'timeout', row };
 }
 
-async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, profile) {
-  const context = await loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile);
-  const timeout = await syncHostedGameTimeout(tablesDB, databaseId, context.game, context.tournament);
+async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, profile, receivedAtMs = Date.now()) {
+  const context = await loadHostedGameForPlayer(tablesDB, databaseId, gameId, profile, receivedAtMs);
+  const timeout = await syncHostedGameTimeout(
+    tablesDB,
+    databaseId,
+    context.game,
+    context.tournament,
+    receivedAtMs,
+  );
   if (timeout.expired) {
     throw new HttpError(409, timeout.reason === 'noShow'
       ? 'The first-move deadline expired. This game was forfeited.'
@@ -2666,7 +2672,9 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
     throw new HttpError(409, 'It is not your turn.');
   }
 
-  const now = new Date();
+  // Stop the mover's clock when the request reaches JuChess. Database reads,
+  // Function processing, and the response trip must not consume player time.
+  const now = new Date(receivedAtMs);
   const clock = hostedClockForMove(row, tournament, chess.turn(), now.getTime());
   if (clock[clock.moverClockKey] <= 0) {
     const timeoutResult = chess.turn() === 'w' ? '0-1' : '1-0';
@@ -3121,6 +3129,7 @@ function adminTeamForRole(role) {
 }
 
 export default async ({ req, res, log, error }) => {
+  const requestReceivedAtMs = Date.now();
   const client = new Client()
     .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
     .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
@@ -3220,7 +3229,14 @@ export default async ({ req, res, log, error }) => {
 
     if (method === 'POST' && segments[0] === 'player' && segments[1] === 'games' && segments[2] && segments[3] === 'move') {
       const player = await requirePlayerActor(req, tablesDB, databaseId);
-      const outcome = await submitHostedTournamentMove(tablesDB, databaseId, segments[2], body, player);
+      const outcome = await submitHostedTournamentMove(
+        tablesDB,
+        databaseId,
+        segments[2],
+        body,
+        player,
+        requestReceivedAtMs,
+      );
       return res.json({ ok: true, action: 'submitHostedTournamentMove', ...outcome });
     }
 
