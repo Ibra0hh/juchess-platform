@@ -16,12 +16,12 @@
 
 .games-board-settings {
   top: 48px;
-  right: 0;
+  right: -10px;
 }
 
 .online-board-settings {
-  top: 42px;
-  right: max(8px, calc((100% - var(--online-board-size)) / 2));
+  top: 0;
+  right: max(8px, calc((100% - var(--online-board-size)) / 2 - 10px));
 }
 
 .board-settings-head {
@@ -318,6 +318,7 @@
   .games-board-settings,
   .online-board-settings {
     top: 42px;
+    right: 8px;
   }
 
   .board-orientation-setting {

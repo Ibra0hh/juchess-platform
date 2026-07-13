@@ -68,7 +68,7 @@
 }
 
 .online-board-station {
-  --online-board-size: min(100cqw, 800px, calc(100cqh - 202px));
+  --online-board-size: min(100cqw, 800px, calc(100cqh - 160px));
   position: relative;
   container-type: size;
   height: 100%;
@@ -84,11 +84,17 @@
 }
 
 .online-board-toolbar {
+  position: absolute;
+  z-index: 14;
+  top: 0;
+  left: 50%;
   display: flex;
   justify-content: flex-end;
   width: var(--online-board-size);
-  min-height: 34px;
-  margin: 0 auto 8px;
+  height: 34px;
+  margin: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
 }
 
 .first-move-deadline {
@@ -120,6 +126,8 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  pointer-events: auto;
+  transform: translateX(10px);
 }
 
 .online-board-head-actions button[aria-label="Board settings"] {
@@ -692,6 +700,10 @@
     --online-board-size: min(100cqw, 800px, calc(100dvh - 300px));
     height: auto;
     min-height: calc(var(--online-board-size) + 190px);
+  }
+
+  .online-board-head-actions {
+    transform: translateX(0);
   }
 
   .online-board-controls {

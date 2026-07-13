@@ -841,6 +841,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transform: translateX(10px);
 }
 
 .board-title-actions button {
@@ -875,7 +876,7 @@
   display: flex;
   align-self: center;
   flex-direction: column;
-  width: min(100cqw, 836px, calc(100cqh - 220px));
+  width: min(100cqw, 836px, calc(100cqh - 210px));
   min-width: 0;
   margin-top: 16px;
 }
@@ -2162,7 +2163,7 @@
   }
 
   .board-player-frame {
-    width: min(100cqw, 800px, calc(100cqh - 220px));
+    width: min(100cqw, 800px, calc(100cqh - 210px));
   }
 
   .game-rail {
@@ -2228,6 +2229,10 @@
 
   .board-player-frame {
     width: min(100cqw, 800px, calc(100dvh - 300px));
+  }
+
+  .board-control-stack {
+    transform: translateX(0);
   }
 
   .game-rail {
