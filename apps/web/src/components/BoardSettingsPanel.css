@@ -15,15 +15,15 @@
 }
 
 .games-board-settings {
-  top: 50%;
-  left: calc(50% + min(50cqw, 418px, calc(50cqh - 105px)) + 52px);
-  transform: translateY(-50%);
+  top: 0;
+  left: calc(100% + 24px);
+  width: clamp(340px, 24vw, 440px);
 }
 
 .online-board-settings {
-  top: 50%;
-  left: calc(50% + min(50cqw, 400px, calc(50cqh - 80px)) + 52px);
-  transform: translateY(-50%);
+  top: 0;
+  left: calc(100% + 24px);
+  width: clamp(340px, 24vw, 440px);
 }
 
 .board-settings-head {
@@ -461,19 +461,33 @@
   font-size: 8.5px;
 }
 
-@media (max-width: 1350px) {
+@media (max-width: 1120px) {
   .games-board-settings {
-    top: 48px;
-    right: max(8px, calc(50% - min(50cqw, 418px, calc(50cqh - 105px))));
-    left: auto;
-    transform: none;
+    left: calc(100% + 20px);
+    width: max(280px, 34vw);
   }
 
   .online-board-settings {
-    top: 0;
-    right: max(8px, calc(50% - min(50cqw, 400px, calc(50cqh - 80px))));
+    left: calc(100% + 24px);
+    width: max(280px, 34vw);
+  }
+}
+
+@media (max-width: 960px) {
+  .games-board-settings {
+    top: 48px;
+    right: 8px;
     left: auto;
-    transform: none;
+    width: min(calc(100% - 16px), 400px);
+  }
+}
+
+@media (max-width: 700px) {
+  .online-board-settings {
+    top: 42px;
+    right: 8px;
+    left: auto;
+    width: min(calc(100% - 16px), 400px);
   }
 }
 
