@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js'
+import type { JuBoardTheme, JuPieceTheme } from '../lib/boardAppearance'
 import './JuChessBoard.css'
 import { buildChessGame, deriveResult, getMaterialEvaluation, type JuCapturedPiece } from './JuChessRules'
 
@@ -37,6 +38,7 @@ type BoardSquare = {
 
 type JuChessBoardProps = {
   annotationsEnabled?: boolean
+  boardTheme?: JuBoardTheme
   className?: string
   evaluation?: number
   fen?: string
@@ -44,6 +46,7 @@ type JuChessBoardProps = {
   interactive?: boolean
   moves?: string[]
   onChange?: (state: JuChessBoardChange) => void
+  pieceTheme?: JuPieceTheme
   showEvaluation?: boolean
   squareBadge?: {
     color: string
@@ -65,6 +68,7 @@ const PIECE_NAMES: Record<PieceSymbol, string> = {
 }
 export function JuChessBoard({
   annotationsEnabled = true,
+  boardTheme = 'juchess',
   className,
   evaluation,
   fen,
@@ -72,6 +76,7 @@ export function JuChessBoard({
   interactive = true,
   moves = [],
   onChange,
+  pieceTheme = 'juchess',
   showEvaluation = true,
   squareBadge,
 }: JuChessBoardProps) {
@@ -205,7 +210,14 @@ export function JuChessBoard({
           <strong className="ju-evaluation-number">{formatEvaluation(evaluationScore)}</strong>
         </div>
       ) : null}
-      <div className="ju-chess-board" data-flipped={flipped ? 'true' : 'false'}>
+      <div
+        className="ju-chess-board"
+        data-board-theme={boardTheme}
+        data-flipped={flipped ? 'true' : 'false'}
+        style={boardTheme === 'brown'
+          ? { backgroundImage: `url(${import.meta.env.BASE_URL}chess-boards/brown.png)` }
+          : undefined}
+      >
         {squares.map((square) => {
           const selectedSquare = selected === square.key
           const lastMoveSquare = lastMove?.from === square.key || lastMove?.to === square.key
@@ -234,7 +246,7 @@ export function JuChessBoard({
               key={square.key}
             >
               {marked ? <span className="ju-square-mark" aria-hidden="true" /> : null}
-              {square.piece ? <PieceGlyph color={square.piece.color} type={square.piece.type} /> : null}
+              {square.piece ? <PieceGlyph color={square.piece.color} pieceTheme={pieceTheme} type={square.piece.type} /> : null}
               {badge ? (
                 <span
                   aria-label={badge.label}
@@ -271,7 +283,7 @@ export function JuChessBoard({
           <div className="ju-promotion-panel">
             {PROMOTIONS.map((piece) => (
               <button type="button" onClick={() => playMove(pendingPromotion.from, pendingPromotion.to, piece)} key={piece}>
-                <PieceGlyph color={pendingPromotion.color} type={piece} />
+                <PieceGlyph color={pendingPromotion.color} pieceTheme={pieceTheme} type={piece} />
               </button>
             ))}
           </div>
@@ -281,7 +293,13 @@ export function JuChessBoard({
   )
 }
 
-export function JuCapturedPieces({ pieces }: { pieces: JuCapturedPiece[] }) {
+export function JuCapturedPieces({
+  pieces,
+  pieceTheme = 'juchess',
+}: {
+  pieces: JuCapturedPiece[]
+  pieceTheme?: JuPieceTheme
+}) {
   const label = pieces.length
     ? `Captured ${pieces.map((piece) => `${piece.color === 'w' ? 'white' : 'black'} ${PIECE_NAMES[piece.type]}`).join(', ')}`
     : 'No captured pieces'
@@ -293,26 +311,35 @@ export function JuCapturedPieces({ pieces }: { pieces: JuCapturedPiece[] }) {
           alt=""
           draggable={false}
           key={`${piece.color}-${piece.type}-${index}`}
-          src={pieceAsset(piece.color, piece.type)}
+          src={pieceAsset(piece.color, piece.type, pieceTheme)}
         />
       ))}
     </span>
   )
 }
 
-function PieceGlyph({ color, type }: { color: Color; type: PieceSymbol }) {
+function PieceGlyph({
+  color,
+  pieceTheme,
+  type,
+}: {
+  color: Color
+  pieceTheme: JuPieceTheme
+  type: PieceSymbol
+}) {
   return (
     <img
       alt=""
       className={`ju-chess-piece ${color === 'w' ? 'white' : 'black'}`}
       draggable={false}
-      src={pieceAsset(color, type)}
+      src={pieceAsset(color, type, pieceTheme)}
     />
   )
 }
 
-function pieceAsset(color: Color, type: PieceSymbol) {
-  return `${import.meta.env.BASE_URL}chess-pieces/${color}${type}.png`
+function pieceAsset(color: Color, type: PieceSymbol, pieceTheme: JuPieceTheme) {
+  const themePath = pieceTheme === 'alpha' ? 'alpha/' : ''
+  return `${import.meta.env.BASE_URL}chess-pieces/${themePath}${color}${type}.png`
 }
 
 function buildSquares(game: Chess, flipped: boolean): BoardSquare[] {

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Square } from 'chess.js'
-import { BookOpen, Check, FlipHorizontal2, Settings2, Star, ThumbsUp, X } from 'lucide-react'
+import { BookOpen, Check, Settings2, Star, ThumbsUp, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import chessComLogo from '../assets/providers/chess-com.png'
 import lichessLogo from '../assets/providers/lichess.png'
+import { BoardSettingsPanel } from '../components/BoardSettingsPanel'
 import {
   JuCapturedPieces,
   JuChessBoard,
@@ -37,6 +38,8 @@ import {
 import { loadExternalGames } from '../lib/externalGames'
 import type { AuthProfile } from '../lib/auth'
 import { useAuth } from '../context/useAuth'
+import { useBoardPreferences } from '../hooks/useBoardPreferences'
+import type { JuBoardTheme, JuPieceTheme } from '../lib/boardAppearance'
 import './ClubScreens.css'
 
 type GameMode = 'review' | 'analysis'
@@ -118,6 +121,7 @@ function GamesPage() {
   const [saved, setSaved] = useState(false)
   const [ran, setRan] = useState(false)
   const [flipped, setFlipped] = useState(false)
+  const { boardTheme, pieceTheme, setBoardTheme, setPieceTheme } = useBoardPreferences()
   const [reviewSession, setReviewSession] = useState<ScopedGameReview | null>(null)
   const [reviewStarted, setReviewStarted] = useState(false)
   const [reviewError, setReviewError] = useState('')
@@ -127,7 +131,7 @@ function GamesPage() {
   const [workspaceAnalysis, setWorkspaceAnalysis] = useState<PositionAnalysisResult | null>(null)
   const [workspaceAnalysisError, setWorkspaceAnalysisError] = useState('')
   const [workspaceAnalysisLoading, setWorkspaceAnalysisLoading] = useState(false)
-  const [engineSettingsOpen, setEngineSettingsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [engineStrength, setEngineStrength] = useState<ReviewEngineStrength>(loadReviewEngineStrength)
   const enginePreset = getReviewEnginePreset(engineStrength)
   const activeGameIdentity = game ? reviewGameIdentity(game) : null
@@ -603,35 +607,36 @@ function GamesPage() {
                 {inReview || (inWorkspace && ran) ? <small>Stockfish 18 · {enginePreset.label}</small> : null}
               </span>
               <div className="board-control-stack">
-                <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
-                  <FlipHorizontal2 aria-hidden="true" />
+                <button
+                  type="button"
+                  aria-expanded={settingsOpen}
+                  aria-label="Board settings"
+                  className={settingsOpen ? 'active' : undefined}
+                  title="Board settings"
+                  onClick={() => setSettingsOpen((current) => !current)}
+                >
+                  <Settings2 aria-hidden="true" />
                 </button>
-                {inReview || inWorkspace ? (
-                  <button
-                    type="button"
-                    aria-expanded={engineSettingsOpen}
-                    aria-label="Engine settings"
-                    className={engineSettingsOpen ? 'active' : undefined}
-                    title="Engine settings"
-                    onClick={() => setEngineSettingsOpen((current) => !current)}
-                  >
-                    <Settings2 aria-hidden="true" />
-                  </button>
-                ) : null}
               </div>
             </div>
           </div>
 
-          {(inReview || inWorkspace) && engineSettingsOpen ? (
-            <EngineSettingsPanel
+          {settingsOpen ? (
+            <GameSettingsPanel
+              boardTheme={boardTheme}
+              flipped={flipped}
+              onBoardThemeChange={setBoardTheme}
               strength={engineStrength}
-              onChange={setEngineStrength}
-              onClose={() => setEngineSettingsOpen(false)}
+              onClose={() => setSettingsOpen(false)}
+              onFlip={() => setFlipped((current) => !current)}
+              onPieceThemeChange={setPieceTheme}
+              onStrengthChange={setEngineStrength}
+              pieceTheme={pieceTheme}
             />
           ) : null}
 
           <div className="board-player-frame">
-            <PlayerBar {...topPlayer} edge="top" />
+            <PlayerBar {...topPlayer} edge="top" pieceTheme={pieceTheme} />
 
             <div className="board-wrap">
               <JuChessBoard
@@ -642,11 +647,13 @@ function GamesPage() {
                 interactive={inWorkspace}
                 moves={boardMoves}
                 onChange={inWorkspace ? updateWorkspaceBoard : undefined}
+                boardTheme={boardTheme}
+                pieceTheme={pieceTheme}
                 squareBadge={reviewSquareBadge}
               />
             </div>
 
-            <PlayerBar {...bottomPlayer} edge="bottom" />
+            <PlayerBar {...bottomPlayer} edge="bottom" pieceTheme={pieceTheme} />
           </div>
 
           {inReview && game && reviewStarted ? (
@@ -846,40 +853,54 @@ function GamesPage() {
   )
 }
 
-function EngineSettingsPanel({
-  onChange,
+function GameSettingsPanel({
+  boardTheme,
+  flipped,
+  onBoardThemeChange,
   onClose,
+  onFlip,
+  onPieceThemeChange,
+  onStrengthChange,
+  pieceTheme,
   strength,
 }: {
-  onChange: (strength: ReviewEngineStrength) => void
+  boardTheme: JuBoardTheme
+  flipped: boolean
+  onBoardThemeChange: (theme: JuBoardTheme) => void
   onClose: () => void
+  onFlip: () => void
+  onPieceThemeChange: (theme: JuPieceTheme) => void
+  onStrengthChange: (strength: ReviewEngineStrength) => void
+  pieceTheme: JuPieceTheme
   strength: ReviewEngineStrength
 }) {
   return (
-    <section className="engine-settings-panel" aria-label="Stockfish engine settings">
-      <div>
-        <span>Engine</span>
-        <strong>Stockfish 18</strong>
-        <button type="button" aria-label="Close engine settings" title="Close" onClick={onClose}>
-          <X aria-hidden="true" />
-        </button>
-      </div>
-      <fieldset>
-        <legend>Strength</legend>
+    <BoardSettingsPanel
+      boardTheme={boardTheme}
+      className="games-board-settings"
+      flipped={flipped}
+      onBoardThemeChange={onBoardThemeChange}
+      onClose={onClose}
+      onFlip={onFlip}
+      onPieceThemeChange={onPieceThemeChange}
+      pieceTheme={pieceTheme}
+    >
+      <fieldset className="engine-strength-options">
+        <legend>Stockfish strength</legend>
         {reviewEnginePresets.map((preset) => (
           <button
             type="button"
             className={preset.id === strength ? 'active' : undefined}
             aria-pressed={preset.id === strength}
             key={preset.id}
-            onClick={() => onChange(preset.id)}
+            onClick={() => onStrengthChange(preset.id)}
           >
             <strong>{preset.label}</strong>
             <span>Depth {preset.depth}</span>
           </button>
         ))}
       </fieldset>
-    </section>
+    </BoardSettingsPanel>
   )
 }
 
@@ -889,6 +910,7 @@ function PlayerBar({
   color,
   edge,
   name,
+  pieceTheme,
   rating,
 }: {
   badge: string
@@ -896,6 +918,7 @@ function PlayerBar({
   color: 'black' | 'white'
   edge: 'bottom' | 'top'
   name: string
+  pieceTheme: JuPieceTheme
   rating?: number
 }) {
   return (
@@ -905,7 +928,7 @@ function PlayerBar({
         <div>
           <small>{color}</small>
           <b>{name}</b>
-          <JuCapturedPieces pieces={captured} />
+          <JuCapturedPieces pieces={captured} pieceTheme={pieceTheme} />
         </div>
         {rating ? <em>{rating}</em> : null}
       </div>

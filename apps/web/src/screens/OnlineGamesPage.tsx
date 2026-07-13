@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FlipHorizontal2, Radio, RotateCcw, ShieldAlert, Trophy, Undo2, Users } from 'lucide-react'
+import { Radio, RotateCcw, Settings2, ShieldAlert, Trophy, Undo2, Users } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { BoardSettingsPanel } from '../components/BoardSettingsPanel'
 import {
   JuCapturedPieces,
   JuChessBoard,
@@ -11,7 +12,9 @@ import { getJuChessBoardSummary, type JuCapturedPiece } from '../components/JuCh
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
 import { useTournamentPlay } from '../context/useTournamentPlay'
+import { useBoardPreferences } from '../hooks/useBoardPreferences'
 import { useFairPlayMonitor } from '../hooks/useFairPlayMonitor'
+import type { JuPieceTheme } from '../lib/boardAppearance'
 import {
   loadTournamentGame,
   loadTournaments,
@@ -60,6 +63,8 @@ function OnlineGamesPage() {
   const [boardResult, setBoardResult] = useState('Live')
   const [gameLoading, setGameLoading] = useState(Boolean(requestedGameId))
   const [flipped, setFlipped] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { boardTheme, pieceTheme, setBoardTheme, setPieceTheme } = useBoardPreferences()
   const [movePending, setMovePending] = useState(false)
   const [message, setMessage] = useState('')
   const [, setClockTick] = useState(0)
@@ -346,14 +351,34 @@ function OnlineGamesPage() {
                 {gameLoading ? <span>Loading game...</span> : !watchingTournament ? <span>Legal chess movement enabled</span> : null}
               </div>
               <div className="online-board-head-actions">
-                <button type="button" aria-label="Flip board" title="Flip board" onClick={() => setFlipped((current) => !current)}>
-                  <FlipHorizontal2 size={17} aria-hidden="true" />
+                <button
+                  type="button"
+                  aria-expanded={settingsOpen}
+                  aria-label="Board settings"
+                  className={settingsOpen ? 'active' : undefined}
+                  title="Board settings"
+                  onClick={() => setSettingsOpen((current) => !current)}
+                >
+                  <Settings2 size={17} aria-hidden="true" />
                 </button>
                 {watchingTournament && !playingOnlineTournament ? (
                   <button type="button" onClick={startFreeBoard}>Free board</button>
                 ) : null}
               </div>
             </div>
+
+            {settingsOpen ? (
+              <BoardSettingsPanel
+                boardTheme={boardTheme}
+                className="online-board-settings"
+                flipped={flipped}
+                onBoardThemeChange={setBoardTheme}
+                onClose={() => setSettingsOpen(false)}
+                onFlip={() => setFlipped((current) => !current)}
+                onPieceThemeChange={setPieceTheme}
+                pieceTheme={pieceTheme}
+              />
+            ) : null}
 
             {preGameCountdown && !preGameCountdown.expired ? (
               <div className="first-move-deadline" role="status">
@@ -367,9 +392,10 @@ function OnlineGamesPage() {
               </div>
             ) : null}
 
-            <PlayerStrip {...playerFor(topSide)} edge="top" />
+            <PlayerStrip {...playerFor(topSide)} edge="top" pieceTheme={pieceTheme} />
             <JuChessBoard
               annotationsEnabled={!playingOnlineTournament}
+              boardTheme={boardTheme}
               className="online-ju-board"
               flipped={flipped}
               interactive={watchingTournament ? canMove : true}
@@ -378,9 +404,10 @@ function OnlineGamesPage() {
                 setBoardMoves(state.moves)
                 setBoardResult(state.result)
               }}
+              pieceTheme={pieceTheme}
               showEvaluation={false}
             />
-            <PlayerStrip {...playerFor(bottomSide)} edge="bottom" />
+            <PlayerStrip {...playerFor(bottomSide)} edge="bottom" pieceTheme={pieceTheme} />
 
             <div className="online-board-controls">
               <button type="button" disabled={watchingTournament || !boardMoves.length} onClick={undoMove}>
@@ -502,6 +529,7 @@ function PlayerStrip({
   clock,
   edge,
   name,
+  pieceTheme,
   rating,
   side,
 }: {
@@ -509,6 +537,7 @@ function PlayerStrip({
   clock?: HostedClockState
   edge: 'bottom' | 'top'
   name: string
+  pieceTheme: JuPieceTheme
   rating?: number
   side: 'white' | 'black'
 }) {
@@ -517,7 +546,7 @@ function PlayerStrip({
       <span>{side === 'white' ? 'W' : 'B'}</span>
       <div className="online-player-copy">
         <strong>{name}</strong>
-        <JuCapturedPieces pieces={captured} />
+        <JuCapturedPieces pieces={captured} pieceTheme={pieceTheme} />
       </div>
       <div className="online-player-meta">
         {clock ? <time className={clock.tone}>{clock.label}</time> : null}

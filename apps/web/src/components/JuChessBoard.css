@@ -70,6 +70,32 @@
   container-type: inline-size;
 }
 
+.ju-chess-board[data-board-theme="brown"] {
+  border-color: #9a7654;
+  background-color: #b78d69;
+  background-position: center;
+  background-size: cover;
+  box-shadow:
+    0 14px 28px rgba(35, 24, 18, 0.2),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+.ju-chess-board[data-board-theme="brown"] .ju-chess-square.light,
+.ju-chess-board[data-board-theme="brown"] .ju-chess-square.dark {
+  background: transparent;
+  box-shadow: none;
+}
+
+.ju-chess-board[data-board-theme="brown"] .ju-chess-square.light .ju-rank-label,
+.ju-chess-board[data-board-theme="brown"] .ju-chess-square.light .ju-file-label {
+  color: #865f3e;
+}
+
+.ju-chess-board[data-board-theme="brown"] .ju-chess-square.dark .ju-rank-label,
+.ju-chess-board[data-board-theme="brown"] .ju-chess-square.dark .ju-file-label {
+  color: #f6dfbd;
+}
+
 .ju-chess-square {
   position: relative;
   display: grid;

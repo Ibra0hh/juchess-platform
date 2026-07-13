@@ -1,0 +1,220 @@
+.board-settings-panel {
+  z-index: 4;
+  width: min(100%, 440px);
+  margin: 8px 0 14px auto;
+  padding: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  border-radius: 8px;
+  background: #fffdf8;
+  box-shadow: 0 12px 28px rgba(17, 17, 17, 0.14);
+}
+
+.games-board-settings {
+  align-self: flex-end;
+}
+
+.online-board-settings {
+  width: min(100%, 800px);
+  margin: 0 auto 14px;
+}
+
+.board-settings-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.board-settings-head > svg {
+  width: 18px;
+  height: 18px;
+  color: #7a2431;
+}
+
+.board-settings-head > div,
+.board-orientation-setting > div,
+.board-theme-options button > span,
+.piece-theme-options button > span {
+  display: grid;
+  min-width: 0;
+}
+
+.board-settings-head strong,
+.board-orientation-setting strong,
+.board-theme-options strong,
+.piece-theme-options strong {
+  color: #111111;
+  font-size: 12px;
+}
+
+.board-settings-head span,
+.board-orientation-setting span,
+.board-theme-options small,
+.piece-theme-options small {
+  margin-top: 1px;
+  color: rgba(17, 17, 17, 0.56);
+  font-size: 9.5px;
+}
+
+.board-settings-head > button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(17, 17, 17, 0.62);
+  cursor: pointer;
+}
+
+.board-settings-head > button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.board-orientation-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  border-radius: 7px;
+  background: #fbf6e8;
+}
+
+.board-orientation-setting > button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.board-orientation-setting > button:hover {
+  border-color: #7a2431;
+  color: #7a2431;
+}
+
+.board-orientation-setting > button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.board-theme-options,
+.piece-theme-options,
+.board-settings-panel > fieldset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.board-theme-options legend,
+.piece-theme-options legend,
+.board-settings-panel > fieldset legend {
+  margin-bottom: 6px;
+  color: rgba(17, 17, 17, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.board-theme-options button,
+.piece-theme-options button,
+.board-settings-panel > fieldset button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 7px;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #111111;
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-theme-options button.active,
+.piece-theme-options button.active,
+.board-settings-panel > fieldset button.active {
+  border-color: #7a2431;
+  box-shadow: inset 0 0 0 1px #7a2431;
+  background: #fff7f5;
+}
+
+.board-theme-swatch {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: 5px;
+  background-color: #f0d8b0;
+  background-image:
+    linear-gradient(45deg, #602830 25%, transparent 25%),
+    linear-gradient(-45deg, #602830 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #602830 75%),
+    linear-gradient(-45deg, transparent 75%, #602830 75%);
+  background-position: 0 0, 0 17px, 17px -17px, -17px 0;
+  background-size: 34px 34px;
+}
+
+.board-theme-swatch.brown {
+  background-position: center;
+  background-size: cover;
+}
+
+.piece-theme-options img {
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.engine-strength-options button > strong,
+.engine-strength-options button > span {
+  display: block;
+}
+
+.engine-strength-options button > strong {
+  font-size: 11px;
+}
+
+.engine-strength-options button > span {
+  margin-top: 2px;
+  color: rgba(17, 17, 17, 0.56);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.5px;
+}
+
+@media (max-width: 620px) {
+  .board-settings-panel {
+    width: 100%;
+  }
+
+  .board-orientation-setting {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .board-orientation-setting > button {
+    justify-content: center;
+  }
+}

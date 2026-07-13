@@ -113,6 +113,7 @@
 }
 
 .online-board-station {
+  --online-board-size: min(100%, 800px, calc(100dvh - 350px));
   padding: 18px;
 }
 
@@ -133,7 +134,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: min(100%, 800px);
+  width: var(--online-board-size);
   margin: 0 auto 8px;
   border: 1px solid rgba(161, 91, 27, 0.28);
   border-radius: 7px;
@@ -175,9 +176,15 @@
   gap: 7px;
 }
 
-.online-board-head-actions button[aria-label="Flip board"] {
+.online-board-head-actions button[aria-label="Board settings"] {
   width: 34px;
   padding: 0;
+}
+
+.online-board-head-actions button.active {
+  border-color: #7a2431;
+  background: #7a2431;
+  color: #ffffff;
 }
 
 .online-board-head button,
@@ -208,7 +215,7 @@
   grid-template-columns: 26px 1fr auto;
   align-items: center;
   gap: 9px;
-  width: min(100%, 800px);
+  width: var(--online-board-size);
   min-height: 50px;
   margin: 0 auto;
   border: 1px solid rgba(17, 17, 17, 0.16);
@@ -300,13 +307,13 @@
 }
 
 .online-ju-board {
-  width: min(100%, 800px);
+  width: var(--online-board-size);
   margin: 0 auto;
 }
 
 .online-ju-board.ju-chess-board-shell,
 .online-ju-board.ju-chess-board-shell.without-evaluation {
-  width: min(100%, 800px);
+  width: var(--online-board-size);
   max-width: none;
 }
 
@@ -315,7 +322,7 @@
 }
 
 .online-board-controls {
-  width: min(100%, 800px);
+  width: var(--online-board-size);
   margin: 13px auto 0;
 }
 

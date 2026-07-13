@@ -860,108 +860,11 @@
   height: 17px;
 }
 
-.engine-settings-panel {
-  z-index: 4;
-  align-self: flex-end;
-  width: min(100%, 410px);
-  margin-top: 8px;
-  padding: 14px;
-  border: 1px solid rgba(17, 17, 17, 0.2);
-  border-radius: 7px;
-  background: #fffdf8;
-  box-shadow: 0 12px 28px rgba(17, 17, 17, 0.14);
-}
-
-.engine-settings-panel > div {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 9px;
-}
-
-.engine-settings-panel > div > span,
-.engine-settings-panel legend {
-  color: rgba(17, 17, 17, 0.58);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.engine-settings-panel > div > strong {
-  font-size: 13px;
-}
-
-.engine-settings-panel > div > button {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: rgba(17, 17, 17, 0.62);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.engine-settings-panel > div > button svg {
-  width: 16px;
-  height: 16px;
-}
-
-.engine-settings-panel fieldset {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  margin: 12px 0 0;
-  padding: 0;
-  border: 0;
-}
-
-.engine-settings-panel legend {
-  margin-bottom: 6px;
-}
-
-.engine-settings-panel fieldset button {
-  min-width: 0;
-  padding: 9px 5px;
-  color: var(--ink);
-  background: #fff;
-  border: 1px solid rgba(17, 17, 17, 0.18);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.engine-settings-panel fieldset button strong,
-.engine-settings-panel fieldset button span {
-  display: block;
-}
-
-.engine-settings-panel fieldset button strong {
-  font-size: 11.5px;
-}
-
-.engine-settings-panel fieldset button span {
-  margin-top: 2px;
-  color: rgba(17, 17, 17, 0.56);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-}
-
-.engine-settings-panel fieldset button.active {
-  color: #fff;
-  border-color: var(--wine);
-  background: var(--wine);
-}
-
-.engine-settings-panel fieldset button.active span {
-  color: rgba(255, 255, 255, 0.78);
-}
-
 .board-player-frame {
   display: flex;
   align-self: center;
   flex-direction: column;
-  width: min(100%, 836px);
+  width: min(100%, 836px, calc(100dvh - 260px));
   min-width: 0;
   margin-top: 16px;
 }
@@ -2231,7 +2134,7 @@
   }
 
   .board-player-frame {
-    width: min(100%, 800px);
+    width: min(100%, 800px, calc(100dvh - 260px));
   }
 
   .game-rail {
