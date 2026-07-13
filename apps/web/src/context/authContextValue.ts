@@ -1,6 +1,12 @@
 import { createContext } from 'react'
 import type { Models } from 'appwrite'
-import type { AuthProfile, SignInInput, SignUpInput } from '../lib/auth'
+import type {
+  AuthProfile,
+  ProfileMediaKind,
+  ProfileUpdateInput,
+  SignInInput,
+  SignUpInput,
+} from '../lib/auth'
 import type { BoardPreferences } from '../lib/boardAppearance'
 
 export type AuthContextValue = {
@@ -18,6 +24,9 @@ export type AuthContextValue = {
     username: string,
   ) => Promise<void>
   saveBoardPreferences: (preferences: BoardPreferences) => Promise<void>
+  updateProfile: (input: ProfileUpdateInput) => Promise<void>
+  uploadProfileImage: (kind: ProfileMediaKind, file: File) => Promise<void>
+  removeProfileImage: (kind: ProfileMediaKind) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

@@ -27,6 +27,7 @@
         "role": "enum:member,organizer,admin",
         "status": "enum:pending,active,suspended",
         "avatarFileId": "string",
+        "coverFileId": "string",
         "chessComUsername": "string|unique",
         "lichessUsername": "string|unique",
         "boardTheme": "string",

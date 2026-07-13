@@ -1,22 +1,52 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Camera, Edit3, ImagePlus, LogOut, Trash2, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
+import { formatAppwriteError, profileMediaUrl, type ProfileMediaKind } from '../lib/auth'
 import { loadProfileGameHistory, type SampleGame } from '../lib/juchess'
 import './ClubScreens.css'
+import './ProfilePage.css'
+
+type ProfileForm = {
+  chessComUsername: string
+  displayName: string
+  lichessUsername: string
+  phone: string
+  universityId: string
+}
 
 function ProfilePage() {
   const navigate = useNavigate()
-  const { loading, profile, signOut, user } = useAuth()
+  const {
+    loading,
+    profile,
+    removeProfileImage,
+    signOut,
+    updateProfile,
+    uploadProfileImage,
+    user,
+  } = useAuth()
   const authenticated = Boolean(user || profile)
   const displayName = profile?.displayName || user?.name || profile?.email || 'Club member'
   const rating = profile?.rating ?? 1200
   const username = profile?.universityId || profile?.email?.split('@')[0] || user?.email.split('@')[0] || 'member'
   const initials = getInitials(displayName)
   const profileId = profile?.$id
+  const avatarUrl = profileMediaUrl(profile?.avatarFileId)
+  const coverUrl = profileMediaUrl(profile?.coverFileId)
   const [history, setHistory] = useState<SampleGame[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [mediaBusy, setMediaBusy] = useState<ProfileMediaKind | null>(null)
+  const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
+  const [form, setForm] = useState<ProfileForm>(() => profileForm(profile))
+
+  useEffect(() => {
+    setForm(profileForm(profile))
+  }, [profile])
 
   useEffect(() => {
     if (!authenticated || !profileId) {
@@ -52,6 +82,50 @@ function ProfilePage() {
     navigate('/home')
   }
 
+  const handleSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSaving(true)
+    setFeedback(null)
+    try {
+      await updateProfile(form)
+      setEditing(false)
+      setFeedback({ tone: 'success', text: 'Profile saved.' })
+    } catch (error) {
+      setFeedback({ tone: 'error', text: formatAppwriteError(error) })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleImage = async (kind: ProfileMediaKind, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setMediaBusy(kind)
+    setFeedback(null)
+    try {
+      await uploadProfileImage(kind, file)
+      setFeedback({ tone: 'success', text: `${kind === 'avatar' ? 'Profile picture' : 'Cover image'} updated.` })
+    } catch (error) {
+      setFeedback({ tone: 'error', text: formatAppwriteError(error) })
+    } finally {
+      setMediaBusy(null)
+    }
+  }
+
+  const handleRemoveImage = async (kind: ProfileMediaKind) => {
+    setMediaBusy(kind)
+    setFeedback(null)
+    try {
+      await removeProfileImage(kind)
+      setFeedback({ tone: 'success', text: `${kind === 'avatar' ? 'Profile picture' : 'Cover image'} removed.` })
+    } catch (error) {
+      setFeedback({ tone: 'error', text: formatAppwriteError(error) })
+    } finally {
+      setMediaBusy(null)
+    }
+  }
+
   if (loading) {
     return <ProfileStatus title="Checking profile" body="Loading your club session..." />
   }
@@ -60,17 +134,12 @@ function ProfilePage() {
     return (
       <div className="club-screen" data-screen-label="Profile">
         <SiteHeader active="profile" />
-        <main className="profile-main">
-          <section className="profile-identity">
-            <div className="profile-avatar">JU</div>
-            <div className="profile-copy">
-              <div className="profile-name-line">
-                <h1>Guest profile</h1>
-                <span>Signed out</span>
-              </div>
-              <p className="profile-handle">Sign in to see the tournament games connected to your account.</p>
-            </div>
-            <div className="profile-rating-card">
+        <main className="member-profile-main">
+          <section className="member-profile-guest">
+            <div className="member-profile-avatar fallback">JU</div>
+            <h1>Your JuChess profile</h1>
+            <p>Sign in to manage your profile and see the tournament games connected to your account.</p>
+            <div>
               <Link to="/sign-in">Sign in</Link>
               <Link to="/sign-up">Create account</Link>
             </div>
@@ -82,30 +151,139 @@ function ProfilePage() {
 
   return (
     <div className="club-screen" data-screen-label="Profile">
-      <SiteHeader active="profile" profilePreview={{ displayName, initials }} />
-      <main className="profile-main">
-        <section className="profile-identity">
-          <div className="profile-avatar">{initials}</div>
-          <div className="profile-copy">
-            <div className="profile-name-line">
-              <h1>{displayName}</h1>
-              <span>{profile?.status === 'pending' ? 'Pending member' : 'Club member'}</span>
+      <SiteHeader active="profile" profilePreview={{ avatarUrl, displayName, initials }} />
+      <main className="member-profile-main">
+        <section className="member-profile-hero">
+          <div
+            className={coverUrl ? 'member-profile-cover has-image' : 'member-profile-cover'}
+            style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
+          >
+            <div className="member-profile-cover-actions">
+              <label className="media-action">
+                <ImagePlus size={17} />
+                <span>{mediaBusy === 'cover' ? 'Uploading...' : coverUrl ? 'Change cover' : 'Add cover'}</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={Boolean(mediaBusy)}
+                  onChange={(event) => void handleImage('cover', event)}
+                />
+              </label>
+              {coverUrl ? (
+                <button
+                  type="button"
+                  className="media-icon-button"
+                  title="Remove cover image"
+                  disabled={Boolean(mediaBusy)}
+                  onClick={() => void handleRemoveImage('cover')}
+                >
+                  <Trash2 size={17} />
+                </button>
+              ) : null}
             </div>
-            <p className="profile-handle">{username} - Member since {formatMemberSince(user?.$createdAt || profile?.$createdAt)}</p>
           </div>
-          <div className="profile-rating-card">
-            <div>
-              <strong>{rating}</strong>
-              <span>Club rating</span>
+
+          <div className="member-profile-summary">
+            <div className="member-profile-avatar-wrap">
+              <div className={avatarUrl ? 'member-profile-avatar has-image' : 'member-profile-avatar fallback'}>
+                {avatarUrl ? <img src={avatarUrl} alt={`${displayName} profile`} /> : initials}
+              </div>
+              <label className="avatar-edit" title="Change profile picture">
+                <Camera size={16} />
+                <span className="sr-only">Change profile picture</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={Boolean(mediaBusy)}
+                  onChange={(event) => void handleImage('avatar', event)}
+                />
+              </label>
             </div>
-            <button type="button" onClick={() => void handleSignOut()}>
-              Sign out
+
+            <div className="member-profile-name">
+              <div>
+                <h1>{displayName}</h1>
+                <span>{profile?.status === 'pending' ? 'Pending member' : 'Club member'}</span>
+              </div>
+              <p>{username} · Member since {formatMemberSince(user?.$createdAt || profile?.$createdAt)}</p>
+            </div>
+
+            <div className="member-profile-actions">
+              <button type="button" className="primary" onClick={() => { setEditing(true); setFeedback(null) }}>
+                <Edit3 size={16} /> Edit profile
+              </button>
+              <button type="button" onClick={() => void handleSignOut()}>
+                <LogOut size={16} /> Sign out
+              </button>
+            </div>
+          </div>
+
+          {avatarUrl ? (
+            <button
+              type="button"
+              className="remove-avatar"
+              disabled={Boolean(mediaBusy)}
+              onClick={() => void handleRemoveImage('avatar')}
+            >
+              <Trash2 size={14} /> Remove profile picture
             </button>
-          </div>
+          ) : null}
         </section>
 
-        <div className="profile-grid">
+        {feedback ? <div className={`profile-feedback ${feedback.tone}`} role="status">{feedback.text}</div> : null}
+
+        {editing ? (
+          <section className="member-profile-editor" aria-labelledby="edit-profile-title">
+            <div className="member-profile-editor-head">
+              <div>
+                <span>Account details</span>
+                <h2 id="edit-profile-title">Edit profile</h2>
+              </div>
+              <button type="button" title="Close profile editor" onClick={() => { setEditing(false); setForm(profileForm(profile)) }}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={(event) => void handleSave(event)}>
+              <label>
+                <span>Display name</span>
+                <input required maxLength={128} value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} />
+              </label>
+              <label>
+                <span>University ID</span>
+                <input maxLength={64} value={form.universityId} onChange={(event) => setForm({ ...form, universityId: event.target.value })} />
+              </label>
+              <label>
+                <span>Phone</span>
+                <input type="tel" maxLength={32} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+              </label>
+              <label>
+                <span>Email</span>
+                <input type="email" value={profile?.email || user?.email || ''} disabled />
+                <small>Email is managed by your sign-in account.</small>
+              </label>
+              <label>
+                <span>Chess.com username</span>
+                <input maxLength={80} value={form.chessComUsername} onChange={(event) => setForm({ ...form, chessComUsername: event.target.value })} />
+              </label>
+              <label>
+                <span>Lichess username</span>
+                <input maxLength={80} value={form.lichessUsername} onChange={(event) => setForm({ ...form, lichessUsername: event.target.value })} />
+              </label>
+              <div className="member-profile-editor-actions">
+                <button type="button" onClick={() => { setEditing(false); setForm(profileForm(profile)) }}>Cancel</button>
+                <button type="submit" className="primary" disabled={saving}>{saving ? 'Saving...' : 'Save changes'}</button>
+              </div>
+            </form>
+          </section>
+        ) : null}
+
+        <div className="member-profile-grid">
           <section className="profile-panel season-panel">
+            <div className="profile-panel-heading">
+              <span>Performance</span>
+              <strong>{rating}</strong>
+              <small>Club rating</small>
+            </div>
             <h2>Tournament record</h2>
             <div className="season-stats">
               <MetricCard label="Games" value={String(stats.played)} />
@@ -147,13 +325,11 @@ function ProfileStatus({ body, title }: { body: string; title: string }) {
   return (
     <div className="club-screen" data-screen-label="Profile">
       <SiteHeader active="profile" />
-      <main className="profile-main">
-        <section className="profile-identity">
-          <div className="profile-avatar">JU</div>
-          <div className="profile-copy">
-            <div className="profile-name-line"><h1>{title}</h1></div>
-            <p className="profile-handle">{body}</p>
-          </div>
+      <main className="member-profile-main">
+        <section className="member-profile-guest">
+          <div className="member-profile-avatar fallback">JU</div>
+          <h1>{title}</h1>
+          <p>{body}</p>
         </section>
       </main>
     </div>
@@ -184,15 +360,7 @@ function ProfileHistoryMessage({ error = false, text }: { error?: boolean; text:
   return <div className={error ? 'profile-history-message error' : 'profile-history-message'}>{text}</div>
 }
 
-function MetricCard({
-  label,
-  tone,
-  value,
-}: {
-  label: string
-  tone?: 'accent' | 'win'
-  value: string
-}) {
+function MetricCard({ label, tone, value }: { label: string; tone?: 'accent' | 'win'; value: string }) {
   return (
     <div className={tone ? `metric-card ${tone}` : 'metric-card'}>
       <strong>{value}</strong>
@@ -223,6 +391,16 @@ function buildProfileStats(games: SampleGame[], profileId?: string) {
     else stats.losses += 1
   })
   return stats
+}
+
+function profileForm(profile: ReturnType<typeof useAuth>['profile']): ProfileForm {
+  return {
+    chessComUsername: profile?.chessComUsername || '',
+    displayName: profile?.displayName || '',
+    lichessUsername: profile?.lichessUsername || '',
+    phone: profile?.phone || '',
+    universityId: profile?.universityId || '',
+  }
 }
 
 function formatMemberSince(value?: string) {

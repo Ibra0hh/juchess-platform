@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { ArrowRight, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-react'
+import { ArrowRight, AtSign, CalendarDays, Mail, MapPin, Trophy, Users, Wifi } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { loadAnnouncements, loadTournamentSummaries, type Announcement, type Tournament } from '../lib/juchess'
@@ -461,47 +461,26 @@ function TeamSection() {
 
 function AppSection() {
   return (
-    <section className="home-app" id="contact" aria-labelledby="app-title">
+    <section className="home-app" id="contact" aria-labelledby="contact-title">
       <div className="home-app-panel">
         <div className="app-panel-grid" aria-hidden="true" />
         <div className="app-copy">
-          <span>Get the app</span>
-          <h2 id="app-title">The whole club, in your pocket.</h2>
-          <p>Follow live boards, check standings, and register for tournaments from anywhere - the JuChess app is on both stores.</p>
-          <div className="store-row">
-            <a href="#contact" aria-label="Download JuChess on the App Store">
-              <AppStoreIcon />
-              <span><small>Download on the</small><strong>App Store</strong></span>
-            </a>
-            <a href="#contact" aria-label="Get JuChess on Google Play">
-              <PlayStoreIcon />
-              <span><small>Get it on</small><strong>Google Play</strong></span>
-            </a>
-          </div>
-        </div>
-        <div className="contact-list">
-          <ContactRow icon="✉" label="Email" value="chessclub@ju.edu.jo" />
-          <ContactRow icon="⌂" label="Find us" value="Student Union Building, JU / Amman" />
-          <div className="social-row">
-            {['IG', 'FB', 'X', 'WA'].map((item) => (
-              <a href="#contact" aria-label={item} key={item}>{item}</a>
-            ))}
+          <span>Contact the club</span>
+          <h2 id="contact-title">Get in touch with us.</h2>
+          <p>Questions about membership, tournaments, or club activities? Our email and Instagram details will be added here shortly.</p>
+          <div className="contact-options" aria-label="Contact details coming soon">
+            <div>
+              <Mail aria-hidden="true" size={20} />
+              <span><small>Email</small><strong>Coming soon</strong></span>
+            </div>
+            <div>
+              <AtSign aria-hidden="true" size={20} />
+              <span><small>Instagram</small><strong>Coming soon</strong></span>
+            </div>
           </div>
         </div>
       </div>
     </section>
-  )
-}
-
-function ContactRow({ icon, label, value }: { icon: string; label: string; value: string }) {
-  return (
-    <div className="contact-row">
-      <span aria-hidden="true">{icon}</span>
-      <p>
-        <small>{label}</small>
-        <strong>{value}</strong>
-      </p>
-    </div>
   )
 }
 
@@ -519,37 +498,12 @@ function HomeFooter() {
         <nav aria-label="Footer navigation">
           <Link to="/tournaments">Tournaments</Link>
           <Link to="/tools">Tools</Link>
-          <Link to="/games">Games</Link>
           <Link to="/leaderboard">Leaderboard</Link>
           <Link to="/sign-up">Join the club</Link>
         </nav>
-        <div className="footer-social">
-          {['IG', 'FB', 'X'].map((item) => (
-            <a href="#contact" aria-label={item} key={item}>{item}</a>
-          ))}
-        </div>
       </div>
       <p>© 2026 JuChess / University of Jordan Chess Club / Amman</p>
     </footer>
-  )
-}
-
-function AppStoreIcon() {
-  return (
-    <svg width="22" height="26" viewBox="0 0 170 210" fill="currentColor" aria-hidden="true">
-      <path d="M150.4 71.6c-1 .8-19.7 11.3-19.7 34.7 0 27 23.7 36.6 24.4 36.8-.1.6-3.8 13-12.5 25.6-7.8 11.1-16 22.2-28.4 22.2s-15.6-7.2-29.9-7.2c-14 0-19 7.4-30.4 7.4S34.7 180.8 26 168.4C15.9 154 7.7 131.7 7.7 110.5c0-34 22.1-52 43.8-52 11.6 0 21.2 7.6 28.5 7.6 6.9 0 17.7-8.1 30.9-8.1 5 .1 23 .5 34.9 17.2l4.6-3.6zM108.7 33.2c5.7-6.7 9.7-16.1 9.7-25.5 0-1.3-.1-2.6-.3-3.7-9.2.3-20.2 6.1-26.8 13.8-5.2 5.9-10 15.3-10 24.8 0 1.4.2 2.9.3 3.3.6.1 1.5.2 2.5.2 8.3.1 18.7-5.4 24.6-12.9z" />
-    </svg>
-  )
-}
-
-function PlayStoreIcon() {
-  return (
-    <svg width="21" height="23" viewBox="0 0 512 512" aria-hidden="true">
-      <path fill="#EA4335" d="M325 234 90 12c-8-8-19-13-31-12l236 234z" />
-      <path fill="#34A853" d="M59 0C48 6 41 17 41 33v446c0 16 7 27 18 33l236-256z" />
-      <path fill="#FBBC04" d="M325 234 89 500c9 1 19-2 30-8l178-100z" />
-      <path fill="#4285F4" d="m420 202-73-41-49 73 62 62 60-34c18-14 18-46 0-60z" />
-    </svg>
   )
 }
 

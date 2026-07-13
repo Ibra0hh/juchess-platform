@@ -1,75 +1,150 @@
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { RefreshCw, Trophy, UsersRound } from 'lucide-react'
 import SiteHeader from '../components/SiteHeader'
-import { members } from '../lib/juchess'
+import {
+  formatAppwriteError,
+  loadClubLeaderboard,
+  profileMediaUrl,
+  type AuthProfile,
+} from '../lib/auth'
 import './ClubScreens.css'
 
-const trends = ['+24', '+18', '-6', '+11', '+9', '-14', '+7', '+3', '-8', '+5', '-2', '+1']
-
-const podiumOrder = [
-  { memberIndex: 1, placeLabel: '2nd place', piece: '\u265c', tone: 'light' },
-  { memberIndex: 0, placeLabel: 'Club champion', piece: '\u265a', tone: 'champion' },
-  { memberIndex: 2, placeLabel: '3rd place', piece: '\u265e', tone: 'bronze' },
-] as const
+const podiumOrder = [1, 0, 2] as const
 
 function LeaderboardPage() {
+  const [players, setPlayers] = useState<AuthProfile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const loadPlayers = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      setPlayers(await loadClubLeaderboard())
+    } catch (caught) {
+      setPlayers([])
+      setError(formatAppwriteError(caught))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadPlayers()
+  }, [loadPlayers])
+
   return (
     <div className="club-screen" data-screen-label="Leaderboard">
       <SiteHeader active="leaderboard" />
       <main className="leaderboard-main">
         <section className="club-title-block">
           <h1>Club Leaderboard</h1>
-          <p>Season 2025-26 club ratings - updated after every rated round</p>
+          <p>Live club ratings from real member profiles.</p>
         </section>
 
-        <section className="podium-grid" aria-label="Top ranked players">
-          {podiumOrder.map((podium) => {
-            const member = members[podium.memberIndex]
+        {loading ? <LeaderboardState icon="loading" title="Loading rankings" body="Reading the latest club ratings..." /> : null}
+        {!loading && error ? (
+          <LeaderboardState
+            icon="error"
+            title="Rankings could not be loaded"
+            body={error}
+            action={<button type="button" onClick={() => void loadPlayers()}><RefreshCw size={16} /> Try again</button>}
+          />
+        ) : null}
+        {!loading && !error && players.length === 0 ? (
+          <LeaderboardState
+            icon="empty"
+            title="No ranked players yet"
+            body="The leaderboard will appear when real active member ratings are available."
+          />
+        ) : null}
 
-            return (
-              <article className={`podium-card ${podium.tone}`} key={member.id}>
-                <div className="podium-piece" aria-hidden="true">
-                  {podium.piece}
-                </div>
-                <h2>{member.name}</h2>
-                <p>{member.universityId}</p>
-                <strong>{member.rating}</strong>
-                <span>{podium.placeLabel}</span>
-              </article>
-            )
-          })}
-        </section>
-
-        <section className="leaderboard-table-wrap" aria-label="Full club leaderboard">
-          <table className="leaderboard-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Player</th>
-                <th>Username</th>
-                <th>Rating</th>
-                <th>Trend</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((member, index) => {
-                const trend = trends[index] || '-'
-                const isPositive = trend.startsWith('+')
-
+        {!loading && !error && players.length > 0 ? (
+          <>
+            <section className="podium-grid" aria-label="Top ranked players">
+              {podiumOrder.map((playerIndex) => {
+                const player = players[playerIndex]
+                if (!player) return null
+                const rank = playerIndex + 1
+                const avatarUrl = profileMediaUrl(player.avatarFileId)
                 return (
-                  <tr className={index === 0 ? 'leader-row' : undefined} key={member.id}>
-                    <td>{index + 1}</td>
-                    <td>{member.name}</td>
-                    <td>{member.universityId}</td>
-                    <td>{member.rating}</td>
-                    <td className={isPositive ? 'positive' : 'negative'}>{trend}</td>
-                  </tr>
+                  <article className={`podium-card ${rank === 1 ? 'champion' : rank === 3 ? 'bronze' : 'light'}`} key={player.$id}>
+                    <div className="podium-avatar" aria-hidden="true">
+                      {avatarUrl ? <img src={avatarUrl} alt="" /> : initialsFor(player.displayName)}
+                    </div>
+                    <h2>{player.displayName}</h2>
+                    <p>{player.universityId || player.email}</p>
+                    <strong>{player.rating ?? 0}</strong>
+                    <span>{rankLabel(rank)}</span>
+                  </article>
                 )
               })}
-            </tbody>
-          </table>
-        </section>
+            </section>
+
+            <section className="leaderboard-table-wrap" aria-label="Full club leaderboard">
+              <table className="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Player</th>
+                    <th>Member ID</th>
+                    <th>Rating</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {players.map((player, index) => (
+                    <tr className={index === 0 ? 'leader-row' : undefined} key={player.$id}>
+                      <td>{index + 1}</td>
+                      <td>{player.displayName}</td>
+                      <td>{player.universityId || player.email}</td>
+                      <td>{player.rating ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          </>
+        ) : null}
       </main>
     </div>
   )
+}
+
+function LeaderboardState({
+  action,
+  body,
+  icon,
+  title,
+}: {
+  action?: ReactNode
+  body: string
+  icon: 'empty' | 'error' | 'loading'
+  title: string
+}) {
+  return (
+    <section className="leaderboard-state" aria-live="polite">
+      {icon === 'empty' ? <UsersRound size={30} /> : <Trophy className={icon === 'loading' ? 'loading' : undefined} size={30} />}
+      <h2>{title}</h2>
+      <p>{body}</p>
+      {action}
+    </section>
+  )
+}
+
+function rankLabel(rank: number) {
+  if (rank === 1) return 'Club leader'
+  if (rank === 2) return '2nd place'
+  return '3rd place'
+}
+
+function initialsFor(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'JU'
 }
 
 export default LeaderboardPage

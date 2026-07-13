@@ -11,12 +11,17 @@ import {
   formatAppwriteError,
   getCurrentSession,
   loadPreviewProfileByEmail,
+  deleteProfileMedia,
   saveBoardAppearance,
   saveExternalGameUsername,
+  saveProfileDetails,
   signInWithEmail,
   signOutCurrentUser,
   signUpWithEmail,
+  uploadProfileMedia,
   type AuthProfile,
+  type ProfileMediaKind,
+  type ProfileUpdateInput,
   type SignInInput,
   type SignUpInput,
 } from '../lib/auth'
@@ -144,6 +149,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(updated)
   }, [previewSession, profile])
 
+  const updateProfile = useCallback(async (input: ProfileUpdateInput) => {
+    if (!profile) throw new Error('Sign in before editing your profile.')
+
+    if (previewSession || profile.$id.startsWith('preview-')) {
+      setProfile({
+        ...profile,
+        ...input,
+        displayName: input.displayName.trim(),
+        chessComUsername: input.chessComUsername?.trim().toLowerCase() || undefined,
+        lichessUsername: input.lichessUsername?.trim().toLowerCase() || undefined,
+      } as AuthProfile)
+      return
+    }
+
+    const updated = await saveProfileDetails(profile.$id, input)
+    setProfile(updated)
+  }, [previewSession, profile])
+
+  const uploadProfileImage = useCallback(async (kind: ProfileMediaKind, file: File) => {
+    if (!profile || !user) throw new Error('Sign in before uploading a profile image.')
+
+    if (previewSession || profile.$id.startsWith('preview-')) {
+      const field = kind === 'avatar' ? 'avatarFileId' : 'coverFileId'
+      setProfile({ ...profile, [field]: URL.createObjectURL(file) } as AuthProfile)
+      return
+    }
+
+    const updated = await uploadProfileMedia(profile, user.$id, kind, file)
+    setProfile(updated)
+  }, [previewSession, profile, user])
+
+  const removeProfileImage = useCallback(async (kind: ProfileMediaKind) => {
+    if (!profile) return
+    const field = kind === 'avatar' ? 'avatarFileId' : 'coverFileId'
+
+    if (previewSession || profile.$id.startsWith('preview-')) {
+      setProfile({ ...profile, [field]: undefined } as AuthProfile)
+      return
+    }
+
+    const updated = await deleteProfileMedia(profile, kind)
+    setProfile(updated)
+  }, [previewSession, profile])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       ready: Boolean(previewSession) || appwriteReady,
@@ -152,13 +201,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       error,
       linkExternalGameUsername,
+      removeProfileImage,
       saveBoardPreferences,
+      updateProfile,
+      uploadProfileImage,
       refresh,
       signIn,
       signUp,
       signOut,
     }),
-    [error, linkExternalGameUsername, loading, previewSession, profile, refresh, saveBoardPreferences, signIn, signOut, signUp, user],
+    [error, linkExternalGameUsername, loading, previewSession, profile, refresh, removeProfileImage, saveBoardPreferences, signIn, signOut, signUp, updateProfile, uploadProfileImage, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

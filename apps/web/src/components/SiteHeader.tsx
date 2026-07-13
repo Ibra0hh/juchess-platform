@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
+import { profileMediaUrl } from '../lib/auth'
 import { useOnlineTournamentPlayLock } from '../lib/onlineTournamentPlayLock'
 import './SiteHeader.css'
 
@@ -8,6 +9,7 @@ type SiteHeaderProps = {
   profilePreview?: {
     displayName: string
     initials: string
+    avatarUrl?: string
   }
   toolsDisabled?: boolean
 }
@@ -27,6 +29,7 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
     .join('')
     .toUpperCase()
     || 'JU'
+  const avatarUrl = profilePreview?.avatarUrl || profileMediaUrl(profile?.avatarFileId)
 
   return (
     <header className="site-header">
@@ -55,9 +58,6 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
               Tools
             </Link>
           )}
-          <Link to="/games" className={active === 'games' ? 'active' : undefined}>
-            Games
-          </Link>
           <Link to="/leaderboard" className={active === 'leaderboard' ? 'active' : undefined}>
             Leaderboard
           </Link>
@@ -69,12 +69,12 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
         <div className="auth-nav">
           {profilePreview ? (
             <Link to="/profile" className="profile-link" title={profilePreview.displayName}>
-              {profilePreview.initials}
+              {avatarUrl ? <img src={avatarUrl} alt="" /> : profilePreview.initials}
             </Link>
           ) : user ? (
             <>
               <Link to="/profile" className="profile-link" title={displayName}>
-                {initials}
+                {avatarUrl ? <img src={avatarUrl} alt="" /> : initials}
               </Link>
               <button type="button" className="sign-out-link" onClick={() => void signOut()}>
                 Sign out

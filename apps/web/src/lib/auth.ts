@@ -1,5 +1,5 @@
 import { ExecutionMethod, ID, Permission, Query, Role, type Models } from 'appwrite'
-import { account, appwriteConfig, appwriteReady, functions, tablesDB } from './appwrite'
+import { account, appwriteConfig, appwriteReady, functions, storage, tablesDB } from './appwrite'
 import { tableIds } from './juchess'
 import type { BoardPreferences } from './boardAppearance'
 
@@ -9,20 +9,33 @@ export type ProfileStatus = 'pending' | 'active' | 'suspended'
 export type AuthProfile = Models.Row & {
   accountId: string
   displayName: string
-  universityId?: string
-  phone?: string
+  universityId?: string | null
+  phone?: string | null
   email: string
   rating?: number
   role?: ProfileRole
   status?: ProfileStatus
   avatarFileId?: string
-  chessComUsername?: string
-  lichessUsername?: string
+  coverFileId?: string
+  chessComUsername?: string | null
+  lichessUsername?: string | null
   boardTheme?: string
   pieceTheme?: string
   arrowColor?: string
   markColor?: string
 }
+
+export type ProfileUpdateInput = {
+  displayName: string
+  universityId?: string
+  phone?: string
+  chessComUsername?: string
+  lichessUsername?: string
+}
+
+export type ProfileMediaKind = 'avatar' | 'cover'
+
+const profileMediaBucketId = 'avatars'
 
 export type AuthSession = {
   user: Models.User
@@ -59,8 +72,8 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
     }
     await assertAccessAllowed({
       email: user.email,
-      universityId: profile?.universityId,
-      phone: profile?.phone,
+      universityId: profile?.universityId ?? undefined,
+      phone: profile?.phone ?? undefined,
     })
     return { user, profile }
   } catch (error) {
@@ -181,6 +194,106 @@ export async function loadProfileByEmail(email: string): Promise<AuthProfile | n
 
 export async function loadPreviewProfileByEmail(email: string): Promise<AuthProfile | null> {
   return await loadProfileByEmail(email)
+}
+
+export async function loadClubLeaderboard(): Promise<AuthProfile[]> {
+  if (!appwriteReady) return []
+
+  const response = await tablesDB.listRows<AuthProfile>({
+    databaseId: appwriteConfig.databaseId,
+    tableId: tableIds.profiles,
+    queries: [Query.limit(5000)],
+    total: false,
+    ttl: 30,
+  })
+
+  return response.rows
+    .filter((profile) => profile.status === 'active' && !isSeedProfile(profile))
+    .sort((left, right) => (
+      (right.rating ?? 0) - (left.rating ?? 0)
+      || left.displayName.localeCompare(right.displayName)
+    ))
+}
+
+export async function saveProfileDetails(profileId: string, input: ProfileUpdateInput) {
+  requireAppwriteReady()
+  const displayName = input.displayName.trim()
+  if (!displayName) throw new Error('Display name is required.')
+
+  return await tablesDB.updateRow<AuthProfile>({
+    databaseId: appwriteConfig.databaseId,
+    tableId: tableIds.profiles,
+    rowId: profileId,
+    data: {
+      displayName,
+      universityId: optionalValue(input.universityId),
+      phone: normalizeJordanPhone(input.phone) ?? null,
+      chessComUsername: optionalUsername(input.chessComUsername),
+      lichessUsername: optionalUsername(input.lichessUsername),
+    },
+  })
+}
+
+export async function uploadProfileMedia(
+  profile: AuthProfile,
+  accountId: string,
+  kind: ProfileMediaKind,
+  file: File,
+) {
+  requireAppwriteReady()
+  validateProfileImage(file)
+
+  const field = kind === 'avatar' ? 'avatarFileId' : 'coverFileId'
+  const previousFileId = profile[field]
+  const uploaded = await storage.createFile({
+    bucketId: profileMediaBucketId,
+    fileId: ID.unique(),
+    file,
+    permissions: [
+      Permission.read(Role.any()),
+      Permission.update(Role.user(accountId)),
+      Permission.delete(Role.user(accountId)),
+    ],
+  })
+
+  try {
+    const updated = await tablesDB.updateRow<AuthProfile>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.profiles,
+      rowId: profile.$id,
+      data: { [field]: uploaded.$id },
+    })
+
+    if (previousFileId && previousFileId !== uploaded.$id) {
+      void storage.deleteFile({ bucketId: profileMediaBucketId, fileId: previousFileId }).catch(() => undefined)
+    }
+    return updated
+  } catch (error) {
+    await storage.deleteFile({ bucketId: profileMediaBucketId, fileId: uploaded.$id }).catch(() => undefined)
+    throw error
+  }
+}
+
+export async function deleteProfileMedia(profile: AuthProfile, kind: ProfileMediaKind) {
+  requireAppwriteReady()
+  const field = kind === 'avatar' ? 'avatarFileId' : 'coverFileId'
+  const fileId = profile[field]
+  if (!fileId) return profile
+
+  const updated = await tablesDB.updateRow<AuthProfile>({
+    databaseId: appwriteConfig.databaseId,
+    tableId: tableIds.profiles,
+    rowId: profile.$id,
+    data: { [field]: null },
+  })
+  await storage.deleteFile({ bucketId: profileMediaBucketId, fileId }).catch(() => undefined)
+  return updated
+}
+
+export function profileMediaUrl(fileId?: string) {
+  if (!fileId) return ''
+  if (/^(blob:|data:|https?:)/.test(fileId)) return fileId
+  return String(storage.getFileView({ bucketId: profileMediaBucketId, fileId }))
 }
 
 export async function saveExternalGameUsername(
@@ -331,6 +444,31 @@ function normalizeJordanPhone(value?: string) {
   if (digits.startsWith('0')) return `+962${digits.slice(1)}`
   if (digits.startsWith('7') && digits.length === 9) return `+962${digits}`
   return raw
+}
+
+function optionalValue(value?: string) {
+  return value?.trim() || null
+}
+
+function optionalUsername(value?: string) {
+  return value?.trim().toLowerCase() || null
+}
+
+function validateProfileImage(file: File) {
+  const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+  if (!allowedTypes.has(file.type)) {
+    throw new Error('Choose a JPG, PNG, or WebP image.')
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Profile images must be 5 MB or smaller.')
+  }
+}
+
+function isSeedProfile(profile: AuthProfile) {
+  return profile.$id.startsWith('showcase_')
+    || profile.accountId.startsWith('showcase_')
+    || profile.universityId?.startsWith('SHOWCASE-') === true
+    || profile.email.endsWith('@juchess.test')
 }
 
 function appUrl(path: string) {
