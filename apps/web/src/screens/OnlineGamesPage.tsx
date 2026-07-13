@@ -366,12 +366,23 @@ function OnlineGamesPage() {
             <PlayerStrip {...playerFor(bottomSide)} edge="bottom" pieceTheme={pieceTheme} />
 
             <div className="online-board-controls">
-              <button type="button" aria-label="Go to first move" disabled={displayedPly === 0} onClick={() => setViewedPly(0)} title="Go to start">
-                <SkipBack size={18} aria-hidden="true" />
-              </button>
-              <button type="button" aria-label="Previous move" disabled={displayedPly === 0} onClick={() => setViewedPly(Math.max(0, displayedPly - 1))} title="Previous move">
-                <ChevronLeft size={19} aria-hidden="true" />
-              </button>
+              <div className="online-move-navigation" aria-label="Move navigation">
+                <button type="button" aria-label="Go to first move" disabled={displayedPly === 0} onClick={() => setViewedPly(0)} title="Go to start">
+                  <SkipBack size={18} aria-hidden="true" />
+                </button>
+                <button type="button" aria-label="Previous move" disabled={displayedPly === 0} onClick={() => setViewedPly(Math.max(0, displayedPly - 1))} title="Previous move">
+                  <ChevronLeft size={19} aria-hidden="true" />
+                </button>
+                <button type="button" aria-label="Next move" disabled={viewingLatest} onClick={() => {
+                  const nextPly = Math.min(boardMoves.length, displayedPly + 1)
+                  setViewedPly(nextPly === boardMoves.length ? null : nextPly)
+                }} title="Next move">
+                  <ChevronRight size={19} aria-hidden="true" />
+                </button>
+                <button type="button" aria-label="Go to latest move" disabled={viewingLatest} onClick={() => setViewedPly(null)} title="Go to latest move">
+                  <SkipForward size={18} aria-hidden="true" />
+                </button>
+              </div>
               <span>
                 {!viewingLatest
                   ? `Move ${displayedPly} of ${boardMoves.length}`
@@ -385,17 +396,8 @@ function OnlineGamesPage() {
                       : canMove ? 'Your turn' : 'Opponent to move'
                     : `${boardMoves.length} moves · ${boardResult}`}
               </span>
-              <button type="button" aria-label="Next move" disabled={viewingLatest} onClick={() => {
-                const nextPly = Math.min(boardMoves.length, displayedPly + 1)
-                setViewedPly(nextPly === boardMoves.length ? null : nextPly)
-              }} title="Next move">
-                <ChevronRight size={19} aria-hidden="true" />
-              </button>
-              <button type="button" aria-label="Go to latest move" disabled={viewingLatest} onClick={() => setViewedPly(null)} title="Go to latest move">
-                <SkipForward size={18} aria-hidden="true" />
-              </button>
               {assignedParticipant ? (
-                <button type="button" disabled={movePending} onClick={() => void resignGame()}>Resign</button>
+                <button className="online-resign-button" type="button" disabled={movePending} onClick={() => void resignGame()}>Resign</button>
               ) : null}
             </div>
             {message ? <p className="online-game-message" role="status">{message}</p> : null}

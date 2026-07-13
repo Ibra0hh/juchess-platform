@@ -1,12 +1,17 @@
 .online-games-screen {
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background: #f5efe3;
 }
 
 .online-games-main {
+  display: flex;
+  flex-direction: column;
   width: min(100% - 40px, 1720px);
+  height: calc(100dvh - 66px);
   margin: 0 auto;
-  padding: 18px 0 52px;
+  padding: 12px 0;
+  box-sizing: border-box;
 }
 
 .forced-game-banner {
@@ -49,7 +54,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(340px, 24vw, 440px);
   align-items: start;
+  flex: 1;
   gap: 24px;
+  min-height: 0;
 }
 
 .online-tournament-panel {
@@ -61,8 +68,10 @@
 }
 
 .online-board-station {
-  --online-board-size: min(100%, 800px, calc(100dvh - 220px));
+  --online-board-size: min(100cqw, 800px, calc(100cqh - 202px));
   position: relative;
+  container-type: size;
+  height: 100%;
   min-width: 0;
 }
 
@@ -253,10 +262,14 @@
 }
 
 .online-board-controls {
-  display: grid;
-  grid-template-columns: 42px 42px minmax(120px, 1fr) 42px 42px auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
   width: var(--online-board-size);
-  margin: 13px auto 0;
+  margin: 8px auto 0;
 }
 
 .online-board-controls span {
@@ -271,8 +284,26 @@
   opacity: 0.4;
 }
 
-.online-board-controls button[aria-label] {
+.online-move-navigation {
+  display: grid;
+  grid-template-columns: repeat(4, 42px);
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 7px;
+  background: rgba(255, 253, 248, 0.92);
+  box-shadow: 0 5px 16px rgba(17, 17, 17, 0.08);
+}
+
+.online-move-navigation button {
+  min-width: 0;
   padding: 0;
+}
+
+.online-resign-button {
+  position: absolute;
+  right: 0;
+  top: 4px;
 }
 
 .online-game-message {
@@ -626,7 +657,7 @@
 
 @media (max-width: 1120px) {
   .online-games-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 34vw);
   }
 
   .online-tournament-panel {
@@ -637,17 +668,31 @@
 }
 
 @media (max-width: 700px) {
+  .online-games-screen {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
   .online-games-main {
     width: min(100% - 28px, 1240px);
+    height: auto;
+    min-height: calc(100dvh - 66px);
     padding-top: 22px;
   }
 
+  .online-games-layout {
+    grid-template-columns: 1fr;
+  }
+
   .online-board-station {
-    --online-board-size: min(100%, 800px, calc(100dvh - 210px));
+    --online-board-size: min(100cqw, 800px, calc(100dvh - 300px));
+    height: auto;
+    min-height: calc(var(--online-board-size) + 190px);
   }
 
   .online-board-controls {
-    grid-template-columns: 38px 38px minmax(92px, 1fr) 38px 38px;
+    width: var(--online-board-size);
   }
 
   .online-board-controls span {
@@ -669,8 +714,8 @@
     font-size: 12px;
   }
 
-  .online-board-controls > button:last-child:not([aria-label]) {
-    grid-column: 1 / -1;
+  .online-resign-button {
+    position: static;
   }
 }
 
