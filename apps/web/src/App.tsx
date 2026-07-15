@@ -4,6 +4,7 @@ import './App.css'
 import { AuthProvider } from './context/AuthContext'
 import { TournamentPlayProvider } from './context/TournamentPlayContext'
 import { TournamentPlayGuard } from './components/TournamentPlayGuard'
+import RouteSkeleton from './components/RouteSkeleton'
 import { useOnlineTournamentPlayLock } from './lib/onlineTournamentPlayLock'
 
 const AuthPage = lazy(() => import('./screens/AuthPage'))
@@ -18,10 +19,6 @@ const CompleteProfilePage = lazy(() => import('./screens/CompleteProfilePage'))
 const ProfilePage = lazy(() => import('./screens/ProfilePage'))
 const TournamentDetailPage = lazy(() => import('./screens/TournamentDetailPage'))
 const TournamentsPage = lazy(() => import('./screens/TournamentsPage'))
-
-function RouteLoading() {
-  return <main className="route-loading" role="status">Loading JuChess…</main>
-}
 
 function NotFound() {
   return (
@@ -44,7 +41,7 @@ function App() {
     <AuthProvider>
       <TournamentPlayProvider>
         <TournamentPlayGuard>
-          <Suspense fallback={<RouteLoading />}>
+          <Suspense fallback={<RouteSkeleton />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/home" element={<HomePage />} />

@@ -17,16 +17,6 @@
   text-align: center;
 }
 
-.route-loading {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 2rem;
-  color: #7d2434;
-  font-weight: 700;
-  background: #f8f5ef;
-}
-
 .prototype-missing img {
   width: 76px;
   height: 76px;
