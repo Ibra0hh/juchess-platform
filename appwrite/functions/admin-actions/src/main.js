@@ -15,10 +15,131 @@ const tableIds = {
   fairPlayReviews: 'fair_play_reviews',
   standings: 'standings',
   announcements: 'announcements',
+  crewApplications: 'crew_applications',
+  crewApplicationReviews: 'crew_application_reviews',
   adminAudit: 'admin_audit',
   identityBlocks: 'identity_blocks',
   ipBlocks: 'ip_blocks',
 };
+
+export const CREW_APPLICATION_STATUSES = [
+  'submitted',
+  'reviewing',
+  'shortlisted',
+  'interview',
+  'accepted',
+  'rejected',
+  'withdrawn',
+];
+
+export function normalizeCrewReviewInput(input = {}) {
+  const status = String(input.status ?? '').trim();
+  if (status && !CREW_APPLICATION_STATUSES.includes(status)) {
+    throw new HttpError(400, 'Choose a valid application status.');
+  }
+
+  const internalNotes = String(input.internalNotes ?? '').trim().slice(0, 4000);
+  const assignedTo = String(input.assignedTo ?? '').trim().slice(0, 128);
+  const interviewAt = String(input.interviewAt ?? '').trim();
+  if (interviewAt && !Number.isFinite(Date.parse(interviewAt))) {
+    throw new HttpError(400, 'Choose a valid interview date and time.');
+  }
+
+  return { status, internalNotes, assignedTo, interviewAt };
+}
+
+function crewReviewRowId(applicationId) {
+  const digest = createHash('sha256').update(String(applicationId)).digest('hex').slice(0, 32);
+  return `review_${digest}`;
+}
+
+async function loadCrewApplications(tablesDB, databaseId) {
+  const [applications, reviews, profiles] = await Promise.all([
+    listAllRows(tablesDB, databaseId, tableIds.crewApplications),
+    listAllRows(tablesDB, databaseId, tableIds.crewApplicationReviews),
+    listAllRows(tablesDB, databaseId, tableIds.profiles),
+  ]);
+  const reviewsByApplication = new Map(reviews.map((review) => [review.applicationId, review]));
+  const profilesById = new Map(profiles.map((profile) => [profile.$id, profile]));
+
+  return applications
+    .map((application) => {
+      const profile = profilesById.get(application.profileId);
+      return {
+        ...application,
+        applicant: profile ? {
+          id: profile.$id,
+          displayName: profile.displayName || profile.email || 'Club member',
+          email: profile.email || '',
+          phone: profile.phone || '',
+          universityId: profile.universityId || '',
+          rating: profile.rating ?? 1200,
+          status: profile.status || 'active',
+          avatarFileId: profile.avatarFileId || '',
+          coverFileId: profile.coverFileId || '',
+        } : null,
+        review: reviewsByApplication.get(application.$id) ?? null,
+      };
+    })
+    .toSorted((left, right) => String(right.updatedAt || right.$updatedAt || '').localeCompare(String(left.updatedAt || left.$updatedAt || '')));
+}
+
+async function saveCrewApplicationReview(tablesDB, databaseId, application, body, actor) {
+  const input = normalizeCrewReviewInput(body);
+  if (!input.status && !('internalNotes' in body) && !('assignedTo' in body) && !('interviewAt' in body)) {
+    throw new HttpError(400, 'No application changes were provided.');
+  }
+
+  const now = new Date().toISOString();
+  const row = input.status
+    ? await tablesDB.updateRow({
+      databaseId,
+      tableId: tableIds.crewApplications,
+      rowId: application.$id,
+      data: { status: input.status, updatedAt: now },
+    })
+    : application;
+
+  let review = null;
+  if ('internalNotes' in body || 'assignedTo' in body || 'interviewAt' in body) {
+    const reviewId = crewReviewRowId(application.$id);
+    const data = {
+      applicationId: application.$id,
+      internalNotes: input.internalNotes,
+      assignedTo: input.assignedTo,
+      interviewAt: input.interviewAt || null,
+      updatedByAdminId: actor.$id,
+      updatedAt: now,
+    };
+    try {
+      review = await tablesDB.getRow({ databaseId, tableId: tableIds.crewApplicationReviews, rowId: reviewId });
+      review = await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.crewApplicationReviews,
+        rowId: reviewId,
+        data,
+      });
+    } catch (cause) {
+      if (Number(cause?.code) !== 404) throw cause;
+      review = await tablesDB.createRow({
+        databaseId,
+        tableId: tableIds.crewApplicationReviews,
+        rowId: reviewId,
+        data,
+      });
+    }
+  }
+
+  await writeAudit(tablesDB, databaseId, {
+    actorProfileId: actor.$id,
+    action: 'recruitment.application.review',
+    targetTable: tableIds.crewApplications,
+    targetRowId: application.$id,
+    payload: { status: input.status || application.status, interviewAt: input.interviewAt || null, assignedTo: input.assignedTo },
+  });
+
+  return { row, review };
+}
 
 const adminTeamIds = {
   superAdmins: 'admin_super_admins',
@@ -3210,6 +3331,8 @@ export default async ({ req, res, log, error }) => {
         'POST /profiles/:id/role',
         'POST /profiles/:id/status',
         'POST /announcements',
+        'GET /recruitment/applications',
+        'PATCH /recruitment/applications/:id',
       ],
     });
   }
@@ -3285,6 +3408,27 @@ export default async ({ req, res, log, error }) => {
     }
 
     const actor = await requireAdminActor(req, tablesDB, databaseId);
+
+    if (method === 'GET' && segments[0] === 'recruitment' && segments[1] === 'applications' && segments.length === 2) {
+      const applications = await loadCrewApplications(tablesDB, databaseId);
+      return res.json({ ok: true, action: 'loadCrewApplications', applications });
+    }
+
+    if (method === 'PATCH' && segments[0] === 'recruitment' && segments[1] === 'applications' && segments[2]) {
+      let application;
+      try {
+        application = await tablesDB.getRow({
+          databaseId,
+          tableId: tableIds.crewApplications,
+          rowId: segments[2],
+        });
+      } catch (cause) {
+        if (Number(cause?.code) === 404) throw new HttpError(404, 'That application no longer exists.');
+        throw cause;
+      }
+      const result = await saveCrewApplicationReview(tablesDB, databaseId, application, body, actor);
+      return res.json({ ok: true, action: 'reviewCrewApplication', ...result });
+    }
 
     if (method === 'POST' && segments[0] === 'fair-play' && segments[1] === 'report') {
       const queries = [Query.limit(500)];

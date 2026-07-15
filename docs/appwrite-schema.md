@@ -203,6 +203,39 @@ Permissions:
 - Members can read member announcements.
 - Admin Function writes.
 
+### `crew_applications`
+
+Private member applications for JuChess design, software, events, media, HR,
+partnerships, finance, and management work.
+
+Fields:
+- `profileId` and `accountId` strings, required. `profileId` is unique so one
+  member has one resumable application record.
+- `interests` string array, required.
+- `skills` and `contribution` text, required.
+- `developmentGoals`, `availability`, and `portfolioUrl` strings.
+- `status` enum: `submitted`, `reviewing`, `shortlisted`, `interview`,
+  `accepted`, `rejected`, `withdrawn`.
+- `submittedAt` and `updatedAt` datetimes.
+
+Permissions:
+- The owning member can read the row.
+- Only `player-actions` can submit, resubmit, edit, or withdraw an application.
+- Only `admin-actions` can change review status.
+
+### `crew_application_reviews`
+
+Private HR notes separated from the applicant-readable application row.
+
+Fields:
+- `applicationId` string, required and unique.
+- `internalNotes`, `assignedTo`, `interviewAt`, `updatedByAdminId`, and
+  `updatedAt`.
+
+Permissions:
+- No direct browser reads or writes.
+- `admin-actions` is the sole reader and writer.
+
 ### `admin_audit`
 
 Append-only operational log for admin actions.
@@ -317,12 +350,17 @@ Implemented routes:
 - `POST /profiles/:id/role`
 - `POST /profiles/:id/status`
 - `POST /announcements`
+- `GET /recruitment/applications`
+- `PATCH /recruitment/applications/:id`
 
 Player registration mutations use the authenticated `player-actions` Function,
 including `POST /registrations/:id/attendance` for the final-hour Yes/No
 answer. Email links use the public `attendance-actions` Function with
 `POST /resolve` and `POST /respond`; the server validates a hashed,
 tournament-scoped token and rejects expired invitations.
+
+Member recruitment mutations also use `player-actions`: `GET` and `POST`
+`/recruitment/application`, plus `POST /recruitment/application/withdraw`.
 
 ## First Guard Function
 

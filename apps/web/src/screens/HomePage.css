@@ -540,6 +540,27 @@
   line-height: 1.65;
 }
 
+.team-join-link {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 0 16px;
+  border: 1px solid #7a2431;
+  border-radius: 6px;
+  color: #7a2431;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color .18s ease, background .18s ease;
+}
+
+.team-join-link:hover {
+  color: #fffaf0;
+  background: #7a2431;
+}
+
 .news-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -239,6 +239,44 @@
         "createdByProfileId": "string|required"
       }
     },
+    "crew_applications": {
+      "note": "Private member applications to join the JuChess working team. Members can read only their own row; all writes go through player-actions so applicants cannot approve themselves.",
+      "permissions": [],
+      "rowSecurity": true,
+      "indexes": {
+        "profile_unique": "unique:profileId",
+        "status_updated": "key:status,updatedAt"
+      },
+      "fields": {
+        "profileId": "string|required|unique",
+        "accountId": "string|required",
+        "interests": "string[]|required",
+        "skills": "string|required|max:4000",
+        "contribution": "string|required|max:4000",
+        "developmentGoals": "string|max:2000",
+        "availability": "string|required|max:512",
+        "portfolioUrl": "string|max:1024",
+        "status": "enum:submitted,reviewing,shortlisted,interview,accepted,rejected,withdrawn|default:submitted",
+        "submittedAt": "datetime|required",
+        "updatedAt": "datetime|required"
+      }
+    },
+    "crew_application_reviews": {
+      "note": "HR-only notes and interview scheduling. No direct browser permissions; admin-actions is the sole reader and writer.",
+      "permissions": [],
+      "rowSecurity": true,
+      "indexes": {
+        "application_unique": "unique:applicationId"
+      },
+      "fields": {
+        "applicationId": "string|required|unique",
+        "internalNotes": "string|max:4000",
+        "interviewAt": "datetime",
+        "assignedTo": "string|max:128",
+        "updatedByAdminId": "string|required",
+        "updatedAt": "datetime|required"
+      }
+    },
     "admin_audit": {
       "fields": {
         "actorProfileId": "string|required",

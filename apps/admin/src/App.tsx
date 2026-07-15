@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Clock3, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
+import RecruitmentScreen from './screens/RecruitmentScreen'
 import {
   JuCapturedPieces,
   JuChessBoard,
@@ -79,7 +80,7 @@ import {
   tournamentWizardSubmitIntent,
 } from './lib/tournamentWizard'
 
-type Screen = 'dashboard' | 'tournaments' | 'players' | 'news' | 'announcements' | 'adminAccess'
+type Screen = 'dashboard' | 'tournaments' | 'players' | 'recruitment' | 'news' | 'announcements' | 'adminAccess'
 type TournamentTab = TournamentStatus
 type TournamentDataSource = 'cloud' | 'unavailable'
 type Player = {
@@ -519,6 +520,7 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
   { key: 'dashboard', label: 'Dashboard', icon: '▤' },
   { key: 'tournaments', label: 'Tournaments', icon: '♞' },
   { key: 'players', label: 'Players', icon: '◍' },
+  { key: 'recruitment', label: 'Recruitment', icon: '◇' },
   { key: 'news', label: 'News', icon: '◫' },
   { key: 'announcements', label: 'Announcements', icon: '◈' },
   { key: 'adminAccess', label: 'Admin access', icon: '▣' },
@@ -562,6 +564,7 @@ const pageText: Record<Screen, { title: string; sub: string }> = {
   dashboard: { title: 'Dashboard', sub: 'Live overview of your club operations' },
   tournaments: { title: 'Tournament Control Center', sub: 'Create, publish and run every event' },
   players: { title: 'Player Management', sub: 'Roster, ratings and player records' },
+  recruitment: { title: 'Recruitment', sub: 'Review member applications and manage the candidate pipeline' },
   news: { title: 'News', sub: 'Public posts shown on the app & website' },
   announcements: { title: 'Announcements', sub: 'Broadcast to players and members' },
   adminAccess: { title: 'Admin access', sub: 'Manage admin-only accounts and permissions' },
@@ -810,6 +813,7 @@ function App() {
       {screen === 'players' ? (
         <PlayersScreen blocks={blocks} session={session} onBlocksChanged={refreshBlocks} />
       ) : null}
+      {screen === 'recruitment' ? <RecruitmentScreen /> : null}
       {screen === 'news' ? <NewsScreen /> : null}
       {screen === 'announcements' ? <AnnouncementsScreen tournaments={tournaments} /> : null}
       {screen === 'adminAccess' ? (

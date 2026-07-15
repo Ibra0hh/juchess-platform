@@ -11,9 +11,22 @@ const tableIds = {
   registrations: 'registrations',
   checkIns: 'check_ins',
   attendance: 'attendance_confirmations',
+  crewApplications: 'crew_applications',
 };
 
 const OPEN_TOURNAMENT_STATUSES = ['upcoming'];
+export const CREW_INTERESTS = [
+  'design',
+  'software',
+  'events',
+  'media',
+  'hr',
+  'partnerships',
+  'finance',
+  'management',
+];
+const EDITABLE_APPLICATION_STATUSES = ['submitted', 'withdrawn', 'rejected'];
+const WITHDRAWABLE_APPLICATION_STATUSES = ['submitted', 'reviewing', 'shortlisted', 'interview'];
 
 class HttpError extends Error {
   constructor(statusCode, message) {
@@ -101,6 +114,58 @@ export function attendanceRowId(registrationId) {
   return `att_${digest}`;
 }
 
+export function crewApplicationRowId(profileId) {
+  const digest = createHash('sha256').update(String(profileId)).digest('hex').slice(0, 32);
+  return `crew_${digest}`;
+}
+
+export function validateCrewApplication(input = {}) {
+  const interests = Array.from(new Set(
+    (Array.isArray(input.interests) ? input.interests : [])
+      .map((value) => String(value).trim().toLowerCase())
+      .filter((value) => CREW_INTERESTS.includes(value)),
+  )).slice(0, 5);
+  const skills = cleanApplicationText(input.skills, 4000);
+  const contribution = cleanApplicationText(input.contribution, 4000);
+  const developmentGoals = cleanApplicationText(input.developmentGoals, 2000);
+  const availability = cleanApplicationText(input.availability, 512);
+  const portfolioUrl = cleanApplicationText(input.portfolioUrl, 1024);
+
+  if (!interests.length) throw new HttpError(400, 'Choose at least one area you are interested in.');
+  if (skills.length < 20) throw new HttpError(400, 'Tell us a little more about your skills.');
+  if (contribution.length < 20) throw new HttpError(400, 'Tell us how you would contribute to JuChess.');
+  if (!availability) throw new HttpError(400, 'Choose your weekly availability.');
+  if (portfolioUrl && !isSafeHttpUrl(portfolioUrl)) {
+    throw new HttpError(400, 'Portfolio links must start with http:// or https://.');
+  }
+
+  return { interests, skills, contribution, developmentGoals, availability, portfolioUrl };
+}
+
+function cleanApplicationText(value, maxLength) {
+  return String(value ?? '').trim().replace(/\r\n/g, '\n').slice(0, maxLength);
+}
+
+function isSafeHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+async function findCrewApplication(tablesDB, databaseId, profileId) {
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.crewApplications,
+    queries: [Query.equal('profileId', profileId), Query.limit(1)],
+    total: false,
+    ttl: 0,
+  });
+  return response.rows[0] ?? null;
+}
+
 export function attendanceWindowState(startsAtValue, nowMs = Date.now()) {
   const startsAt = Date.parse(String(startsAtValue ?? ''));
   if (!Number.isFinite(startsAt)) return 'unscheduled';
@@ -185,12 +250,72 @@ export default async ({ req, res, log, error }) => {
         'POST /registrations',
         'POST /registrations/:id/cancel',
         'POST /registrations/:id/attendance',
+        'GET /recruitment/application',
+        'POST /recruitment/application',
+        'POST /recruitment/application/withdraw',
       ],
     });
   }
 
   try {
     const { accountId, profile } = await requirePlayer(req, tablesDB, databaseId);
+
+    if (segments[0] === 'recruitment' && segments[1] === 'application' && segments.length === 2) {
+      if (method === 'GET') {
+        const row = await findCrewApplication(tablesDB, databaseId, profile.$id);
+        return res.json({ ok: true, action: 'loadCrewApplication', row });
+      }
+
+      if (method === 'POST') {
+        const application = validateCrewApplication(body);
+        const existing = await findCrewApplication(tablesDB, databaseId, profile.$id);
+        if (existing && !EDITABLE_APPLICATION_STATUSES.includes(existing.status)) {
+          throw new HttpError(409, 'This application is already being reviewed and can no longer be edited.');
+        }
+
+        const now = new Date().toISOString();
+        const data = {
+          ...application,
+          status: 'submitted',
+          submittedAt: now,
+          updatedAt: now,
+        };
+        const row = existing
+          ? await tablesDB.updateRow({
+            databaseId,
+            tableId: tableIds.crewApplications,
+            rowId: existing.$id,
+            data,
+          })
+          : await tablesDB.createRow({
+            databaseId,
+            tableId: tableIds.crewApplications,
+            rowId: crewApplicationRowId(profile.$id),
+            data: {
+              profileId: profile.$id,
+              accountId,
+              ...data,
+            },
+            permissions: [Permission.read(Role.user(accountId))],
+          });
+        return res.json({ ok: true, action: existing ? 'resubmitCrewApplication' : 'submitCrewApplication', row });
+      }
+    }
+
+    if (method === 'POST' && segments[0] === 'recruitment' && segments[1] === 'application' && segments[2] === 'withdraw') {
+      const existing = await findCrewApplication(tablesDB, databaseId, profile.$id);
+      if (!existing) throw new HttpError(404, 'No crew application was found for this account.');
+      if (!WITHDRAWABLE_APPLICATION_STATUSES.includes(existing.status)) {
+        throw new HttpError(409, 'This application can no longer be withdrawn.');
+      }
+      const row = await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.crewApplications,
+        rowId: existing.$id,
+        data: { status: 'withdrawn', updatedAt: new Date().toISOString() },
+      });
+      return res.json({ ok: true, action: 'withdrawCrewApplication', row });
+    }
 
     // Register for a tournament. The server decides profileId and status.
     if (method === 'POST' && segments[0] === 'registrations' && segments.length === 1) {

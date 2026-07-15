@@ -8,6 +8,8 @@ export const tableIds = {
   games: 'games',
   standings: 'standings',
   announcements: 'announcements',
+  crewApplications: 'crew_applications',
+  crewApplicationReviews: 'crew_application_reviews',
   adminAudit: 'admin_audit',
   identityBlocks: 'identity_blocks',
   ipBlocks: 'ip_blocks',

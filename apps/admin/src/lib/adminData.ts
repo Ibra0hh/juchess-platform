@@ -5,6 +5,7 @@ import { tableIds, type TournamentStatus } from './juchess'
 export type AdminRole = 'superAdmin' | 'admin' | 'organizer'
 export type AdminStatus = 'active' | 'suspended'
 export type OnlineTournamentPlatform = 'chessCom' | 'lichess' | 'juchess'
+export type RecruitmentStatus = 'submitted' | 'reviewing' | 'shortlisted' | 'interview' | 'accepted' | 'rejected' | 'withdrawn'
 
 const tournamentAssetsBucketId = 'tournament-assets'
 const tournamentMediaPrefix = 'ju-media'
@@ -108,6 +109,55 @@ type AppwriteProfileRow = Models.Row & {
   status?: string
   avatarFileId?: string
   coverFileId?: string
+}
+
+export type RecruitmentApplicant = {
+  id: string
+  displayName: string
+  email: string
+  phone: string
+  universityId: string
+  rating: number
+  status: string
+  avatarFileId?: string
+  coverFileId?: string
+}
+
+export type RecruitmentReview = Models.Row & {
+  applicationId: string
+  internalNotes?: string
+  interviewAt?: string
+  assignedTo?: string
+  updatedByAdminId: string
+  updatedAt: string
+}
+
+export type RecruitmentApplication = Models.Row & {
+  profileId: string
+  accountId: string
+  interests: string[]
+  skills: string
+  contribution: string
+  developmentGoals?: string
+  availability: string
+  portfolioUrl?: string
+  status: RecruitmentStatus
+  submittedAt: string
+  updatedAt: string
+  applicant: RecruitmentApplicant | null
+  review: RecruitmentReview | null
+}
+
+export type RecruitmentApplicationsResult = {
+  applications: RecruitmentApplication[]
+  error?: string
+}
+
+export type RecruitmentReviewInput = {
+  status: RecruitmentStatus
+  internalNotes: string
+  interviewAt: string
+  assignedTo: string
 }
 
 const tournamentFormatOrder = [
@@ -707,10 +757,32 @@ export async function loadClubPlayers(): Promise<ClubPlayersResult> {
   }
 }
 
-function profileMediaUrl(fileId?: string) {
+export function profileMediaUrl(fileId?: string) {
   if (!fileId) return ''
   if (/^(blob:|data:|https?:)/.test(fileId)) return fileId
   return String(storage.getFileView({ bucketId: profileMediaBucketId, fileId }))
+}
+
+export async function loadRecruitmentApplications(): Promise<RecruitmentApplicationsResult> {
+  if (!appwriteReady) return { applications: [] }
+
+  try {
+    return await runAdminAction<RecruitmentApplicationsResult>({
+      method: ExecutionMethod.GET,
+      path: '/recruitment/applications',
+    })
+  } catch (error) {
+    return { applications: [], error: formatAdminError(error) }
+  }
+}
+
+export async function updateRecruitmentApplication(applicationId: string, input: RecruitmentReviewInput) {
+  const response = await runAdminAction<{ row: RecruitmentApplication; review: RecruitmentReview | null }>({
+    method: ExecutionMethod.PATCH,
+    path: `/recruitment/applications/${applicationId}`,
+    body: input,
+  })
+  return response
 }
 
 export async function deleteClubPlayers(profileIds: string[]) {

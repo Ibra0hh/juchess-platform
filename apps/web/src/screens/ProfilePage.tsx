@@ -280,6 +280,15 @@ function ProfilePage() {
           </section>
         ) : null}
 
+        <section className="profile-crew-cta">
+          <div>
+            <span>Club involvement</span>
+            <h2>Want to help build JuChess?</h2>
+            <p>Share your skills and interests with the HR team, then follow your application from your account.</p>
+          </div>
+          <Link to="/join-the-team">Join the working team &rarr;</Link>
+        </section>
+
         <div className="member-profile-grid">
           <section className="profile-panel season-panel">
             <div className="profile-panel-heading">

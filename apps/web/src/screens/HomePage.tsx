@@ -459,6 +459,7 @@ function TeamSection() {
         <span>The people behind the board</span>
         <h2 id="team-title">Meet the club team</h2>
         <p>Meet the students leading JuChess, shaping its events and identity, and building the platform behind the club.</p>
+        <Link to="/join-the-team" className="team-join-link">Join the working team <ArrowRight size={16} /></Link>
       </div>
       <div className="team-grid">
         {teamMembers.map((member) => (
@@ -524,6 +525,7 @@ function HomeFooter() {
           <Link to="/tournaments">Tournaments</Link>
           <Link to="/tools">Tools</Link>
           <Link to="/sign-up">Join the club</Link>
+          <Link to="/join-the-team">Join the team</Link>
         </nav>
       </div>
       <p>© 2026 JuChess / University of Jordan Chess Club / Amman</p>

@@ -276,6 +276,7 @@ export const tableIds = {
   games: 'games',
   standings: 'standings',
   announcements: 'announcements',
+  crewApplications: 'crew_applications',
   gameMessages: 'game_messages',
   fairPlayEvents: 'fair_play_events',
   fairPlayReviews: 'fair_play_reviews',

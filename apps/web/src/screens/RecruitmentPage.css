@@ -1,0 +1,154 @@
+.recruitment-main {
+  width: min(100% - 40px, 1180px);
+  margin: 0 auto;
+  padding: 36px 0 80px;
+}
+
+.recruitment-intro {
+  position: relative;
+  display: flex;
+  min-height: 236px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  overflow: hidden;
+  padding: 42px 48px;
+  color: #f7efe2;
+  background: #171717;
+  border-radius: 10px;
+}
+
+.recruitment-intro::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background-image: linear-gradient(rgba(247, 239, 226, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(247, 239, 226, 0.055) 1px, transparent 1px);
+  background-size: 52px 52px;
+  pointer-events: none;
+}
+
+.recruitment-intro > div:first-child { position: relative; z-index: 1; max-width: 720px; }
+.recruitment-intro span { color: #c9ad68; font-size: 12px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.recruitment-intro h1 { margin: 8px 0 9px; font-family: "Cormorant Garamond", Georgia, serif; font-size: clamp(42px, 6vw, 68px); font-weight: 600; line-height: .95; }
+.recruitment-intro p { max-width: 680px; margin: 0; color: rgba(247, 239, 226, .72); font-size: 15px; line-height: 1.65; }
+.recruitment-intro-mark { position: relative; z-index: 1; color: #7a2431; font-family: Georgia, serif; font-size: 126px; line-height: 1; transform: rotate(-8deg); }
+
+.recruitment-feedback { margin: 18px 0 0; padding: 13px 16px; border: 1px solid; border-radius: 7px; font-size: 13px; font-weight: 600; }
+.recruitment-feedback.success { color: #23603c; background: #eef8f0; border-color: #a9d2b6; }
+.recruitment-feedback.error { color: #7a2431; background: #fff1f2; border-color: #e8b5bc; }
+
+.recruitment-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 24px; align-items: start; margin-top: 24px; }
+.recruitment-form, .recruitment-aside > section { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 8px 26px rgba(17, 17, 17, .055); }
+.recruitment-form { padding: 30px; }
+.recruitment-form > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.recruitment-form > header span:first-child { color: var(--wine); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.recruitment-form h2, .recruitment-aside h2 { margin: 4px 0 0; font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; }
+.recruitment-form h2 { font-size: 30px; }
+
+.recruitment-status { display: inline-flex; min-height: 30px; align-items: center; padding: 0 11px; border-radius: 999px; color: #6b4f12; background: #f5e9c5; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.recruitment-status.reviewing, .recruitment-status.shortlisted, .recruitment-status.interview { color: #284a70; background: #e6eff8; }
+.recruitment-status.accepted { color: #23603c; background: #e5f4e9; }
+.recruitment-status.rejected, .recruitment-status.withdrawn { color: #6d6570; background: #ece9ed; }
+
+.recruitment-form fieldset { min-width: 0; margin: 25px 0; padding: 0 0 25px; border: 0; border-bottom: 1px solid var(--line); }
+.recruitment-form fieldset:disabled { opacity: .72; }
+.recruitment-form legend, .recruitment-form label > span { display: block; color: #171717; font-size: 13px; font-weight: 700; }
+.recruitment-form fieldset > p, .recruitment-form label > small { display: block; margin: 5px 0 13px; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; }
+.interest-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+.interest-grid button { display: flex; min-height: 46px; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid rgba(17,17,17,.18); border-radius: 7px; color: #171717; background: #fffdf7; font-size: 12px; font-weight: 600; text-align: left; }
+.interest-grid button > span { display: grid; width: 19px; height: 19px; flex: 0 0 19px; place-items: center; border: 1px solid rgba(17,17,17,.28); border-radius: 4px; }
+.interest-grid button.selected { color: var(--wine); background: #f8eaec; border-color: var(--wine); }
+.interest-grid button.selected > span { color: white; background: var(--wine); border-color: var(--wine); }
+
+.recruitment-form > label { display: block; margin: 22px 0; }
+.recruitment-form textarea, .recruitment-form input, .recruitment-form select { width: 100%; border: 1px solid rgba(17,17,17,.2); border-radius: 7px; outline: 0; color: #171717; background: white; }
+.recruitment-form textarea { min-height: 116px; padding: 13px 14px; line-height: 1.55; resize: vertical; }
+.recruitment-form input, .recruitment-form select { height: 46px; padding: 0 13px; }
+.recruitment-form textarea:focus, .recruitment-form input:focus, .recruitment-form select:focus { border-color: var(--wine); box-shadow: 0 0 0 3px rgba(122,36,49,.1); }
+.recruitment-form :disabled:not(button) { color: rgba(17,17,17,.62); background: #f1ede5; }
+.recruitment-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; }
+.recruitment-form-row > label { display: block; }
+.portfolio-label { margin-top: 17px; }
+.portfolio-label em { color: var(--muted); font-size: 10px; font-style: normal; font-weight: 500; text-transform: uppercase; }
+
+.recruitment-form-actions { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 28px -30px -30px; padding: 20px 30px; background: #f2eadc; border-radius: 0 0 9px 9px; }
+.recruitment-form-actions p { display: flex; max-width: 360px; align-items: flex-start; gap: 8px; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.recruitment-form-actions p svg { flex: 0 0 auto; color: var(--wine); }
+.recruitment-form-actions > div { display: flex; gap: 9px; }
+.recruitment-form-actions button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 0 17px; border: 0; border-radius: 7px; color: white; background: var(--wine); font-size: 12px; font-weight: 700; }
+.recruitment-form-actions button.secondary { color: #171717; background: transparent; border: 1px solid rgba(17,17,17,.22); }
+.recruitment-form-actions button:disabled { cursor: not-allowed; opacity: .56; }
+
+.recruitment-aside { display: grid; gap: 16px; }
+.recruitment-aside > section { padding: 20px; }
+.applicant-summary { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 12px; align-items: center; }
+.applicant-avatar { display: grid; width: 50px; height: 50px; overflow: hidden; place-items: center; border-radius: 50%; color: white; background: var(--wine); font-family: "Cormorant Garamond", Georgia, serif; font-size: 20px; font-weight: 700; }
+.applicant-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.applicant-summary span, .applicant-summary small { display: block; color: var(--muted); font-size: 10px; }
+.applicant-summary strong { display: block; margin: 2px 0; font-family: "Cormorant Garamond", Georgia, serif; font-size: 19px; }
+.applicant-summary > a { grid-column: 1 / -1; color: var(--wine); font-size: 11px; font-weight: 700; text-decoration: none; }
+.aside-heading { display: flex; align-items: center; gap: 8px; color: var(--wine); }
+.aside-heading h2 { color: #171717; font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 13px; font-weight: 700; }
+.aside-empty, .status-terminal p { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.application-progress > small { display: block; margin-top: 15px; color: var(--muted); font-size: 10px; }
+.status-timeline { display: grid; gap: 0; margin: 18px 0 0; padding: 0; list-style: none; }
+.status-timeline li { position: relative; display: grid; min-height: 40px; grid-template-columns: 25px 1fr; gap: 10px; align-items: start; color: rgba(17,17,17,.4); font-size: 11px; }
+.status-timeline li:not(:last-child)::after { position: absolute; top: 23px; bottom: -1px; left: 11px; width: 1px; content: ""; background: rgba(17,17,17,.14); }
+.status-timeline li > span { position: relative; z-index: 1; display: grid; width: 23px; height: 23px; place-items: center; border: 1px solid rgba(17,17,17,.18); border-radius: 50%; background: var(--surface); font-size: 9px; }
+.status-timeline li.done, .status-timeline li.active { color: #171717; }
+.status-timeline li.done > span, .status-timeline li.active > span { color: white; background: var(--wine); border-color: var(--wine); }
+.status-timeline li strong { padding-top: 4px; }
+.status-terminal { margin-top: 16px; }
+.application-summary ul { display: grid; gap: 9px; margin: 16px 0; padding: 0 0 0 17px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.application-summary a { display: inline-flex; align-items: center; gap: 5px; color: var(--wine); font-size: 11px; font-weight: 700; text-decoration: none; }
+
+.recruitment-guest { display: grid; min-height: 480px; place-items: center; align-content: center; padding: 60px 24px; text-align: center; }
+.recruitment-guest > svg { width: 52px; height: 52px; color: var(--wine); }
+.recruitment-guest h1 { margin: 18px 0 8px; font-family: "Cormorant Garamond", Georgia, serif; font-size: 46px; font-weight: 600; }
+.recruitment-guest p { max-width: 590px; margin: 0; color: var(--muted); line-height: 1.7; }
+.recruitment-guest > div { display: flex; gap: 10px; margin-top: 24px; }
+.recruitment-guest a { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; padding: 0 18px; border: 1px solid var(--wine); border-radius: 7px; color: var(--wine); font-size: 12px; font-weight: 700; text-decoration: none; }
+.recruitment-guest a:first-child { color: white; background: var(--wine); }
+
+.recruitment-page-skeleton, .recruitment-form-skeleton { display: grid; gap: 15px; }
+.recruitment-page-skeleton { min-height: 600px; padding-top: 24px; }
+.recruitment-page-skeleton span, .recruitment-form-skeleton span { border-radius: 8px; background: linear-gradient(90deg, #e8dfcf 20%, #f7f0e4 48%, #e8dfcf 76%); background-size: 220% 100%; animation: recruitment-shimmer 1.4s infinite; }
+.recruitment-page-skeleton span:first-child { height: 230px; }
+.recruitment-page-skeleton span:not(:first-child) { height: 160px; }
+.recruitment-form-skeleton { padding-top: 24px; }
+.recruitment-form-skeleton span { height: 120px; }
+@keyframes recruitment-shimmer { to { background-position: -220% 0; } }
+
+@media (max-width: 900px) {
+  .recruitment-layout { grid-template-columns: 1fr; }
+  .recruitment-aside { grid-template-columns: repeat(3, minmax(0, 1fr)); order: -1; }
+  .interest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .recruitment-main { width: min(100% - 24px, 1180px); padding-top: 18px; }
+  .recruitment-intro { min-height: 215px; padding: 30px 24px; }
+  .recruitment-intro h1 { font-size: 46px; }
+  .recruitment-intro-mark { position: absolute; right: 2px; bottom: -16px; opacity: .22; }
+  .recruitment-layout { margin-top: 14px; }
+  .recruitment-aside { grid-template-columns: 1fr; order: 0; }
+  .recruitment-form { padding: 22px 16px; }
+  .recruitment-form > header { align-items: center; }
+  .recruitment-form h2 { font-size: 25px; }
+  .recruitment-form-row { grid-template-columns: 1fr; }
+  .recruitment-form-actions { display: grid; margin: 24px -16px -22px; padding: 17px 16px; }
+  .recruitment-form-actions > div, .recruitment-form-actions button { width: 100%; }
+  .recruitment-form-actions button { flex: 1; }
+  .recruitment-guest h1 { font-size: 38px; }
+  .recruitment-guest > div { width: 100%; flex-direction: column; }
+  .recruitment-guest a { justify-content: center; }
+}
+
+@media (max-width: 390px) {
+  .interest-grid { grid-template-columns: 1fr; }
+  .recruitment-form > header { align-items: flex-start; flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recruitment-page-skeleton span, .recruitment-form-skeleton span { animation: none; }
+}
