@@ -1,6 +1,6 @@
 # JuChess Complete New-Chat Handoff
 
-Last updated: July 13, 2026
+Last updated: July 15, 2026
 
 This file is both a complete project handoff and a copy-paste prompt for a new
 AI chat. It describes the intended product, the actual implementation, the
@@ -24,10 +24,14 @@ https://github.com/Ibra0hh/juchess-platform
 Required first file:
 C:\Users\ibra_\Downloads\juchess-platform\docs\NEXT_CHAT_HANDOFF.md
 
-Public website:
-https://ibra0hh.github.io/juchess-platform/web/
+Primary public website:
+https://juchess.page/
 
-Admin website:
+Primary admin website:
+https://juchess.page/admin/
+
+Legacy GitHub Pages URLs:
+https://ibra0hh.github.io/juchess-platform/web/
 https://ibra0hh.github.io/juchess-platform/admin/
 
 Shared backend:
@@ -37,10 +41,11 @@ Database ID juchess
 
 Start by running:
 1. cd C:\Users\ibra_\Downloads\juchess-platform
-2. git status --short
-3. git log -8 --oneline
-4. read docs/NEXT_CHAT_HANDOFF.md completely
-5. inspect the specific source files for the user's newest request
+2. git status --short --branch
+3. git fetch origin
+4. git log -8 --oneline --decorate
+5. read docs/NEXT_CHAT_HANDOFF.md completely
+6. inspect the specific source files for the user's newest request
 
 Non-negotiable rules:
 - The prototype UI and the user's screenshots are the design source of truth.
@@ -50,6 +55,8 @@ Non-negotiable rules:
 - Preserve unrelated user changes and untracked folders.
 - Never expose or commit an Appwrite API key. Use environment variables or the
   authenticated Appwrite CLI. Do not repeat any key from an old chat.
+- Never expose the Resend SMTP/API credential. It is stored in Appwrite, not in
+  this repository.
 - Admin-only writes go through server Functions.
 - Tournament results, clocks, pairings, standings, and brackets must agree on
   web, admin, and mobile. A UI-only approximation is not complete.
@@ -110,11 +117,20 @@ latest user wording. Fix the real screen instead of rationalizing the mismatch.
 - Local repo: `C:\Users\ibra_\Downloads\juchess-platform`
 - Remote: `https://github.com/Ibra0hh/juchess-platform.git`
 - Primary branch: `main`
-- Current handoff baseline commit: `c20c8c3`
-- Current remote was pushed through `c20c8c3` when this handoff was written.
+- Current implementation baseline commit: `31179d1`
+- This handoff document is committed immediately after that implementation
+  baseline on `main`.
 
 Recent important commits:
 
+- `31179d1` Require email verification before web sign-in
+- `a4c6f46` Deploy admin player profile media
+- `af326b1` Show player profile media in admin
+- `7bbc970` Add branded authentication email templates
+- `d6977ea` Hide unfinished public sections
+- `a24972c` Serve JuChess home at domain root
+- `2a8e87a` Align Google profile completion flow
+- `d160a21` Polish signup and signin forms
 - `c20c8c3` Fix board orientation and add pregame countdown
 - `9364c91` Auto-refresh tournament data without page reloads
 - `6e9cff8` Keep players on their current live board
@@ -126,15 +142,12 @@ Recent important commits:
 - `27c26a5` Use cloud standings on tournament pages
 - `96188b2` Add online Swiss showcase seeder
 
-The worktree can contain unrelated untracked `.claude/` and `graphify-out/`
+The worktree currently contains unrelated untracked `.claude/` and `graphify-out/`
 files. Do not delete, revert, stage, or commit them unless the user explicitly
 asks. Always run `git status --short` before editing and before committing.
 
-At the moment this handoff was written, there was also an unrelated uncommitted
-change in `apps/admin/src/App.tsx` around the create-tournament modal backdrop:
-the backdrop/form click-to-close handlers were removed. This handoff did not
-create, stage, revert, or commit that change. Inspect and preserve it unless the
-user explicitly asks to change that behavior.
+At this handoff baseline there are no tracked local modifications. Do not infer
+that this remains true; check the worktree again in the new chat.
 
 ## 4. Repository Map
 
@@ -163,6 +176,9 @@ Public routes:
 - `/sign-in`
 - `/sign-up`
 - `/forgot-password`
+- `/verify-email`
+- `/auth/callback`
+- `/complete-profile`
 - `/games` for hosted tournament play/free board
 - `/tools` for game review and analysis entry
 - `/leaderboard`
@@ -221,9 +237,22 @@ lag recent commits. Source code and this handoff override stale graph output.
 
 Public URLs:
 
-- Root redirect: `https://ibra0hh.github.io/juchess-platform/`
-- Public web: `https://ibra0hh.github.io/juchess-platform/web/`
-- Admin: `https://ibra0hh.github.io/juchess-platform/admin/`
+- Primary public web: `https://juchess.page/`
+- Primary admin: `https://juchess.page/admin/`
+- Verification callback: `https://juchess.page/verify-email`
+- Password recovery callback: `https://juchess.page/forgot-password`
+- Legacy public web: `https://ibra0hh.github.io/juchess-platform/web/`
+- Legacy admin: `https://ibra0hh.github.io/juchess-platform/admin/`
+
+Domain and hosting:
+
+- Domain registrar: Name.com
+- Domain: `juchess.page`
+- Static hosting: GitHub Pages from the repository `docs` directory
+- `scripts/build-pages.mjs` builds both the custom-domain root client and the
+  legacy `/web/` client, plus `/admin/`.
+- Do not add a client-side redirect from `juchess.page` to the legacy GitHub
+  URL. The root domain now serves the real web app directly.
 
 Appwrite:
 
@@ -259,6 +288,84 @@ Player web/mobile:
 - Player profiles live in `profiles`.
 - Sign-up/sign-in checks call `access-guards`.
 - Blocked email, University ID, phone, user, profile, or IP must be rejected.
+
+### Web email/password flow
+
+The web email/password flow is live in commit `31179d1`:
+
+1. Sign-up creates the Appwrite Account because Appwrite requires an account
+   and authenticated session before it can send a verification message.
+2. JuChess creates the supplied player profile data.
+3. JuChess calls `account.createEmailVerification()` with
+   `https://juchess.page/verify-email` as the production callback.
+4. The temporary sign-up session is immediately deleted.
+5. `/verify-email` reads Appwrite's `userId` and `secret`, calls
+   `account.updateEmailVerification()`, and then asks the player to sign in.
+6. JuChess does not automatically create a post-verification session.
+7. `getCurrentSession()` deletes and rejects any unverified email/password
+   session before loading private app state.
+8. Signing in before verification attempts to send a fresh verification link,
+   deletes the temporary session, and shows a verification-required message.
+
+Important semantic point: the Appwrite account technically exists before email
+verification, but it cannot obtain JuChess app access. Do not promise that no
+account row exists until verification; that is not how this provider flow works.
+
+Relevant files:
+
+- `apps/web/src/lib/auth.ts`
+- `apps/web/src/context/AuthContext.tsx`
+- `apps/web/src/screens/AuthPage.tsx`
+- `apps/web/src/screens/VerifyEmailPage.tsx`
+- `apps/web/src/screens/ForgotPasswordPage.tsx`
+- `apps/web/src/screens/OAuthCallbackPage.tsx`
+
+### Transactional email delivery
+
+Appwrite initiates verification and recovery emails. Resend is only the SMTP
+delivery transport configured inside Appwrite Auth settings.
+
+Current non-secret configuration:
+
+- Resend domain `juchess.page` is verified.
+- SMTP sender name: `JuChess`
+- SMTP sender email: `no-reply@juchess.page`
+- Reply-to name: `JuChess Club`
+- Reply-to email: `Juchess180@gmail.com`
+- SMTP host: `smtp.resend.com`
+- SMTP port: `587`
+- SMTP username: `resend`
+- Encryption: TLS
+- SMTP/API credential: stored in Appwrite only; never print, copy into source,
+  or include in a handoff.
+
+Branded Appwrite templates are saved for English:
+
+- Verification subject: `Verify your JuChess email`
+- Recovery subject: `Reset your JuChess password`
+- Source templates:
+  `appwrite/email-templates/account-verification.html` and
+  `appwrite/email-templates/password-recovery.html`
+- Public email logo:
+  `https://juchess.page/email/juchess-email-logo.png`
+- Validation command: `npm run check:email-templates`
+
+At this handoff, SMTP configuration and both templates were accepted by
+Appwrite, but no real end-to-end verification email was sent because the user
+had not yet confirmed the recipient address at the final send step. The next AI
+must not claim inbox delivery until a real account/email test succeeds.
+
+### OAuth
+
+- The visible social option is Google only. Apple was removed from the UI
+  because it is not configured; do not show it until Apple credentials exist.
+- Google OAuth is configured through Appwrite and Google Cloud.
+- The Google authorized redirect URI must be the exact callback URI shown by
+  Appwrite, not `juchess.page` directly.
+- Appwrite returns to `/auth/callback`; JuChess creates the session and routes
+  incomplete profiles to `/complete-profile`.
+- Google supplies basic account identity but not JuChess-required university,
+  University ID, and phone data. The completion screen collects those fields.
 
 Admin:
 
@@ -670,14 +777,15 @@ published web page with no console warnings/errors.
 
 ## 16. Public Website State
 
-Primary navigation:
+Primary visible navigation:
 
 - Home
 - Tournaments
 - Tools
-- Games
-- Leaderboard
 - Profile
+
+`/games` and `/leaderboard` routes still exist internally, but their public
+navigation entries are intentionally hidden until those surfaces are ready.
 
 Home should follow the provided real prototype and include News. Tournament
 cards must use live Appwrite tournaments and clearly indicate online events.
@@ -913,6 +1021,7 @@ npm run dev:admin
 npm run build:web
 npm run build:admin
 npm run build:pages
+npm run check:email-templates
 npm run check:functions
 npm run test:functions
 npm run test:engine
@@ -970,7 +1079,7 @@ Build and publish GitHub Pages:
 ```powershell
 npm run build:pages
 git status --short
-git add apps/web apps/admin docs
+git add <only the source and generated files for this change>
 git commit -m "<specific message>"
 git push origin main
 ```
@@ -1012,7 +1121,23 @@ running it against production.
 
 ## 25. Latest Verified Behavior
 
-At commit `c20c8c3`, the following individual checks passed:
+At commit `31179d1`, the latest authentication work passed:
+
+- Web lint and production TypeScript/Vite build
+- All 33 current web review/import/board/helper tests
+- Both branded email templates passed local validation
+- GitHub Pages production bundle built successfully
+- `https://juchess.page/verify-email` loaded the deployed JuChess verification
+  screen with the expected email and sign-in return action
+- Appwrite accepted the Resend SMTP configuration
+- Appwrite saved both branded English verification and recovery templates
+
+The real-email send, inbox rendering, verification click, verified sign-in,
+recovery send, and password reset remain to be tested with a user-confirmed
+recipient. Do not convert the configuration checks above into a false
+end-to-end claim.
+
+At commit `c20c8c3`, the tournament/board checks below had passed:
 
 - Function JavaScript syntax checks
 - 56 tournament engine/workflow tests
@@ -1061,26 +1186,44 @@ These are real limitations, not optional wording issues:
     a phone because no adb device was connected at handoff time.
 12. Provider-dependent Email/SMS/Push broadcast delivery may be incomplete;
     inspect credentials/provider code before claiming it works.
+13. The verification/recovery provider is configured, but a real inbox flow has
+    not yet been completed. This is the highest-priority auth verification gap.
+14. `profiles` currently combines public-facing member fields with private
+    fields such as phone and University ID while profile rows may be readable
+    broadly. Treat this as a security/privacy architecture risk: inspect live
+    permissions and split private data into an owner/admin-only table before
+    claiming production-grade privacy.
+15. Email verification is currently implemented on the web client. Audit the
+    Flutter sign-up/sign-in flow before assuming mobile enforces the identical
+    verification gate and branded callback experience.
 
 ## 27. Recommended Next Work
 
 Do not start this list blindly; the user's newest request always wins. If the
 new chat asks for general continuation, use this order:
 
-1. Reconcile public web tournament tabs with the mobile/product contract and
+1. With explicit confirmation of the recipient, run one real web sign-up email
+   verification and one password-recovery flow. Confirm inbox branding, links,
+   verified sign-in, expired/used-link behavior, and that unverified accounts
+   cannot enter private app state. Do not expose credentials while testing.
+2. Audit live `profiles` permissions and move phone/University ID to a private
+   owner/admin-only data boundary if the current row is publicly readable.
+3. Bring mobile auth to the same verification contract and test on a connected
+   device.
+4. Reconcile public web tournament tabs with the mobile/product contract and
    verify all formats.
-2. Install the current Flutter app on a connected device and verify board flip,
+5. Install the current Flutter app on a connected device and verify board flip,
    Black orientation, clocks, and 20-second pre-game countdown with two real
    player accounts.
-3. Run a complete six-player JuChess-hosted Swiss tournament end to end:
+6. Run a complete six-player JuChess-hosted Swiss tournament end to end:
    registration, publish, activation, four rounds, live play, standings,
    completion, photos.
-4. Add provider-history pagination/lazy loading for Chess.com and Lichess.
-5. Profile and optimize Stockfish review without reducing default accuracy.
-6. Implement a real Team data model/engine only after agreeing on team rules.
-7. Upgrade Arena only after specifying scoring, streaks, re-pair interval,
+7. Add provider-history pagination/lazy loading for Chess.com and Lichess.
+8. Profile and optimize Stockfish review without reducing default accuracy.
+9. Implement a real Team data model/engine only after agreeing on team rules.
+10. Upgrade Arena only after specifying scoring, streaks, re-pair interval,
    withdrawals, late join, and finish conditions.
-8. Split large admin/mobile files incrementally with tests, not as an unrelated
+11. Split large admin/mobile files incrementally with tests, not as an unrelated
    rewrite.
 
 ## 28. Working Style For The Next AI
