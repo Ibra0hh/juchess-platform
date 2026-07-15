@@ -1,5 +1,4 @@
 import { useLocation } from 'react-router-dom'
-import './RouteSkeleton.css'
 
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 const navItems = Array.from({ length: 6 }, (_, index) => index)

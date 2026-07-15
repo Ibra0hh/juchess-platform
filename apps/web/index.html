@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="%BASE_URL%prototype/assets/crest.png" />
     <link rel="apple-touch-icon" href="%BASE_URL%prototype/assets/crest.png" />
+    <link rel="stylesheet" href="/src/components/RouteSkeleton.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -11,7 +12,70 @@
     <title>JuChess</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main
+        class="route-skeleton route-skeleton-content"
+        data-variant="content"
+        role="status"
+        aria-label="Loading JuChess"
+      >
+        <header class="route-skeleton-header">
+          <div class="route-skeleton-header-inner">
+            <div class="route-skeleton-brand" aria-hidden="true">
+              <img src="%BASE_URL%prototype/assets/crest.png" alt="" />
+              <span>
+                <strong>JuChess</strong>
+                <small>University of Jordan Chess Club</small>
+              </span>
+            </div>
+            <div class="route-skeleton-nav" aria-hidden="true">
+              <span><b class="route-skeleton-shape"></b></span>
+              <span><b class="route-skeleton-shape"></b></span>
+              <span><b class="route-skeleton-shape"></b></span>
+              <span><b class="route-skeleton-shape"></b></span>
+              <span><b class="route-skeleton-shape"></b></span>
+              <span><b class="route-skeleton-shape"></b></span>
+            </div>
+            <span class="route-skeleton-account route-skeleton-shape" aria-hidden="true"></span>
+          </div>
+        </header>
+
+        <div class="route-skeleton-content-preview" aria-hidden="true">
+          <div class="route-skeleton-heading route-skeleton-shape"></div>
+          <div class="route-skeleton-subheading route-skeleton-shape"></div>
+          <div class="route-skeleton-search route-skeleton-shape"></div>
+          <div class="route-skeleton-filters">
+            <span class="route-skeleton-shape"></span>
+            <span class="route-skeleton-shape"></span>
+            <span class="route-skeleton-shape"></span>
+          </div>
+          <div class="route-skeleton-card-list">
+            <div class="route-skeleton-card">
+              <span class="route-skeleton-card-icon route-skeleton-shape"></span>
+              <div><b class="route-skeleton-shape"></b><i class="route-skeleton-shape"></i></div>
+            </div>
+            <div class="route-skeleton-card">
+              <span class="route-skeleton-card-icon route-skeleton-shape"></span>
+              <div><b class="route-skeleton-shape"></b><i class="route-skeleton-shape"></i></div>
+            </div>
+            <div class="route-skeleton-card">
+              <span class="route-skeleton-card-icon route-skeleton-shape"></span>
+              <div><b class="route-skeleton-shape"></b><i class="route-skeleton-shape"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="route-skeleton-mobile-nav" aria-hidden="true">
+          <span><i class="route-skeleton-shape"></i><b class="route-skeleton-shape"></b></span>
+          <span><i class="route-skeleton-shape"></i><b class="route-skeleton-shape"></b></span>
+          <span><i class="route-skeleton-shape"></i><b class="route-skeleton-shape"></b></span>
+          <span><i class="route-skeleton-shape"></i><b class="route-skeleton-shape"></b></span>
+          <span><i class="route-skeleton-shape"></i><b class="route-skeleton-shape"></b></span>
+          <span><i class="route-skeleton-shape"></i><b class="route-skeleton-shape"></b></span>
+        </div>
+        <span class="route-skeleton-status">Loading JuChess…</span>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
