@@ -1,6 +1,6 @@
 # JuChess Complete New-Chat Handoff
 
-Last updated: July 15, 2026
+Last updated: July 16, 2026
 
 This file is both a complete project handoff and a copy-paste prompt for a new
 AI chat. It describes the intended product, the actual implementation, the
@@ -117,12 +117,18 @@ latest user wording. Fix the real screen instead of rationalizing the mismatch.
 - Local repo: `C:\Users\ibra_\Downloads\juchess-platform`
 - Remote: `https://github.com/Ibra0hh/juchess-platform.git`
 - Primary branch: `main`
-- Current implementation baseline commit: `31179d1`
-- This handoff document is committed immediately after that implementation
-  baseline on `main`.
+- Current deployed application baseline commit: `6d864fa`
+- The handoff is maintained on `main`; always confirm the remote has not moved
+  before starting new work.
 
 Recent important commits:
 
+- `6d864fa` Fix phone desktop-mode layout
+- `298e040` Build Pages for authenticated player actions
+- `cfee654` Authenticate player Function requests
+- `753cbbe` Separate private player profile data
+- `d8cc704` Place recruitment action below team
+- `cc082f2` Add member recruitment workflow
 - `31179d1` Require email verification before web sign-in
 - `a4c6f46` Deploy admin player profile media
 - `af326b1` Show player profile media in admin
@@ -265,10 +271,10 @@ Appwrite:
 
 Live Function IDs and latest ready deployments at handoff time:
 
-- `admin-actions`: deployment `6a53f0e9b1889b81b5d3`, ready and active
-- `player-actions`: deployment `6a53cd5bc66a6a6eabd1`, ready and active
+- `admin-actions`: deployment `6a5804c4e80f7913e518`, ready and active
+- `player-actions`: deployment `6a5804c43a59bae2fb6d`, ready and active
 - `attendance-actions`: deployment `6a53cd75ade72590f33d`, ready and active
-- `access-guards`: deployment `6a4adc00dbe3a387a814`, ready and active
+- `access-guards`: deployment `6a57ee981310b683f32f`, ready and active
 
 `admin-actions` is scheduled every minute for attendance processing and also
 serves the tournament engine and hosted online-game endpoints.
@@ -285,7 +291,10 @@ Player identity and admin identity are deliberately separate.
 Player web/mobile:
 
 - Appwrite Account handles sessions.
-- Player profiles live in `profiles`.
+- Public member fields live in `profiles`; account ID, email, University ID,
+  and phone live in owner-readable `profile_private` rows with the same row ID.
+- Owner profile reads and writes go through `player-actions` using a short-lived
+  Account JWT in the `juchess-player-jwt` execution header.
 - Sign-up/sign-in checks call `access-guards`.
 - Blocked email, University ID, phone, user, profile, or IP must be rejected.
 
@@ -364,6 +373,11 @@ must not claim inbox delivery until a real account/email test succeeds.
   Appwrite, not `juchess.page` directly.
 - Appwrite returns to `/auth/callback`; JuChess creates the session and routes
   incomplete profiles to `/complete-profile`.
+- A July 16 production failure was caused by `/profile` being called without a
+  player JWT after Appwrite created the Google session. Commit `cfee654` adds
+  the JWT to web/mobile profile, registration, recruitment, and hosted-game
+  Function calls. The live callback now reaches `/complete-profile` and the
+  matching production `GET /profile` execution returns HTTP 200.
 - Google supplies basic account identity but not JuChess-required university,
   University ID, and phone data. The completion screen collects those fields.
 
@@ -388,7 +402,8 @@ Machine-readable contract: `appwrite/schema.json`.
 Important tables:
 
 - `admin_profiles`: private admin identities and role/status.
-- `profiles`: member identity, rating, avatar, Chess.com and Lichess usernames.
+- `profiles`: public member display data, rating, avatar, and external usernames.
+- `profile_private`: owner/admin-only account, email, University ID, and phone.
 - `tournaments`: status, format, rounds, mode/platform, dates, bracket snapshot,
   procedure settings, hosted-game policy.
 - `registrations`: one player/tournament registration, status, seed.
@@ -399,6 +414,8 @@ Important tables:
 - `fair_play_reviews`: organizer review summaries/decisions.
 - `standings`: canonical tournament ranking snapshot.
 - `announcements`: club broadcasts.
+- `crew_applications`, `crew_application_reviews`: player recruitment workflow
+  and private admin review notes.
 - `admin_audit`: operational audit log.
 - `identity_blocks`, `ip_blocks`: access controls.
 - `check_ins`: legacy table; the current flow uses attendance confirmation.
@@ -985,9 +1002,11 @@ Read route handling near the bottom of
 ### `player-actions`
 
 - Health
+- Owner profile load/update
 - Register for tournament
 - Cancel registration
 - Attendance response entry
+- Recruitment application load/submit/withdraw
 
 ### `attendance-actions`
 
@@ -1115,11 +1134,42 @@ Available migrations:
 - `npm run migrate:tournament-live`
 - `npm run migrate:profile-usernames`
 - `npm run migrate:registration-deadline`
+- `npm run migrate:recruitment`
+- `npm run migrate:profile-privacy`
+
+`migrate:profile-privacy` is a two-stage migration. Production finalization ran
+successfully on July 16, 2026; reruns must remain idempotent and must never
+recreate private columns on `profiles`.
 
 Migrations are additive and should be repeatable. Read the script before
 running it against production.
 
 ## 25. Latest Verified Behavior
+
+At commit `298e040`, the July 16 OAuth/privacy release passed and was verified
+in production:
+
+- `check:web`: lint/build plus 34 tests
+- `check:admin`: lint/build, 3 wizard tests, and 62 backend/engine tests
+- `check:functions` and 16 Function tests
+- Flutter analyze and all 23 Flutter tests
+- Release APK built at
+  `apps/mobile/build/app/outputs/flutter-apk/app-release.apk` (244.1 MB)
+- GitHub Pages deployment for `298e040` completed successfully; live web/admin
+  HTML references the expected release bundles
+- `admin-actions` deployment `6a5804c4e80f7913e518` and `player-actions`
+  deployment `6a5804c43a59bae2fb6d` are ready and active
+- A real Google OAuth retry reached `/complete-profile`; the new production
+  `player-actions GET /profile` execution returned HTTP 200 instead of the
+  previous HTTP 401
+- The privacy migration moved 14 identity rows to `profile_private`, removed
+  the four private columns and three related indexes from `profiles`, and left
+  all public rows read-only
+- Anonymous production reads returned 13 safe public rows and zero private
+  rows; the authenticated completion screen still loaded after finalization
+
+No Android/iOS device was connected, so the APK was not installed or visually
+verified on a physical device.
 
 At commit `31179d1`, the latest authentication work passed:
 
@@ -1188,12 +1238,7 @@ These are real limitations, not optional wording issues:
     inspect credentials/provider code before claiming it works.
 13. The verification/recovery provider is configured, but a real inbox flow has
     not yet been completed. This is the highest-priority auth verification gap.
-14. `profiles` currently combines public-facing member fields with private
-    fields such as phone and University ID while profile rows may be readable
-    broadly. Treat this as a security/privacy architecture risk: inspect live
-    permissions and split private data into an owner/admin-only table before
-    claiming production-grade privacy.
-15. Email verification is currently implemented on the web client. Audit the
+14. Email verification is currently implemented on the web client. Audit the
     Flutter sign-up/sign-in flow before assuming mobile enforces the identical
     verification gate and branded callback experience.
 
@@ -1206,24 +1251,22 @@ new chat asks for general continuation, use this order:
    verification and one password-recovery flow. Confirm inbox branding, links,
    verified sign-in, expired/used-link behavior, and that unverified accounts
    cannot enter private app state. Do not expose credentials while testing.
-2. Audit live `profiles` permissions and move phone/University ID to a private
-   owner/admin-only data boundary if the current row is publicly readable.
-3. Bring mobile auth to the same verification contract and test on a connected
+2. Bring mobile auth to the same verification contract and test on a connected
    device.
-4. Reconcile public web tournament tabs with the mobile/product contract and
+3. Reconcile public web tournament tabs with the mobile/product contract and
    verify all formats.
-5. Install the current Flutter app on a connected device and verify board flip,
+4. Install the current Flutter app on a connected device and verify board flip,
    Black orientation, clocks, and 20-second pre-game countdown with two real
    player accounts.
-6. Run a complete six-player JuChess-hosted Swiss tournament end to end:
+5. Run a complete six-player JuChess-hosted Swiss tournament end to end:
    registration, publish, activation, four rounds, live play, standings,
    completion, photos.
-7. Add provider-history pagination/lazy loading for Chess.com and Lichess.
-8. Profile and optimize Stockfish review without reducing default accuracy.
-9. Implement a real Team data model/engine only after agreeing on team rules.
-10. Upgrade Arena only after specifying scoring, streaks, re-pair interval,
+6. Add provider-history pagination/lazy loading for Chess.com and Lichess.
+7. Profile and optimize Stockfish review without reducing default accuracy.
+8. Implement a real Team data model/engine only after agreeing on team rules.
+9. Upgrade Arena only after specifying scoring, streaks, re-pair interval,
    withdrawals, late join, and finish conditions.
-11. Split large admin/mobile files incrementally with tests, not as an unrelated
+10. Split large admin/mobile files incrementally with tests, not as an unrelated
    rewrite.
 
 ## 28. Working Style For The Next AI
