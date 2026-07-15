@@ -1,6 +1,8 @@
 import { Client, Query, TablesDB } from 'node-appwrite';
 
 const tableIds = {
+  profiles: 'profiles',
+  profilePrivate: 'profile_private',
   identityBlocks: 'identity_blocks',
   ipBlocks: 'ip_blocks',
 };
@@ -26,7 +28,7 @@ function routeSegments(path = '/') {
   return path.split('/').filter(Boolean);
 }
 
-function normalizePhone(value) {
+export function normalizePhone(value) {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
 
@@ -41,7 +43,7 @@ function normalizePhone(value) {
   return raw;
 }
 
-function normalizeCandidates(body) {
+export function normalizeCandidates(body) {
   const candidates = [];
   const email = String(body.email ?? '').trim().toLowerCase();
   const universityId = String(body.universityId ?? '').trim().toLowerCase();
@@ -52,6 +54,43 @@ function normalizeCandidates(body) {
   if (phone) candidates.push({ type: 'phone', value: phone });
 
   return candidates;
+}
+
+export function mergeCandidates(...groups) {
+  const merged = new Map();
+  for (const candidate of groups.flat()) {
+    if (!candidate?.type || !candidate?.value) continue;
+    merged.set(`${candidate.type}:${candidate.value}`, candidate);
+  }
+  return [...merged.values()];
+}
+
+async function loadStoredCandidates(tablesDB, databaseId, accountId) {
+  if (!accountId) return [];
+
+  try {
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.profilePrivate,
+      queries: [Query.equal('accountId', accountId), Query.limit(1)],
+      total: false,
+    });
+    if (response.rows[0]) return normalizeCandidates(response.rows[0]);
+  } catch {
+    // Additive-deployment compatibility while profile_private is introduced.
+  }
+
+  try {
+    const legacy = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.profiles,
+      queries: [Query.equal('accountId', accountId), Query.limit(1)],
+      total: false,
+    });
+    return legacy.rows[0] ? normalizeCandidates(legacy.rows[0]) : [];
+  } catch {
+    return [];
+  }
 }
 
 function getRequestIp(req) {
@@ -127,19 +166,24 @@ export default async ({ req, res, log, error }) => {
 
   try {
     const requestIp = getRequestIp(req);
-    const [identityBlocks, ipBlocks] = await Promise.all([
+    const accountId = String(req.headers?.['x-appwrite-user-id'] ?? '').trim();
+    const [identityBlocks, ipBlocks, storedCandidates] = await Promise.all([
       listRows(tablesDB, databaseId, tableIds.identityBlocks),
       listRows(tablesDB, databaseId, tableIds.ipBlocks),
+      loadStoredCandidates(tablesDB, databaseId, accountId),
     ]);
 
-    const candidates = normalizeCandidates(body);
+    // Before sign-up there is no authenticated account, so submitted values
+    // are the only candidates. Authenticated checks also include the canonical
+    // owner-only identity row and cannot evade a block by omitting body fields.
+    const candidates = mergeCandidates(normalizeCandidates(body), storedCandidates);
     const identityMatch = identityBlocks.find((block) => (
       block.status === 'active' &&
       candidates.some((candidate) => candidate.type === block.type && candidate.value === block.value)
     ));
 
     if (identityMatch) {
-      log(`Blocked identity ${identityMatch.type}:${identityMatch.value}`);
+      log(`Blocked request by ${identityMatch.type} identity rule.`);
       return res.json({
         ok: true,
         allowed: false,
@@ -151,7 +195,7 @@ export default async ({ req, res, log, error }) => {
 
     const ipMatch = ipBlocks.find((block) => block.status === 'active' && ipMatchesRange(requestIp, block.ipRange));
     if (ipMatch) {
-      log(`Blocked IP ${requestIp} by ${ipMatch.ipRange}`);
+      log('Blocked request by network rule.');
       return res.json({
         ok: true,
         allowed: false,
@@ -162,13 +206,12 @@ export default async ({ req, res, log, error }) => {
 
     return res.json({ ok: true, allowed: true });
   } catch (cause) {
-    error(cause?.message ?? String(cause));
+    error('Access guard verification failed.');
     return res.json({
       ok: false,
       allowed: false,
       error: 'Access guard failed.',
       reason: 'Access could not be verified right now.',
-      detail: cause?.message ?? String(cause),
     }, 500);
   }
 };

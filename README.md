@@ -111,10 +111,12 @@ Provisioned resources:
 
 Admin-only mutations must go through Appwrite Functions, not browser API keys.
 Admin panel identity is separated from player identity: the admin app checks the
-private `admin_profiles` table through the `admin-actions` Function, while the
-web/mobile apps use the public player `profiles` table. Admin function calls
-send a short Account JWT in the `juchess-admin-jwt` execution header, and the
-Function rejects admin routes without it.
+private `admin_profiles` table through the `admin-actions` Function. Public
+player fields live in `profiles`; account, email, University ID, and phone live
+in owner-readable `profile_private` rows and are joined only by authenticated
+Functions. Web/mobile profile writes go through `player-actions`. Admin function
+calls send a short Account JWT in the `juchess-admin-jwt` execution header, and
+the Function rejects admin routes without it.
 To redeploy the admin function after edits:
 
 ```bash
@@ -132,8 +134,17 @@ Appwrite project:
 ```powershell
 npm run migrate:procedure
 npm run migrate:profile-usernames
+npm run migrate:profile-privacy
 npm run migrate:tournament-live
 npm run migrate:attendance
+```
+
+The profile privacy migration is intentionally two-stage. Run the command above
+to create/backfill `profile_private`, deploy every updated Function and client,
+then remove the legacy public columns with:
+
+```powershell
+npm run migrate:profile-privacy -- -FinalizePublicFields
 ```
 
 The migration uses the current Appwrite CLI login, or `APPWRITE_API_KEY` when
@@ -173,6 +184,8 @@ appwrite functions create-deployment \
   ID disables the account and deletes its sessions.
 - Web and Flutter sign-in/sign-up call the `access-guards` Function so blocked
   emails, University IDs, phones, and IPs cannot continue.
+- Web, admin, and Flutter keep contact/identity data behind authenticated
+  Functions; public player reads contain display-safe profile fields only.
 - Flutter has Appwrite config, session detection, sign-in, sign-up, sign-out,
   and tournament reads while preserving the prototype visual structure.
 - The `admin-actions` Function has concrete admin mutation routes for admin

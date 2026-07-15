@@ -19,7 +19,8 @@ function Upsert-Row {
   param(
     [Parameter(Mandatory)][string]$TableId,
     [Parameter(Mandatory)][string]$RowId,
-    [Parameter(Mandatory)][hashtable]$Data
+    [Parameter(Mandatory)][hashtable]$Data,
+    [string[]]$Permissions = @($PublicRead)
   )
 
   $json = $Data | ConvertTo-Json -Depth 12 -Compress
@@ -29,7 +30,7 @@ function Upsert-Row {
     --table-id $TableId `
     --row-id $RowId `
     --data $json `
-    --permissions $PublicRead `
+    --permissions $Permissions `
     --json 2>&1
 
   if ($LASTEXITCODE -ne 0) {
@@ -72,15 +73,20 @@ $players = @(
 )
 
 foreach ($player in $players) {
+  $accountId = "$($player.Id)_account"
   Upsert-Row -TableId 'profiles' -RowId $player.Id -Data @{
-    accountId = "$($player.Id)_account"
     displayName = $player.Name
-    universityId = $player.UniversityId
-    email = $player.Email
+    university = 'University of Jordan'
     rating = $player.Rating
     role = 'member'
     status = 'active'
   }
+  Upsert-Row -TableId 'profile_private' -RowId $player.Id -Data @{
+    profileId = $player.Id
+    accountId = $accountId
+    email = $player.Email
+    universityId = $player.UniversityId
+  } -Permissions @("read(`"user:$accountId`")")
 }
 
 Upsert-Row -TableId 'tournaments' -RowId $TournamentId -Data @{

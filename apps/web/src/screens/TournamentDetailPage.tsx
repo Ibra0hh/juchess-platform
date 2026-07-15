@@ -883,7 +883,7 @@ function PlayersTab({ standings }: { standings: StandingRow[] }) {
                 <td>{row.rank}</td>
                 <td>
                   <strong>{row.member.name}</strong>
-                  <small>{row.member.universityId}</small>
+                  <small>{row.member.university || 'University not listed'}</small>
                 </td>
                 <td>{row.member.rating}</td>
                 <td>{row.points}</td>

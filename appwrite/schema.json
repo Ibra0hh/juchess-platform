@@ -17,12 +17,12 @@
       }
     },
     "profiles": {
+      "note": "Public player directory. Rows are written only by server Functions. Table permissions are admin-team read-only; public and owner visibility is granted per row. Never store authentication identifiers or contact data here.",
+      "permissions": ["read(\"team:admin_super_admins\")", "read(\"team:admin_staff\")"],
+      "rowSecurity": true,
       "fields": {
-        "accountId": "string|required|unique",
         "displayName": "string|required",
-        "universityId": "string|unique",
-        "email": "email|required",
-        "phone": "string|unique",
+        "university": "string",
         "rating": "integer|default:1200",
         "role": "enum:member,organizer,admin",
         "status": "enum:pending,active,suspended",
@@ -34,6 +34,25 @@
         "pieceTheme": "string",
         "arrowColor": "string",
         "markColor": "string"
+      }
+    },
+    "profile_private": {
+      "note": "Owner-readable identity and contact data. The row ID is exactly the matching public profile row ID. Clients cannot create or update rows; trusted server Functions own all writes.",
+      "permissions": [],
+      "rowSecurity": true,
+      "indexes": {
+        "profileId_unique": "unique:profileId",
+        "accountId_unique": "unique:accountId",
+        "email_unique": "unique:email",
+        "universityId_unique": "unique:universityId",
+        "phone_unique": "unique:phone"
+      },
+      "fields": {
+        "profileId": "string|required",
+        "accountId": "string|required",
+        "email": "email|required",
+        "universityId": "string",
+        "phone": "string"
       }
     },
     "tournaments": {

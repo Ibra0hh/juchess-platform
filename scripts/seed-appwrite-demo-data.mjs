@@ -13,6 +13,7 @@ const actorProfileId = env('APPWRITE_SEED_ACTOR_PROFILE_ID') || 'seed_profile_01
 
 const tableIds = {
   profiles: 'profiles',
+  profilePrivate: 'profile_private',
   tournaments: 'tournaments',
   registrations: 'registrations',
   games: 'games',
@@ -46,6 +47,8 @@ const players = [
   player('seed_profile_19', 'Salma Nouri', 'salma_nouri', 'salma.seed@juchess.test', 1166, '+962790000019'),
   player('seed_profile_20', 'Adam Kareem', 'adam_kareem', 'adam.seed@juchess.test', 1148, '+962790000020'),
 ]
+
+const privatePlayers = players.map((profile) => profile.privateRow)
 
 const tournamentPlayerCounts = {
   seed_tour_swiss: 6,
@@ -250,7 +253,8 @@ const announcements = [
 ]
 
 const plan = [
-  [tableIds.profiles, players, 'accountId'],
+  [tableIds.profiles, players],
+  [tableIds.profilePrivate, privatePlayers, 'profileId'],
   [tableIds.tournaments, tournaments, 'slug'],
   [tableIds.registrations, registrations],
   [tableIds.games, games],
@@ -395,19 +399,28 @@ async function loadAppwriteSdk() {
 }
 
 function player(rowId, displayName, universityId, email, rating, phone) {
+  const accountId = `${rowId}_account`
   return {
     rowId,
     data: {
-      accountId: `${rowId}_account`,
       displayName,
-      universityId,
-      email,
-      phone,
+      university: 'University of Jordan',
       rating,
       role: 'member',
       status: 'active',
     },
     permissions: [Permission.read(Role.any())],
+    privateRow: {
+      rowId,
+      data: {
+        profileId: rowId,
+        accountId,
+        email,
+        universityId,
+        phone,
+      },
+      permissions: [Permission.read(Role.user(accountId))],
+    },
   }
 }
 

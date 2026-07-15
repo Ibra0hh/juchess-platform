@@ -513,57 +513,22 @@ class AppwriteService {
     return account.get();
   }
 
-  Future<Map<String, String?>> loadProfileIdentity(String accountId) async {
+  Future<Map<String, String?>> loadProfileIdentity() async {
     try {
-      final response = await tablesDB.listRows(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.profilesTableId,
-        queries: [Query.equal('accountId', accountId), Query.limit(1)],
-        total: false,
-        ttl: 30,
+      final response = await _runPlayerAction(
+        '/profile',
+        method: enums.ExecutionMethod.gET,
       );
-
-      if (response.rows.isEmpty) return <String, String?>{};
-      final row = response.rows.first;
-      final data = row.data;
+      final row = response['row'];
+      if (row is! Map<String, dynamic>) return <String, String?>{};
       return {
-        'profileId': row.$id,
-        'displayName': data['displayName']?.toString(),
-        'universityId': data['universityId']?.toString(),
-        'phone': data['phone']?.toString(),
-        'status': data['status']?.toString(),
-        'chessComUsername': data['chessComUsername']?.toString(),
-        'lichessUsername': data['lichessUsername']?.toString(),
-      };
-    } catch (_) {
-      return <String, String?>{};
-    }
-  }
-
-  Future<Map<String, String?>> loadProfileIdentityByEmail(String email) async {
-    final normalizedEmail = email.trim();
-    if (normalizedEmail.isEmpty) return <String, String?>{};
-
-    try {
-      final response = await tablesDB.listRows(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.profilesTableId,
-        queries: [Query.equal('email', normalizedEmail), Query.limit(1)],
-        total: false,
-        ttl: 30,
-      );
-
-      if (response.rows.isEmpty) return <String, String?>{};
-      final row = response.rows.first;
-      final data = row.data;
-      return {
-        'profileId': row.$id,
-        'displayName': data['displayName']?.toString(),
-        'universityId': data['universityId']?.toString(),
-        'phone': data['phone']?.toString(),
-        'status': data['status']?.toString(),
-        'chessComUsername': data['chessComUsername']?.toString(),
-        'lichessUsername': data['lichessUsername']?.toString(),
+        'profileId': row['\$id']?.toString(),
+        'displayName': row['displayName']?.toString(),
+        'universityId': row['universityId']?.toString(),
+        'phone': row['phone']?.toString(),
+        'status': row['status']?.toString(),
+        'chessComUsername': row['chessComUsername']?.toString(),
+        'lichessUsername': row['lichessUsername']?.toString(),
       };
     } catch (_) {
       return <String, String?>{};
@@ -571,17 +536,14 @@ class AppwriteService {
   }
 
   Future<Map<String, String?>> ensureProfileIdentity(models.User user) async {
-    var profile = await loadProfileIdentity(user.$id);
+    var profile = await loadProfileIdentity();
     if (profile['profileId'] != null) return profile;
 
-    profile = await loadProfileIdentityByEmail(user.email);
-    if (profile['profileId'] != null) return profile;
-
-    await _createProfile(user);
-    profile = await loadProfileIdentity(user.$id);
-    if (profile['profileId'] != null) return profile;
-
-    return loadProfileIdentityByEmail(user.email);
+    await _saveProfile(
+      displayName: user.name,
+      university: 'University of Jordan',
+    );
+    return loadProfileIdentity();
   }
 
   Future<Map<String, String?>> assertCurrentUserAllowed(
@@ -641,8 +603,9 @@ class AppwriteService {
     );
 
     await account.createEmailPasswordSession(email: email, password: password);
-    await _createProfile(
-      user,
+    await _saveProfile(
+      displayName: user.name,
+      university: 'University of Jordan',
       universityId: universityId,
       phone: phone,
       chessComUsername: chessComUsername,
@@ -674,11 +637,9 @@ class AppwriteService {
       );
     }
 
-    await tablesDB.updateRow(
-      databaseId: AppConfig.databaseId,
-      tableId: AppConfig.profilesTableId,
-      rowId: profileId,
-      data: {
+    await _runPlayerAction(
+      '/profile',
+      body: {
         (source == MobileGameSource.chessCom
                 ? 'chessComUsername'
                 : 'lichessUsername'):
@@ -693,13 +654,14 @@ class AppwriteService {
   Future<Map<String, dynamic>> _runPlayerAction(
     String path, {
     Map<String, dynamic> body = const {},
+    enums.ExecutionMethod method = enums.ExecutionMethod.pOST,
   }) async {
     final execution = await functions.createExecution(
       functionId: AppConfig.playerFunctionId,
       body: jsonEncode(body),
       xasync: false,
       path: path,
-      method: enums.ExecutionMethod.pOST,
+      method: method,
       headers: {'content-type': 'application/json'},
     );
 
@@ -1109,43 +1071,31 @@ class AppwriteService {
     }
   }
 
-  Future<void> _createProfile(
-    models.User user, {
+  Future<void> _saveProfile({
+    String? displayName,
+    String? university,
     String? universityId,
     String? phone,
     String? chessComUsername,
     String? lichessUsername,
   }) async {
-    try {
-      await tablesDB.createRow(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.profilesTableId,
-        rowId: ID.unique(),
-        data: {
-          'accountId': user.$id,
-          'displayName': user.name,
-          'email': user.email,
-          if (universityId != null && universityId.trim().isNotEmpty)
-            'universityId': universityId.trim(),
-          if (normalizeJordanPhone(phone) != null)
-            'phone': normalizeJordanPhone(phone),
-          if (chessComUsername != null && chessComUsername.trim().isNotEmpty)
-            'chessComUsername': chessComUsername.trim().toLowerCase(),
-          if (lichessUsername != null && lichessUsername.trim().isNotEmpty)
-            'lichessUsername': lichessUsername.trim().toLowerCase(),
-          'rating': 1200,
-          'role': 'member',
-          'status': 'pending',
-        },
-        permissions: [
-          Permission.read(Role.any()),
-          Permission.read(Role.user(user.$id)),
-          Permission.update(Role.user(user.$id)),
-        ],
-      );
-    } catch (_) {
-      // Account creation is still valid if the profile row is blocked by table permissions.
-    }
+    await _runPlayerAction(
+      '/profile',
+      body: {
+        if (displayName != null && displayName.trim().isNotEmpty)
+          'displayName': displayName.trim(),
+        if (university != null && university.trim().isNotEmpty)
+          'university': university.trim(),
+        if (universityId != null && universityId.trim().isNotEmpty)
+          'universityId': universityId.trim(),
+        if (normalizeJordanPhone(phone) != null)
+          'phone': normalizeJordanPhone(phone),
+        if (chessComUsername != null && chessComUsername.trim().isNotEmpty)
+          'chessComUsername': chessComUsername.trim().toLowerCase(),
+        if (lichessUsername != null && lichessUsername.trim().isNotEmpty)
+          'lichessUsername': lichessUsername.trim().toLowerCase(),
+      },
+    );
   }
 
   TournamentSeed? _mapTournament(
@@ -1396,9 +1346,9 @@ Map<String, PlayerSeed> _mapProfileRows(List<models.Row> rows) {
     final data = row.data;
     profiles[row.$id] = PlayerSeed(
       9999,
-      data['displayName']?.toString() ?? data['email']?.toString() ?? row.$id,
+      data['displayName']?.toString() ?? row.$id,
       _asInt(data['rating']) ?? 1200,
-      data['universityId']?.toString() ?? data['email']?.toString() ?? row.$id,
+      data['university']?.toString() ?? 'University of Jordan',
     );
   }
   return profiles;
@@ -1429,7 +1379,7 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
     final seed = _asInt(data['seed']) ?? 9999;
     groups
         .putIfAbsent(tournamentId, () => [])
-        .add(PlayerSeed(seed, profile.name, profile.rating, profile.username));
+        .add(PlayerSeed(seed, profile.name, profile.rating, profile.subtitle));
   }
 
   return groups.map((tournamentId, players) {
@@ -1444,7 +1394,7 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
           i + 1,
           players[i].name,
           players[i].rating,
-          players[i].username,
+          players[i].subtitle,
         ),
     ]);
   });
@@ -1743,20 +1693,7 @@ class AppState extends ChangeNotifier {
       final previewEmail = _initialPreviewEmail();
       userName = _initialPreviewUserName();
       userEmail = previewEmail;
-
-      if (service.ready && previewEmail != null) {
-        final profile = await service.loadProfileIdentityByEmail(previewEmail);
-        final displayName = profile['displayName'];
-        _applyProfileIdentity(profile);
-        if (displayName != null && displayName.isNotEmpty) {
-          userName = displayName;
-        }
-        if (profileId != null) {
-          myRegistrations = await service.loadMyRegistrations(profileId!);
-        }
-      } else {
-        profileId = 'preview-profile';
-      }
+      profileId = 'preview-profile';
 
       error = null;
       notifyListeners();
@@ -6055,7 +5992,7 @@ class _TournamentPlayersTab extends StatelessWidget {
                 (player) => LeaderboardRow(
                   rank: player.rank,
                   name: player.name,
-                  username: player.username,
+                  subtitle: player.subtitle,
                   rating: player.rating,
                 ),
               )
@@ -7240,7 +7177,7 @@ class LeaderboardScreen extends StatelessWidget {
                   (player) => LeaderboardRow(
                     rank: player.rank,
                     name: player.name,
-                    username: player.username,
+                    subtitle: player.subtitle,
                     rating: player.rating,
                   ),
                 )
@@ -7256,14 +7193,14 @@ class LeaderboardRow extends StatelessWidget {
   const LeaderboardRow({
     required this.rank,
     required this.name,
-    required this.username,
+    required this.subtitle,
     required this.rating,
     super.key,
   });
 
   final int rank;
   final String name;
-  final String username;
+  final String subtitle;
   final int rating;
 
   @override
@@ -7300,7 +7237,7 @@ class LeaderboardRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '@$username',
+                  subtitle,
                   style: const TextStyle(
                     color: Color(0x8c111111),
                     fontSize: 11,
@@ -12152,7 +12089,7 @@ class LeaderboardPreview extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '@${player.username}',
+                            player.subtitle,
                             style: const TextStyle(
                               color: Color(0x8c111111),
                               fontSize: 11,
@@ -14164,12 +14101,12 @@ class TournamentMediaSeed {
 }
 
 class PlayerSeed {
-  const PlayerSeed(this.rank, this.name, this.rating, this.username);
+  const PlayerSeed(this.rank, this.name, this.rating, this.subtitle);
 
   final int rank;
   final String name;
   final int rating;
-  final String username;
+  final String subtitle;
 }
 
 class GameSeed {
@@ -14338,26 +14275,26 @@ class PuzzleSeed {
 }
 
 const clubPlayers = [
-  PlayerSeed(1, 'Ibrahim Ahmad', 1810, 'ibrahim_ahmad'),
-  PlayerSeed(2, 'Omar Saleh', 1740, 'omar_saleh'),
-  PlayerSeed(3, 'Leen Haddad', 1685, 'leen_haddad'),
-  PlayerSeed(4, 'Yazan Khaled', 1602, 'yazan_khaled'),
-  PlayerSeed(5, 'Sara Nasser', 1550, 'sara_nasser'),
-  PlayerSeed(6, 'Mohammad Al-Khatib', 1490, 'mohammad_alkhatib'),
-  PlayerSeed(7, 'Rania Odeh', 1465, 'rania_odeh'),
-  PlayerSeed(8, 'Khaled Mansour', 1430, 'khaled_mansour'),
-  PlayerSeed(9, 'Tala Suleiman', 1395, 'tala_suleiman'),
-  PlayerSeed(10, 'Hasan Qasem', 1370, 'hasan_qasem'),
-  PlayerSeed(11, 'Noor Barakat', 1340, 'noor_barakat'),
-  PlayerSeed(12, 'Zaid Hamdan', 1310, 'zaid_hamdan'),
-  PlayerSeed(13, 'Amr Zaidan', 1295, 'amr_zaidan'),
-  PlayerSeed(14, 'Lina Shami', 1270, 'lina_shami'),
-  PlayerSeed(15, 'Fadi Rimawi', 1245, 'fadi_rimawi'),
-  PlayerSeed(16, 'Dana Aqel', 1220, 'dana_aqel'),
-  PlayerSeed(17, 'Nour Alami', 1198, 'nour_alami'),
-  PlayerSeed(18, 'Tamer Qasem', 1184, 'tamer_qasem'),
-  PlayerSeed(19, 'Salma Nouri', 1166, 'salma_nouri'),
-  PlayerSeed(20, 'Adam Kareem', 1148, 'adam_kareem'),
+  PlayerSeed(1, 'Ibrahim Ahmad', 1810, 'University of Jordan'),
+  PlayerSeed(2, 'Omar Saleh', 1740, 'University of Jordan'),
+  PlayerSeed(3, 'Leen Haddad', 1685, 'University of Jordan'),
+  PlayerSeed(4, 'Yazan Khaled', 1602, 'University of Jordan'),
+  PlayerSeed(5, 'Sara Nasser', 1550, 'University of Jordan'),
+  PlayerSeed(6, 'Mohammad Al-Khatib', 1490, 'University of Jordan'),
+  PlayerSeed(7, 'Rania Odeh', 1465, 'University of Jordan'),
+  PlayerSeed(8, 'Khaled Mansour', 1430, 'University of Jordan'),
+  PlayerSeed(9, 'Tala Suleiman', 1395, 'University of Jordan'),
+  PlayerSeed(10, 'Hasan Qasem', 1370, 'University of Jordan'),
+  PlayerSeed(11, 'Noor Barakat', 1340, 'University of Jordan'),
+  PlayerSeed(12, 'Zaid Hamdan', 1310, 'University of Jordan'),
+  PlayerSeed(13, 'Amr Zaidan', 1295, 'University of Jordan'),
+  PlayerSeed(14, 'Lina Shami', 1270, 'University of Jordan'),
+  PlayerSeed(15, 'Fadi Rimawi', 1245, 'University of Jordan'),
+  PlayerSeed(16, 'Dana Aqel', 1220, 'University of Jordan'),
+  PlayerSeed(17, 'Nour Alami', 1198, 'University of Jordan'),
+  PlayerSeed(18, 'Tamer Qasem', 1184, 'University of Jordan'),
+  PlayerSeed(19, 'Salma Nouri', 1166, 'University of Jordan'),
+  PlayerSeed(20, 'Adam Kareem', 1148, 'University of Jordan'),
 ];
 
 class DoubleEliminationRoundSets {

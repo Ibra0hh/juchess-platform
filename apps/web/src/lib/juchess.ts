@@ -92,8 +92,7 @@ type AppwriteRegistrationRow = Models.Row & {
 
 type AppwriteProfileRow = Models.Row & {
   displayName?: string
-  universityId?: string
-  email?: string
+  university?: string
   rating?: number
 }
 
@@ -146,7 +145,7 @@ export type Member = {
   id: string
   name: string
   rating: number
-  universityId: string
+  university: string
 }
 
 export type TournamentGame = {
@@ -286,26 +285,26 @@ export const tableIds = {
 } as const
 
 export const members: Member[] = [
-  { id: 'ibrahim', name: 'Ibrahim Ahmad', rating: 1810, universityId: 'ibrahim_ju' },
-  { id: 'omar', name: 'Omar Saleh', rating: 1740, universityId: 'omar_saleh' },
-  { id: 'leen', name: 'Leen Haddad', rating: 1685, universityId: 'leenh' },
-  { id: 'yazan', name: 'Yazan Khaled', rating: 1602, universityId: 'ykhaled' },
-  { id: 'sara', name: 'Sara Nasser', rating: 1550, universityId: 'sara_n' },
-  { id: 'mohammad', name: 'Mohammad Al-Khatib', rating: 1490, universityId: 'mohammad_ak' },
-  { id: 'rania', name: 'Rania Odeh', rating: 1465, universityId: 'rania_o' },
-  { id: 'khaled', name: 'Khaled Mansour', rating: 1430, universityId: 'kmansour' },
-  { id: 'tala', name: 'Tala Suleiman', rating: 1395, universityId: 'tala_s' },
-  { id: 'hasan', name: 'Hasan Qasem', rating: 1370, universityId: 'hqasem' },
-  { id: 'noor', name: 'Noor Barakat', rating: 1340, universityId: 'noorb' },
-  { id: 'zaid', name: 'Zaid Hamdan', rating: 1310, universityId: 'zhamdan' },
-  { id: 'amr', name: 'Amr Zaidan', rating: 1295, universityId: 'amr_zaidan' },
-  { id: 'lina', name: 'Lina Shami', rating: 1270, universityId: 'lina_shami' },
-  { id: 'fadi', name: 'Fadi Rimawi', rating: 1245, universityId: 'fadi_rimawi' },
-  { id: 'dana', name: 'Dana Aqel', rating: 1220, universityId: 'dana_aqel' },
-  { id: 'nour', name: 'Nour Alami', rating: 1198, universityId: 'nour_alami' },
-  { id: 'tamer', name: 'Tamer Qasem', rating: 1184, universityId: 'tamer_qasem' },
-  { id: 'salma', name: 'Salma Nouri', rating: 1166, universityId: 'salma_nouri' },
-  { id: 'adam', name: 'Adam Kareem', rating: 1148, universityId: 'adam_kareem' },
+  { id: 'ibrahim', name: 'Ibrahim Ahmad', rating: 1810, university: 'University of Jordan' },
+  { id: 'omar', name: 'Omar Saleh', rating: 1740, university: 'University of Jordan' },
+  { id: 'leen', name: 'Leen Haddad', rating: 1685, university: 'University of Jordan' },
+  { id: 'yazan', name: 'Yazan Khaled', rating: 1602, university: 'University of Jordan' },
+  { id: 'sara', name: 'Sara Nasser', rating: 1550, university: 'University of Jordan' },
+  { id: 'mohammad', name: 'Mohammad Al-Khatib', rating: 1490, university: 'University of Jordan' },
+  { id: 'rania', name: 'Rania Odeh', rating: 1465, university: 'University of Jordan' },
+  { id: 'khaled', name: 'Khaled Mansour', rating: 1430, university: 'University of Jordan' },
+  { id: 'tala', name: 'Tala Suleiman', rating: 1395, university: 'University of Jordan' },
+  { id: 'hasan', name: 'Hasan Qasem', rating: 1370, university: 'University of Jordan' },
+  { id: 'noor', name: 'Noor Barakat', rating: 1340, university: 'University of Jordan' },
+  { id: 'zaid', name: 'Zaid Hamdan', rating: 1310, university: 'University of Jordan' },
+  { id: 'amr', name: 'Amr Zaidan', rating: 1295, university: 'University of Jordan' },
+  { id: 'lina', name: 'Lina Shami', rating: 1270, university: 'University of Jordan' },
+  { id: 'fadi', name: 'Fadi Rimawi', rating: 1245, university: 'University of Jordan' },
+  { id: 'dana', name: 'Dana Aqel', rating: 1220, university: 'University of Jordan' },
+  { id: 'nour', name: 'Nour Alami', rating: 1198, university: 'University of Jordan' },
+  { id: 'tamer', name: 'Tamer Qasem', rating: 1184, university: 'University of Jordan' },
+  { id: 'salma', name: 'Salma Nouri', rating: 1166, university: 'University of Jordan' },
+  { id: 'adam', name: 'Adam Kareem', rating: 1148, university: 'University of Jordan' },
 ]
 
 const tournamentFormatOrder = [
@@ -736,9 +735,9 @@ async function loadProfilesForGame(row: AppwriteGameRow) {
       })
       profiles.set(profile.$id, {
         id: profile.$id,
-        name: profile.displayName || profile.email || profile.$id,
+        name: profile.displayName || profile.$id,
         rating: profile.rating ?? 1200,
-        universityId: profile.universityId || profile.email || profile.$id,
+        university: profile.university || '',
       })
     } catch {
       // Missing profile rows should not block opening a saved game.
@@ -758,13 +757,13 @@ function appwriteGameToSampleGame(
     id: row.whiteProfileId,
     name: row.whiteProfileId,
     rating: 1200,
-    universityId: row.whiteProfileId,
+    university: '',
   }
   const black = profiles.get(row.blackProfileId) ?? {
     id: row.blackProfileId,
     name: row.blackProfileId,
     rating: 1200,
-    universityId: row.blackProfileId,
+    university: '',
   }
   const moves = parseStoredMoves(row.pgn)
   const tournamentName = row.tournamentId
@@ -1105,9 +1104,9 @@ function mapProfiles(rows: AppwriteProfileRow[]) {
   rows.forEach((row) => {
     profiles.set(row.$id, {
       id: row.$id,
-      name: row.displayName || row.email || row.$id,
+      name: row.displayName || row.$id,
       rating: row.rating ?? 1200,
-      universityId: row.universityId || row.email || row.$id,
+      university: row.university || '',
     })
   })
   return profiles

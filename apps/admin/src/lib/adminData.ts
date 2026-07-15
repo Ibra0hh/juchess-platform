@@ -727,18 +727,16 @@ export async function loadClubPlayers(): Promise<ClubPlayersResult> {
   if (!appwriteReady) return { players: [] }
 
   try {
-    const response = await tablesDB.listRows<AppwriteProfileRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.profiles,
-      queries: [Query.limit(1000)],
-      total: false,
+    const response = await runAdminAction<{ rows: AppwriteProfileRow[] }>({
+      method: ExecutionMethod.GET,
+      path: '/players',
     })
 
     const players = response.rows
       .filter((row) => row.$id !== SYSTEM_BYE_PROFILE_ID)
       .map((row) => ({
         id: row.$id,
-        name: row.displayName || row.email || row.$id,
+        name: row.displayName || row.$id,
         universityId: row.universityId || '-',
         rating: row.rating ?? 1200,
         email: row.email ?? '',
@@ -1102,8 +1100,8 @@ async function loadPublishedGamesByTournament() {
         board: row.board ?? list.length + 1,
         whiteProfileId: row.whiteProfileId,
         blackProfileId: row.blackProfileId,
-        whiteName: white?.displayName || white?.email || row.whiteProfileId,
-        blackName: black?.displayName || black?.email || row.blackProfileId,
+        whiteName: white?.displayName || row.whiteProfileId,
+        blackName: black?.displayName || row.blackProfileId,
         whiteRating: white?.rating ?? 1200,
         blackRating: black?.rating ?? 1200,
         status: row.status ?? 'scheduled',

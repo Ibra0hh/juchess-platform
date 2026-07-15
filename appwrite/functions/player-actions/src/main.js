@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { Account, Client, Permission, Query, Role, TablesDB } from 'node-appwrite';
+import { Account, Client, ID, Permission, Query, Role, TablesDB } from 'node-appwrite';
 
 // Player-facing writes. Everything a signed-in student is allowed to change
 // about their own registration goes through here, so the client can never pick
@@ -7,12 +7,39 @@ import { Account, Client, Permission, Query, Role, TablesDB } from 'node-appwrit
 
 const tableIds = {
   profiles: 'profiles',
+  profilePrivate: 'profile_private',
   tournaments: 'tournaments',
   registrations: 'registrations',
   checkIns: 'check_ins',
   attendance: 'attendance_confirmations',
   crewApplications: 'crew_applications',
 };
+
+const PROFILE_PUBLIC_FIELDS = [
+  'displayName',
+  'university',
+  'avatarFileId',
+  'coverFileId',
+  'chessComUsername',
+  'lichessUsername',
+  'boardTheme',
+  'pieceTheme',
+  'arrowColor',
+  'markColor',
+];
+const PROFILE_PRIVATE_FIELDS = ['universityId', 'phone'];
+const PROFILE_SERVER_FIELDS = new Set([
+  'accountId',
+  'email',
+  'rating',
+  'role',
+  'status',
+  'profileId',
+  '$id',
+  '$permissions',
+  '$createdAt',
+  '$updatedAt',
+]);
 
 const OPEN_TOURNAMENT_STATUSES = ['upcoming'];
 export const CREW_INTERESTS = [
@@ -55,35 +82,240 @@ function routeSegments(path = '/') {
   return path.split('/').filter(Boolean);
 }
 
-async function requirePlayer(req, tablesDB, databaseId) {
+function cleanObject(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined));
+}
+
+function optionalText(value, { lowercase = false } = {}) {
+  if (value === undefined) return undefined;
+  const normalized = String(value ?? '').trim();
+  if (!normalized) return null;
+  return lowercase ? normalized.toLowerCase() : normalized;
+}
+
+export function normalizeUniversityId(value) {
+  return optionalText(value, { lowercase: true });
+}
+
+export function normalizePhone(value) {
+  if (value === undefined) return undefined;
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+
+  const compact = raw.replace(/[^\d+]/g, '');
+  if (compact.startsWith('+962')) return `+962${compact.slice(4).replace(/\D/g, '')}`;
+  if (compact.startsWith('00962')) return `+962${compact.slice(5).replace(/\D/g, '')}`;
+  if (compact.startsWith('962')) return `+962${compact.slice(3).replace(/\D/g, '')}`;
+
+  const digits = compact.replace(/\D/g, '');
+  if (digits.startsWith('0')) return `+962${digits.slice(1)}`;
+  if (digits.startsWith('7') && digits.length === 9) return `+962${digits}`;
+  return raw;
+}
+
+export function profilePermissions(status, accountId) {
+  const permissions = [];
+  if (status === 'active') permissions.push(Permission.read(Role.any()));
+  if (accountId) permissions.push(Permission.read(Role.user(accountId)));
+  return permissions;
+}
+
+export function normalizeProfileUpdate(body = {}) {
+  const restricted = Object.keys(body).filter((field) => PROFILE_SERVER_FIELDS.has(field));
+  if (restricted.length) {
+    throw new HttpError(400, `These profile fields are managed by JuChess: ${restricted.join(', ')}.`);
+  }
+
+  const publicData = {};
+  for (const field of PROFILE_PUBLIC_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(body, field)) continue;
+    const lowercase = field === 'chessComUsername' || field === 'lichessUsername';
+    publicData[field] = optionalText(body[field], { lowercase });
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'fullName')) {
+    publicData.displayName = optionalText(body.fullName);
+  }
+  if (publicData.displayName === null) throw new HttpError(400, 'Display name is required.');
+
+  const privateData = {};
+  if (Object.prototype.hasOwnProperty.call(body, 'universityId')) {
+    privateData.universityId = normalizeUniversityId(body.universityId);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'phone')) {
+    privateData.phone = normalizePhone(body.phone);
+  }
+
+  const unknown = Object.keys(body).filter((field) => (
+    field !== 'fullName'
+    && !PROFILE_PUBLIC_FIELDS.includes(field)
+    && !PROFILE_PRIVATE_FIELDS.includes(field)
+  ));
+  if (unknown.length) throw new HttpError(400, `Unsupported profile fields: ${unknown.join(', ')}.`);
+
+  return { publicData, privateData };
+}
+
+export function buildPrivateProfileData(profileId, user, existing = null, updates = {}) {
+  return {
+    profileId,
+    accountId: user.$id,
+    email: String(user.email ?? '').trim().toLowerCase(),
+    universityId: Object.prototype.hasOwnProperty.call(updates, 'universityId')
+      ? updates.universityId
+      : existing?.universityId ?? null,
+    phone: Object.prototype.hasOwnProperty.call(updates, 'phone')
+      ? updates.phone
+      : existing?.phone ?? null,
+  };
+}
+
+export function mergeOwnerProfile(profile, identity, user = null) {
+  if (!profile) return null;
+  const privateIdentity = identity ?? {};
+  const hasPrivateIdentity = Boolean(identity);
+  return cleanObject({
+    $id: profile.$id,
+    $createdAt: profile.$createdAt,
+    $updatedAt: profile.$updatedAt,
+    displayName: profile.displayName,
+    university: profile.university,
+    rating: profile.rating,
+    role: profile.role,
+    status: profile.status,
+    avatarFileId: profile.avatarFileId,
+    coverFileId: profile.coverFileId,
+    chessComUsername: profile.chessComUsername,
+    lichessUsername: profile.lichessUsername,
+    boardTheme: profile.boardTheme,
+    pieceTheme: profile.pieceTheme,
+    arrowColor: profile.arrowColor,
+    markColor: profile.markColor,
+    accountId: user?.$id ?? privateIdentity.accountId ?? profile.accountId,
+    email: String(user?.email ?? privateIdentity.email ?? profile.email ?? '').trim().toLowerCase() || undefined,
+    universityId: hasPrivateIdentity ? privateIdentity.universityId : profile.universityId,
+    phone: hasPrivateIdentity ? privateIdentity.phone : profile.phone,
+  });
+}
+
+async function requireAccount(req, authMessage = 'Sign in to manage your JuChess profile.') {
   const jwt = req.headers['juchess-player-jwt'] || req.headers['x-appwrite-user-jwt'];
-  if (!jwt) throw new HttpError(401, 'Sign in to manage your registration.');
+  if (!jwt) throw new HttpError(401, authMessage);
 
   const userClient = new Client()
     .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
     .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
     .setJWT(jwt);
 
-  let accountId;
   try {
-    const user = await new Account(userClient).get();
-    accountId = user.$id;
+    return await new Account(userClient).get();
   } catch {
-    throw new HttpError(401, 'Sign in to manage your registration.');
+    throw new HttpError(401, authMessage);
+  }
+}
+
+async function loadProfileContext(tablesDB, databaseId, accountId) {
+  // The caught public-table lookup is temporary migration compatibility. Once
+  // every account has a private identity row, profiles never need accountId.
+  try {
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.profilePrivate,
+      queries: [Query.equal('accountId', accountId), Query.limit(1)],
+      total: false,
+    });
+    const identity = response.rows[0] ?? null;
+    if (identity) {
+      const profile = await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.profiles,
+        rowId: identity.$id,
+      }).catch(() => null);
+      return { profile, identity };
+    }
+  } catch {
+    // profile_private may not exist during an additive deployment.
   }
 
-  const response = await tablesDB.listRows({
-    databaseId,
-    tableId: tableIds.profiles,
-    queries: [Query.equal('accountId', accountId), Query.limit(1)],
-    total: false,
-  });
+  try {
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.profiles,
+      queries: [Query.equal('accountId', accountId), Query.limit(1)],
+      total: false,
+    });
+    const profile = response.rows[0] ?? null;
+    return { profile, identity: profile ? {
+      $id: profile.$id,
+      accountId: profile.accountId,
+      email: profile.email,
+      universityId: profile.universityId,
+      phone: profile.phone,
+    } : null };
+  } catch {
+    return { profile: null, identity: null };
+  }
+}
 
-  const profile = response.rows[0];
+async function requirePlayer(req, tablesDB, databaseId) {
+  const user = await requireAccount(req, 'Sign in to manage your registration.');
+  const { profile } = await loadProfileContext(tablesDB, databaseId, user.$id);
+
   if (!profile) throw new HttpError(403, 'No club profile exists for this account.');
   if (profile.status === 'suspended') throw new HttpError(403, 'This account is blocked by club administration.');
 
-  return { accountId, profile };
+  return { accountId: user.$id, profile };
+}
+
+async function saveOwnerProfile(tablesDB, databaseId, user, body) {
+  const { publicData, privateData } = normalizeProfileUpdate(body);
+  const context = await loadProfileContext(tablesDB, databaseId, user.$id);
+  const profileId = context.profile?.$id ?? context.identity?.$id ?? ID.unique();
+  const status = context.profile?.status ?? 'pending';
+  const transaction = await tablesDB.createTransaction({ ttl: 60 });
+
+  try {
+    const profile = context.profile
+      ? await tablesDB.updateRow({
+          databaseId,
+          tableId: tableIds.profiles,
+          rowId: profileId,
+          data: publicData,
+          permissions: profilePermissions(status, user.$id),
+          transactionId: transaction.$id,
+        })
+      : await tablesDB.createRow({
+          databaseId,
+          tableId: tableIds.profiles,
+          rowId: profileId,
+          data: {
+            displayName: publicData.displayName || String(user.name || user.email).trim(),
+            ...publicData,
+            rating: 1200,
+            role: 'member',
+            status: 'pending',
+          },
+          permissions: profilePermissions('pending', user.$id),
+          transactionId: transaction.$id,
+        });
+
+    const identity = await tablesDB.upsertRow({
+      databaseId,
+      tableId: tableIds.profilePrivate,
+      rowId: profileId,
+      data: buildPrivateProfileData(profileId, user, context.identity, privateData),
+      permissions: [Permission.read(Role.user(user.$id))],
+      transactionId: transaction.$id,
+    });
+
+    await tablesDB.updateTransaction({ transactionId: transaction.$id, commit: true });
+    return mergeOwnerProfile(profile, identity, user);
+  } catch (cause) {
+    await tablesDB.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => {});
+    if (isConflict(cause)) {
+      throw new HttpError(409, 'That University ID, phone number, or account is already registered.');
+    }
+    throw cause;
+  }
 }
 
 async function findRegistration(tablesDB, databaseId, tournamentId, profileId) {
@@ -247,6 +479,8 @@ export default async ({ req, res, log, error }) => {
       ok: true,
       service: 'juchess-player-actions',
       routes: [
+        'GET /profile',
+        'POST /profile',
         'POST /registrations',
         'POST /registrations/:id/cancel',
         'POST /registrations/:id/attendance',
@@ -258,6 +492,18 @@ export default async ({ req, res, log, error }) => {
   }
 
   try {
+    if (segments[0] === 'profile' && segments.length === 1 && ['GET', 'POST'].includes(method)) {
+      const user = await requireAccount(req);
+      if (method === 'GET') {
+        const { profile, identity } = await loadProfileContext(tablesDB, databaseId, user.$id);
+        if (!profile) return res.json({ ok: false, error: 'No club profile exists for this account.' }, 404);
+        return res.json({ ok: true, row: mergeOwnerProfile(profile, identity, user) });
+      }
+
+      const row = await saveOwnerProfile(tablesDB, databaseId, user, body);
+      return res.json({ ok: true, row });
+    }
+
     const { accountId, profile } = await requirePlayer(req, tablesDB, databaseId);
 
     if (segments[0] === 'recruitment' && segments[1] === 'application' && segments.length === 2) {

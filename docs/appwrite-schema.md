@@ -51,14 +51,12 @@ Permissions:
 
 ### `profiles`
 
-Member profile connected to Appwrite Auth user.
+Public member directory profile. It deliberately contains no Auth account ID,
+email address, University ID, or phone number.
 
 Fields:
-- `accountId` string, required, unique.
 - `displayName` string, required.
-- `universityId` string, optional, unique when present.
-- `email` email, required.
-- `phone` string, optional, unique when present. Stored in normalized `+962...` format for Jordan numbers.
+- `university` string, optional public university label.
 - `rating` integer, default `1200`.
 - `role` enum: `member`, `organizer`, `admin`.
 - `status` enum: `pending`, `active`, `suspended`.
@@ -68,9 +66,40 @@ Fields:
 - `lichessUsername` string, optional, unique. Saved after a successful Lichess import.
 
 Permissions:
-- Owner can read/update limited profile fields.
-- Members can read public profile fields.
-- Admin Function handles role/status changes.
+- The table grants read access only to `admin_super_admins` and `admin_staff`.
+- Individual public rows may grant `read("any")`; owner-specific row reads are
+  preserved when present.
+- Clients have no create, update, or delete permission. All profile writes go
+  through trusted server Functions, including owner-editable public fields.
+
+### `profile_private`
+
+Private identity and contact data paired one-to-one with `profiles`. Its row ID
+is exactly the corresponding public profile row ID.
+
+Fields:
+- `profileId` string, required, unique. Matches both row IDs.
+- `accountId` string, required, unique. Appwrite Auth user ID.
+- `email` email, required, unique.
+- `universityId` string, optional, unique when present.
+- `phone` string, optional, unique when present. Stored in normalized `+962...`
+  format for Jordan numbers.
+
+Permissions:
+- The table has no permissions and has row security enabled.
+- Each row grants only `read` to its owning Appwrite user.
+- Clients cannot create, update, or delete private rows. Trusted server
+  Functions own all writes; admin access is mediated by those Functions.
+
+Migration:
+- `npm run migrate:profile-privacy` creates and verifies the private table,
+  backfills current rows, and leaves the old public columns in place for a
+  controlled deployment window.
+- After every client and Function uses `profile_private`, run
+  `npm run migrate:profile-privacy -- -FinalizePublicFields`. Finalization
+  re-verifies the private copies, removes all client write permissions from
+  public profiles, scrubs the old values, removes their indexes and columns,
+  and performs an anonymous response-shape check.
 
 ### `tournaments`
 

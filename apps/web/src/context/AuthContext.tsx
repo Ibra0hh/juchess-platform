@@ -11,7 +11,6 @@ import {
   completeOAuthTokenSession,
   formatAppwriteError,
   getCurrentSession,
-  loadPreviewProfileByEmail,
   deleteProfileMedia,
   saveBoardAppearance,
   saveExternalGameUsername,
@@ -43,9 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (previewSession) {
-      const nextSession = await loadAppwritePreviewSession(previewSession)
-      setUser(nextSession.user)
-      setProfile(nextSession.profile)
+      setUser(previewSession.user)
+      setProfile(previewSession.profile)
       setLoading(false)
       setError(null)
       return
@@ -142,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const updated = await saveExternalGameUsername(profile.$id, source, normalized)
+    const updated = await saveExternalGameUsername(source, normalized)
     setProfile(updated)
   }, [previewSession, profile])
 
@@ -154,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const updated = await saveBoardAppearance(profile.$id, preferences)
+    const updated = await saveBoardAppearance(preferences)
     setProfile(updated)
   }, [previewSession, profile])
 
@@ -172,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const updated = await saveProfileDetails(profile.$id, input)
+    const updated = await saveProfileDetails(input)
     setProfile(updated)
   }, [previewSession, profile])
 
@@ -253,25 +251,6 @@ function createPreviewSession(email: string, displayName = displayNameFromEmail(
   } as unknown as AuthProfile
 
   return { user, profile }
-}
-
-async function loadAppwritePreviewSession(fallbackSession: PreviewAuthSession): Promise<PreviewAuthSession> {
-  try {
-    const realProfile = await loadPreviewProfileByEmail(fallbackSession.user.email)
-    if (!realProfile) return fallbackSession
-
-    const user = {
-      ...fallbackSession.user,
-      $id: realProfile.accountId,
-      email: realProfile.email,
-      name: realProfile.displayName,
-    } as unknown as Models.User
-
-    return { user, profile: realProfile }
-  } catch (error) {
-    console.warn('JuChess preview profile could not be loaded from the cloud.', error)
-    return fallbackSession
-  }
 }
 
 function displayNameFromEmail(email: string) {

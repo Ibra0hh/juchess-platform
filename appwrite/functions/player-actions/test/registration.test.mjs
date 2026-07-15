@@ -3,9 +3,106 @@ import test from 'node:test';
 import {
   attendanceRowId,
   attendanceWindowState,
+  buildPrivateProfileData,
+  mergeOwnerProfile,
+  normalizePhone,
+  normalizeProfileUpdate,
+  normalizeUniversityId,
+  profilePermissions,
   registrationRowId,
   selectCanonicalRegistration,
 } from '../src/main.js';
+
+test('profile updates separate editable public and private fields', () => {
+  assert.deepEqual(normalizeProfileUpdate({
+    displayName: '  Student Knight  ',
+    university: '  University of Jordan  ',
+    universityId: '  0201234  ',
+    phone: '079 123 4567',
+    chessComUsername: '  JuKnight  ',
+  }), {
+    publicData: {
+      displayName: 'Student Knight',
+      university: 'University of Jordan',
+      chessComUsername: 'juknight',
+    },
+    privateData: {
+      universityId: '0201234',
+      phone: '+962791234567',
+    },
+  });
+  assert.equal(normalizeUniversityId('  JU-AbC  '), 'ju-abc');
+  assert.equal(normalizePhone('00962 79 123 4567'), '+962791234567');
+});
+
+test('private profile writes always bind the required matching profile ID', () => {
+  assert.deepEqual(buildPrivateProfileData(
+    'profile-1',
+    { $id: 'account-1', email: ' Owner@Example.com ' },
+    { universityId: 'old-id', phone: '+962790000000' },
+    { universityId: 'new-id' },
+  ), {
+    profileId: 'profile-1',
+    accountId: 'account-1',
+    email: 'owner@example.com',
+    universityId: 'new-id',
+    phone: '+962790000000',
+  });
+});
+
+test('profile updates reject every server-owned identity and moderation field', () => {
+  for (const field of ['accountId', 'email', 'rating', 'role', 'status', 'profileId', '$id']) {
+    assert.throws(
+      () => normalizeProfileUpdate({ [field]: 'attacker-controlled' }),
+      (error) => error.statusCode === 400 && /managed by JuChess/.test(error.message),
+      field,
+    );
+  }
+  assert.throws(
+    () => normalizeProfileUpdate({ surprise: true }),
+    (error) => error.statusCode === 400 && /unsupported profile fields/i.test(error.message),
+  );
+});
+
+test('owner profile DTO exposes private identity only from the private join', () => {
+  const row = mergeOwnerProfile({
+    $id: 'profile-1',
+    displayName: 'Public Name',
+    status: 'pending',
+    accountId: 'legacy-account',
+    email: 'legacy@example.com',
+    universityId: 'legacy-id',
+  }, {
+    accountId: 'private-account',
+    email: 'Private@Example.com',
+    universityId: 'private-id',
+    phone: '+962790000000',
+  });
+
+  assert.equal(row.accountId, 'private-account');
+  assert.equal(row.email, 'private@example.com');
+  assert.equal(row.universityId, 'private-id');
+  assert.equal(row.phone, '+962790000000');
+  assert.equal(row.displayName, 'Public Name');
+
+  const cleared = mergeOwnerProfile({
+    $id: 'profile-1',
+    universityId: 'legacy-id',
+    phone: 'legacy-phone',
+  }, { accountId: 'private-account', universityId: null, phone: null });
+  assert.equal(cleared.universityId, null);
+  assert.equal(cleared.phone, null);
+});
+
+test('public profile permissions never grant client update access', () => {
+  assert.deepEqual(profilePermissions('active', 'account-1'), [
+    'read("any")',
+    'read("user:account-1")',
+  ]);
+  assert.deepEqual(profilePermissions('pending', 'account-1'), ['read("user:account-1")']);
+  assert.deepEqual(profilePermissions('suspended', 'account-1'), ['read("user:account-1")']);
+  assert.equal(profilePermissions('pending', 'account-1').some((value) => value.startsWith('update(')), false);
+});
 
 test('registration row IDs are deterministic and Appwrite-safe', () => {
   const first = registrationRowId('tournament-1', 'profile-1');

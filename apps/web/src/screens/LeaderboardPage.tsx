@@ -5,14 +5,14 @@ import {
   formatAppwriteError,
   loadClubLeaderboard,
   profileMediaUrl,
-  type AuthProfile,
+  type PublicProfile,
 } from '../lib/auth'
 import './ClubScreens.css'
 
 const podiumOrder = [1, 0, 2] as const
 
 function LeaderboardPage() {
-  const [players, setPlayers] = useState<AuthProfile[]>([])
+  const [players, setPlayers] = useState<PublicProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -73,7 +73,7 @@ function LeaderboardPage() {
                       {avatarUrl ? <img src={avatarUrl} alt="" /> : initialsFor(player.displayName)}
                     </div>
                     <h2>{player.displayName}</h2>
-                    <p>{player.universityId || player.email}</p>
+                    <p>{player.university || 'University not listed'}</p>
                     <strong>{player.rating ?? 0}</strong>
                     <span>{rankLabel(rank)}</span>
                   </article>
@@ -87,7 +87,7 @@ function LeaderboardPage() {
                   <tr>
                     <th>#</th>
                     <th>Player</th>
-                    <th>Member ID</th>
+                    <th>University</th>
                     <th>Rating</th>
                   </tr>
                 </thead>
@@ -96,7 +96,7 @@ function LeaderboardPage() {
                     <tr className={index === 0 ? 'leader-row' : undefined} key={player.$id}>
                       <td>{index + 1}</td>
                       <td>{player.displayName}</td>
-                      <td>{player.universityId || player.email}</td>
+                      <td>{player.university || 'University not listed'}</td>
                       <td>{player.rating ?? 0}</td>
                     </tr>
                   ))}

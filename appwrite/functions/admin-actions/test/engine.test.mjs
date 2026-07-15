@@ -75,8 +75,8 @@ const SDK_STUB = `
 const stub = () => { throw new Error('appwrite SDK called in a pure-logic test') };
 const Account = stub, Client = stub, Messaging = stub, TablesDB = stub, Teams = stub, Users = stub;
 const ID = { unique: () => 'stub' };
-const Permission = { read: () => 'stub' };
-const Role = { any: () => 'stub', user: () => 'stub' };
+const Permission = { read: (role) => \`read(\"\${role}\")\` };
+const Role = { any: () => 'any', user: (accountId) => \`user:\${accountId}\` };
 const Query = { cursorAfter: () => 'query', equal: () => 'query', limit: () => 'query', notEqual: () => 'query', or: () => 'query' };
 `
 
@@ -194,17 +194,22 @@ test('tournament deletion removes every dependent row across repeated batches', 
 
 test('player deletion protects tournament history and admin accounts', () => {
   const players = [
-    { $id: 'p1', accountId: 'user-1', displayName: 'Player One' },
-    { $id: 'p2', accountId: 'user-2', displayName: 'Player Two' },
+    { $id: 'p1', displayName: 'Player One' },
+    { $id: 'p2', displayName: 'Player Two' },
+  ]
+  const privatePlayers = [
+    { $id: 'p1', accountId: 'user-1', email: 'one@example.com' },
+    { $id: 'p2', accountId: 'user-2', email: 'two@example.com' },
   ]
 
-  assert.equal(engine.assertPlayersCanBeDeleted(['p1'], players, [], []), undefined)
+  assert.equal(engine.assertPlayersCanBeDeleted(['p1'], players, [], [], privatePlayers), undefined)
   assert.throws(
     () => engine.assertPlayersCanBeDeleted(
       ['p1'],
       players,
       [{ $id: 'game-1', whiteProfileId: 'p1', blackProfileId: 'p2' }],
       [],
+      privatePlayers,
     ),
     (error) => error.statusCode === 409 && /game history/i.test(error.message),
   )
@@ -214,6 +219,7 @@ test('player deletion protects tournament history and admin accounts', () => {
       players,
       [],
       [{ $id: 'admin-1', accountId: 'user-2' }],
+      privatePlayers,
     ),
     (error) => error.statusCode === 409 && /admin access/i.test(error.message),
   )
@@ -953,6 +959,44 @@ test('hosted schedules refresh on activation, time edits, and legacy future star
     [{ status: 'scheduled', scheduledStartAt: '2026-07-12T10:00:20.000Z' }],
     now,
   ), false)
+})
+
+test('admin profile DTO joins private identity without retaining legacy public PII', () => {
+  const row = engine.mergeAdminProfile({
+    $id: 'p1',
+    displayName: 'Player One',
+    status: 'active',
+    accountId: 'legacy-user',
+    email: 'legacy@example.com',
+    universityId: 'legacy-id',
+    phone: 'legacy-phone',
+  }, {
+    $id: 'p1',
+    accountId: 'private-user',
+    email: 'private@example.com',
+    universityId: 'private-id',
+    phone: '+962790000000',
+  })
+
+  assert.deepEqual(row, {
+    $id: 'p1',
+    displayName: 'Player One',
+    status: 'active',
+    accountId: 'private-user',
+    email: 'private@example.com',
+    universityId: 'private-id',
+    phone: '+962790000000',
+  })
+})
+
+test('profile status permissions expose only active rows publicly and never allow owner updates', () => {
+  assert.deepEqual(engine.publicProfilePermissions('active', 'user-1'), [
+    'read("any")',
+    'read("user:user-1")',
+  ])
+  assert.deepEqual(engine.publicProfilePermissions('pending', 'user-1'), ['read("user:user-1")'])
+  assert.deepEqual(engine.publicProfilePermissions('suspended', 'user-1'), ['read("user:user-1")'])
+  assert.equal(engine.publicProfilePermissions('active', 'user-1').some((value) => value.startsWith('update(')), false)
 })
 
 test('scheduled hosted clocks repair legacy zero values without overwriting positive time', () => {

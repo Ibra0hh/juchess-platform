@@ -5,6 +5,7 @@ import { Chess } from 'chess.js';
 const tableIds = {
   adminProfiles: 'admin_profiles',
   profiles: 'profiles',
+  profilePrivate: 'profile_private',
   tournaments: 'tournaments',
   registrations: 'registrations',
   checkIns: 'check_ins',
@@ -236,6 +237,77 @@ function normalizeIdentityValue(type, value) {
   return String(value ?? '').trim();
 }
 
+function legacyIdentityForProfile(profile) {
+  if (!profile) return null;
+  if (!profile.accountId && !profile.email && !profile.universityId && !profile.phone) return null;
+  return cleanObject({
+    $id: profile.$id,
+    accountId: profile.accountId,
+    email: profile.email,
+    universityId: profile.universityId,
+    phone: profile.phone,
+    $legacy: true,
+  });
+}
+
+export function mergeAdminProfile(profile, privateIdentity = null) {
+  const {
+    accountId: legacyAccountId,
+    email: legacyEmail,
+    universityId: legacyUniversityId,
+    phone: legacyPhone,
+    ...publicProfile
+  } = profile;
+  const identity = privateIdentity ?? {
+    accountId: legacyAccountId,
+    email: legacyEmail,
+    universityId: legacyUniversityId,
+    phone: legacyPhone,
+  };
+  return cleanObject({
+    ...publicProfile,
+    accountId: identity.accountId,
+    email: identity.email,
+    universityId: identity.universityId,
+    phone: identity.phone,
+  });
+}
+
+export function publicProfilePermissions(status, accountId) {
+  const permissions = [];
+  if (status === 'active') permissions.push(Permission.read(Role.any()));
+  if (accountId) permissions.push(Permission.read(Role.user(accountId)));
+  return permissions;
+}
+
+async function loadPrivateIdentityForProfile(tablesDB, databaseId, profile) {
+  if (!profile) return null;
+  try {
+    return await tablesDB.getRow({
+      databaseId,
+      tableId: tableIds.profilePrivate,
+      rowId: profile.$id,
+    });
+  } catch {
+    // Temporary additive-deployment fallback until every legacy row is moved.
+    return legacyIdentityForProfile(profile);
+  }
+}
+
+async function joinProfilesWithPrivate(tablesDB, databaseId, profiles) {
+  let privateRows = [];
+  try {
+    privateRows = await listAllRows(tablesDB, databaseId, tableIds.profilePrivate);
+  } catch {
+    // profile_private can be absent during the additive deployment window.
+  }
+  const byProfileId = new Map(privateRows.map((row) => [row.$id, row]));
+  return profiles.map((profile) => mergeAdminProfile(
+    profile,
+    byProfileId.get(profile.$id) ?? legacyIdentityForProfile(profile),
+  ));
+}
+
 function actorProfileId(req, body, actor) {
   return body.actorProfileId || actor?.$id || req.headers['x-appwrite-user-id'] || 'system';
 }
@@ -273,7 +345,8 @@ async function ensureAttendanceConfirmation(tablesDB, databaseId, registration, 
       tableId: tableIds.profiles,
       rowId: registration.profileId,
     });
-  if (!profile.accountId) return null;
+  const identity = await loadPrivateIdentityForProfile(tablesDB, databaseId, profile);
+  if (!identity?.accountId) return null;
   const now = new Date().toISOString();
 
   try {
@@ -285,7 +358,7 @@ async function ensureAttendanceConfirmation(tablesDB, databaseId, registration, 
         tournamentId: registration.tournamentId,
         profileId: registration.profileId,
         registrationId: registration.$id,
-        accountId: profile.accountId,
+        accountId: identity.accountId,
         status: 'pending',
         tokenNonce: randomBytes(16).toString('hex'),
         reminderEmailStatus: 'pending',
@@ -293,7 +366,7 @@ async function ensureAttendanceConfirmation(tablesDB, databaseId, registration, 
         createdAt: now,
         updatedAt: now,
       },
-      permissions: [Permission.read(Role.user(profile.accountId))],
+      permissions: [Permission.read(Role.user(identity.accountId))],
     });
   } catch (cause) {
     if (!isConflict(cause)) throw cause;
@@ -753,9 +826,7 @@ async function ensureSystemByeProfile(tablesDB, databaseId) {
       tableId: tableIds.profiles,
       rowId: SYSTEM_BYE_PROFILE_ID,
       data: {
-        accountId: SYSTEM_BYE_PROFILE_ID,
         displayName: 'Bye',
-        email: 'bye@juchess.internal',
         rating: 0,
         role: 'member',
         status: 'active',
@@ -1619,7 +1690,7 @@ async function loadProfileNames(tablesDB, databaseId, profileIds) {
   for (const profileId of unique) {
     try {
       const row = await tablesDB.getRow({ databaseId, tableId: tableIds.profiles, rowId: profileId });
-      names.set(profileId, row.displayName || row.email || profileId);
+      names.set(profileId, row.displayName || profileId);
     } catch {
       names.set(profileId, profileId);
     }
@@ -2073,7 +2144,7 @@ async function listAllRows(tablesDB, databaseId, tableId) {
   }
 }
 
-function assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles) {
+function assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles, privateProfiles = []) {
   if (profileIds.includes(SYSTEM_BYE_PROFILE_ID)) {
     throw new HttpError(409, 'The system bye profile cannot be deleted.');
   }
@@ -2083,9 +2154,13 @@ function assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles) {
   if (missingId) throw new HttpError(404, `Player ${missingId} was not found.`);
 
   const adminAccountIds = new Set(adminProfiles.map((profile) => profile.accountId).filter(Boolean));
-  const protectedProfile = profiles.find((profile) => profile.accountId && adminAccountIds.has(profile.accountId));
+  const privateById = new Map(privateProfiles.map((profile) => [profile.$id, profile]));
+  const protectedProfile = profiles.find((profile) => {
+    const identity = privateById.get(profile.$id) ?? legacyIdentityForProfile(profile);
+    return identity?.accountId && adminAccountIds.has(identity.accountId);
+  });
   if (protectedProfile) {
-    throw new HttpError(409, `${protectedProfile.displayName || protectedProfile.email || 'This player'} has admin access. Remove that access before deleting the player.`);
+    throw new HttpError(409, `${protectedProfile.displayName || 'This player'} has admin access. Remove that access before deleting the player.`);
   }
 
   const profileIdSet = new Set(profileIds);
@@ -2097,7 +2172,7 @@ function assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles) {
       ? referencedGame.whiteProfileId
       : referencedGame.blackProfileId;
     const profile = profileById.get(profileId);
-    throw new HttpError(409, `${profile?.displayName || profile?.email || 'This player'} has tournament game history and cannot be deleted. Suspend the player instead.`);
+    throw new HttpError(409, `${profile?.displayName || 'This player'} has tournament game history and cannot be deleted. Suspend the player instead.`);
   }
 }
 
@@ -2932,7 +3007,10 @@ async function sendPlayerGameMessage(tablesDB, databaseId, gameId, body, profile
   const participantProfiles = await Promise.all([game.whiteProfileId, game.blackProfileId].map((profileId) => (
     tablesDB.getRow({ databaseId, tableId: tableIds.profiles, rowId: profileId })
   )));
-  const accountIds = [...new Set(participantProfiles.map((item) => item.accountId).filter(Boolean))];
+  const participantIdentities = await Promise.all(participantProfiles.map((item) => (
+    loadPrivateIdentityForProfile(tablesDB, databaseId, item)
+  )));
+  const accountIds = [...new Set(participantIdentities.map((item) => item?.accountId).filter(Boolean))];
   if (accountIds.length !== 2) throw new HttpError(409, 'Both player accounts must be available before chat can start.');
 
   return await tablesDB.createRow({
@@ -3140,11 +3218,18 @@ async function writeAudit(tablesDB, databaseId, { actorProfileId, action, target
 
 async function setProfileStatus(tablesDB, databaseId, profileId, status) {
   if (!profileId) return;
-  await tablesDB.updateRow({
+  const profile = await tablesDB.getRow({
+    databaseId,
+    tableId: tableIds.profiles,
+    rowId: profileId,
+  });
+  const identity = await loadPrivateIdentityForProfile(tablesDB, databaseId, profile);
+  return await tablesDB.updateRow({
     databaseId,
     tableId: tableIds.profiles,
     rowId: profileId,
     data: { status },
+    permissions: publicProfilePermissions(status, identity?.accountId),
   });
 }
 
@@ -3209,13 +3294,37 @@ async function getAuthenticatedAccountId(req, authMessage = 'Admin session is re
 
 async function requirePlayerActor(req, tablesDB, databaseId) {
   const accountId = await getAuthenticatedAccountId(req, 'Sign in to play this tournament game.');
-  const response = await tablesDB.listRows({
-    databaseId,
-    tableId: tableIds.profiles,
-    queries: [Query.equal('accountId', accountId), Query.limit(1)],
-    total: false,
-  });
-  const profile = response.rows[0];
+  let profile = null;
+  try {
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.profilePrivate,
+      queries: [Query.equal('accountId', accountId), Query.limit(1)],
+      total: false,
+    });
+    if (response.rows[0]) {
+      profile = await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.profiles,
+        rowId: response.rows[0].$id,
+      }).catch(() => null);
+    }
+  } catch {
+    // Temporary fallback for executions during the additive migration.
+  }
+  if (!profile) {
+    try {
+      const legacy = await tablesDB.listRows({
+        databaseId,
+        tableId: tableIds.profiles,
+        queries: [Query.equal('accountId', accountId), Query.limit(1)],
+        total: false,
+      });
+      profile = legacy.rows[0] ?? null;
+    } catch {
+      profile = null;
+    }
+  }
   if (!profile) throw new HttpError(403, 'No JuChess player profile exists for this account.');
   if (profile.status === 'suspended') throw new HttpError(403, 'This player account is suspended.');
   return profile;
@@ -3311,6 +3420,7 @@ export default async ({ req, res, log, error }) => {
         'POST /player/games/:id/messages/list',
         'POST /player/games/:id/messages/send',
         'POST /player/games/:id/fair-play',
+        'GET /players',
         'POST /profiles/lookup',
         'DELETE /players',
         'GET /admin/session',
@@ -3502,8 +3612,11 @@ export default async ({ req, res, log, error }) => {
         listAllRows(tablesDB, databaseId, tableIds.standings),
         listAllRows(tablesDB, databaseId, tableIds.adminProfiles),
       ]);
+      const privateProfiles = await Promise.all(profiles.map((profile) => (
+        loadPrivateIdentityForProfile(tablesDB, databaseId, profile)
+      )));
 
-      assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles);
+      assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles, privateProfiles.filter(Boolean));
 
       const profileIdSet = new Set(profileIds);
       const deletedRows = {
@@ -3513,14 +3626,23 @@ export default async ({ req, res, log, error }) => {
         standings: await deleteProfileRows(tablesDB, databaseId, tableIds.standings, standings, profileIdSet),
       };
 
+      for (const identity of privateProfiles) {
+        if (!identity?.$id) continue;
+        try {
+          await tablesDB.deleteRow({ databaseId, tableId: tableIds.profilePrivate, rowId: identity.$id });
+        } catch (cause) {
+          if (Number(cause?.code) !== 404) throw cause;
+        }
+      }
+
       for (const profile of profiles) {
         await tablesDB.deleteRow({ databaseId, tableId: tableIds.profiles, rowId: profile.$id });
       }
 
-      for (const profile of profiles) {
-        if (!profile.accountId) continue;
+      for (const identity of privateProfiles) {
+        if (!identity?.accountId) continue;
         try {
-          await users.delete({ userId: profile.accountId });
+          await users.delete({ userId: identity.accountId });
         } catch (cause) {
           if (Number(cause?.code) !== 404) throw cause;
         }
@@ -3528,7 +3650,7 @@ export default async ({ req, res, log, error }) => {
 
       const deleted = profiles.map((profile) => ({
         profileId: profile.$id,
-        name: profile.displayName || profile.email || profile.$id,
+        name: profile.displayName || profile.$id,
       }));
 
       await writeAudit(tablesDB, databaseId, {
@@ -3544,6 +3666,12 @@ export default async ({ req, res, log, error }) => {
 
     if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'session') {
       return res.json({ ok: true, allowed: true, profile: actor });
+    }
+
+    if (method === 'GET' && segments[0] === 'players' && segments.length === 1) {
+      const profiles = await listAllRows(tablesDB, databaseId, tableIds.profiles);
+      const rows = await joinProfilesWithPrivate(tablesDB, databaseId, profiles);
+      return res.json({ ok: true, rows });
     }
 
     if (method === 'POST' && segments[0] === 'profiles' && segments[1] === 'lookup') {
@@ -3562,10 +3690,9 @@ export default async ({ req, res, log, error }) => {
         total: false,
       });
 
-      return res.json({
-        ok: true,
-        rows: response.rows.filter((row) => ids.includes(row.$id)),
-      });
+      const profiles = response.rows.filter((row) => ids.includes(row.$id));
+      const rows = await joinProfilesWithPrivate(tablesDB, databaseId, profiles);
+      return res.json({ ok: true, rows });
     }
 
     if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'admins' && segments.length === 2) {
@@ -4149,6 +4276,7 @@ export default async ({ req, res, log, error }) => {
       if (profile.status !== 'active') {
         throw new HttpError(409, 'Only active club players can be added to a tournament.');
       }
+      const identity = await loadPrivateIdentityForProfile(tablesDB, databaseId, profile);
 
       const existing = assertParticipantCanBeAdded(tournament, games, registrations, profile.$id);
       const nextSeed = Math.max(0, ...registrations.map((row) => Number(row.seed) || 0)) + 1;
@@ -4165,7 +4293,7 @@ export default async ({ req, res, log, error }) => {
             tableId: tableIds.registrations,
             rowId: ID.unique(),
             data: { tournamentId, profileId: profile.$id, ...data },
-            permissions: profile.accountId ? [Permission.read(Role.user(profile.accountId))] : [],
+            permissions: identity?.accountId ? [Permission.read(Role.user(identity.accountId))] : [],
           });
       const attendance = await ensureAttendanceConfirmation(tablesDB, databaseId, row, profile);
       await deleteLegacyCheckIn(tablesDB, databaseId, row);
@@ -4360,11 +4488,18 @@ export default async ({ req, res, log, error }) => {
         return badRequest(res, 'Missing profile role.', { missing });
       }
 
+      const profile = await tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.profiles,
+        rowId: segments[1],
+      });
+      const identity = await loadPrivateIdentityForProfile(tablesDB, databaseId, profile);
       const row = await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.profiles,
         rowId: segments[1],
         data: { role: body.role },
+        permissions: publicProfilePermissions(profile.status, identity?.accountId),
       });
 
       return res.json({ ok: true, action: 'updateProfileRole', row });
@@ -4376,12 +4511,7 @@ export default async ({ req, res, log, error }) => {
         return badRequest(res, 'Missing profile status.', { missing });
       }
 
-      const row = await tablesDB.updateRow({
-        databaseId,
-        tableId: tableIds.profiles,
-        rowId: segments[1],
-        data: { status: body.status },
-      });
+      const row = await setProfileStatus(tablesDB, databaseId, segments[1], body.status);
 
       return res.json({ ok: true, action: 'updateProfileStatus', row });
     }

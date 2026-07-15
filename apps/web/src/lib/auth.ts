@@ -26,6 +26,17 @@ export type AuthProfile = Models.Row & {
   markColor?: string
 }
 
+export type PublicProfile = Models.Row & {
+  displayName: string
+  university?: string | null
+  rating?: number
+  status?: ProfileStatus
+  avatarFileId?: string
+  coverFileId?: string
+  chessComUsername?: string | null
+  lichessUsername?: string | null
+}
+
 export type ProfileUpdateInput = {
   displayName: string
   university?: string
@@ -233,45 +244,10 @@ export async function completeEmailVerification(userId: string, secret: string) 
   })
 }
 
-export async function loadProfile(accountId: string): Promise<AuthProfile | null> {
-  if (!appwriteReady) return null
-
-  const response = await tablesDB.listRows<AuthProfile>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.profiles,
-    queries: [Query.equal('accountId', accountId), Query.limit(1)],
-    total: false,
-    ttl: 30,
-  })
-
-  return response.rows[0] ?? null
-}
-
-export async function loadProfileByEmail(email: string): Promise<AuthProfile | null> {
-  if (!appwriteReady) return null
-
-  const normalizedEmail = email.trim()
-  if (!normalizedEmail) return null
-
-  const response = await tablesDB.listRows<AuthProfile>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.profiles,
-    queries: [Query.equal('email', normalizedEmail), Query.limit(1)],
-    total: false,
-    ttl: 30,
-  })
-
-  return response.rows[0] ?? null
-}
-
-export async function loadPreviewProfileByEmail(email: string): Promise<AuthProfile | null> {
-  return await loadProfileByEmail(email)
-}
-
-export async function loadClubLeaderboard(): Promise<AuthProfile[]> {
+export async function loadClubLeaderboard(): Promise<PublicProfile[]> {
   if (!appwriteReady) return []
 
-  const response = await tablesDB.listRows<AuthProfile>({
+  const response = await tablesDB.listRows<PublicProfile>({
     databaseId: appwriteConfig.databaseId,
     tableId: tableIds.profiles,
     queries: [Query.limit(5000)],
@@ -287,7 +263,7 @@ export async function loadClubLeaderboard(): Promise<AuthProfile[]> {
     ))
 }
 
-export async function saveProfileDetails(profileId: string, input: ProfileUpdateInput) {
+export async function saveProfileDetails(input: ProfileUpdateInput) {
   requireAppwriteReady()
   const displayName = input.displayName.trim()
   if (!displayName) throw new Error('Display name is required.')
@@ -298,18 +274,13 @@ export async function saveProfileDetails(profileId: string, input: ProfileUpdate
   const phone = normalizeJordanPhone(input.phone)
   if (!phone) throw new Error('Phone number is required.')
 
-  return await tablesDB.updateRow<AuthProfile>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.profiles,
-    rowId: profileId,
-    data: {
-      displayName,
-      university,
-      universityId,
-      phone,
-      chessComUsername: optionalUsername(input.chessComUsername),
-      lichessUsername: optionalUsername(input.lichessUsername),
-    },
+  return await updateOwnerProfile({
+    displayName,
+    university,
+    universityId,
+    phone,
+    chessComUsername: optionalUsername(input.chessComUsername),
+    lichessUsername: optionalUsername(input.lichessUsername),
   })
 }
 
@@ -336,12 +307,7 @@ export async function uploadProfileMedia(
   })
 
   try {
-    const updated = await tablesDB.updateRow<AuthProfile>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.profiles,
-      rowId: profile.$id,
-      data: { [field]: uploaded.$id },
-    })
+    const updated = await updateOwnerProfile({ [field]: uploaded.$id })
 
     if (previousFileId && previousFileId !== uploaded.$id) {
       void storage.deleteFile({ bucketId: profileMediaBucketId, fileId: previousFileId }).catch(() => undefined)
@@ -359,12 +325,7 @@ export async function deleteProfileMedia(profile: AuthProfile, kind: ProfileMedi
   const fileId = profile[field]
   if (!fileId) return profile
 
-  const updated = await tablesDB.updateRow<AuthProfile>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.profiles,
-    rowId: profile.$id,
-    data: { [field]: null },
-  })
+  const updated = await updateOwnerProfile({ [field]: null })
   await storage.deleteFile({ bucketId: profileMediaBucketId, fileId }).catch(() => undefined)
   return updated
 }
@@ -376,7 +337,6 @@ export function profileMediaUrl(fileId?: string) {
 }
 
 export async function saveExternalGameUsername(
-  profileId: string,
   source: 'chess.com' | 'lichess',
   username: string,
 ) {
@@ -384,45 +344,71 @@ export async function saveExternalGameUsername(
   const normalized = username.trim().toLowerCase()
   if (!normalized) throw new Error('Enter a username before linking the account.')
 
-  return await tablesDB.updateRow<AuthProfile>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.profiles,
-    rowId: profileId,
-    data: {
-      [source === 'chess.com' ? 'chessComUsername' : 'lichessUsername']: normalized,
-    },
+  return await updateOwnerProfile({
+    [source === 'chess.com' ? 'chessComUsername' : 'lichessUsername']: normalized,
   })
 }
 
 export async function saveBoardAppearance(
-  profileId: string,
   preferences: BoardPreferences,
 ) {
   requireAppwriteReady()
-  return await tablesDB.updateRow<AuthProfile>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.profiles,
-    rowId: profileId,
-    data: {
-      boardTheme: preferences.boardTheme,
-      pieceTheme: preferences.pieceTheme,
-      arrowColor: preferences.arrowColor,
-      markColor: preferences.markColor,
-    },
+  return await updateOwnerProfile({
+    boardTheme: preferences.boardTheme,
+    pieceTheme: preferences.pieceTheme,
+    arrowColor: preferences.arrowColor,
+    markColor: preferences.markColor,
   })
 }
 
 export async function ensureProfileForUser(user: Models.User): Promise<AuthProfile | null> {
-  const accountProfile = await loadProfile(user.$id)
-  if (accountProfile) return accountProfile
-
-  const emailProfile = await loadProfileByEmail(user.email)
-  if (emailProfile) return emailProfile
+  const profile = await loadOwnerProfile()
+  if (profile) return profile
 
   return await createProfileForUser(user, {
     fullName: user.name || user.email,
-    email: user.email,
   })
+}
+
+async function loadOwnerProfile() {
+  return await runProfileAction(ExecutionMethod.GET, {}, true)
+}
+
+async function updateOwnerProfile(data: Record<string, unknown>) {
+  const profile = await runProfileAction(ExecutionMethod.POST, data)
+  if (!profile) throw new Error('The player profile service returned no profile.')
+  return profile
+}
+
+async function runProfileAction(
+  method: ExecutionMethod,
+  body: Record<string, unknown>,
+  allowMissing = false,
+): Promise<AuthProfile | null> {
+  requireAppwriteReady()
+  const execution = await functions.createExecution({
+    functionId: appwriteConfig.playerFunctionId,
+    body: JSON.stringify(body),
+    async: false,
+    xpath: '/profile',
+    method,
+    headers: { 'content-type': 'application/json' },
+  })
+
+  let payload: { ok?: boolean; row?: AuthProfile | null; error?: string; detail?: string }
+  try {
+    payload = JSON.parse(execution.responseBody) as typeof payload
+  } catch {
+    throw new Error('The player profile service returned an unreadable response.')
+  }
+
+  if (allowMissing && execution.responseStatusCode === 404) return null
+  if (execution.responseStatusCode >= 400 || payload.ok === false) {
+    throw new Error(payload.detail || payload.error || 'The player profile service rejected the request.')
+  }
+  if (allowMissing && !payload.row) return null
+  if (!payload.row) throw new Error('The player profile service returned no profile.')
+  return payload.row
 }
 
 export function formatAppwriteError(error: unknown) {
@@ -440,35 +426,15 @@ function cloudMessage(value: string) {
   return value.replace(/appwrite/gi, 'cloud')
 }
 
-async function createProfileForUser(user: Models.User, input: Partial<SignUpInput> & Pick<SignUpInput, 'email'>) {
-  try {
-    return await tablesDB.createRow<AuthProfile>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.profiles,
-      rowId: ID.unique(),
-      data: {
-        accountId: user.$id,
-        displayName: input.fullName?.trim() || user.name || input.email,
-        university: input.university?.trim() || undefined,
-        universityId: input.universityId?.trim() || undefined,
-        phone: normalizeJordanPhone(input.phone),
-        email: input.email,
-        chessComUsername: optionalUsername(input.chessComUsername),
-        lichessUsername: optionalUsername(input.lichessUsername),
-        rating: 1200,
-        role: 'member',
-        status: 'pending',
-      },
-      permissions: [
-        Permission.read(Role.any()),
-        Permission.read(Role.user(user.$id)),
-        Permission.update(Role.user(user.$id)),
-      ],
-    })
-  } catch (error) {
-    console.warn('JuChess profile creation failed after signup.', error)
-    return null
-  }
+async function createProfileForUser(user: Models.User, input: Partial<SignUpInput>) {
+  return await updateOwnerProfile({
+    displayName: input.fullName?.trim() || user.name || user.email,
+    university: input.university?.trim() || undefined,
+    universityId: input.universityId?.trim() || undefined,
+    phone: normalizeJordanPhone(input.phone),
+    chessComUsername: optionalUsername(input.chessComUsername),
+    lichessUsername: optionalUsername(input.lichessUsername),
+  })
 }
 
 function requireAppwriteReady() {
@@ -556,11 +522,10 @@ function validateProfileImage(file: File) {
   }
 }
 
-function isSeedProfile(profile: AuthProfile) {
+function isSeedProfile(profile: PublicProfile) {
   return profile.$id.startsWith('showcase_')
-    || profile.accountId.startsWith('showcase_')
-    || profile.universityId?.startsWith('SHOWCASE-') === true
-    || profile.email.endsWith('@juchess.test')
+    || profile.$id.startsWith('seed_profile_')
+    || profile.$id === 'system_bye'
 }
 
 function appUrl(path: string) {
