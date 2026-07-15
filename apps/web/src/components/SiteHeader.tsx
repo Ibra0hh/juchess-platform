@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChartNoAxesColumnIncreasing, Gamepad2, Home, Trophy, UserRound, Wrench } from 'lucide-react'
+import { Home, Trophy, UserRound, Wrench } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { profileMediaUrl } from '../lib/auth'
 import { useOnlineTournamentPlayLock } from '../lib/onlineTournamentPlayLock'
@@ -63,14 +63,6 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
               <span>Tools</span>
             </Link>
           )}
-          <Link to="/games" className={active === 'games' ? 'active' : undefined}>
-            <Gamepad2 className="nav-icon" aria-hidden="true" />
-            <span>Games</span>
-          </Link>
-          <Link to="/leaderboard" className={active === 'leaderboard' ? 'active' : undefined}>
-            <ChartNoAxesColumnIncreasing className="nav-icon" aria-hidden="true" />
-            <span>Leaderboard</span>
-          </Link>
           <Link to="/profile" className={active === 'profile' ? 'active' : undefined}>
             <UserRound className="nav-icon" aria-hidden="true" />
             <span>Profile</span>
