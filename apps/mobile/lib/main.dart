@@ -656,13 +656,17 @@ class AppwriteService {
     Map<String, dynamic> body = const {},
     enums.ExecutionMethod method = enums.ExecutionMethod.pOST,
   }) async {
+    final jwt = await account.createJWT(duration: 900);
     final execution = await functions.createExecution(
       functionId: AppConfig.playerFunctionId,
       body: jsonEncode(body),
       xasync: false,
       path: path,
       method: method,
-      headers: {'content-type': 'application/json'},
+      headers: {
+        'content-type': 'application/json',
+        'juchess-player-jwt': jwt.jwt,
+      },
     );
 
     final payload = jsonDecode(execution.responseBody);
@@ -683,13 +687,17 @@ class AppwriteService {
     String path, {
     Map<String, dynamic> body = const {},
   }) async {
+    final jwt = await account.createJWT(duration: 900);
     final execution = await functions.createExecution(
       functionId: AppConfig.adminFunctionId,
       body: jsonEncode(body),
       xasync: false,
       path: path,
       method: enums.ExecutionMethod.pOST,
-      headers: {'content-type': 'application/json'},
+      headers: {
+        'content-type': 'application/json',
+        'juchess-player-jwt': jwt.jwt,
+      },
     );
     final decoded = jsonDecode(execution.responseBody);
     if (decoded is! Map<String, dynamic>) {

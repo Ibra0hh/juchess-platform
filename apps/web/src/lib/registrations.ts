@@ -1,5 +1,5 @@
 import { ExecutionMethod, Query, type Models } from 'appwrite'
-import { appwriteConfig, appwriteReady, functions, tablesDB } from './appwrite'
+import { appwriteConfig, appwriteReady, createPlayerFunctionHeaders, functions, tablesDB } from './appwrite'
 import { tableIds } from './juchess'
 
 export type RegistrationStatus = 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
@@ -34,6 +34,7 @@ export type MyAttendanceConfirmation = Models.Row & {
  */
 async function runPlayerAction<T>(path: string, body: Record<string, unknown> = {}): Promise<T> {
   requireReady()
+  const headers = await createPlayerFunctionHeaders()
 
   const execution = await functions.createExecution({
     functionId: appwriteConfig.playerFunctionId,
@@ -41,7 +42,7 @@ async function runPlayerAction<T>(path: string, body: Record<string, unknown> = 
     async: false,
     xpath: path,
     method: ExecutionMethod.POST,
-    headers: { 'content-type': 'application/json' },
+    headers,
   })
 
   let payload: { ok?: boolean; error?: string } & Record<string, unknown>

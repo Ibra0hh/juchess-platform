@@ -1,5 +1,5 @@
 import { ExecutionMethod, ID, OAuthProvider, Permission, Query, Role, type Models } from 'appwrite'
-import { account, appwriteConfig, appwriteReady, functions, storage, tablesDB } from './appwrite'
+import { account, appwriteConfig, appwriteReady, createPlayerFunctionHeaders, functions, storage, tablesDB } from './appwrite'
 import { tableIds } from './juchess'
 import type { BoardPreferences } from './boardAppearance'
 
@@ -386,13 +386,14 @@ async function runProfileAction(
   allowMissing = false,
 ): Promise<AuthProfile | null> {
   requireAppwriteReady()
+  const headers = await createPlayerFunctionHeaders()
   const execution = await functions.createExecution({
     functionId: appwriteConfig.playerFunctionId,
     body: JSON.stringify(body),
     async: false,
     xpath: '/profile',
     method,
-    headers: { 'content-type': 'application/json' },
+    headers,
   })
 
   let payload: { ok?: boolean; row?: AuthProfile | null; error?: string; detail?: string }

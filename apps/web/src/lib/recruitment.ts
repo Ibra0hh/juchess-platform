@@ -1,5 +1,5 @@
 import { ExecutionMethod, type Models } from 'appwrite'
-import { appwriteConfig, appwriteReady, functions } from './appwrite'
+import { appwriteConfig, appwriteReady, createPlayerFunctionHeaders, functions } from './appwrite'
 
 export const recruitmentInterestOptions = [
   { value: 'design', label: 'Design' },
@@ -79,6 +79,7 @@ async function runRecruitmentAction<T>(
   body: Record<string, unknown> = {},
 ): Promise<T> {
   if (!appwriteReady) throw new Error('Club recruitment is not configured for this app.')
+  const headers = await createPlayerFunctionHeaders()
 
   const execution = await functions.createExecution({
     functionId: appwriteConfig.playerFunctionId,
@@ -86,7 +87,7 @@ async function runRecruitmentAction<T>(
     async: false,
     xpath: path,
     method,
-    headers: { 'content-type': 'application/json' },
+    headers,
   })
 
   let payload: { ok?: boolean; error?: string } & Record<string, unknown>

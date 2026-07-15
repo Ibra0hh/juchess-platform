@@ -54,14 +54,15 @@ function crewReviewRowId(applicationId) {
   return `review_${digest}`;
 }
 
-async function loadCrewApplications(tablesDB, databaseId) {
+export async function loadCrewApplications(tablesDB, databaseId) {
   const [applications, reviews, profiles] = await Promise.all([
     listAllRows(tablesDB, databaseId, tableIds.crewApplications),
     listAllRows(tablesDB, databaseId, tableIds.crewApplicationReviews),
     listAllRows(tablesDB, databaseId, tableIds.profiles),
   ]);
+  const profilesWithIdentity = await joinProfilesWithPrivate(tablesDB, databaseId, profiles);
   const reviewsByApplication = new Map(reviews.map((review) => [review.applicationId, review]));
-  const profilesById = new Map(profiles.map((profile) => [profile.$id, profile]));
+  const profilesById = new Map(profilesWithIdentity.map((profile) => [profile.$id, profile]));
 
   return applications
     .map((application) => {
@@ -3273,7 +3274,7 @@ async function loadAdminProfile(tablesDB, databaseId, accountId) {
 }
 
 async function getAuthenticatedAccountId(req, authMessage = 'Admin session is required.') {
-  const jwt = req.headers['juchess-admin-jwt'] || req.headers['x-appwrite-user-jwt'];
+  const jwt = req.headers['juchess-admin-jwt'] || req.headers['juchess-player-jwt'] || req.headers['x-appwrite-user-jwt'];
   if (!jwt) {
     throw new HttpError(401, authMessage);
   }

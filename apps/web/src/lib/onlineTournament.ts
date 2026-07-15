@@ -1,5 +1,5 @@
 import { Channel, ExecutionMethod, Query } from 'appwrite'
-import { appwriteConfig, appwriteReady, functions, realtime } from './appwrite'
+import { appwriteConfig, appwriteReady, createPlayerFunctionHeaders, functions, realtime } from './appwrite'
 
 export type HostedGameRow = {
   $id: string
@@ -86,6 +86,7 @@ export type FairPlayEventType =
 
 async function runHostedGameAction<T>(path: string, body: Record<string, unknown> = {}): Promise<T> {
   if (!appwriteReady) throw new Error('JuChess online play is not configured.')
+  const headers = await createPlayerFunctionHeaders()
 
   const execution = await functions.createExecution({
     functionId: appwriteConfig.adminFunctionId,
@@ -93,7 +94,7 @@ async function runHostedGameAction<T>(path: string, body: Record<string, unknown
     async: false,
     xpath: path,
     method: ExecutionMethod.POST,
-    headers: { 'content-type': 'application/json' },
+    headers,
   })
 
   let payload: ({ ok?: boolean; error?: string } & Record<string, unknown>)

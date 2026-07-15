@@ -1,4 +1,7 @@
 import { Account, Client, Functions, Realtime, Storage, TablesDB } from 'appwrite'
+import { playerFunctionHeaders } from './functionAuth'
+
+export { playerFunctionHeaders } from './functionAuth'
 
 // Appwrite endpoint, project, and database IDs are public client configuration,
 // not secrets. Keep production-safe defaults so static GitHub Pages builds do
@@ -34,3 +37,8 @@ export const tablesDB = new TablesDB(client)
 export const storage = new Storage(client)
 export const functions = new Functions(client)
 export const realtime = new Realtime(client)
+
+export async function createPlayerFunctionHeaders() {
+  const token = await account.createJWT({ duration: 900 })
+  return playerFunctionHeaders(token.jwt)
+}
