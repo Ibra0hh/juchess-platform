@@ -728,7 +728,17 @@
   .online-board-toolbar {
     top: 50%;
     right: 8px;
+    width: 44px;
+    height: 96px;
     transform: translateY(-50%);
+  }
+
+  .online-board-head-actions button[aria-label="Board settings"],
+  .online-board-head-actions button[aria-label="Flip board"] {
+    width: 44px;
+    min-height: 44px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(17, 17, 17, 0.14);
   }
 
   .online-games-layout {
@@ -742,7 +752,7 @@
   .online-board-station {
     --online-board-size: min(100cqw, 800px, calc(100dvh - 300px));
     height: auto;
-    min-height: calc(var(--online-board-size) + 190px);
+    min-height: calc(var(--online-board-size) + 150px);
   }
 
   .online-board-head-actions {
@@ -760,6 +770,16 @@
 
   .online-board-controls button {
     min-width: 0;
+  }
+
+  .online-move-navigation {
+    grid-template-columns: repeat(4, 44px);
+    gap: 4px;
+  }
+
+  .online-move-navigation button {
+    width: 44px;
+    height: 44px;
   }
 
   .online-player-meta {

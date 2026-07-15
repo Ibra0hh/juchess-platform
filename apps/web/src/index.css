@@ -27,9 +27,18 @@ body {
 a,
 button {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 :focus-visible {
   outline: 3px solid rgba(125, 36, 52, 0.45);
   outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }

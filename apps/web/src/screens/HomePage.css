@@ -271,22 +271,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 0;
+  margin-top: 6px;
 }
 
 .home-feature-dots button {
-  width: 8px;
-  height: 8px;
+  position: relative;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.home-feature-dots button::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: rgba(17, 17, 17, 0.24);
-  cursor: pointer;
+  transform: translate(-50%, -50%);
   transition: width 0.18s ease, background-color 0.18s ease;
 }
 
-.home-feature-dots button.active {
+.home-feature-dots button.active::after {
   width: 24px;
   background: #7a2431;
 }
@@ -444,9 +456,14 @@
   left: 50%;
   z-index: 3;
   color: rgba(17, 17, 17, 0.5);
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
   font-size: 22px;
   line-height: 1;
   text-decoration: none;
+  transform: translateX(-50%);
   animation: home-hint 2.2s ease-in-out infinite;
 }
 
@@ -1056,6 +1073,9 @@
 }
 
 .footer-inner nav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   color: rgba(245, 239, 227, 0.72);
   font-size: 13px;
   text-decoration: none;
@@ -1124,7 +1144,7 @@
 @keyframes home-hint {
   50% {
     opacity: 1;
-    transform: translateY(8px);
+    transform: translate(-50%, 8px);
   }
 }
 
@@ -1143,10 +1163,6 @@
 }
 
 @media (max-width: 980px) {
-  .home-screen .main-nav {
-    display: flex;
-  }
-
   .home-hero-grid {
     grid-template-columns: 1fr;
     gap: 30px;
@@ -1167,53 +1183,13 @@
 }
 
 @media (max-width: 760px) {
-  .home-screen .site-header-inner {
-    height: auto;
-    min-height: 104px;
-    padding: 8px 20px 10px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "brand auth"
-      "nav nav";
-    gap: 8px 12px;
-  }
-
-  .home-screen .brand-link {
-    grid-area: brand;
-    min-width: 0;
-  }
-
-  .home-screen .auth-nav {
-    grid-area: auth;
-  }
-
-  .home-screen .main-nav {
-    grid-area: nav;
-    width: 100%;
-    max-width: 100%;
-    min-height: 36px;
-    gap: 0;
-    justify-content: flex-start;
-    justify-self: stretch;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .home-screen .main-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .home-screen .main-nav a {
-    flex: 0 0 auto;
-    padding: 8px 6px;
-    font-size: clamp(12px, 3.25vw, 13px);
+  .home-screen .site-header {
+    background: #f5efe3;
+    backdrop-filter: none;
   }
 
   .home-hero-grid {
-    padding: 132px 20px 34px;
+    padding: 88px 20px 34px;
   }
 
   .hero-kicker {

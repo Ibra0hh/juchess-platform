@@ -438,6 +438,10 @@
 }
 
 .member-profile-guest a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 10px 16px;
   color: var(--paper);
   background: var(--wine);
@@ -502,8 +506,14 @@
   }
 
   .media-action {
-    width: 38px;
+    width: 44px;
+    min-height: 44px;
     padding: 0;
+  }
+
+  .media-icon-button {
+    width: 44px;
+    height: 44px;
   }
 
   .member-profile-summary {

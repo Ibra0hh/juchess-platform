@@ -451,17 +451,34 @@
 
 @media (max-width: 620px) {
   .board-settings-panel {
+    position: fixed;
+    z-index: 120;
+    top: auto !important;
     right: 8px;
-    width: calc(100% - 16px);
-    max-height: min(650px, calc(100dvh - 92px));
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    left: 8px !important;
+    width: auto;
+    max-height: min(650px, calc(100dvh - 154px - env(safe-area-inset-bottom)));
+    border-radius: 16px;
+    transform: none !important;
   }
 
   .games-board-settings,
   .online-board-settings {
-    top: 42px;
     right: 8px;
-    left: auto;
-    transform: none;
+  }
+
+  .board-settings-head > button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .board-settings-tabs button {
+    min-height: 44px;
+  }
+
+  .board-theme-search input {
+    min-height: 44px;
   }
 
   .board-theme-options,

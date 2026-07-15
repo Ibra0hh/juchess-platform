@@ -6,106 +6,6 @@
   overflow-x: clip;
 }
 
-.tournaments-screen .site-header {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: rgba(245, 239, 227, 0.92);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(17, 17, 17, 0.14);
-}
-
-.tournaments-screen .site-header-inner {
-  max-width: 1200px;
-  height: 66px;
-  margin: 0 auto;
-  padding: 0 24px;
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto minmax(96px, 1fr);
-  align-items: center;
-  gap: 24px;
-}
-
-.tournaments-screen .brand-link {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #111111;
-  text-decoration: none;
-  flex: 0 0 auto;
-}
-
-.tournaments-screen .brand-link img {
-  width: 42px;
-  height: 42px;
-  object-fit: contain;
-}
-
-.tournaments-screen .brand-link span {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.tournaments-screen .brand-link strong {
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.tournaments-screen .brand-link small {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #7a2431;
-  font-weight: 500;
-}
-
-.tournaments-screen .main-nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  justify-content: center;
-  justify-self: center;
-  min-width: 0;
-}
-
-.tournaments-screen .main-nav a {
-  font-size: 13.5px;
-  font-weight: 500;
-  color: #111111;
-  text-decoration: none;
-  padding: 8px 12px;
-  border-radius: 6px;
-}
-
-.tournaments-screen .main-nav a:hover {
-  background: rgba(17, 17, 17, 0.07);
-}
-
-.tournaments-screen .main-nav a.active {
-  font-weight: 600;
-  color: #7a2431;
-  border-bottom: 2px solid #a98a3f;
-}
-
-.tournaments-screen .sign-in-link {
-  justify-self: end;
-  font-size: 13px;
-  font-weight: 600;
-  color: #f5efe3;
-  background: #111111;
-  text-decoration: none;
-  padding: 9px 18px;
-  border-radius: 7px;
-  white-space: nowrap;
-}
-
-.tournaments-screen .sign-in-link:hover {
-  background: #7a2431;
-}
-
 .tournaments-main {
   max-width: 980px;
   margin: 0 auto;
@@ -518,62 +418,7 @@
   }
 }
 
-@media (max-width: 960px) {
-  .tournaments-screen .main-nav {
-    display: flex;
-  }
-}
-
 @media (max-width: 760px) {
-  .tournaments-screen .site-header-inner {
-    height: auto;
-    min-height: 104px;
-    padding: 8px 16px 10px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "brand auth"
-      "nav nav";
-    gap: 8px 12px;
-  }
-
-  .tournaments-screen .brand-link {
-    grid-area: brand;
-    min-width: 0;
-  }
-
-  .tournaments-screen .auth-nav {
-    grid-area: auth;
-  }
-
-  .tournaments-screen .main-nav {
-    grid-area: nav;
-    width: 100%;
-    max-width: 100%;
-    min-height: 36px;
-    gap: 0;
-    justify-content: flex-start;
-    justify-self: stretch;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .tournaments-screen .main-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .tournaments-screen .main-nav a {
-    flex: 0 0 auto;
-    padding: 8px 6px;
-    font-size: clamp(12px, 3.25vw, 13px);
-  }
-
-  .tournaments-screen .brand-link small {
-    display: none;
-  }
-
   .tournaments-main {
     padding: 36px 16px 56px;
   }
@@ -586,6 +431,17 @@
 
   .tournament-filters {
     flex-basis: 100%;
+  }
+
+  .tournament-filters button {
+    min-height: 44px;
+    height: 44px;
+    padding-inline: 16px;
+  }
+
+  .view-toggle button {
+    min-height: 44px;
+    height: 44px;
   }
 
   .tournament-list.list .tournament-card {

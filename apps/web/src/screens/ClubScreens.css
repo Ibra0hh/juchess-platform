@@ -2347,6 +2347,23 @@
     transform: translateY(-50%);
   }
 
+  .board-control-stack button {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(17, 17, 17, 0.14);
+  }
+
+  .move-navigation {
+    grid-template-columns: repeat(4, 44px);
+    gap: 4px;
+  }
+
+  .move-navigation button {
+    width: 44px;
+    height: 44px;
+  }
+
   .game-rail {
     max-height: none;
     overflow: visible;

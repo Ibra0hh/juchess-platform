@@ -103,7 +103,7 @@
   padding: 0;
   cursor: pointer;
   line-height: 1;
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
   animation: none;
   transition: none;

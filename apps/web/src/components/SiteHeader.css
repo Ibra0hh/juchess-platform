@@ -25,6 +25,7 @@
   color: #111111;
   text-decoration: none;
   flex: 0 0 auto;
+  min-height: 44px;
 }
 
 .brand-link img {
@@ -61,6 +62,10 @@
   justify-content: center;
   justify-self: center;
   min-width: 0;
+}
+
+.nav-icon {
+  display: none;
 }
 
 .main-nav a,
@@ -184,16 +189,25 @@
 }
 
 @media (max-width: 760px) {
+  .site-header {
+    background: #f5efe3;
+    backdrop-filter: none;
+  }
+
+  .home-screen,
+  .tournaments-screen,
+  .club-screen {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+
   .site-header-inner {
-    height: auto;
-    min-height: 104px;
-    padding: 8px 16px 10px;
+    height: 64px;
+    min-height: 64px;
+    padding: 0 14px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "brand auth"
-      "nav nav";
-    gap: 8px 12px;
+    grid-template-areas: "brand auth";
+    gap: 12px;
   }
 
   .brand-link {
@@ -207,35 +221,66 @@
 
   .brand-link strong {
     white-space: nowrap;
+    font-size: 21px;
   }
 
   .main-nav {
-    grid-area: nav;
-    width: 100%;
-    max-width: 100%;
-    min-height: 36px;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    width: auto;
+    max-width: none;
+    min-height: calc(66px + env(safe-area-inset-bottom));
+    padding: 4px 6px env(safe-area-inset-bottom);
     gap: 0;
-    justify-content: flex-start;
-    justify-self: stretch;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .main-nav::-webkit-scrollbar {
-    display: none;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    align-items: stretch;
+    overflow: visible;
+    background: rgba(255, 252, 244, 0.97);
+    border-top: 1px solid rgba(17, 17, 17, 0.14);
+    box-shadow: 0 -8px 24px rgba(17, 17, 17, 0.1);
+    backdrop-filter: blur(14px);
   }
 
   .main-nav a,
   .main-nav .disabled {
-    flex: 0 0 auto;
-    padding: 8px 6px;
-    font-size: clamp(12px, 3.25vw, 13px);
+    min-width: 0;
+    min-height: 58px;
+    padding: 6px 2px 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: 0;
+    border-radius: 10px;
+    font-size: clamp(9px, 2.55vw, 11px);
+    line-height: 1;
+    text-align: center;
+  }
+
+  .main-nav a.active {
+    border-bottom: 0;
+    background: rgba(122, 36, 49, 0.1);
+  }
+
+  .nav-icon {
+    display: block;
+    width: 21px;
+    height: 21px;
+    flex: none;
   }
 
   .brand-link small {
     display: none;
+  }
+
+  .brand-link img {
+    width: 38px;
+    height: 38px;
   }
 
   .auth-nav {
@@ -246,12 +291,24 @@
   .sign-out-link {
     display: none;
   }
+
+  .sign-in-link {
+    min-height: 44px;
+    padding: 0 16px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .profile-link {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 @media (max-width: 420px) {
   .main-nav a,
   .main-nav .disabled {
-    padding-inline: 4px;
-    font-size: 11.5px;
+    padding-inline: 1px;
+    font-size: 10px;
   }
 }

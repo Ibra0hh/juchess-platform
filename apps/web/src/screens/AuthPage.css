@@ -601,6 +601,36 @@
   .auth-footer {
     padding-top: 6px;
   }
+
+  .auth-label-row {
+    align-items: center;
+  }
+
+  .auth-label-row a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .auth-password-field input {
+    padding-right: 54px;
+  }
+
+  .auth-password-toggle {
+    right: 2px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .auth-guest-link {
+    height: 44px;
+  }
+
+  .auth-switch a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
 }
 
 @media (max-width: 430px) {

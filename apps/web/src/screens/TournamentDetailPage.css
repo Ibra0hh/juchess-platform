@@ -1857,6 +1857,7 @@
 
   .detail-tabs button {
     flex: 1 0 max-content;
+    min-height: 44px;
     padding: 10px 10px;
     font-size: 13px;
     white-space: nowrap;

@@ -213,6 +213,10 @@ export function JuChessBoard({
 
   function handlePiecePointerDown(event: ReactPointerEvent<HTMLButtonElement>, square: Square) {
     if (event.button !== 0) return
+    // A finger swipe that starts on the board must remain a page-scroll gesture.
+    // Touch players can still move pieces with the existing tap-to-select flow,
+    // while mouse and pen users keep drag-and-drop.
+    if (event.pointerType === 'touch') return
     clearAnnotations()
     if (!interactive || pendingPromotion) return
     const piece = game.get(square)

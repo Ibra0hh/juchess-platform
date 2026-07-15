@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { ChartNoAxesColumnIncreasing, Gamepad2, Home, Trophy, UserRound, Wrench } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { profileMediaUrl } from '../lib/auth'
 import { useOnlineTournamentPlayLock } from '../lib/onlineTournamentPlayLock'
@@ -44,25 +45,35 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
 
         <nav className="main-nav" aria-label="Primary navigation">
           <Link to="/home" className={active === 'home' ? 'active' : undefined}>
-            Home
+            <Home className="nav-icon" aria-hidden="true" />
+            <span>Home</span>
           </Link>
           <Link to="/tournaments" className={active === 'tournaments' ? 'active' : undefined}>
-            Tournaments
+            <Trophy className="nav-icon" aria-hidden="true" />
+            <span>Tournaments</span>
           </Link>
           {toolsUnavailable ? (
             <span aria-disabled="true" className="disabled" title="Tools are unavailable during live online tournament play">
-              Tools
+              <Wrench className="nav-icon" aria-hidden="true" />
+              <span>Tools</span>
             </span>
           ) : (
             <Link to="/tools" className={active === 'tools' ? 'active' : undefined}>
-              Tools
+              <Wrench className="nav-icon" aria-hidden="true" />
+              <span>Tools</span>
             </Link>
           )}
+          <Link to="/games" className={active === 'games' ? 'active' : undefined}>
+            <Gamepad2 className="nav-icon" aria-hidden="true" />
+            <span>Games</span>
+          </Link>
           <Link to="/leaderboard" className={active === 'leaderboard' ? 'active' : undefined}>
-            Leaderboard
+            <ChartNoAxesColumnIncreasing className="nav-icon" aria-hidden="true" />
+            <span>Leaderboard</span>
           </Link>
           <Link to="/profile" className={active === 'profile' ? 'active' : undefined}>
-            Profile
+            <UserRound className="nav-icon" aria-hidden="true" />
+            <span>Profile</span>
           </Link>
         </nav>
 
