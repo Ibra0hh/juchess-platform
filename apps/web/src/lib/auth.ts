@@ -517,6 +517,7 @@ function isSeedProfile(profile: AuthProfile) {
 }
 
 function appUrl(path: string) {
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
+  const base = routeBase.replace(/\/$/, '')
   return new URL(`${base}${path}`, window.location.origin).toString()
 }

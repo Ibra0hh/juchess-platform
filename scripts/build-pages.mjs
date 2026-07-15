@@ -1,5 +1,6 @@
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -12,9 +13,9 @@ import { join } from 'node:path'
 
 const env = { ...process.env, GITHUB_PAGES: 'true' }
 
-function run(command) {
+function run(command, envOverrides = {}) {
   execSync(command, {
-    env,
+    env: { ...env, ...envOverrides },
     stdio: 'inherit',
   })
 }
@@ -37,7 +38,15 @@ for (const [index, assetDir] of assetDirs.entries()) {
 }
 
 try {
-  run('npm run build:web')
+  // Keep the old /web URLs working, then add the custom-domain root build
+  // without clearing the legacy bundle or the admin application.
+  run('npm run build:web', { JUCHESS_PAGES_TARGET: 'web' })
+  run('npm run build:web', {
+    JUCHESS_PAGES_TARGET: 'root',
+    VITE_ROUTER_BASE: '/',
+  })
+  cpSync('.pages-root/assets', 'docs/web/assets', { force: true, recursive: true })
+  copyFileSync('.pages-root/index.html', 'docs/index.html')
   run('npm run build:admin')
 
   for (const [index, assetDir] of assetDirs.entries()) {
@@ -50,9 +59,10 @@ try {
     }
   }
 
-  copyFileSync('docs/web/index.html', 'docs/404.html')
+  copyFileSync('docs/index.html', 'docs/404.html')
   copyFileSync('docs/web/index.html', 'docs/web/404.html')
   copyFileSync('docs/admin/index.html', 'docs/admin/404.html')
 } finally {
+  rmSync('.pages-root', { force: true, recursive: true })
   rmSync(retainedAssetsRoot, { force: true, recursive: true })
 }

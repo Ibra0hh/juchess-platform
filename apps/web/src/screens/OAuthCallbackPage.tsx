@@ -17,7 +17,8 @@ export default function OAuthCallbackPage() {
 
     const userId = searchParams.get('userId')
     const secret = searchParams.get('secret')
-    window.history.replaceState(null, '', `${import.meta.env.BASE_URL}auth/callback`)
+    const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
+    window.history.replaceState(null, '', `${routeBase}auth/callback`)
 
     if (!userId || !secret) {
       setError('The Google sign-in response is incomplete. Please start again.')

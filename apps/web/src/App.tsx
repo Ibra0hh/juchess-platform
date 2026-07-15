@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
 import { AuthProvider } from './context/AuthContext'
 import { TournamentPlayProvider } from './context/TournamentPlayContext'
@@ -24,13 +24,11 @@ function RouteLoading() {
 }
 
 function NotFound() {
-  const homeUrl = `${import.meta.env.BASE_URL}home`
-
   return (
     <main className="prototype-missing">
       <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="JuChess logo" />
       <h1>Screen not found</h1>
-      <a href={homeUrl}>Open JuChess Home</a>
+      <Link to="/home">Open JuChess Home</Link>
     </main>
   )
 }
@@ -48,7 +46,7 @@ function App() {
         <TournamentPlayGuard>
           <Suspense fallback={<RouteLoading />}>
             <Routes>
-              <Route path="/" element={<Navigate to="/home" replace />} />
+              <Route path="/" element={<HomePage />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/tournaments" element={<TournamentsPage />} />
               <Route path="/attendance-confirm" element={<AttendanceConfirmPage />} />
