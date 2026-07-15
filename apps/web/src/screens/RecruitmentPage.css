@@ -119,13 +119,13 @@
 .recruitment-form-skeleton span { height: 120px; }
 @keyframes recruitment-shimmer { to { background-position: -220% 0; } }
 
-@media (max-width: 900px), (min-width: 900px) and (max-width: 1100px) and (pointer: coarse), (min-width: 900px) and (max-device-width: 600px), (min-width: 900px) and (max-device-height: 600px) {
+@media (max-width: 900px) {
   .recruitment-layout { grid-template-columns: 1fr; }
   .recruitment-aside { grid-template-columns: repeat(3, minmax(0, 1fr)); order: -1; }
   .interest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 680px), (min-width: 900px) and (max-width: 1100px) and (pointer: coarse), (min-width: 900px) and (max-device-width: 600px), (min-width: 900px) and (max-device-height: 600px) {
+@media (max-width: 680px) {
   .recruitment-main { width: min(100% - 24px, 1180px); padding-top: 18px; }
   .recruitment-intro { min-height: 215px; padding: 30px 24px; }
   .recruitment-intro h1 { font-size: 46px; }
@@ -144,7 +144,7 @@
   .recruitment-guest a { justify-content: center; }
 }
 
-@media (max-width: 390px), (min-width: 900px) and (max-width: 1100px) and (pointer: coarse), (min-width: 900px) and (max-device-width: 600px), (min-width: 900px) and (max-device-height: 600px) {
+@media (max-width: 390px) {
   .interest-grid { grid-template-columns: 1fr; }
   .recruitment-form > header { align-items: flex-start; flex-direction: column; }
 }
