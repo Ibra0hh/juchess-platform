@@ -3799,7 +3799,7 @@ button {
   gap: 10px;
 }
 
-.player-name span {
+.player-avatar {
   width: 36px;
   height: 36px;
   display: inline-grid;
@@ -3809,6 +3809,14 @@ button {
   color: #fff;
   font-size: 13px;
   font-weight: 900;
+  overflow: hidden;
+}
+
+.player-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .player-name em {
@@ -3891,6 +3899,113 @@ button {
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 30px 90px -35px rgba(17, 17, 17, 0.6);
+}
+
+.player-profile-modal {
+  width: min(100%, 640px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+
+.player-profile-cover {
+  position: relative;
+  height: 150px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(169, 138, 63, 0.32), transparent 34%),
+    linear-gradient(135deg, #2b0e14, #7d2434 58%, #a98a3f);
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.player-profile-cover > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.player-profile-cover > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.player-profile-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 50%;
+  background: rgba(17, 17, 17, 0.56);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.player-profile-identity {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  min-height: 82px;
+  padding: 0 20px 14px 118px;
+  border-bottom: 1px solid #efeae0;
+}
+
+.player-avatar-profile {
+  position: absolute;
+  left: 20px;
+  bottom: 14px;
+  width: 82px;
+  height: 82px;
+  border: 4px solid #fff;
+  box-shadow: 0 10px 25px rgba(17, 17, 17, 0.18);
+  font-size: 22px;
+}
+
+.player-profile-identity > div {
+  min-width: 0;
+}
+
+.player-profile-identity span {
+  color: #8b8577;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-profile-identity h2 {
+  margin: 2px 0 0;
+  color: #111;
+  font-family: "Source Serif 4", Georgia, serif;
+  font-size: 22px;
+  line-height: 1.05;
+}
+
+.player-profile-identity p {
+  margin: 5px 0 0;
+  color: #6f695e;
+  font-size: 12px;
+}
+
+.player-profile-identity em {
+  margin-left: auto;
+  border-radius: 5px;
+  background: #fbeaea;
+  color: #b23a3a;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
 }
 
 .player-modal .panel-head button {
@@ -4236,6 +4351,32 @@ button {
   .format-card-grid,
   .field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .player-profile-modal {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .player-profile-cover {
+    height: 124px;
+  }
+
+  .player-profile-identity {
+    align-items: flex-start;
+    min-height: 104px;
+    padding: 50px 16px 14px;
+  }
+
+  .player-avatar-profile {
+    left: 16px;
+    bottom: auto;
+    top: -42px;
+    width: 76px;
+    height: 76px;
+  }
+
+  .player-profile-identity em {
+    margin-left: auto;
   }
 
   .format-time-window {

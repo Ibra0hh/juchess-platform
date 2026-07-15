@@ -8,6 +8,7 @@ export type OnlineTournamentPlatform = 'chessCom' | 'lichess' | 'juchess'
 
 const tournamentAssetsBucketId = 'tournament-assets'
 const tournamentMediaPrefix = 'ju-media'
+const profileMediaBucketId = 'avatars'
 
 export type TournamentMedia = {
   id: string
@@ -105,6 +106,8 @@ type AppwriteProfileRow = Models.Row & {
   rating?: number
   role?: string
   status?: string
+  avatarFileId?: string
+  coverFileId?: string
 }
 
 const tournamentFormatOrder = [
@@ -661,6 +664,8 @@ export type ClubPlayer = {
   phone: string
   role: string
   status: string
+  avatarUrl: string
+  coverUrl: string
 }
 
 export type ClubPlayersResult = {
@@ -690,6 +695,8 @@ export async function loadClubPlayers(): Promise<ClubPlayersResult> {
         phone: row.phone ?? '',
         role: row.role ?? 'member',
         status: row.status ?? 'active',
+        avatarUrl: profileMediaUrl(row.avatarFileId),
+        coverUrl: profileMediaUrl(row.coverFileId),
       }))
       .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))
 
@@ -698,6 +705,12 @@ export async function loadClubPlayers(): Promise<ClubPlayersResult> {
     console.warn('JuChess club players could not be loaded.', error)
     return { players: [], error: formatAdminError(error) }
   }
+}
+
+function profileMediaUrl(fileId?: string) {
+  if (!fileId) return ''
+  if (/^(blob:|data:|https?:)/.test(fileId)) return fileId
+  return String(storage.getFileView({ bucketId: profileMediaBucketId, fileId }))
 }
 
 export async function deleteClubPlayers(profileIds: string[]) {

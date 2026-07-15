@@ -93,6 +93,8 @@ type Player = {
   rating: number
   record: string
   avatarColor: string
+  avatarUrl?: string
+  coverUrl?: string
   tournaments: number
   blocked?: boolean
 }
@@ -113,6 +115,28 @@ function avatarColorFor(profileId: string) {
     hash = (hash * 31 + profileId.charCodeAt(index)) >>> 0
   }
   return avatarPalette[hash % avatarPalette.length]
+}
+
+function PlayerAvatar({ player, profile = false }: { player: Player; profile?: boolean }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const showImage = Boolean(player.avatarUrl && !imageFailed)
+
+  return (
+    <span
+      className={profile ? 'player-avatar player-avatar-profile' : 'player-avatar'}
+      style={showImage ? undefined : { background: player.avatarColor }}
+      aria-hidden={profile ? undefined : true}
+    >
+      {showImage ? (
+        <img
+          src={player.avatarUrl}
+          alt={profile ? `${player.name} profile` : ''}
+          loading={profile ? 'eager' : 'lazy'}
+          onError={() => setImageFailed(true)}
+        />
+      ) : player.initials}
+    </span>
+  )
 }
 
 function ClockTimePicker({
@@ -4458,6 +4482,8 @@ function PlayersScreen({
         // rather than a fabricated record.
         record: '-',
         avatarColor: avatarColorFor(player.id),
+        avatarUrl: player.avatarUrl,
+        coverUrl: player.coverUrl,
         tournaments: 0,
         blocked: player.status === 'suspended',
       })))
@@ -4563,7 +4589,7 @@ function PlayersScreen({
                   </td>
                   <td>
                     <div className="player-name">
-                      <span style={{ background: player.avatarColor }}>{player.initials}</span>
+                      <PlayerAvatar player={player} />
                       <strong>{player.name}</strong>
                       {player.blocked ? <em>BLOCKED</em> : null}
                     </div>
@@ -4646,6 +4672,8 @@ function PlayerModal({
   onToggleBlock: () => void
   player: Player
 }) {
+  const [coverFailed, setCoverFailed] = useState(false)
+  const showCover = Boolean(player.coverUrl && !coverFailed)
   const fields = [
     ['Name', player.name],
     ['University ID', player.universityId],
@@ -4658,10 +4686,31 @@ function PlayerModal({
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <section className="player-modal" onClick={(event) => event.stopPropagation()}>
-        <div className="panel-head">
-          <strong>{player.name}</strong>
-          <button type="button" onClick={onClose}>×</button>
+      <section
+        aria-labelledby="player-profile-title"
+        aria-modal="true"
+        className="player-modal player-profile-modal"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className={showCover ? 'player-profile-cover has-image' : 'player-profile-cover'}>
+          {showCover ? (
+            <img src={player.coverUrl} alt="" onError={() => setCoverFailed(true)} />
+          ) : (
+            <span><ImageIcon size={16} aria-hidden="true" /> No cover image</span>
+          )}
+          <button type="button" className="player-profile-close" onClick={onClose} aria-label="Close player profile">
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="player-profile-identity">
+          <PlayerAvatar player={player} profile />
+          <div>
+            <span>Player profile</span>
+            <h2 id="player-profile-title">{player.name}</h2>
+            <p>{player.universityId} · Rating {player.rating}</p>
+          </div>
+          {player.blocked ? <em>BLOCKED</em> : null}
         </div>
         <div className="field-grid">
           {fields.map(([label, value]) => (
