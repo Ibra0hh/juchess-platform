@@ -14,6 +14,7 @@
     "build:web": "npm --workspace apps/web run build",
     "build:admin": "npm --workspace apps/admin run build",
     "build:pages": "node scripts/build-pages.mjs",
+    "check:email-templates": "node scripts/validate-email-templates.mjs",
     "seed:appwrite-demo": "node scripts/seed-appwrite-demo-data.mjs",
     "migrate:procedure": "powershell -ExecutionPolicy Bypass -File scripts/migrate-procedure-schema.ps1",
     "migrate:online-tournaments": "powershell -ExecutionPolicy Bypass -File scripts/migrate-online-tournament-schema.ps1",

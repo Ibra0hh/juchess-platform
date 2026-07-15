@@ -47,6 +47,8 @@ try {
   })
   cpSync('.pages-root/assets', 'docs/web/assets', { force: true, recursive: true })
   copyFileSync('.pages-root/index.html', 'docs/index.html')
+  mkdirSync('docs/email', { recursive: true })
+  copyFileSync('apps/web/public/email/juchess-email-logo.png', 'docs/email/juchess-email-logo.png')
   run('npm run build:admin')
 
   for (const [index, assetDir] of assetDirs.entries()) {
