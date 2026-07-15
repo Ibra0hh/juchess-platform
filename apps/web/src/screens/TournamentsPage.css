@@ -418,7 +418,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (min-width: 900px) and (max-width: 1100px) and (pointer: coarse), (min-width: 900px) and (max-device-width: 600px), (min-width: 900px) and (max-device-height: 600px) {
   .tournaments-main {
     padding: 36px 16px 56px;
   }

@@ -24,6 +24,15 @@ body {
   min-height: 100vh;
 }
 
+html[data-phone-desktop-mode='true'] {
+  overflow-x: hidden;
+}
+
+html[data-phone-desktop-mode='true'] body {
+  min-width: 0;
+  zoom: var(--phone-desktop-zoom);
+}
+
 a,
 button {
   -webkit-tap-highlight-color: transparent;
@@ -35,7 +44,7 @@ button {
   outline-offset: 3px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (min-width: 900px) and (max-width: 1100px) and (pointer: coarse), (min-width: 900px) and (max-device-width: 600px), (min-width: 900px) and (max-device-height: 600px) {
   input,
   select,
   textarea {

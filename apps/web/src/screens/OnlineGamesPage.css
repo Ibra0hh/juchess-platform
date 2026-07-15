@@ -699,7 +699,7 @@
   }
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1120px), (min-width: 900px) and (max-width: 1100px) and (pointer: coarse), (min-width: 900px) and (max-device-width: 600px), (min-width: 900px) and (max-device-height: 600px) {
   .online-games-layout {
     grid-template-columns: minmax(0, 1fr) minmax(280px, 34vw);
   }
@@ -711,7 +711,7 @@
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 700px), (min-width: 900px) and (max-width: 1100px) and (pointer: coarse), (min-width: 900px) and (max-device-width: 600px), (min-width: 900px) and (max-device-height: 600px) {
   .online-games-screen {
     height: auto;
     min-height: 100dvh;
