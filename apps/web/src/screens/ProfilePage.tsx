@@ -253,11 +253,11 @@ function ProfilePage() {
               <UniversityField required value={form.university} onChange={(university) => setForm({ ...form, university })} />
               <label>
                 <span>University ID</span>
-                <input maxLength={64} value={form.universityId} onChange={(event) => setForm({ ...form, universityId: event.target.value })} />
+                <input required maxLength={64} value={form.universityId} onChange={(event) => setForm({ ...form, universityId: event.target.value })} />
               </label>
               <label>
                 <span>Phone</span>
-                <input type="tel" maxLength={32} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+                <input required type="tel" maxLength={32} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
               </label>
               <label>
                 <span>Email</span>

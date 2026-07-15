@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { BadgeCheck } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
+import GoogleMark from '../components/GoogleMark'
 import UniversityField from '../components/UniversityField'
 import { formatAppwriteError } from '../lib/auth'
 import './AuthPage.css'
@@ -59,13 +61,18 @@ export default function CompleteProfilePage() {
       <main className="auth-main prototype-auth-main signup">
         <section className="auth-panel prototype-auth-panel signup social-profile-panel" aria-labelledby="complete-profile-title">
           <div className="auth-intro">
-            <h1 id="complete-profile-title">Complete your club profile</h1>
-            <p>Google verified your identity. Add the club details it does not provide.</p>
+            <h1 id="complete-profile-title">Complete your player profile</h1>
+            <p>Your Google account is connected. Add the details required for JuChess tournaments and membership.</p>
           </div>
 
           <div className="social-verified-account">
-            <span>Verified Google account</span>
-            <strong>{user.email}</strong>
+            <span className="social-provider-mark"><GoogleMark size={20} /></span>
+            <div className="social-account-identity">
+              <span>Signed in with Google</span>
+              <strong>{user.name || 'Google account'}</strong>
+              <small>{user.email}</small>
+            </div>
+            <span className="social-verification-status"><BadgeCheck size={16} /> Verified</span>
           </div>
 
           <form className="auth-form prototype-auth-form" onSubmit={handleSubmit}>
@@ -76,8 +83,8 @@ export default function CompleteProfilePage() {
               <AuthInput label="Phone number" required value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} placeholder="07X XXX XXXX" autoComplete="tel" type="tel" />
             </div>
             <div className="auth-two-column">
-              <AuthInput label="Chess.com username" value={form.chessComUsername} onChange={(value) => setForm({ ...form, chessComUsername: value })} placeholder="Optional" />
-              <AuthInput label="Lichess username" value={form.lichessUsername} onChange={(value) => setForm({ ...form, lichessUsername: value })} placeholder="Optional" />
+              <AuthInput label="Chess.com username" value={form.chessComUsername} onChange={(value) => setForm({ ...form, chessComUsername: value })} placeholder="username" />
+              <AuthInput label="Lichess username" value={form.lichessUsername} onChange={(value) => setForm({ ...form, lichessUsername: value })} placeholder="username" />
             </div>
 
             {message ? <div className="auth-error" role="alert">{message}</div> : null}

@@ -116,6 +116,9 @@ export async function signInWithEmail(input: SignInInput): Promise<AuthSession> 
 
 export async function signUpWithEmail(input: SignUpInput): Promise<AuthSession> {
   requireAppwriteReady()
+  if (!input.universityId?.trim() || !normalizeJordanPhone(input.phone)) {
+    throw new Error('University ID and phone number are required.')
+  }
   await assertAccessAllowed({
     email: input.email,
     universityId: input.universityId,
@@ -257,6 +260,10 @@ export async function saveProfileDetails(profileId: string, input: ProfileUpdate
   if (!displayName) throw new Error('Display name is required.')
   const university = input.university?.trim()
   if (!university) throw new Error('University is required.')
+  const universityId = input.universityId?.trim()
+  if (!universityId) throw new Error('University ID is required.')
+  const phone = normalizeJordanPhone(input.phone)
+  if (!phone) throw new Error('Phone number is required.')
 
   return await tablesDB.updateRow<AuthProfile>({
     databaseId: appwriteConfig.databaseId,
@@ -265,8 +272,8 @@ export async function saveProfileDetails(profileId: string, input: ProfileUpdate
     data: {
       displayName,
       university,
-      universityId: optionalValue(input.universityId),
-      phone: normalizeJordanPhone(input.phone) ?? null,
+      universityId,
+      phone,
       chessComUsername: optionalUsername(input.chessComUsername),
       lichessUsername: optionalUsername(input.lichessUsername),
     },
@@ -486,10 +493,6 @@ function normalizeJordanPhone(value?: string) {
   if (digits.startsWith('0')) return `+962${digits.slice(1)}`
   if (digits.startsWith('7') && digits.length === 9) return `+962${digits}`
   return raw
-}
-
-function optionalValue(value?: string) {
-  return value?.trim() || null
 }
 
 function optionalUsername(value?: string) {

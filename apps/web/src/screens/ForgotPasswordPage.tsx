@@ -121,7 +121,7 @@ function ForgotPasswordPage() {
                   onChange={(event) => setEmail(event.target.value)}
                   required
                   autoComplete="email"
-                  placeholder="student@ju.edu.jo"
+                  placeholder="name@email.com"
                 />
               </label>
             )}

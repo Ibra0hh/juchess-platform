@@ -608,15 +608,34 @@
 
 .social-verified-account {
   display: grid;
-  gap: 3px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 20px;
-  padding: 12px 14px;
+  padding: 14px;
   border: 1px solid rgba(33, 86, 61, 0.24);
   border-radius: 8px;
   background: rgba(33, 86, 61, 0.07);
 }
 
-.social-verified-account span {
+.social-provider-mark {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.social-account-identity {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.social-account-identity > span {
   color: #21563d;
   font-size: 11px;
   font-weight: 700;
@@ -624,9 +643,37 @@
   text-transform: uppercase;
 }
 
-.social-verified-account strong {
+.social-account-identity strong,
+.social-account-identity small {
   overflow-wrap: anywhere;
+}
+
+.social-account-identity strong {
   font-size: 14px;
+}
+
+.social-account-identity small {
+  color: rgba(17, 17, 17, 0.58);
+  font-size: 12px;
+}
+
+.social-verification-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #21563d;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .social-verified-account {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .social-verification-status {
+    grid-column: 2;
+  }
 }
 
 @keyframes auth-spin {
