@@ -73,7 +73,7 @@ export default function CompleteProfilePage() {
             <UniversityField required value={form.university} onChange={(university) => setForm({ ...form, university })} />
             <div className="auth-two-column">
               <AuthInput label="University ID" required value={form.universityId} onChange={(value) => setForm({ ...form, universityId: value })} placeholder="e.g. 0201234" autoComplete="username" />
-              <AuthInput label="Phone number" required value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} placeholder="+962 7X XXX XXXX" autoComplete="tel" type="tel" />
+              <AuthInput label="Phone number" required value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} placeholder="07X XXX XXXX" autoComplete="tel" type="tel" />
             </div>
             <div className="auth-two-column">
               <AuthInput label="Chess.com username" value={form.chessComUsername} onChange={(value) => setForm({ ...form, chessComUsername: value })} placeholder="Optional" />

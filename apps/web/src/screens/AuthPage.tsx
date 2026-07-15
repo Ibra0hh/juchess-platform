@@ -42,6 +42,7 @@ function AuthPage({ mode }: AuthPageProps) {
     uppercase: /[A-Z]/.test(password),
     number: /[0-9]/.test(password),
   }), [password])
+  const passwordStrength = useMemo(() => getPasswordStrength(password), [password])
   const passwordReady = passwordRules.length && passwordRules.uppercase && passwordRules.number
   const passwordsMatch = confirmPassword.length > 0 && confirmPassword === password
 
@@ -134,10 +135,10 @@ function AuthPage({ mode }: AuthPageProps) {
 
                 <div className="auth-two-column">
                   <AuthField label="Email">
-                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="you@ju.edu.jo" />
+                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="u@email.com" />
                   </AuthField>
                   <AuthField label="Phone number">
-                    <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" inputMode="tel" placeholder="+962 7X XXX XXXX" />
+                    <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" inputMode="tel" placeholder="07X XXX XXXX" />
                   </AuthField>
                 </div>
 
@@ -170,6 +171,7 @@ function AuthPage({ mode }: AuthPageProps) {
                   <PasswordRule met={passwordRules.uppercase}>1 uppercase letter</PasswordRule>
                   <PasswordRule met={passwordRules.number}>1 number</PasswordRule>
                 </div>
+                <PasswordStrength score={passwordStrength.score} label={passwordStrength.label} />
 
                 <PasswordField
                   label="Confirm password"
@@ -184,16 +186,19 @@ function AuthPage({ mode }: AuthPageProps) {
             ) : (
               <>
                 <AuthField label="Email">
-                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="you@ju.edu.jo" />
+                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="u@email.com" />
                 </AuthField>
                 <PasswordField
-                  label={<span className="auth-label-row"><span>Password</span><Link to="/forgot-password">Forgot password?</Link></span>}
+                  label="Password"
                   value={password}
                   showPassword={showPassword}
                   onChange={setPassword}
                   onToggle={() => setShowPassword((visible) => !visible)}
                   autoComplete="current-password"
                 />
+                <div className="auth-forgot-row">
+                  <Link to="/forgot-password">Forgot password?</Link>
+                </div>
               </>
             )}
 
@@ -206,7 +211,7 @@ function AuthPage({ mode }: AuthPageProps) {
             {!isSignup ? (
               <>
                 <Link className="auth-secondary-button" to="/sign-up">Sign Up</Link>
-                <Link className="auth-guest-link" to="/home">Enter as guest <span aria-hidden="true">&rarr;</span></Link>
+                <Link className="auth-guest-link" to="/home">Enter as guest</Link>
               </>
             ) : null}
           </form>
@@ -240,10 +245,6 @@ function SocialSignIn({ busy, oauthProvider, onSelect, ready }: {
 }) {
   return (
     <div className="auth-social-row">
-      <button type="button" className="auth-social apple" disabled={!ready || busy} onClick={() => onSelect('apple')}>
-        <AppleLogo />
-        <span>{oauthProvider === 'apple' ? 'Connecting...' : 'Continue with Apple'}</span>
-      </button>
       <button type="button" className="auth-social google" disabled={!ready || busy} onClick={() => onSelect('google')}>
         <GoogleLogo />
         <span>{oauthProvider === 'google' ? 'Connecting...' : 'Continue with Google'}</span>
@@ -294,8 +295,41 @@ function PasswordRule({ children, met }: { children: ReactNode; met: boolean }) 
   return <span className={met ? 'met' : ''}>{children}</span>
 }
 
-function AppleLogo() {
-  return <svg width="16" height="19" viewBox="0 0 170 210" fill="currentColor" aria-hidden="true"><path d="M150.4 71.6c-1 .8-19.7 11.3-19.7 34.7 0 27 23.7 36.6 24.4 36.8-.1.6-3.8 13-12.5 25.6-7.8 11.1-16 22.2-28.4 22.2s-15.6-7.2-29.9-7.2c-14 0-19 7.4-30.4 7.4S34.7 180.8 26 168.4C15.9 154 7.7 131.7 7.7 110.5c0-34 22.1-52 43.8-52 11.6 0 21.2 7.6 28.5 7.6 6.9 0 17.7-8.1 30.9-8.1 5 .1 23 .5 34.9 17.2l4.6-3.6zM108.7 33.2c5.7-6.7 9.7-16.1 9.7-25.5 0-1.3-.1-2.6-.3-3.7-9.2.3-20.2 6.1-26.8 13.8-5.2 5.9-10 15.3-10 24.8 0 1.4.2 2.9.3 3.3.6.1 1.5.2 2.5.2 8.3.1 18.7-5.4 24.6-12.9z" /></svg>
+function PasswordStrength({ label, score }: { label: string; score: number }) {
+  return (
+    <div className={`auth-password-strength strength-${score}`}>
+      <div className="auth-password-strength-label">
+        <span>Password strength</span>
+        <strong>{label}</strong>
+      </div>
+      <div
+        className="auth-password-strength-meter"
+        role="meter"
+        aria-label="Password strength"
+        aria-valuemin={0}
+        aria-valuemax={4}
+        aria-valuenow={score}
+        aria-valuetext={label}
+      >
+        {[1, 2, 3, 4].map((level) => <span key={level} className={score >= level ? 'active' : ''} />)}
+      </div>
+    </div>
+  )
+}
+
+function getPasswordStrength(password: string) {
+  if (!password) return { score: 0, label: 'Not set' }
+
+  let score = 0
+  if (password.length >= 8) score += 1
+  if (/[A-Z]/.test(password)) score += 1
+  if (/[0-9]/.test(password)) score += 1
+  if (password.length >= 12 || (/[a-z]/.test(password) && /[^A-Za-z0-9]/.test(password))) score += 1
+
+  return {
+    score,
+    label: ['Weak', 'Weak', 'Fair', 'Good', 'Strong'][score],
+  }
 }
 
 function GoogleLogo() {
