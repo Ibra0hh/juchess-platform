@@ -19,6 +19,7 @@ const CompleteProfilePage = lazy(() => import('./screens/CompleteProfilePage'))
 const ProfilePage = lazy(() => import('./screens/ProfilePage'))
 const TournamentDetailPage = lazy(() => import('./screens/TournamentDetailPage'))
 const TournamentsPage = lazy(() => import('./screens/TournamentsPage'))
+const VerifyEmailPage = lazy(() => import('./screens/VerifyEmailPage'))
 
 function NotFound() {
   return (
@@ -51,6 +52,7 @@ function App() {
               <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
               <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="/auth/callback" element={<OAuthCallbackPage />} />
               <Route path="/complete-profile" element={<CompleteProfilePage />} />
               <Route path="/games" element={<OnlineGamesPage />} />

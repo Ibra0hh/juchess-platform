@@ -73,10 +73,11 @@ function AuthPage({ mode }: AuthPageProps) {
           email: email.trim(),
           password,
         })
+        navigate(`/verify-email?sent=1&email=${encodeURIComponent(email.trim())}`)
       } else {
         await signIn({ email: email.trim(), password })
+        navigate('/profile')
       }
-      navigate('/profile')
     } catch (error) {
       setMessage(formatAppwriteError(error))
     } finally {

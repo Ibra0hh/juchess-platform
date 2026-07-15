@@ -111,9 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setError(null)
-    const session = await signUpWithEmail(input)
-    setUser(session.user)
-    setProfile(session.profile)
+    await signUpWithEmail(input)
+    setUser(null)
+    setProfile(null)
   }, [previewSession])
 
   const signOut = useCallback(async () => {

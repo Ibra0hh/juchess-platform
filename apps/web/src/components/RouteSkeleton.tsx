@@ -7,7 +7,7 @@ type SkeletonKind = 'auth' | 'board' | 'content'
 
 function routeKind(pathname: string): SkeletonKind {
   if (/\/(?:games|tools)(?:\/|$)/.test(pathname)) return 'board'
-  if (/\/(?:sign-in|sign-up|forgot-password|complete-profile|auth)(?:\/|$)/.test(pathname)) return 'auth'
+  if (/\/(?:sign-in|sign-up|forgot-password|verify-email|complete-profile|auth)(?:\/|$)/.test(pathname)) return 'auth'
   return 'content'
 }
 

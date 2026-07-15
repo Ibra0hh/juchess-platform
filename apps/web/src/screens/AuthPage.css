@@ -583,6 +583,36 @@
   margin-top: 8px;
 }
 
+.auth-status-icon {
+  width: 64px;
+  height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(169, 138, 63, 0.34);
+  border-radius: 50%;
+  background: rgba(169, 138, 63, 0.1);
+  color: #7a2431;
+}
+
+.auth-status-icon.verified {
+  border-color: rgba(33, 86, 61, 0.28);
+  background: rgba(33, 86, 61, 0.08);
+  color: #21563d;
+}
+
+.auth-status-icon.error {
+  border-color: rgba(122, 36, 49, 0.28);
+  background: rgba(122, 36, 49, 0.08);
+  color: #7a2431;
+}
+
+.auth-callback-panel .auth-verification-help {
+  max-width: 360px;
+  color: rgba(17, 17, 17, 0.58);
+  font-size: 12.5px;
+}
+
 .auth-spinner {
   width: 28px;
   height: 28px;

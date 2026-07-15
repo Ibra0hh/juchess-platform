@@ -68,11 +68,18 @@ type AccessGuardInput = {
 
 class AccessBlockedError extends Error {}
 
+class EmailVerificationRequiredError extends Error {}
+
 export async function getCurrentSession(): Promise<AuthSession | null> {
   if (!appwriteReady) return null
 
   try {
     const user = await account.get()
+    if (!user.emailVerification) {
+      await deleteCurrentSession()
+      return null
+    }
+
     const profile = await ensureProfileForUser(user)
     if (profile?.status === 'suspended') {
       throw new AccessBlockedError('This account is blocked by club administration.')
@@ -106,6 +113,25 @@ export async function signInWithEmail(input: SignInInput): Promise<AuthSession> 
     password: input.password,
   })
 
+  const user = await account.get()
+  if (!user.emailVerification) {
+    let verificationSent = false
+    try {
+      await sendCurrentUserEmailVerification()
+      verificationSent = true
+    } catch (error) {
+      console.warn('JuChess could not resend the email verification link.', error)
+    } finally {
+      await deleteCurrentSession()
+    }
+
+    throw new EmailVerificationRequiredError(
+      verificationSent
+        ? 'Verify your email before signing in. We sent you a new verification link.'
+        : 'Verify your email before signing in. Open the most recent verification email we sent you.',
+    )
+  }
+
   const session = await getCurrentSession()
   if (!session) {
     throw new Error('Sign in succeeded, but the account session could not be loaded.')
@@ -114,7 +140,7 @@ export async function signInWithEmail(input: SignInInput): Promise<AuthSession> 
   return session
 }
 
-export async function signUpWithEmail(input: SignUpInput): Promise<AuthSession> {
+export async function signUpWithEmail(input: SignUpInput): Promise<void> {
   requireAppwriteReady()
   if (!input.universityId?.trim() || !normalizeJordanPhone(input.phone)) {
     throw new Error('University ID and phone number are required.')
@@ -137,14 +163,12 @@ export async function signUpWithEmail(input: SignUpInput): Promise<AuthSession> 
     password: input.password,
   })
 
-  await createProfileForUser(user, input)
-
-  const session = await getCurrentSession()
-  if (!session) {
-    throw new Error('Account created, but the account session could not be loaded.')
+  try {
+    await createProfileForUser(user, input)
+    await sendCurrentUserEmailVerification()
+  } finally {
+    await deleteCurrentSession()
   }
-
-  return session
 }
 
 export function startOAuthSession(provider: SocialAuthProvider) {
@@ -197,6 +221,15 @@ export async function completePasswordRecovery(userId: string, secret: string, p
     userId,
     secret,
     password,
+  })
+}
+
+export async function completeEmailVerification(userId: string, secret: string) {
+  requireAppwriteReady()
+
+  await account.updateEmailVerification({
+    userId,
+    secret,
   })
 }
 
@@ -441,6 +474,20 @@ async function createProfileForUser(user: Models.User, input: Partial<SignUpInpu
 function requireAppwriteReady() {
   if (!appwriteReady) {
     throw new Error('Cloud accounts are not configured for this app.')
+  }
+}
+
+async function sendCurrentUserEmailVerification() {
+  await account.createEmailVerification({
+    url: appUrl('/verify-email'),
+  })
+}
+
+async function deleteCurrentSession() {
+  try {
+    await account.deleteSession({ sessionId: 'current' })
+  } catch {
+    // A failed or expired session is already signed out from the app's perspective.
   }
 }
 
