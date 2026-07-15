@@ -459,7 +459,6 @@ function TeamSection() {
         <span>The people behind the board</span>
         <h2 id="team-title">Meet the club team</h2>
         <p>Meet the students leading JuChess, shaping its events and identity, and building the platform behind the club.</p>
-        <Link to="/join-the-team" className="team-join-link">Join the working team <ArrowRight size={16} /></Link>
       </div>
       <div className="team-grid">
         {teamMembers.map((member) => (
@@ -475,6 +474,9 @@ function TeamSection() {
             </div>
           </article>
         ))}
+      </div>
+      <div className="team-join-action">
+        <Link to="/join-the-team" className="team-join-link">Join the working team <ArrowRight size={16} /></Link>
       </div>
     </section>
   )
