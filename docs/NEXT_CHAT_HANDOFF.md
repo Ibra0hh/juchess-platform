@@ -271,7 +271,7 @@ Appwrite:
 
 Live Function IDs and latest ready deployments at handoff time:
 
-- `admin-actions`: deployment `6a58efdbaa4dd6278a01`, ready and active
+- `admin-actions`: deployment `6a590cc75b48c61da74b`, ready and active
 - `player-actions`: deployment `6a5804c43a59bae2fb6d`, ready and active
 - `attendance-actions`: deployment `6a53cd75ade72590f33d`, ready and active
 - `access-guards`: deployment `6a57ee981310b683f32f`, ready and active
@@ -948,8 +948,9 @@ Player Management email is implemented in source and in the active
   and the action is recorded in `admin_audit` without storing the message body.
 - After the first Gmail test showed a delayed crest, the shared email-only logo
   was reduced from 45,141 bytes at 220x220 to 16,950 bytes at 120x120. Player
-  emails render it at 72x72 and show a burgundy circular `JU` fallback while a
-  mail client fetches the remote image.
+  emails still render it at 72x72. A temporary burgundy `JU` fallback was tried,
+  then removed at the user's request so the original transparent crest style,
+  spacing, and `JuChess` alt text are restored while retaining the smaller file.
 - Production now has the enabled Appwrite Messaging provider `JuChess Resend`.
   Its active Resend credential is send-only and restricted to `juchess.page`;
   Appwrite stores it server-side. A superseded setup key was revoked during
@@ -1210,15 +1211,18 @@ The July 16 Player Management email implementation passed before commit:
   survived reload, and produced no browser warnings/errors
 - GitHub Pages run `29508455594` succeeded and the production crest matched the
   16,950-byte source asset exactly
-- `admin-actions` deployment `6a58efdbaa4dd6278a01` reached ready and active
+- Restored original transparent crest markup rendered with no forced background
+  or rounding, survived reload, and produced no browser warnings/errors
+- `admin-actions` deployment `6a590cc75b48c61da74b` reached ready and active
 
 The Appwrite Messaging provider `JuChess Resend` was subsequently created and
 verified enabled through Appwrite. The first user-confirmed branded production
 test reached `status: sent` with one delivery; the recipient confirmed Gmail
 rendering and reported only the crest's initial loading delay. After the asset
-and fallback fix, two more user-confirmed emails also reached `status: sent`
-with one delivery each. Their Gmail rendering and reply-to behavior await
-confirmation.
+optimization, two more user-confirmed emails also reached `status: sent` with
+one delivery each. The original transparent crest markup was then restored at
+the user's request. Gmail rendering of that final style and reply-to behavior
+await confirmation.
 
 At commit `31179d1`, the latest authentication work passed:
 
