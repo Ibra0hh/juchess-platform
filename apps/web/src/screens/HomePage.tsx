@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { ArrowRight, CalendarDays, Mail, MapPin, Trophy, Users, Wifi } from 'lucide-react'
+import { ArrowRight, AtSign, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
@@ -7,26 +7,7 @@ import { loadAnnouncements, loadTournamentSummaries, type Announcement, type Tou
 import './HomePage.css'
 
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
-
-function InstagramIcon({ size = 20 }: { size?: number }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="18" height="18" x="3" y="3" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  )
-}
+const instagramGlyphUrl = `${import.meta.env.BASE_URL}prototype/assets/instagram-glyph-gradient.svg`
 
 const fallers = [
   { glyph: '♟', left: 12, size: 28, duration: 12.5, delay: -4.2, opacity: 0.1 },
@@ -492,15 +473,19 @@ function AppSection() {
       <div className="home-app-panel">
         <div className="app-panel-grid" aria-hidden="true" />
         <div className="app-copy">
-          <span>Contact the club</span>
-          <h2 id="contact-title">Get in touch with us.</h2>
+          <div className="contact-heading">
+            <img className="contact-logo" src={crestUrl} alt="JuChess crest" />
+            <div className="contact-heading-copy">
+              <span>Contact the club</span>
+              <h2 id="contact-title">Get in touch with us.</h2>
+            </div>
+          </div>
           <p>Questions about membership, tournaments, or club activities? Contact the JuChess team by email or Instagram.</p>
         </div>
         <div className="contact-side">
-          <img className="contact-logo" src={crestUrl} alt="JuChess crest" />
           <div className="contact-options" aria-label="Club contact details">
             <a href="mailto:Juchess180@gmail.com" aria-label="Email JuChess at Juchess180@gmail.com">
-              <span className="contact-option-icon"><Mail aria-hidden="true" size={20} /></span>
+              <span className="contact-option-icon contact-option-icon--email"><AtSign aria-hidden="true" size={23} strokeWidth={2.25} /></span>
               <span><small>Email</small><strong>Juchess180@gmail.com</strong></span>
               <ArrowRight className="contact-option-arrow" aria-hidden="true" size={17} />
             </a>
@@ -510,7 +495,9 @@ function AppSection() {
               rel="noreferrer"
               aria-label="Open JuChess on Instagram"
             >
-              <span className="contact-option-icon"><InstagramIcon /></span>
+              <span className="contact-option-icon contact-option-icon--instagram">
+                <img src={instagramGlyphUrl} alt="" aria-hidden="true" />
+              </span>
               <span><small>Instagram</small><strong>@ju.chess</strong></span>
               <ArrowRight className="contact-option-arrow" aria-hidden="true" size={17} />
             </a>
