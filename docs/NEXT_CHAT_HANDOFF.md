@@ -962,6 +962,13 @@ Player Management email is implemented in source and in the active
   crest-loading optimization, then requested the original transparent style
   again. The restored-style follow-up awaits Gmail feedback; reply-to behavior
   also remains unconfirmed.
+- A live bulk verification resend was triggered on July 16, 2026 for all seven
+  accounts that Appwrite reported as `emailVerification: false`. Each resend
+  used a newly created short-lived user session so Appwrite could issue its
+  canonical seven-day verification link, and all seven temporary sessions were
+  deleted immediately afterward. Appwrite subsequently reported all seven
+  accounts as verified and zero remaining unverified accounts; individual inbox
+  delivery was not independently confirmed.
 
 ## 21. Game Review And Analysis
 
