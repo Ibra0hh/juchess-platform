@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { Account, Client, ID, Permission, Query, Role, TablesDB } from 'node-appwrite';
+import { Account, Client, ID, Permission, Query, Role, TablesDB, Users } from 'node-appwrite';
 
 // Player-facing writes. Everything a signed-in student is allowed to change
 // about their own registration goes through here, so the client can never pick
@@ -273,6 +273,44 @@ async function loadProfileContext(tablesDB, databaseId, accountId) {
   }
 }
 
+function isNotFound(error) {
+  return error?.code === 404 || error?.response?.code === 404;
+}
+
+export async function findReclaimablePhoneIdentity(
+  tablesDB,
+  users,
+  databaseId,
+  profileId,
+  phone,
+) {
+  if (!phone) return null;
+
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.profilePrivate,
+    queries: [Query.equal('phone', phone), Query.limit(2)],
+    total: false,
+  });
+  const conflict = response.rows.find((row) => (
+    row.$id !== profileId && row.profileId !== profileId
+  ));
+  if (!conflict) return null;
+
+  if (!users || !conflict.accountId) {
+    throw new HttpError(409, 'That phone number is already registered.');
+  }
+
+  try {
+    await users.get({ userId: conflict.accountId });
+  } catch (cause) {
+    if (isNotFound(cause)) return conflict;
+    throw cause;
+  }
+
+  throw new HttpError(409, 'That phone number is already registered.');
+}
+
 async function requirePlayer(req, tablesDB, databaseId) {
   const user = await requireAccount(req, 'Sign in to manage your registration.');
   const { profile, identity } = await loadProfileContext(tablesDB, databaseId, user.$id);
@@ -286,16 +324,35 @@ async function requirePlayer(req, tablesDB, databaseId) {
   return { accountId: user.$id, profile };
 }
 
-export async function saveOwnerProfile(tablesDB, databaseId, user, body) {
+export async function saveOwnerProfile(tablesDB, databaseId, user, body, users = null) {
   const { publicData, privateData } = normalizeProfileUpdate(body);
   const context = await loadProfileContext(tablesDB, databaseId, user.$id);
   const profileId = context.profile?.$id ?? context.identity?.$id ?? ID.unique();
   const status = context.profile?.status ?? 'pending';
   const identityData = buildPrivateProfileData(profileId, user, context.identity, privateData);
   assertCompletePlayerProfile({ ...context.profile, ...publicData }, identityData);
+  const reclaimablePhoneIdentity = Object.prototype.hasOwnProperty.call(privateData, 'phone')
+    ? await findReclaimablePhoneIdentity(
+        tablesDB,
+        users,
+        databaseId,
+        profileId,
+        privateData.phone,
+      )
+    : null;
   const transaction = await tablesDB.createTransaction({ ttl: 60 });
 
   try {
+    if (reclaimablePhoneIdentity) {
+      await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.profilePrivate,
+        rowId: reclaimablePhoneIdentity.$id,
+        data: { phone: null },
+        transactionId: transaction.$id,
+      });
+    }
+
     const profile = context.profile
       ? await tablesDB.updateRow({
           databaseId,
@@ -487,6 +544,7 @@ export default async ({ req, res, log, error }) => {
     .setKey(req.headers['x-appwrite-key'] ?? '');
 
   const tablesDB = new TablesDB(client);
+  const users = new Users(client);
   const databaseId = process.env.JUCHESS_DATABASE_ID ?? 'juchess';
   const method = req.method.toUpperCase();
   const path = req.path || '/';
@@ -521,7 +579,7 @@ export default async ({ req, res, log, error }) => {
         return res.json({ ok: true, row: mergeOwnerProfile(profile, identity, user) });
       }
 
-      const row = await saveOwnerProfile(tablesDB, databaseId, user, body);
+      const row = await saveOwnerProfile(tablesDB, databaseId, user, body, users);
       return res.json({ ok: true, row });
     }
 

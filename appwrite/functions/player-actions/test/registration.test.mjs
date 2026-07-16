@@ -5,6 +5,7 @@ import {
   attendanceRowId,
   attendanceWindowState,
   buildPrivateProfileData,
+  findReclaimablePhoneIdentity,
   isCompletePlayerProfile,
   mergeOwnerProfile,
   normalizePhone,
@@ -110,6 +111,153 @@ test('private profile writes always bind the required matching profile ID', () =
     universityId: 'new-id',
     phone: '+962790000000',
   });
+});
+
+test('a phone owned by an active account cannot be reclaimed', async () => {
+  const tablesDB = {
+    async listRows() {
+      return {
+        rows: [{
+          $id: 'other-profile',
+          profileId: 'other-profile',
+          accountId: 'active-account',
+          phone: '+962791234567',
+        }],
+      };
+    },
+  };
+  const users = {
+    async get() {
+      return { $id: 'active-account' };
+    },
+  };
+
+  await assert.rejects(
+    findReclaimablePhoneIdentity(
+      tablesDB,
+      users,
+      'juchess',
+      'current-profile',
+      '+962791234567',
+    ),
+    (error) => error.statusCode === 409 && /phone number is already registered/i.test(error.message),
+  );
+});
+
+test('a deleted account cannot reserve a phone number forever', async () => {
+  const orphan = {
+    $id: 'orphan-profile',
+    profileId: 'orphan-profile',
+    accountId: 'deleted-account',
+    phone: '+962791234567',
+  };
+  const tablesDB = {
+    async listRows() {
+      return { rows: [orphan] };
+    },
+  };
+  const users = {
+    async get() {
+      throw { code: 404 };
+    },
+  };
+
+  assert.equal(
+    await findReclaimablePhoneIdentity(
+      tablesDB,
+      users,
+      'juchess',
+      'current-profile',
+      '+962791234567',
+    ),
+    orphan,
+  );
+});
+
+test('profile completion clears an orphaned phone reservation in the same transaction', async () => {
+  const updates = [];
+  const transactionUpdates = [];
+  let listCall = 0;
+  const tablesDB = {
+    async listRows() {
+      listCall += 1;
+      if (listCall === 1) {
+        return {
+          rows: [{
+            $id: 'current-profile',
+            profileId: 'current-profile',
+            accountId: 'current-account',
+            email: 'student@example.com',
+            universityId: '0201234',
+            phone: null,
+          }],
+        };
+      }
+      return {
+        rows: [{
+          $id: 'orphan-profile',
+          profileId: 'orphan-profile',
+          accountId: 'deleted-account',
+          phone: '+962791234567',
+        }],
+      };
+    },
+    async getRow() {
+      return { $id: 'current-profile', displayName: 'Student Knight', status: 'pending' };
+    },
+    async createTransaction() {
+      return { $id: 'transaction-1' };
+    },
+    async updateRow(options) {
+      updates.push(options);
+      if (options.tableId === 'profiles') {
+        return {
+          $id: 'current-profile',
+          displayName: 'Student Knight',
+          university: 'University of Jordan',
+          status: 'pending',
+        };
+      }
+      return { $id: options.rowId, ...options.data };
+    },
+    async upsertRow(options) {
+      return { $id: options.rowId, ...options.data };
+    },
+    async updateTransaction(options) {
+      transactionUpdates.push(options);
+      return {};
+    },
+  };
+  const users = {
+    async get() {
+      throw { code: 404 };
+    },
+  };
+
+  const result = await saveOwnerProfile(
+    tablesDB,
+    'juchess',
+    { $id: 'current-account', email: 'student@example.com' },
+    {
+      displayName: 'Student Knight',
+      university: 'University of Jordan',
+      universityId: '0201234',
+      phone: '0791234567',
+    },
+    users,
+  );
+
+  assert.deepEqual(updates[0], {
+    databaseId: 'juchess',
+    tableId: 'profile_private',
+    rowId: 'orphan-profile',
+    data: { phone: null },
+    transactionId: 'transaction-1',
+  });
+  assert.equal(updates[1].tableId, 'profiles');
+  assert.equal(updates[1].transactionId, 'transaction-1');
+  assert.deepEqual(transactionUpdates, [{ transactionId: 'transaction-1', commit: true }]);
+  assert.equal(result.phone, '+962791234567');
 });
 
 test('profile updates reject every server-owned identity and moderation field', () => {

@@ -70,7 +70,8 @@
       "rows.read",
       "rows.write",
       "documents.read",
-      "documents.write"
+      "documents.write",
+      "users.read"
     ],
     "vars": [
       {
