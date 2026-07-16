@@ -1209,6 +1209,22 @@ running it against production.
 
 ## 25. Latest Verified Behavior
 
+At commit `84c6d0f`, profile completion now safely releases a phone number
+reserved by a private profile only when Appwrite confirms that the former
+account no longer exists. Active accounts still retain exclusive ownership.
+The release and the completing player's public/private updates are staged in
+one Appwrite transaction. `player-actions` now has the minimum additional
+`users.read` runtime scope needed for that account-existence check.
+
+- Function syntax checks and all 21 Function tests passed.
+- `player-actions` deployment `6a593e77c824110fdeb3` is ready, active, and
+  live with execution permission `users` and runtime scope `users.read`.
+- The production completion form reproduced the prior duplicate error before
+  deployment. After deployment, the same signed-in submission returned HTTP
+  200, persisted the completed private profile, cleared the orphaned phone
+  reservation, and `/complete-profile` redirected to the rendered `/profile`
+  page after a fresh load with no alert.
+
 At commit `298e040`, the July 16 OAuth/privacy release passed and was verified
 in production:
 
