@@ -271,7 +271,7 @@ Appwrite:
 
 Live Function IDs and latest ready deployments at handoff time:
 
-- `admin-actions`: deployment `6a5880628791d61de9b5`, ready and active
+- `admin-actions`: deployment `6a58efdbaa4dd6278a01`, ready and active
 - `player-actions`: deployment `6a5804c43a59bae2fb6d`, ready and active
 - `attendance-actions`: deployment `6a53cd75ade72590f33d`, ready and active
 - `access-guards`: deployment `6a57ee981310b683f32f`, ready and active
@@ -946,14 +946,18 @@ Player Management email is implemented in source and in the active
   addresses and provider credentials are never sent back as delivery data.
 - Appwrite Messaging receives one private email message targeted by user ID,
   and the action is recorded in `admin_audit` without storing the message body.
+- After the first Gmail test showed a delayed crest, the shared email-only logo
+  was reduced from 45,141 bytes at 220x220 to 16,950 bytes at 120x120. Player
+  emails render it at 72x72 and show a burgundy circular `JU` fallback while a
+  mail client fetches the remote image.
 - Production now has the enabled Appwrite Messaging provider `JuChess Resend`.
   Its active Resend credential is send-only and restricted to `juchess.page`;
   Appwrite stores it server-side. A superseded setup key was revoked during
   configuration, and no provider secret is stored in the repository.
 - One user-confirmed production test email was sent through Appwrite Messaging
   on July 16, 2026. Appwrite reported `status: sent` and `deliveredTotal: 1`.
-  The recipient address is intentionally not stored in this handoff. Gmail
-  inbox rendering and reply-to behavior still require user confirmation.
+  The recipient address is intentionally not stored in this handoff. The user
+  confirmed Gmail rendering; reply-to behavior still requires confirmation.
 
 ## 21. Game Review And Analysis
 
@@ -1200,12 +1204,17 @@ The July 16 Player Management email implementation passed before commit:
 - Function syntax checks and 16 player/attendance/access Function tests
 - Desktop rendered composer interaction with no console warnings/errors
 - A 390x844 phone render showing the stacked, scrollable composer
-- `admin-actions` deployment `6a5880628791d61de9b5` reached ready and active
+- Optimized player-email crest rendered at 72x72 from the 120x120 source,
+  survived reload, and produced no browser warnings/errors
+- GitHub Pages run `29508455594` succeeded and the production crest matched the
+  16,950-byte source asset exactly
+- `admin-actions` deployment `6a58efdbaa4dd6278a01` reached ready and active
 
 The Appwrite Messaging provider `JuChess Resend` was subsequently created and
 verified enabled through Appwrite. A user-confirmed branded production test was
-then accepted with `status: sent` and `deliveredTotal: 1`; Gmail inbox rendering
-has not yet been confirmed by the recipient.
+then accepted with `status: sent` and `deliveredTotal: 1`; the recipient
+confirmed Gmail rendering and reported only the crest's initial loading delay,
+which the optimized asset and fallback address. Reply-to remains untested.
 
 At commit `31179d1`, the latest authentication work passed:
 
