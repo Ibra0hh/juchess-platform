@@ -11,12 +11,11 @@ function routeKind(pathname: string): SkeletonKind {
   return 'content'
 }
 
-function SkeletonNavigation({ mobile = false }: { mobile?: boolean }) {
+function SkeletonNavigation() {
   return (
-    <div className={mobile ? 'route-skeleton-mobile-nav' : 'route-skeleton-nav'} aria-hidden="true">
+    <div className="route-skeleton-nav" aria-hidden="true">
       {navItems.map((item) => (
         <span key={item}>
-          {mobile ? <i className="route-skeleton-shape" /> : null}
           <b className="route-skeleton-shape" />
         </span>
       ))}
@@ -108,7 +107,6 @@ export default function RouteSkeleton() {
       </header>
 
       {kind === 'board' ? <BoardPreview /> : kind === 'auth' ? <AuthPreview /> : <ContentPreview />}
-      {kind === 'auth' ? null : <SkeletonNavigation mobile />}
       <span className="route-skeleton-status">Loading JuChess…</span>
     </main>
   )

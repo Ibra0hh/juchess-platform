@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { Home, Trophy, UserRound, Wrench } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { profileMediaUrl } from '../lib/auth'
 import { useOnlineTournamentPlayLock } from '../lib/onlineTournamentPlayLock'
@@ -46,27 +45,22 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
 
         <nav className="main-nav" aria-label="Primary navigation">
           <Link to="/home" className={active === 'home' ? 'active' : undefined} aria-current={active === 'home' ? 'page' : undefined}>
-            <span className="nav-icon-shell"><Home className="nav-icon" aria-hidden="true" /></span>
-            <span className="nav-label">Home</span>
+            Home
           </Link>
           <Link to="/tournaments" className={active === 'tournaments' ? 'active' : undefined} aria-current={active === 'tournaments' ? 'page' : undefined}>
-            <span className="nav-icon-shell"><Trophy className="nav-icon" aria-hidden="true" /></span>
-            <span className="nav-label">Tournaments</span>
+            Tournaments
           </Link>
           {toolsUnavailable ? (
             <span aria-current={toolsActive ? 'page' : undefined} aria-disabled="true" className={toolsActive ? 'disabled active' : 'disabled'} title="Tools are unavailable during live online tournament play">
-              <span className="nav-icon-shell"><Wrench className="nav-icon" aria-hidden="true" /></span>
-              <span className="nav-label">Tools</span>
+              Tools
             </span>
           ) : (
             <Link to="/tools" className={toolsActive ? 'active' : undefined} aria-current={toolsActive ? 'page' : undefined}>
-              <span className="nav-icon-shell"><Wrench className="nav-icon" aria-hidden="true" /></span>
-              <span className="nav-label">Tools</span>
+              Tools
             </Link>
           )}
           <Link to="/profile" className={active === 'profile' ? 'active' : undefined} aria-current={active === 'profile' ? 'page' : undefined}>
-            <span className="nav-icon-shell"><UserRound className="nav-icon" aria-hidden="true" /></span>
-            <span className="nav-label">Profile</span>
+            Profile
           </Link>
         </nav>
 

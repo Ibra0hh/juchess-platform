@@ -1257,12 +1257,19 @@
 
 @media (max-width: 760px) {
   .home-screen .site-header {
+    position: sticky;
+    inset: auto;
+    top: 0;
     background: #f5efe3;
     backdrop-filter: none;
   }
 
+  .home-hero {
+    min-height: calc(100dvh - 108px);
+  }
+
   .home-hero-grid {
-    padding: 88px 20px 34px;
+    padding: 40px 20px 34px;
   }
 
   .hero-kicker {

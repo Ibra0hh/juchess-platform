@@ -64,10 +64,6 @@
   min-width: 0;
 }
 
-.nav-icon-shell {
-  display: none;
-}
-
 .main-nav a,
 .main-nav .disabled {
   font-size: 13.5px;
@@ -194,23 +190,18 @@
     backdrop-filter: none;
   }
 
-  .home-screen,
-  .tournaments-screen,
-  .club-screen,
-  .detail-screen,
-  .attendance-page-shell,
-  .auth-screen:has(> .site-header) {
-    padding-bottom: calc(94px + env(safe-area-inset-bottom));
-  }
-
   .site-header-inner {
-    height: 64px;
-    min-height: 64px;
+    height: auto;
+    min-height: 108px;
     padding: 0 14px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "brand auth";
-    gap: 12px;
+    grid-template-rows: 63px 45px;
+    grid-template-areas:
+      "brand auth"
+      "nav nav";
+    column-gap: 12px;
+    row-gap: 0;
   }
 
   .brand-link {
@@ -228,102 +219,56 @@
   }
 
   .main-nav {
-    position: fixed;
-    right: max(12px, env(safe-area-inset-right));
-    bottom: max(10px, env(safe-area-inset-bottom));
-    left: max(12px, env(safe-area-inset-left));
-    z-index: 100;
-    width: auto;
-    max-width: 460px;
-    min-height: 68px;
-    margin-inline: auto;
-    padding: 6px;
-    gap: 2px;
+    grid-area: nav;
+    position: static;
+    width: 100%;
+    min-height: 45px;
+    padding: 0;
+    gap: 0;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    align-items: stretch;
+    align-items: end;
+    justify-self: stretch;
     overflow: visible;
-    background: rgba(255, 252, 244, 0.94);
-    border: 1px solid rgba(82, 61, 51, 0.16);
-    border-radius: 22px;
-    box-shadow: 0 12px 34px rgba(45, 31, 25, 0.18), 0 2px 8px rgba(45, 31, 25, 0.08);
-    backdrop-filter: blur(20px) saturate(1.25);
+    border-top: 1px solid rgba(17, 17, 17, 0.1);
   }
 
   .main-nav a,
   .main-nav .disabled {
     min-width: 0;
-    min-height: 56px;
-    padding: 4px 2px 3px;
+    min-height: 44px;
+    padding: 0 4px;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
     border: 0;
-    border-radius: 16px;
-    color: rgba(42, 32, 28, 0.76);
-    font-size: clamp(9.5px, 2.6vw, 11px);
-    font-weight: 600;
+    border-radius: 0;
+    color: rgba(17, 17, 17, 0.74);
+    font-size: clamp(11px, 3.2vw, 13px);
+    font-weight: 500;
     line-height: 1;
     text-align: center;
-    transition: color 160ms ease, background-color 160ms ease, transform 160ms ease;
+    transition: color 160ms ease, background-color 160ms ease;
   }
 
   .main-nav a.active {
-    border-bottom: 0;
+    border-bottom: 2px solid #a98a3f;
     background: transparent;
     color: #7a2431;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .main-nav a:hover {
-    background: rgba(122, 36, 49, 0.06);
-  }
-
-  .main-nav a:active {
-    transform: scale(0.97);
+    background: rgba(17, 17, 17, 0.045);
   }
 
   .main-nav a:focus-visible {
     outline: 2px solid #a98a3f;
-    outline-offset: -2px;
+    outline-offset: -3px;
   }
 
   .main-nav .disabled {
     opacity: 0.34;
-  }
-
-  .nav-icon-shell {
-    width: 38px;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    border-radius: 12px;
-    color: #2a201c;
-    transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
-  }
-
-  .main-nav .active .nav-icon-shell {
-    background: #7a2431;
-    color: #fffaf0;
-    box-shadow: 0 5px 12px rgba(122, 36, 49, 0.24);
-  }
-
-  .nav-icon {
-    display: block;
-    width: 20px;
-    height: 20px;
-    stroke-width: 2.1;
-    flex: none;
-  }
-
-  .nav-label {
-    display: block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .brand-link small {
@@ -358,16 +303,30 @@
 }
 
 @media (max-width: 420px) {
-  .main-nav a,
-  .main-nav .disabled {
-    padding-inline: 0;
-    font-size: 9.5px;
+  .site-header-inner {
+    padding-inline: 12px;
+  }
+
+  .brand-link {
+    gap: 9px;
+  }
+
+  .brand-link img {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand-link strong {
+    font-size: 20px;
+  }
+
+  .sign-in-link {
+    padding-inline: 14px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .main-nav a,
-  .nav-icon-shell {
+  .main-nav a {
     transition: none;
   }
 }
