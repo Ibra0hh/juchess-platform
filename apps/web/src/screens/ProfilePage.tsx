@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Camera, Edit3, ImagePlus, LogOut, Trash2, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import ProfileImageEditor from '../components/ProfileImageEditor'
 import SiteHeader from '../components/SiteHeader'
 import UniversityField from '../components/UniversityField'
 import { useAuth } from '../context/useAuth'
@@ -16,6 +17,11 @@ type ProfileForm = {
   phone: string
   university: string
   universityId: string
+}
+
+type PendingProfileImage = {
+  file: File
+  kind: ProfileMediaKind
 }
 
 function ProfilePage() {
@@ -43,6 +49,7 @@ function ProfilePage() {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [mediaBusy, setMediaBusy] = useState<ProfileMediaKind | null>(null)
+  const [imageEditor, setImageEditor] = useState<PendingProfileImage | null>(null)
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
   const [form, setForm] = useState<ProfileForm>(() => profileForm(profile))
 
@@ -99,17 +106,34 @@ function ProfilePage() {
     }
   }
 
-  const handleImage = async (kind: ProfileMediaKind, event: ChangeEvent<HTMLInputElement>) => {
+  const handleImage = (kind: ProfileMediaKind, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    setFeedback(null)
+
+    const selectionError = profileImageSelectionError(file)
+    if (selectionError) {
+      setFeedback({ tone: 'error', text: selectionError })
+      return
+    }
+
+    setImageEditor({ file, kind })
+  }
+
+  const handleCroppedImage = async (file: File) => {
+    if (!imageEditor) return
+    const { kind } = imageEditor
     setMediaBusy(kind)
     setFeedback(null)
     try {
       await uploadProfileImage(kind, file)
+      setImageEditor(null)
       setFeedback({ tone: 'success', text: `${kind === 'avatar' ? 'Profile picture' : 'Cover image'} updated.` })
     } catch (error) {
-      setFeedback({ tone: 'error', text: formatAppwriteError(error) })
+      const message = formatAppwriteError(error)
+      setFeedback({ tone: 'error', text: message })
+      throw new Error(message)
     } finally {
       setMediaBusy(null)
     }
@@ -168,7 +192,7 @@ function ProfilePage() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   disabled={Boolean(mediaBusy)}
-                  onChange={(event) => void handleImage('cover', event)}
+                  onChange={(event) => handleImage('cover', event)}
                 />
               </label>
               {coverUrl ? (
@@ -197,7 +221,7 @@ function ProfilePage() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   disabled={Boolean(mediaBusy)}
-                  onChange={(event) => void handleImage('avatar', event)}
+                  onChange={(event) => handleImage('avatar', event)}
                 />
               </label>
             </div>
@@ -330,6 +354,15 @@ function ProfilePage() {
           </section>
         </div>
       </main>
+      {imageEditor ? (
+        <ProfileImageEditor
+          key={`${imageEditor.kind}-${imageEditor.file.name}-${imageEditor.file.lastModified}`}
+          file={imageEditor.file}
+          kind={imageEditor.kind}
+          onCancel={() => setImageEditor(null)}
+          onSave={handleCroppedImage}
+        />
+      ) : null}
     </div>
   )
 }
@@ -433,6 +466,13 @@ function getInitials(name: string) {
     .map((part) => part[0])
     .join('')
     .toUpperCase() || 'JU'
+}
+
+function profileImageSelectionError(file: File) {
+  const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+  if (!allowedTypes.has(file.type)) return 'Choose a JPG, PNG, or WebP image.'
+  if (file.size > 5 * 1024 * 1024) return 'Profile images must be 5 MB or smaller.'
+  return ''
 }
 
 export default ProfilePage
