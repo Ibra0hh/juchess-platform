@@ -315,6 +315,13 @@ The web email/password flow is live in commit `31179d1`:
    session before loading private app state.
 8. Signing in before verification attempts to send a fresh verification link,
    deletes the temporary session, and shows a verification-required message.
+9. If a verification link is invalid, expired, or already used, the callback
+   page offers a real `Resend verification email` form. Appwrite requires a
+   signed-in account to create a verification token, so JuChess asks for the
+   registered email and password, creates a short-lived session, sends the new
+   seven-day link, and deletes that session immediately. Already-verified
+   accounts are directed back to normal sign-in instead of receiving another
+   link.
 
 Important semantic point: the Appwrite account technically exists before email
 verification, but it cannot obtain JuChess app access. Do not promise that no
@@ -1253,6 +1260,14 @@ The real-email send, inbox rendering, verification click, verified sign-in,
 recovery send, and password reset remain to be tested with a user-confirmed
 recipient. Do not convert the configuration checks above into a false
 end-to-end claim.
+
+The invalid/expired verification-link recovery screen was added on July 16,
+2026. Local web lint, production build, and all 40 current web tests passed.
+Rendered desktop and 390x844 checks confirmed the error copy, credential-backed
+resend form, native required-field validation, full-width mobile action, no
+horizontal overflow, and no browser console warnings/errors. A real resend was
+not triggered during UI QA because that requires the affected player's actual
+credentials and sends an external email.
 
 At commit `c20c8c3`, the tournament/board checks below had passed:
 

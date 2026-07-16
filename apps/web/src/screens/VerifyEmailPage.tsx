@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, MailCheck } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { completeEmailVerification, formatAppwriteError } from '../lib/auth'
+import { resendEmailVerification } from '../lib/emailVerification'
 import './AuthPage.css'
+import './VerifyEmailPage.css'
 
 type VerificationStatus = 'checking' | 'sent' | 'verified' | 'error'
 
@@ -22,6 +24,10 @@ export default function VerifyEmailPage() {
         ? `We sent a verification link to ${email}.`
         : 'We sent a verification link to your email address.',
   )
+  const [resendEmail, setResendEmail] = useState(email)
+  const [resendPassword, setResendPassword] = useState('')
+  const [resending, setResending] = useState(false)
+  const [resendError, setResendError] = useState('')
 
   useEffect(() => {
     if (!hasVerificationToken || started.current) return
@@ -34,11 +40,38 @@ export default function VerifyEmailPage() {
         setStatus('verified')
         setMessage('Your email is verified. You can now sign in to JuChess.')
       })
-      .catch((error) => {
+      .catch(() => {
         setStatus('error')
-        setMessage(formatAppwriteError(error))
+        setMessage('This verification link is invalid, expired, or has already been used.')
       })
   }, [hasVerificationToken, secret, userId])
+
+  async function handleResend(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (resending) return
+
+    setResending(true)
+    setResendError('')
+    try {
+      const result = await resendEmailVerification(resendEmail, resendPassword)
+      const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
+      window.history.replaceState(null, '', `${routeBase}verify-email`)
+      setResendPassword('')
+
+      if (result === 'already-verified') {
+        setStatus('verified')
+        setMessage('Your email is already verified. You can sign in to JuChess.')
+        return
+      }
+
+      setStatus('sent')
+      setMessage(`We sent a fresh verification link to ${resendEmail.trim()}.`)
+    } catch (error) {
+      setResendError(formatAppwriteError(error))
+    } finally {
+      setResending(false)
+    }
+  }
 
   const verified = status === 'verified'
   const failed = status === 'error'
@@ -58,7 +91,37 @@ export default function VerifyEmailPage() {
             <p className="auth-verification-help">Open the latest email from JuChess and press Verify email. The link expires after seven days.</p>
           ) : null}
           {failed ? (
-            <p className="auth-verification-help">The link may be expired or already used. Sign in again and JuChess will send a fresh one.</p>
+            <>
+              <p className="auth-verification-help">Request a fresh link below. For security, enter the email and password you registered with.</p>
+              <form className="verification-resend-form" onSubmit={handleResend}>
+                <label>
+                  Email address
+                  <input
+                    type="email"
+                    name="email"
+                    autoComplete="email"
+                    value={resendEmail}
+                    onChange={(event) => setResendEmail(event.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    name="password"
+                    autoComplete="current-password"
+                    value={resendPassword}
+                    onChange={(event) => setResendPassword(event.target.value)}
+                    required
+                  />
+                </label>
+                {resendError ? <p className="verification-resend-error" role="alert">{resendError}</p> : null}
+                <button className="verification-resend-button" type="submit" disabled={resending}>
+                  {resending ? 'Sending a new link...' : 'Resend verification email'}
+                </button>
+              </form>
+            </>
           ) : null}
           {status !== 'checking' ? (
             <Link className="auth-secondary-button" to="/sign-in">
