@@ -322,7 +322,9 @@ The web email/password flow is live in commit `31179d1`:
    seven-day link, and deletes that session immediately. Already-verified
    accounts are detected from Appwrite's explicit already-verified response or
    the matching signed-in account state, receive a short thank-you confirmation,
-   and can return directly to Home instead of seeing the resend form.
+   and can return directly to Home instead of seeing the resend form. The
+   profile-completion guard deliberately allows `/verify-email` so it cannot
+   redirect an authenticated player before this state check finishes.
 
 Important semantic point: the Appwrite account technically exists before email
 verification, but it cannot obtain JuChess app access. Do not promise that no

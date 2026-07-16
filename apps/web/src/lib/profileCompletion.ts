@@ -5,7 +5,7 @@ export type ProfileCompletionFields = {
   phone?: string | null
 }
 
-const PROFILE_COMPLETION_PATHS = new Set(['/auth/callback', '/complete-profile'])
+const PROFILE_COMPLETION_PATHS = new Set(['/auth/callback', '/complete-profile', '/verify-email'])
 
 export function profileNeedsCompletion(profile: ProfileCompletionFields | null | undefined) {
   return !profile?.displayName?.trim()
