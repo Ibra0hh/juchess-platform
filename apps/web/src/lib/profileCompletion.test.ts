@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { profileNeedsCompletion, shouldRedirectToProfileCompletion } from './profileCompletion.ts'
+import {
+  profileCompletionAuthMethod,
+  profileNeedsCompletion,
+  shouldRedirectToProfileCompletion,
+} from './profileCompletion.ts'
 
 const completeProfile = {
   displayName: 'Student Knight',
@@ -55,4 +59,11 @@ test('signed-in identities without a complete profile are restricted to completi
     profile: null,
     signedIn: false,
   }), false)
+})
+
+test('profile completion uses the current session provider instead of linked identities', () => {
+  assert.equal(profileCompletionAuthMethod('email'), 'email')
+  assert.equal(profileCompletionAuthMethod('google'), 'google')
+  assert.equal(profileCompletionAuthMethod(''), 'account')
+  assert.equal(profileCompletionAuthMethod('github'), 'account')
 })

@@ -53,6 +53,7 @@ const profileMediaBucketId = 'avatars'
 export type AuthSession = {
   user: Models.User
   profile: AuthProfile | null
+  sessionProvider: string | null
 }
 
 export type SignInInput = {
@@ -91,7 +92,10 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
       return null
     }
 
-    const profile = await loadOwnerProfile()
+    const [profile, sessionProvider] = await Promise.all([
+      loadOwnerProfile(),
+      loadCurrentSessionProvider(),
+    ])
     if (profile?.status === 'suspended') {
       throw new AccessBlockedError('This account is blocked by club administration.')
     }
@@ -100,7 +104,7 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
       universityId: profile?.universityId ?? undefined,
       phone: profile?.phone ?? undefined,
     })
-    return { user, profile }
+    return { user, profile, sessionProvider }
   } catch (error) {
     if (error instanceof AccessBlockedError) {
       try {
@@ -356,6 +360,16 @@ export async function saveBoardAppearance(
 
 async function loadOwnerProfile() {
   return await runProfileAction(ExecutionMethod.GET, {}, true)
+}
+
+async function loadCurrentSessionProvider() {
+  try {
+    const session = await account.getSession({ sessionId: 'current' })
+    return session.provider?.trim().toLowerCase() || null
+  } catch {
+    // Provider metadata should never invalidate an otherwise healthy account session.
+    return null
+  }
 }
 
 async function updateOwnerProfile(data: Record<string, unknown>) {

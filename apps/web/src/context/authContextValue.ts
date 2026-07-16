@@ -15,6 +15,7 @@ export type AuthContextValue = {
   loading: boolean
   user: Models.User | null
   profile: AuthProfile | null
+  sessionProvider: string | null
   error: string | null
   refresh: () => Promise<void>
   completeOAuth: (userId: string, secret: string) => Promise<AuthSession>

@@ -7,6 +7,15 @@ export type ProfileCompletionFields = {
 
 const PROFILE_COMPLETION_PATHS = new Set(['/auth/callback', '/complete-profile', '/verify-email'])
 
+export type ProfileCompletionAuthMethod = 'google' | 'email' | 'account'
+
+export function profileCompletionAuthMethod(sessionProvider: string | null | undefined): ProfileCompletionAuthMethod {
+  const provider = sessionProvider?.trim().toLowerCase()
+  if (provider === 'google') return 'google'
+  if (provider === 'email') return 'email'
+  return 'account'
+}
+
 export function profileNeedsCompletion(profile: ProfileCompletionFields | null | undefined) {
   return !profile?.displayName?.trim()
     || !profile.university?.trim()

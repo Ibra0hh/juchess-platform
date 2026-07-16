@@ -20,6 +20,7 @@ import {
   signUpWithEmail,
   uploadProfileMedia,
   type AuthProfile,
+  type AuthSession,
   type ProfileMediaKind,
   type ProfileUpdateInput,
   type SignInInput,
@@ -28,15 +29,13 @@ import {
 import type { BoardPreferences } from '../lib/boardAppearance'
 import type { Models } from 'appwrite'
 
-type PreviewAuthSession = {
-  user: Models.User
-  profile: AuthProfile
-}
+type PreviewAuthSession = AuthSession & { profile: AuthProfile }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const previewSession = useMemo(() => createPreviewSessionFromUrl(), [])
   const [user, setUser] = useState<Models.User | null>(previewSession?.user ?? null)
   const [profile, setProfile] = useState<AuthProfile | null>(previewSession?.profile ?? null)
+  const [sessionProvider, setSessionProvider] = useState<string | null>(previewSession?.sessionProvider ?? null)
   const [loading, setLoading] = useState(!previewSession)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (previewSession) {
       setUser(previewSession.user)
       setProfile(previewSession.profile)
+      setSessionProvider(previewSession.sessionProvider)
       setLoading(false)
       setError(null)
       return
@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!appwriteReady) {
       setUser(null)
       setProfile(null)
+      setSessionProvider(null)
       setLoading(false)
       return
     }
@@ -63,10 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const session = await getCurrentSession()
       setUser(session?.user ?? null)
       setProfile(session?.profile ?? null)
+      setSessionProvider(session?.sessionProvider ?? null)
     } catch (caught) {
       setError(formatAppwriteError(caught))
       setUser(null)
       setProfile(null)
+      setSessionProvider(null)
     } finally {
       setLoading(false)
     }
@@ -81,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nextSession = createPreviewSession(input.email)
       setUser(nextSession.user)
       setProfile(nextSession.profile)
+      setSessionProvider(nextSession.sessionProvider)
       setError(null)
       return
     }
@@ -89,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = await signInWithEmail(input)
     setUser(session.user)
     setProfile(session.profile)
+    setSessionProvider(session.sessionProvider)
   }, [previewSession])
 
   const completeOAuth = useCallback(async (userId: string, secret: string) => {
@@ -96,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = await completeOAuthTokenSession(userId, secret)
     setUser(session.user)
     setProfile(session.profile)
+    setSessionProvider(session.sessionProvider)
     return session
   }, [])
 
@@ -104,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nextSession = createPreviewSession(input.email, input.fullName)
       setUser(nextSession.user)
       setProfile(nextSession.profile)
+      setSessionProvider(nextSession.sessionProvider)
       setError(null)
       return
     }
@@ -112,18 +119,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signUpWithEmail(input)
     setUser(null)
     setProfile(null)
+    setSessionProvider(null)
   }, [previewSession])
 
   const signOut = useCallback(async () => {
     if (previewSession) {
       setUser(previewSession.user)
       setProfile(previewSession.profile)
+      setSessionProvider(previewSession.sessionProvider)
       return
     }
 
     await signOutCurrentUser()
     setUser(null)
     setProfile(null)
+    setSessionProvider(null)
   }, [previewSession])
 
   const linkExternalGameUsername = useCallback(async (
@@ -218,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       user,
       profile,
+      sessionProvider,
       error,
       completeOAuth,
       linkExternalGameUsername,
@@ -230,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
     }),
-    [completeOAuth, error, linkExternalGameUsername, loading, previewSession, profile, refresh, removeProfileImage, saveBoardPreferences, signIn, signOut, signUp, updateProfile, uploadProfileImage, user],
+    [completeOAuth, error, linkExternalGameUsername, loading, previewSession, profile, refresh, removeProfileImage, saveBoardPreferences, sessionProvider, signIn, signOut, signUp, updateProfile, uploadProfileImage, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -262,7 +273,7 @@ function createPreviewSession(email: string, displayName = displayNameFromEmail(
     rating: 1200,
   } as unknown as AuthProfile
 
-  return { user, profile }
+  return { user, profile, sessionProvider: 'email' }
 }
 
 function displayNameFromEmail(email: string) {

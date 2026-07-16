@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { BadgeCheck } from 'lucide-react'
+import { BadgeCheck, Mail } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import GoogleMark from '../components/GoogleMark'
 import UniversityField from '../components/UniversityField'
 import { formatAppwriteError } from '../lib/auth'
-import { profileNeedsCompletion } from '../lib/profileCompletion'
+import { profileCompletionAuthMethod, profileNeedsCompletion } from '../lib/profileCompletion'
 import './AuthPage.css'
 
 type CompletionForm = {
@@ -18,7 +18,7 @@ type CompletionForm = {
 }
 
 export default function CompleteProfilePage() {
-  const { loading, profile, signOut, updateProfile, user } = useAuth()
+  const { loading, profile, sessionProvider, signOut, updateProfile, user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState<CompletionForm>(() => createForm(profile, user?.name))
   const [saving, setSaving] = useState(false)
@@ -32,6 +32,9 @@ export default function CompleteProfilePage() {
   if (loading) return <CompletionStatus />
   if (!user) return <Navigate to="/sign-in" replace />
   if (!profileNeedsCompletion(profile)) return <Navigate to="/profile" replace />
+
+  const authMethod = profileCompletionAuthMethod(sessionProvider)
+  const authContent = completionAuthContent(authMethod)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -77,15 +80,17 @@ export default function CompleteProfilePage() {
         <section className="auth-panel prototype-auth-panel signup social-profile-panel" aria-labelledby="complete-profile-title">
           <div className="auth-intro">
             <h1 id="complete-profile-title">Complete your player profile</h1>
-            <p>Your Google sign-in is connected. Add the details required for JuChess tournaments and membership.</p>
-            <p className="profile-creation-note">No JuChess profile is created until you submit every required field.</p>
+            <p>{authContent.intro}</p>
+            <p className="profile-creation-note">Complete every required field before continuing to private JuChess features.</p>
           </div>
 
           <div className="social-verified-account">
-            <span className="social-provider-mark"><GoogleMark size={20} /></span>
+            <span className="social-provider-mark">
+              {authMethod === 'google' ? <GoogleMark size={20} /> : <Mail size={20} aria-hidden="true" />}
+            </span>
             <div className="social-account-identity">
-              <span>Signed in with Google</span>
-              <strong>{user.name || 'Google account'}</strong>
+              <span>{authContent.label}</span>
+              <strong>{user.name || authContent.fallbackName}</strong>
               <small>{user.email}</small>
             </div>
             <span className="social-verification-status"><BadgeCheck size={16} /> Verified</span>
@@ -120,6 +125,28 @@ export default function CompleteProfilePage() {
       </main>
     </div>
   )
+}
+
+function completionAuthContent(authMethod: ReturnType<typeof profileCompletionAuthMethod>) {
+  if (authMethod === 'google') {
+    return {
+      label: 'Signed in with Google',
+      fallbackName: 'Google account',
+      intro: 'Your Google sign-in is connected. Add the missing details required for JuChess tournaments and membership.',
+    }
+  }
+  if (authMethod === 'email') {
+    return {
+      label: 'Signed in with email',
+      fallbackName: 'JuChess account',
+      intro: 'You signed in with email and password. Add the missing details required for JuChess tournaments and membership.',
+    }
+  }
+  return {
+    label: 'Signed in to JuChess',
+    fallbackName: 'JuChess account',
+    intro: 'Your JuChess account is signed in. Add the missing details required for tournaments and membership.',
+  }
 }
 
 function AuthInput({

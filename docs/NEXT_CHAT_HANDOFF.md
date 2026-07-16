@@ -399,6 +399,14 @@ must not claim inbox delivery until a real account/email test succeeds.
   matching production `GET /profile` execution returns HTTP 200.
 - Google supplies basic account identity but not JuChess-required university,
   University ID, and phone data. The completion screen collects those fields.
+- The profile-completion requirement is provider-agnostic: any signed-in player
+  missing full name, university, University ID, or phone is routed to
+  `/complete-profile`. The screen now reads the provider on the current
+  Appwrite session, rather than treating a linked Google identity as the active
+  sign-in method. Email/password sessions therefore show email-specific copy
+  and an email icon; only an active Google session shows Google wording. A
+  failure to load provider metadata falls back to neutral JuChess-account copy
+  and never invalidates an otherwise healthy session.
 
 Admin:
 
