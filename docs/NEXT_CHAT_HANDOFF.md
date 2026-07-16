@@ -946,10 +946,10 @@ Player Management email is implemented in source and in the active
   addresses and provider credentials are never sent back as delivery data.
 - Appwrite Messaging receives one private email message targeted by user ID,
   and the action is recorded in `admin_audit` without storing the message body.
-- Production still has zero Appwrite Messaging email providers. The next step
-  is to create and enable a send-only Resend provider in Appwrite Messaging.
-  Until that provider exists, the composer correctly reports delivery as not
-  configured and keeps Send disabled.
+- Production now has the enabled Appwrite Messaging provider `JuChess Resend`.
+  Its active Resend credential is send-only and restricted to `juchess.page`;
+  Appwrite stores it server-side. A superseded setup key was revoked during
+  configuration, and no provider secret is stored in the repository.
 - No real player email has been sent from this workflow. Obtain confirmation
   of the recipient and exact test content immediately before the first send.
 
@@ -1200,8 +1200,9 @@ The July 16 Player Management email implementation passed before commit:
 - A 390x844 phone render showing the stacked, scrollable composer
 - `admin-actions` deployment `6a5880628791d61de9b5` reached ready and active
 
-The Appwrite Messaging provider remains an external configuration blocker, so
-these checks do not constitute a real inbox delivery test.
+The Appwrite Messaging provider `JuChess Resend` was subsequently created and
+verified enabled through Appwrite. This configuration check still does not
+constitute a real inbox delivery test.
 
 At commit `31179d1`, the latest authentication work passed:
 
@@ -1266,10 +1267,10 @@ These are real limitations, not optional wording issues:
     `appwrite/schema.json`, source code, deployment status, and this handoff.
 11. The latest mobile board/pre-game change has not been visually installed on
     a phone because no adb device was connected at handoff time.
-12. Player Management email delivery code is deployed, but Appwrite Messaging
-    has no enabled email provider. Create a send-only Resend provider before
-    claiming player emails can be delivered. Email/SMS/Push announcement
-    broadcast delivery also remains incomplete.
+12. Player Management email delivery code is deployed and the send-only,
+    `juchess.page`-restricted `JuChess Resend` provider is enabled. A real
+    user-confirmed inbox delivery test is still outstanding. Email/SMS/Push
+    announcement broadcast delivery also remains incomplete.
 13. The verification/recovery provider is configured, but a real inbox flow has
     not yet been completed. This is the highest-priority auth verification gap.
 14. Email verification is currently implemented on the web client. Audit the
@@ -1281,10 +1282,12 @@ These are real limitations, not optional wording issues:
 Do not start this list blindly; the user's newest request always wins. If the
 new chat asks for general continuation, use this order:
 
-1. With explicit confirmation of the recipient, run one real web sign-up email
-   verification and one password-recovery flow. Confirm inbox branding, links,
-   verified sign-in, expired/used-link behavior, and that unverified accounts
-   cannot enter private app state. Do not expose credentials while testing.
+1. With explicit confirmation of the recipient and exact message, run one real
+   Player Management email and confirm its JuChess inbox rendering and reply-to
+   behavior. Then run one real web sign-up verification and password-recovery
+   flow, confirming branding, links, verified sign-in, expired/used-link
+   behavior, and the unverified-account gate. Do not expose credentials while
+   testing.
 2. Bring mobile auth to the same verification contract and test on a connected
    device.
 3. Reconcile public web tournament tabs with the mobile/product contract and
