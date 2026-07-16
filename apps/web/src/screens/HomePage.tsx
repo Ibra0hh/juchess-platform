@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ArrowRight, CalendarDays, Mail, MapPin, Trophy, Users, Wifi } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
+import { useAuth } from '../context/useAuth'
 import { loadAnnouncements, loadTournamentSummaries, type Announcement, type Tournament } from '../lib/juchess'
 import './HomePage.css'
 
@@ -116,6 +117,7 @@ type FeatureSlot = {
 }
 
 function HomePage() {
+  const { loading: authLoading, user } = useAuth()
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
@@ -203,10 +205,12 @@ function HomePage() {
                 Jordan students, run weekly meetups, and help every player sharpen their game across the board.
               </p>
               <div className="hero-actions">
-                <Link to="/sign-up" className="primary-action">
-                  <span aria-hidden="true">♞</span>
-                  Join the Club
-                </Link>
+                {!authLoading && !user ? (
+                  <Link to="/sign-in" className="primary-action">
+                    <span aria-hidden="true">♞</span>
+                    Join the Club
+                  </Link>
+                ) : null}
                 <a href="#vision" className="secondary-action">Our Vision <span aria-hidden="true">↓</span></a>
               </div>
             </div>
