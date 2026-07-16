@@ -355,6 +355,9 @@ Current non-secret configuration:
 - SMTP port: `587`
 - SMTP username: `resend`
 - Encryption: TLS
+- Appwrite Auth session alerts are disabled project-wide. Normal email/password
+  sign-ins on web, admin, and mobile must not send a new-session email. This
+  does not disable verification, recovery, or admin-composed player email.
 - SMTP/API credential: stored in Appwrite only; never print, copy into source,
   or include in a handoff.
 
