@@ -69,6 +69,7 @@ const EXPORTED = [
   'deleteTournamentRows',
   'assertPlayersCanBeDeleted',
   'assertParticipantCanBeAdded',
+  'isCompletePlayerProfile',
 ]
 
 const SDK_STUB = `
@@ -97,6 +98,17 @@ function loadEngine() {
 }
 
 const engine = await loadEngine()
+
+test('hosted play requires a complete public and private player profile', () => {
+  const profile = { displayName: 'Student Knight', university: 'University of Jordan' }
+  const identity = { universityId: '0201234', phone: '+962791234567' }
+
+  assert.equal(engine.isCompletePlayerProfile(profile, identity), true)
+  assert.equal(engine.isCompletePlayerProfile(null, identity), false)
+  assert.equal(engine.isCompletePlayerProfile(profile, null), false)
+  assert.equal(engine.isCompletePlayerProfile({ ...profile, university: ' ' }, identity), false)
+  assert.equal(engine.isCompletePlayerProfile(profile, { ...identity, phone: null }), false)
+})
 
 test('attendance reminder opens only during the final hour before an upcoming tournament', () => {
   const now = Date.parse('2026-07-12T12:00:00.000Z')

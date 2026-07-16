@@ -19,7 +19,6 @@ import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { TournamentMiniBoard } from '../components/TournamentMiniBoard'
 import { useAuth } from '../context/useAuth'
-import { ensureProfileForUser } from '../lib/auth'
 import {
   loadTournaments,
   parseStoredMoves,
@@ -573,7 +572,7 @@ function RegistrationTab({
 }
 
 function RegistrationActions({ tournament }: { tournament: Tournament }) {
-  const { loading: authLoading, profile, refresh, user } = useAuth()
+  const { loading: authLoading, profile, user } = useAuth()
   const [registration, setRegistration] = useState<MyRegistration | null>(null)
   const [attendance, setAttendance] = useState<MyAttendanceConfirmation | null>(null)
   const [registrationLoading, setRegistrationLoading] = useState(false)
@@ -659,6 +658,23 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
     )
   }
 
+  if (!profileId) {
+    return (
+      <div className="register-card">
+        <div className="register-icon">
+          <ShieldCheck size={24} aria-hidden="true" />
+        </div>
+        <div>
+          <h2>Complete your player profile</h2>
+          <p>Your JuChess profile is created only after you submit all required information.</p>
+        </div>
+        <div className="register-actions">
+          <Link to="/complete-profile" className="primary-action">Complete profile</Link>
+        </div>
+      </div>
+    )
+  }
+
   if (!tournamentRowId) {
     return <div className="register-card muted">Registration opens when this event is published.</div>
   }
@@ -669,16 +685,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
     setBusy(true)
     setMessage(null)
     try {
-      let resolvedProfileId = profileId
-      if (!resolvedProfileId) {
-        const resolvedProfile = await ensureProfileForUser(user)
-        resolvedProfileId = resolvedProfile?.$id
-        await refresh()
-      }
-
-      if (!resolvedProfileId) {
-        throw new Error('Player profile is not ready yet.')
-      }
+      if (!profileId) throw new Error('Complete your player profile before registering.')
 
       setRegistration(await registerForTournament(tournamentRowId))
       setMessage('Registration received. The organizers will review your spot.')

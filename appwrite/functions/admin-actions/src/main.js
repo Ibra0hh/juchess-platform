@@ -419,6 +419,15 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function isCompletePlayerProfile(profile, identity) {
+  return Boolean(
+    String(profile?.displayName ?? '').trim()
+    && String(profile?.university ?? '').trim()
+    && String(identity?.universityId ?? '').trim()
+    && String(identity?.phone ?? '').trim(),
+  );
+}
+
 const PLAYER_EMAIL_RECIPIENT_LIMIT = 50;
 const PLAYER_EMAIL_SUBJECT_LIMIT = 120;
 const PLAYER_EMAIL_BODY_LIMIT = 5000;
@@ -3419,6 +3428,7 @@ async function getAuthenticatedAccountId(req, authMessage = 'Admin session is re
 async function requirePlayerActor(req, tablesDB, databaseId) {
   const accountId = await getAuthenticatedAccountId(req, 'Sign in to play this tournament game.');
   let profile = null;
+  let identity = null;
   try {
     const response = await tablesDB.listRows({
       databaseId,
@@ -3427,6 +3437,7 @@ async function requirePlayerActor(req, tablesDB, databaseId) {
       total: false,
     });
     if (response.rows[0]) {
+      identity = response.rows[0];
       profile = await tablesDB.getRow({
         databaseId,
         tableId: tableIds.profiles,
@@ -3445,11 +3456,16 @@ async function requirePlayerActor(req, tablesDB, databaseId) {
         total: false,
       });
       profile = legacy.rows[0] ?? null;
+      identity = legacyIdentityForProfile(profile);
     } catch {
       profile = null;
+      identity = null;
     }
   }
   if (!profile) throw new HttpError(403, 'No JuChess player profile exists for this account.');
+  if (!isCompletePlayerProfile(profile, identity)) {
+    throw new HttpError(403, 'Complete your JuChess profile before playing tournament games.');
+  }
   if (profile.status === 'suspended') throw new HttpError(403, 'This player account is suspended.');
   return profile;
 }

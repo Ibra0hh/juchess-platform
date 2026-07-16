@@ -197,6 +197,23 @@ export function mergeOwnerProfile(profile, identity, user = null) {
   });
 }
 
+export function isCompletePlayerProfile(profile, identity) {
+  return Boolean(
+    String(profile?.displayName ?? '').trim()
+    && String(profile?.university ?? '').trim()
+    && String(identity?.universityId ?? '').trim()
+    && String(identity?.phone ?? '').trim(),
+  );
+}
+
+export function assertCompletePlayerProfile(profile, identity) {
+  if (isCompletePlayerProfile(profile, identity)) return;
+  throw new HttpError(
+    400,
+    'Full name, university, University ID, and phone number are required before a JuChess profile can be created.',
+  );
+}
+
 async function requireAccount(req, authMessage = 'Sign in to manage your JuChess profile.') {
   const jwt = req.headers['juchess-player-jwt'] || req.headers['x-appwrite-user-jwt'];
   if (!jwt) throw new HttpError(401, authMessage);
@@ -258,19 +275,24 @@ async function loadProfileContext(tablesDB, databaseId, accountId) {
 
 async function requirePlayer(req, tablesDB, databaseId) {
   const user = await requireAccount(req, 'Sign in to manage your registration.');
-  const { profile } = await loadProfileContext(tablesDB, databaseId, user.$id);
+  const { profile, identity } = await loadProfileContext(tablesDB, databaseId, user.$id);
 
   if (!profile) throw new HttpError(403, 'No club profile exists for this account.');
+  if (!isCompletePlayerProfile(profile, identity)) {
+    throw new HttpError(403, 'Complete your JuChess profile before using player services.');
+  }
   if (profile.status === 'suspended') throw new HttpError(403, 'This account is blocked by club administration.');
 
   return { accountId: user.$id, profile };
 }
 
-async function saveOwnerProfile(tablesDB, databaseId, user, body) {
+export async function saveOwnerProfile(tablesDB, databaseId, user, body) {
   const { publicData, privateData } = normalizeProfileUpdate(body);
   const context = await loadProfileContext(tablesDB, databaseId, user.$id);
   const profileId = context.profile?.$id ?? context.identity?.$id ?? ID.unique();
   const status = context.profile?.status ?? 'pending';
+  const identityData = buildPrivateProfileData(profileId, user, context.identity, privateData);
+  assertCompletePlayerProfile({ ...context.profile, ...publicData }, identityData);
   const transaction = await tablesDB.createTransaction({ ttl: 60 });
 
   try {
@@ -288,7 +310,6 @@ async function saveOwnerProfile(tablesDB, databaseId, user, body) {
           tableId: tableIds.profiles,
           rowId: profileId,
           data: {
-            displayName: publicData.displayName || String(user.name || user.email).trim(),
             ...publicData,
             rating: 1200,
             role: 'member',
@@ -302,7 +323,7 @@ async function saveOwnerProfile(tablesDB, databaseId, user, body) {
       databaseId,
       tableId: tableIds.profilePrivate,
       rowId: profileId,
-      data: buildPrivateProfileData(profileId, user, context.identity, privateData),
+      data: identityData,
       permissions: [Permission.read(Role.user(user.$id))],
       transactionId: transaction.$id,
     });

@@ -4,6 +4,7 @@ import './App.css'
 import { AuthProvider } from './context/AuthContext'
 import { TournamentPlayProvider } from './context/TournamentPlayContext'
 import { TournamentPlayGuard } from './components/TournamentPlayGuard'
+import { ProfileCompletionGuard } from './components/ProfileCompletionGuard'
 import RouteSkeleton from './components/RouteSkeleton'
 import { useOnlineTournamentPlayLock } from './lib/onlineTournamentPlayLock'
 
@@ -41,10 +42,11 @@ function ToolsRoute() {
 function App() {
   return (
     <AuthProvider>
-      <TournamentPlayProvider>
-        <TournamentPlayGuard>
-          <Suspense fallback={<RouteSkeleton />}>
-            <Routes>
+      <ProfileCompletionGuard>
+        <TournamentPlayProvider>
+          <TournamentPlayGuard>
+            <Suspense fallback={<RouteSkeleton />}>
+              <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/tournaments" element={<TournamentsPage />} />
@@ -62,10 +64,11 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/join-the-team" element={<RecruitmentPage />} />
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </TournamentPlayGuard>
-      </TournamentPlayProvider>
+              </Routes>
+            </Suspense>
+          </TournamentPlayGuard>
+        </TournamentPlayProvider>
+      </ProfileCompletionGuard>
     </AuthProvider>
   )
 }

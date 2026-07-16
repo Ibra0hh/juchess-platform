@@ -157,9 +157,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [previewSession, profile])
 
   const updateProfile = useCallback(async (input: ProfileUpdateInput) => {
-    if (!profile) throw new Error('Sign in before editing your profile.')
+    if (!user) throw new Error('Sign in before creating or editing your profile.')
 
-    if (previewSession || profile.$id.startsWith('preview-')) {
+    if (previewSession) {
+      if (!profile) throw new Error('The preview profile is unavailable.')
+      setProfile({
+        ...profile,
+        ...input,
+        displayName: input.displayName.trim(),
+        chessComUsername: input.chessComUsername?.trim().toLowerCase() || undefined,
+        lichessUsername: input.lichessUsername?.trim().toLowerCase() || undefined,
+      } as AuthProfile)
+      return
+    }
+
+    if (profile?.$id.startsWith('preview-')) {
       setProfile({
         ...profile,
         ...input,
@@ -172,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const updated = await saveProfileDetails(input)
     setProfile(updated)
-  }, [previewSession, profile])
+  }, [previewSession, profile, user])
 
   const uploadProfileImage = useCallback(async (kind: ProfileMediaKind, file: File) => {
     if (!profile || !user) throw new Error('Sign in before uploading a profile image.')

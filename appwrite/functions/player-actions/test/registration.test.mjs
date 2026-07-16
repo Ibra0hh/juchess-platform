@@ -1,17 +1,79 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  assertCompletePlayerProfile,
   attendanceRowId,
   attendanceWindowState,
   buildPrivateProfileData,
+  isCompletePlayerProfile,
   mergeOwnerProfile,
   normalizePhone,
   normalizeProfileUpdate,
   normalizeUniversityId,
   profilePermissions,
   registrationRowId,
+  saveOwnerProfile,
   selectCanonicalRegistration,
 } from '../src/main.js';
+
+const completePublicProfile = {
+  displayName: 'Student Knight',
+  university: 'University of Jordan',
+};
+
+const completePrivateProfile = {
+  universityId: '0201234',
+  phone: '+962791234567',
+};
+
+test('profile creation requires every membership field before any write can begin', () => {
+  assert.equal(isCompletePlayerProfile(completePublicProfile, completePrivateProfile), true);
+  assert.doesNotThrow(() => assertCompletePlayerProfile(completePublicProfile, completePrivateProfile));
+
+  for (const [target, field] of [
+    ['public', 'displayName'],
+    ['public', 'university'],
+    ['private', 'universityId'],
+    ['private', 'phone'],
+  ]) {
+    const publicProfile = target === 'public'
+      ? { ...completePublicProfile, [field]: '  ' }
+      : completePublicProfile;
+    const privateProfile = target === 'private'
+      ? { ...completePrivateProfile, [field]: null }
+      : completePrivateProfile;
+
+    assert.throws(
+      () => assertCompletePlayerProfile(publicProfile, privateProfile),
+      (error) => error.statusCode === 400 && /required before a JuChess profile can be created/.test(error.message),
+      field,
+    );
+  }
+});
+
+test('an incomplete first profile submission starts no database transaction', async () => {
+  let transactionCalls = 0;
+  const tablesDB = {
+    async listRows() {
+      return { rows: [] };
+    },
+    async createTransaction() {
+      transactionCalls += 1;
+      throw new Error('A transaction must not start for incomplete profile data.');
+    },
+  };
+
+  await assert.rejects(
+    saveOwnerProfile(
+      tablesDB,
+      'juchess',
+      { $id: 'google-auth-id', email: 'student@example.com', name: 'Google Name' },
+      { displayName: 'Google Name' },
+    ),
+    (error) => error.statusCode === 400 && /required before a JuChess profile can be created/.test(error.message),
+  );
+  assert.equal(transactionCalls, 0);
+});
 
 test('profile updates separate editable public and private fields', () => {
   assert.deepEqual(normalizeProfileUpdate({

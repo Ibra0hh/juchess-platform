@@ -5,6 +5,7 @@ import { useAuth } from '../context/useAuth'
 import GoogleMark from '../components/GoogleMark'
 import UniversityField from '../components/UniversityField'
 import { formatAppwriteError } from '../lib/auth'
+import { profileNeedsCompletion } from '../lib/profileCompletion'
 import './AuthPage.css'
 
 type CompletionForm = {
@@ -17,10 +18,11 @@ type CompletionForm = {
 }
 
 export default function CompleteProfilePage() {
-  const { loading, profile, updateProfile, user } = useAuth()
+  const { loading, profile, signOut, updateProfile, user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState<CompletionForm>(() => createForm(profile, user?.name))
   const [saving, setSaving] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export default function CompleteProfilePage() {
 
   if (loading) return <CompletionStatus />
   if (!user) return <Navigate to="/sign-in" replace />
+  if (!profileNeedsCompletion(profile)) return <Navigate to="/profile" replace />
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -50,6 +53,18 @@ export default function CompleteProfilePage() {
     }
   }
 
+  async function handleSignOutWithoutProfile() {
+    setMessage(null)
+    setSigningOut(true)
+    try {
+      await signOut()
+      navigate('/home', { replace: true })
+    } catch (error) {
+      setMessage(formatAppwriteError(error))
+      setSigningOut(false)
+    }
+  }
+
   return (
     <div className="auth-screen">
       <header className="auth-site-header">
@@ -62,7 +77,8 @@ export default function CompleteProfilePage() {
         <section className="auth-panel prototype-auth-panel signup social-profile-panel" aria-labelledby="complete-profile-title">
           <div className="auth-intro">
             <h1 id="complete-profile-title">Complete your player profile</h1>
-            <p>Your Google account is connected. Add the details required for JuChess tournaments and membership.</p>
+            <p>Your Google sign-in is connected. Add the details required for JuChess tournaments and membership.</p>
+            <p className="profile-creation-note">No JuChess profile is created until you submit every required field.</p>
           </div>
 
           <div className="social-verified-account">
@@ -88,8 +104,16 @@ export default function CompleteProfilePage() {
             </div>
 
             {message ? <div className="auth-error" role="alert">{message}</div> : null}
-            <button className="auth-submit-button" type="submit" disabled={saving}>
+            <button className="auth-submit-button" type="submit" disabled={saving || signingOut}>
               {saving ? 'Saving profile...' : 'Continue to JuChess'}
+            </button>
+            <button
+              className="auth-secondary-button"
+              type="button"
+              disabled={saving || signingOut}
+              onClick={() => void handleSignOutWithoutProfile()}
+            >
+              {signingOut ? 'Signing out...' : 'Sign out without creating a profile'}
             </button>
           </form>
         </section>

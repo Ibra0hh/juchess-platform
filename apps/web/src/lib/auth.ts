@@ -91,7 +91,7 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
       return null
     }
 
-    const profile = await ensureProfileForUser(user)
+    const profile = await loadOwnerProfile()
     if (profile?.status === 'suspended') {
       throw new AccessBlockedError('This account is blocked by club administration.')
     }
@@ -202,13 +202,6 @@ export async function completeOAuthTokenSession(userId: string, secret: string):
   }
 
   return session
-}
-
-export function profileNeedsCompletion(profile: AuthProfile | null) {
-  return !profile?.displayName?.trim()
-    || !profile.university?.trim()
-    || !profile.universityId?.trim()
-    || !profile.phone?.trim()
 }
 
 export async function signOutCurrentUser() {
@@ -358,15 +351,6 @@ export async function saveBoardAppearance(
     pieceTheme: preferences.pieceTheme,
     arrowColor: preferences.arrowColor,
     markColor: preferences.markColor,
-  })
-}
-
-export async function ensureProfileForUser(user: Models.User): Promise<AuthProfile | null> {
-  const profile = await loadOwnerProfile()
-  if (profile) return profile
-
-  return await createProfileForUser(user, {
-    fullName: user.name || user.email,
   })
 }
 

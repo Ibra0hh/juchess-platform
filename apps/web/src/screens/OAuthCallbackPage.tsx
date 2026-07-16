@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
-import { formatAppwriteError, profileNeedsCompletion } from '../lib/auth'
+import { formatAppwriteError } from '../lib/auth'
+import { profileNeedsCompletion } from '../lib/profileCompletion'
 import './AuthPage.css'
 
 export default function OAuthCallbackPage() {
@@ -39,7 +40,7 @@ export default function OAuthCallbackPage() {
         <section className="auth-panel prototype-auth-panel signin auth-callback-panel" aria-live="polite">
           <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="" />
           <h1>{error ? 'Sign-in needs attention' : 'Finishing your sign-in'}</h1>
-          <p>{error || 'Creating your secure JuChess session...'}</p>
+          <p>{error || 'Creating your secure sign-in session...'}</p>
           {!error ? <span className="auth-spinner" aria-hidden="true" /> : null}
           {error ? <Link className="auth-secondary-button" to="/sign-in">Return to sign in</Link> : null}
         </section>

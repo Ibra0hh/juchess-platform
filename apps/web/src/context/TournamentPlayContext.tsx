@@ -17,14 +17,17 @@ const ACTIVE_GAME_POLL_MS = 15_000
 
 export function TournamentPlayProvider({ children }: { children: ReactNode }) {
   const { loading: authLoading, profile, user } = useAuth()
+  const accountId = user?.$id ?? null
+  const profileId = profile?.$id ?? null
+  const canCheckAssignments = Boolean(accountId && profileId)
   const [activeGame, setActiveGame] = useState<HostedGameRow | null>(null)
   const [activeTournament, setActiveTournament] = useState<HostedTournamentRow | null>(null)
-  const [checking, setChecking] = useState(Boolean(user))
+  const [checking, setChecking] = useState(canCheckAssignments)
   const [error, setError] = useState<string | null>(null)
   const requestRef = useRef<Promise<void> | null>(null)
 
   const refresh = useCallback(async () => {
-    if (!user) {
+    if (!canCheckAssignments) {
       setActiveGame(null)
       setActiveTournament(null)
       setChecking(false)
@@ -52,16 +55,16 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
     })()
     requestRef.current = request
     return request
-  }, [user])
+  }, [canCheckAssignments])
 
   useEffect(() => {
     if (authLoading) return
-    setChecking(Boolean(user))
+    setChecking(canCheckAssignments)
     void refresh()
-  }, [authLoading, refresh, user])
+  }, [authLoading, canCheckAssignments, refresh])
 
   useEffect(() => {
-    if (!user) return
+    if (!canCheckAssignments) return
     const timer = window.setInterval(() => void refresh(), ACTIVE_GAME_POLL_MS)
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') void refresh()
@@ -73,13 +76,13 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', refreshWhenVisible)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
-  }, [refresh, user])
+  }, [canCheckAssignments, refresh])
 
   useEffect(() => {
-    if (!user || !profile?.$id || activeGame) return
+    if (!accountId || !profileId || activeGame) return
     let alive = true
     let unsubscribe: (() => void) | undefined
-    void subscribeToPlayerTournamentGames(profile.$id, () => void refresh())
+    void subscribeToPlayerTournamentGames(profileId, () => void refresh())
       .then((stop) => {
         if (alive) unsubscribe = stop
         else stop()
@@ -91,7 +94,7 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
       alive = false
       unsubscribe?.()
     }
-  }, [activeGame, profile?.$id, refresh, user])
+  }, [accountId, activeGame, profileId, refresh])
 
   const value = useMemo<TournamentPlayContextValue>(() => ({
     activeGame,
