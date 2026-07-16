@@ -421,21 +421,24 @@
 
   .route-skeleton-mobile-nav {
     position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
     z-index: 10;
-    min-height: calc(66px + env(safe-area-inset-bottom));
-    padding: 4px 6px env(safe-area-inset-bottom);
+    max-width: 460px;
+    min-height: 68px;
+    margin-inline: auto;
+    padding: 6px;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    background: rgba(255, 252, 244, 0.98);
-    border-top: 1px solid var(--skeleton-line);
-    box-shadow: 0 -8px 24px rgba(17, 17, 17, 0.08);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    background: rgba(255, 252, 244, 0.94);
+    border: 1px solid var(--skeleton-line);
+    border-radius: 22px;
+    box-shadow: 0 12px 34px rgba(45, 31, 25, 0.14);
   }
 
   .route-skeleton-mobile-nav span {
-    min-height: 58px;
+    min-height: 56px;
     display: grid;
     place-items: center;
     align-content: center;

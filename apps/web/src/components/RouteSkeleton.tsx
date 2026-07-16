@@ -1,7 +1,7 @@
 import { useLocation } from 'react-router-dom'
 
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
-const navItems = Array.from({ length: 6 }, (_, index) => index)
+const navItems = Array.from({ length: 4 }, (_, index) => index)
 
 type SkeletonKind = 'auth' | 'board' | 'content'
 

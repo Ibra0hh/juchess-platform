@@ -21,6 +21,7 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
   const { loading, profile, signOut, user } = useAuth()
   const playLock = useOnlineTournamentPlayLock()
   const toolsUnavailable = toolsDisabled || Boolean(playLock)
+  const toolsActive = active === 'tools' || active === 'games'
   const displayName = profile?.displayName || user?.name || user?.email || ''
   const initials = displayName
     .split(/\s+/)
@@ -44,28 +45,28 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
         </Link>
 
         <nav className="main-nav" aria-label="Primary navigation">
-          <Link to="/home" className={active === 'home' ? 'active' : undefined}>
-            <Home className="nav-icon" aria-hidden="true" />
-            <span>Home</span>
+          <Link to="/home" className={active === 'home' ? 'active' : undefined} aria-current={active === 'home' ? 'page' : undefined}>
+            <span className="nav-icon-shell"><Home className="nav-icon" aria-hidden="true" /></span>
+            <span className="nav-label">Home</span>
           </Link>
-          <Link to="/tournaments" className={active === 'tournaments' ? 'active' : undefined}>
-            <Trophy className="nav-icon" aria-hidden="true" />
-            <span>Tournaments</span>
+          <Link to="/tournaments" className={active === 'tournaments' ? 'active' : undefined} aria-current={active === 'tournaments' ? 'page' : undefined}>
+            <span className="nav-icon-shell"><Trophy className="nav-icon" aria-hidden="true" /></span>
+            <span className="nav-label">Tournaments</span>
           </Link>
           {toolsUnavailable ? (
-            <span aria-disabled="true" className="disabled" title="Tools are unavailable during live online tournament play">
-              <Wrench className="nav-icon" aria-hidden="true" />
-              <span>Tools</span>
+            <span aria-current={toolsActive ? 'page' : undefined} aria-disabled="true" className={toolsActive ? 'disabled active' : 'disabled'} title="Tools are unavailable during live online tournament play">
+              <span className="nav-icon-shell"><Wrench className="nav-icon" aria-hidden="true" /></span>
+              <span className="nav-label">Tools</span>
             </span>
           ) : (
-            <Link to="/tools" className={active === 'tools' ? 'active' : undefined}>
-              <Wrench className="nav-icon" aria-hidden="true" />
-              <span>Tools</span>
+            <Link to="/tools" className={toolsActive ? 'active' : undefined} aria-current={toolsActive ? 'page' : undefined}>
+              <span className="nav-icon-shell"><Wrench className="nav-icon" aria-hidden="true" /></span>
+              <span className="nav-label">Tools</span>
             </Link>
           )}
-          <Link to="/profile" className={active === 'profile' ? 'active' : undefined}>
-            <UserRound className="nav-icon" aria-hidden="true" />
-            <span>Profile</span>
+          <Link to="/profile" className={active === 'profile' ? 'active' : undefined} aria-current={active === 'profile' ? 'page' : undefined}>
+            <span className="nav-icon-shell"><UserRound className="nav-icon" aria-hidden="true" /></span>
+            <span className="nav-label">Profile</span>
           </Link>
         </nav>
 
