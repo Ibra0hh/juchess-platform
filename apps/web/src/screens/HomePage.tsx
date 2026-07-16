@@ -495,10 +495,14 @@ function AppSection() {
           <span>Contact the club</span>
           <h2 id="contact-title">Get in touch with us.</h2>
           <p>Questions about membership, tournaments, or club activities? Contact the JuChess team by email or Instagram.</p>
+        </div>
+        <div className="contact-side">
+          <img className="contact-logo" src={crestUrl} alt="JuChess crest" />
           <div className="contact-options" aria-label="Club contact details">
             <a href="mailto:Juchess180@gmail.com" aria-label="Email JuChess at Juchess180@gmail.com">
-              <Mail aria-hidden="true" size={20} />
+              <span className="contact-option-icon"><Mail aria-hidden="true" size={20} /></span>
               <span><small>Email</small><strong>Juchess180@gmail.com</strong></span>
+              <ArrowRight className="contact-option-arrow" aria-hidden="true" size={17} />
             </a>
             <a
               href="https://www.instagram.com/ju.chess?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="
@@ -506,8 +510,9 @@ function AppSection() {
               rel="noreferrer"
               aria-label="Open JuChess on Instagram"
             >
-              <InstagramIcon />
+              <span className="contact-option-icon"><InstagramIcon /></span>
               <span><small>Instagram</small><strong>@ju.chess</strong></span>
+              <ArrowRight className="contact-option-arrow" aria-hidden="true" size={17} />
             </a>
           </div>
         </div>
