@@ -21,8 +21,9 @@ function run(command, envOverrides = {}) {
 }
 
 // GitHub Pages clients can retain an older HTML document briefly. Preserve
-// hashed JavaScript bundles across deployments so those cached documents do
-// not fail while loading a route chunk after a newer build is published.
+// hashed JavaScript and CSS bundles across deployments so those cached
+// documents do not fail while loading a route chunk or its styles after a
+// newer build is published.
 const assetDirs = ['docs/web/assets', 'docs/admin/assets']
 const retainedAssetsRoot = mkdtempSync(join(tmpdir(), 'juchess-pages-assets-'))
 
@@ -31,7 +32,7 @@ for (const [index, assetDir] of assetDirs.entries()) {
   mkdirSync(retainedDir)
   if (!existsSync(assetDir)) continue
   for (const name of readdirSync(assetDir)) {
-    if (name.endsWith('.js')) {
+    if (name.endsWith('.js') || name.endsWith('.css')) {
       copyFileSync(join(assetDir, name), join(retainedDir, name))
     }
   }
