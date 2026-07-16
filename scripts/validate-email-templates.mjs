@@ -9,6 +9,13 @@ const requiredByTemplate = {
 }
 const forbiddenPatterns = [/<script\b/i, /<form\b/i, /javascript:/i, /src=["']data:/i]
 const logoUrl = 'https://juchess.page/email/juchess-email-logo.png'
+const responsiveMarkup = [
+  '<meta name="viewport" content="width=device-width, initial-scale=1">',
+  '@media only screen and (max-width:480px)',
+  'class="email-gutter"',
+  'class="email-content"',
+  'class="email-cta"',
+]
 
 if (!templates.length) throw new Error('No email templates were found.')
 
@@ -22,6 +29,9 @@ for (const name of templates) {
   }
   if (!html.includes(logoUrl)) {
     throw new Error(`${name}: missing the stable JuChess email logo URL.`)
+  }
+  for (const marker of responsiveMarkup) {
+    if (!html.includes(marker)) throw new Error(`${name}: missing responsive email markup ${marker}.`)
   }
   for (const token of requiredByTemplate[name] ?? []) {
     if (!html.includes(token)) throw new Error(`${name}: missing required Appwrite token ${token}.`)

@@ -358,6 +358,12 @@ Branded Appwrite templates are saved for English:
 - Public email logo:
   `https://juchess.page/email/juchess-email-logo.png`
 - Validation command: `npm run check:email-templates`
+- Both live authentication templates were made phone-responsive on July 16,
+  2026. They use compact inline fallback spacing plus a Gmail-supported
+  `max-width:480px` media query: 24px mobile headings, 14px body copy, full-width
+  action buttons, and stacked footer links. Local renders passed at 320x568,
+  390x844, and desktop width with no horizontal overflow or console errors;
+  Appwrite's saved `verification` and `recovery` HTML matched source exactly.
 
 At this handoff, SMTP configuration and both templates were accepted by
 Appwrite, but no real end-to-end verification email was sent because the user
