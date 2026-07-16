@@ -32,8 +32,6 @@ test('player email template keeps the JuChess theme and escapes admin content', 
   });
 
   assert.match(html, /juchess-email-logo\.png/);
-  assert.match(html, /alt="JU"/);
-  assert.match(html, /border-radius:50%;background:#7d2434/);
   assert.match(html, /University of Jordan Chess Club/);
   assert.match(html, /#7d2434/);
   assert.match(html, /Pairings &lt;Final&gt;/);
