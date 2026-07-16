@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Square } from 'chess.js'
-import { BookOpen, Check, ChevronLeft, ChevronRight, FlipHorizontal2, Settings2, SkipBack, SkipForward, Star, ThumbsUp, X } from 'lucide-react'
+import { BookOpen, Check, ChevronLeft, ChevronRight, FlipHorizontal2, Settings2, SkipBack, SkipForward, Star, ThumbsUp, Trophy, X, type LucideIcon } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import chessComLogo from '../assets/providers/chess-com.png'
 import lichessLogo from '../assets/providers/lichess.png'
@@ -57,7 +57,7 @@ type SourceDef = {
   key: GameSource
   name: string
   sub: string
-  icon: string
+  icon?: LucideIcon
   image?: string
   tone: 'green' | 'blue' | 'wine'
 }
@@ -65,9 +65,9 @@ type SourceDef = {
 const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
 const sourceDefs: SourceDef[] = [
-  { key: 'chess.com', name: 'Chess.com', sub: 'Import by username', icon: '', image: chessComLogo, tone: 'green' },
-  { key: 'lichess', name: 'Lichess', sub: 'Import by username', icon: '', image: lichessLogo, tone: 'blue' },
-  { key: 'tournament', name: 'Tournament Games', sub: 'Search the club archive', icon: '\u2655', tone: 'wine' },
+  { key: 'chess.com', name: 'Chess.com', sub: 'Import by username', image: chessComLogo, tone: 'green' },
+  { key: 'lichess', name: 'Lichess', sub: 'Import by username', image: lichessLogo, tone: 'blue' },
+  { key: 'tournament', name: 'Tournament Games', sub: 'Search the club archive', icon: Trophy, tone: 'wine' },
 ]
 
 const classificationColors: Record<ReviewClassification, string> = {
@@ -724,6 +724,7 @@ function GamesPage() {
               onClick={() => setSettingsOpen((current) => !current)}
             >
               <Settings2 aria-hidden="true" />
+              <span>Settings</span>
             </button>
             <button
               type="button"
@@ -733,6 +734,7 @@ function GamesPage() {
               onClick={() => setFlipped((current) => !current)}
             >
               <FlipHorizontal2 aria-hidden="true" />
+              <span>Flip board</span>
             </button>
           </div>
 
@@ -752,6 +754,7 @@ function GamesPage() {
                 moves={boardMoves}
                 onChange={inWorkspace ? updateWorkspaceBoard : inReview ? undefined : startAnalysisFromBoard}
                 pieceTheme={pieceTheme}
+                showEvaluation={Boolean(boardGame || inReview || inWorkspace)}
                 squareBadge={reviewSquareBadge}
               />
             </div>
@@ -772,9 +775,7 @@ function GamesPage() {
                   last={workspaceMoves.length}
                   onChange={(ply) => setWorkspaceViewedPly(ply === workspaceMoves.length ? null : ply)}
                 />
-              ) : (
-                <MoveNavigation current={0} last={0} onChange={() => undefined} />
-              )}
+              ) : null}
             />
           </div>
         </section>
@@ -1098,23 +1099,26 @@ function SourceStep({
         <p className="source-help">Pick where the game was played, find it, and get a full engine-style review.</p>
       )}
 
-      {sourceDefs.map((source) => (
-        <button
-          type="button"
-          className="source-card"
-          onClick={() => onSource(source.key)}
-          key={source.key}
-        >
-          <span className={`source-icon ${source.image ? 'provider' : source.tone}`}>
-            {source.image ? <img src={source.image} alt="" aria-hidden="true" /> : source.icon}
-          </span>
-          <span>
-            <strong>{source.name}</strong>
-            <small>{source.sub}</small>
-          </span>
-          <em>&rarr;</em>
-        </button>
-      ))}
+      {sourceDefs.map((source) => {
+        const SourceIcon = source.icon
+        return (
+          <button
+            type="button"
+            className="source-card"
+            onClick={() => onSource(source.key)}
+            key={source.key}
+          >
+            <span className={`source-icon ${source.image ? 'provider' : source.tone}`}>
+              {source.image ? <img src={source.image} alt="" aria-hidden="true" /> : SourceIcon ? <SourceIcon aria-hidden="true" /> : null}
+            </span>
+            <span>
+              <strong>{source.name}</strong>
+              <small>{source.sub}</small>
+            </span>
+            <em>&rarr;</em>
+          </button>
+        )
+      })}
     </>
   )
 }

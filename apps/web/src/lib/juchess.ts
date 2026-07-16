@@ -1399,7 +1399,9 @@ function formatDateRange(startsAt?: string, endsAt?: string) {
   if (!startsAt && !endsAt) return 'Date TBA'
   if (!startsAt) return `Ends ${formatDate(endsAt)}`
   if (!endsAt || startsAt === endsAt) return formatDate(startsAt)
-  return `${formatDate(startsAt)} - ${formatDate(endsAt)}`
+  const startLabel = formatDate(startsAt)
+  const endLabel = formatDate(endsAt)
+  return startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`
 }
 
 function formatDate(value?: string) {

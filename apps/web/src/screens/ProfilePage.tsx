@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Camera, Edit3, ImagePlus, LogOut, Trash2, X } from 'lucide-react'
+import { BookOpen, Camera, Edit3, History, ImagePlus, LogOut, ShieldCheck, Trash2, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import ProfileImageEditor from '../components/ProfileImageEditor'
+import SiteFooter from '../components/SiteFooter'
 import SiteHeader from '../components/SiteHeader'
 import UniversityField from '../components/UniversityField'
 import { useAuth } from '../context/useAuth'
@@ -23,6 +24,8 @@ type PendingProfileImage = {
   file: File
   kind: ProfileMediaKind
 }
+
+const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 
 function ProfilePage() {
   const navigate = useNavigate()
@@ -162,15 +165,37 @@ function ProfilePage() {
         <SiteHeader active="profile" />
         <main className="member-profile-main">
           <section className="member-profile-guest">
-            <div className="member-profile-avatar fallback">JU</div>
-            <h1>Your JuChess profile</h1>
-            <p>Sign in to manage your profile and see the tournament games connected to your account.</p>
-            <div>
-              <Link to="/sign-in">Sign in</Link>
-              <Link to="/sign-up">Create account</Link>
+            <div className="member-profile-guest-copy">
+              <img className="member-profile-guest-crest" src={crestUrl} alt="JuChess crest" />
+              <span className="member-profile-guest-label">Member profile</span>
+              <h1>Your chess life at JuChess</h1>
+              <p>Sign in to manage your club details and open the tournament games connected to you.</p>
+              <p className="member-profile-guest-notice">
+                <ShieldCheck size={18} aria-hidden="true" />
+                <span>Signing in alone does not create a JuChess profile. We create it only after you complete the required club information.</span>
+              </p>
+              <div className="member-profile-guest-actions">
+                <Link to="/sign-in">Sign in</Link>
+                <Link to="/sign-up">Create account</Link>
+              </div>
+            </div>
+            <div className="member-profile-benefits" aria-label="Profile benefits">
+              <article>
+                <History size={20} aria-hidden="true" />
+                <span><strong>Tournament history</strong><small>See completed JuChess games linked to you.</small></span>
+              </article>
+              <article>
+                <BookOpen size={20} aria-hidden="true" />
+                <span><strong>Review room</strong><small>Open your games directly in the analysis workspace.</small></span>
+              </article>
+              <article>
+                <ShieldCheck size={20} aria-hidden="true" />
+                <span><strong>Club identity</strong><small>Keep your university and chess usernames together.</small></span>
+              </article>
             </div>
           </section>
         </main>
+        <SiteFooter />
       </div>
     )
   }
@@ -354,6 +379,7 @@ function ProfilePage() {
           </section>
         </div>
       </main>
+      <SiteFooter />
       {imageEditor ? (
         <ProfileImageEditor
           key={`${imageEditor.kind}-${imageEditor.file.name}-${imageEditor.file.lastModified}`}
@@ -372,12 +398,15 @@ function ProfileStatus({ body, title }: { body: string; title: string }) {
     <div className="club-screen" data-screen-label="Profile">
       <SiteHeader active="profile" />
       <main className="member-profile-main">
-        <section className="member-profile-guest">
-          <div className="member-profile-avatar fallback">JU</div>
-          <h1>{title}</h1>
-          <p>{body}</p>
+        <section className="member-profile-guest member-profile-status">
+          <div className="member-profile-guest-copy">
+            <img className="member-profile-guest-crest" src={crestUrl} alt="JuChess crest" />
+            <h1>{title}</h1>
+            <p>{body}</p>
+          </div>
         </section>
       </main>
+      <SiteFooter />
     </div>
   )
 }

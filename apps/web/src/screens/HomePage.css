@@ -739,18 +739,23 @@
 
 .team-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 18px;
   margin-top: 38px;
 }
 
 .team-card {
+  grid-column: span 3;
   min-width: 0;
   overflow: hidden;
   background: #fffaf0;
   border: 1px solid rgba(17, 17, 17, 0.13);
   border-radius: 8px;
   transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.team-card:nth-child(5) {
+  grid-column: 2 / span 3;
 }
 
 .team-card:hover {
@@ -826,6 +831,11 @@
 @media (max-width: 900px) {
   .team-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-card,
+  .team-card:nth-child(5) {
+    grid-column: auto;
   }
 }
 
@@ -1296,17 +1306,23 @@
   }
 
   .home-hero {
-    min-height: calc(100dvh - 108px);
+    min-height: auto;
   }
 
   .home-hero-grid {
-    padding: 40px 20px 34px;
+    gap: 24px;
+    padding: 32px 16px 26px;
+  }
+
+  .home-scroll-hint {
+    display: none;
   }
 
   .hero-kicker {
     align-items: flex-start;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 7px;
+    margin-bottom: 16px;
   }
 
   .hero-kicker strong {
@@ -1325,18 +1341,23 @@
   }
 
   .hero-title-row h1 {
-    font-size: 54px;
+    font-size: 50px;
   }
 
   .hero-tagline {
-    font-size: 24px;
+    margin-top: 13px;
+    font-size: 22px;
   }
 
   .hero-description {
-    font-size: 14.5px;
+    margin-top: 12px;
+    font-size: 14px;
+    line-height: 1.58;
   }
 
   .hero-actions {
+    gap: 10px;
+    margin-top: 22px;
     flex-direction: column;
     align-items: stretch;
   }
@@ -1344,18 +1365,33 @@
   .hero-actions a {
     width: 100%;
     box-sizing: border-box;
+    min-height: 46px;
   }
 
   .home-feature-card {
-    min-height: 330px;
-    padding: 26px;
+    min-height: 250px;
+    padding: 22px;
+    border-radius: 14px;
+    box-shadow: 0 14px 34px rgba(17, 17, 17, 0.12);
+  }
+
+  .home-feature-card.empty-feature {
+    min-height: 190px;
   }
 
   .home-feature-card h2 {
-    font-size: 34px;
+    margin-top: 13px;
+    font-size: 31px;
+  }
+
+  .home-feature-card p {
+    font-size: 13.5px;
+    line-height: 1.5;
   }
 
   .feature-pills {
+    gap: 7px;
+    margin: 17px 0;
     align-items: stretch;
     flex-direction: column;
   }
@@ -1363,6 +1399,7 @@
   .feature-pills span {
     width: 100%;
     box-sizing: border-box;
+    padding: 6px 11px;
   }
 
   .feature-eyebrow,
@@ -1374,29 +1411,148 @@
   .feature-cta {
     align-self: stretch;
     justify-content: center;
+    padding: 11px 18px;
+  }
+
+  .home-feature-dots {
+    margin-top: 0;
+  }
+
+  .home-marquee {
+    gap: 10px 22px;
+    padding: 11px 16px;
+    font-size: 16px;
   }
 
   .home-news,
   .home-team,
   .home-app {
-    padding-inline: 20px;
+    padding-inline: 16px;
+  }
+
+  .home-news,
+  .home-team {
+    padding-top: 56px;
+  }
+
+  .home-news {
+    padding-bottom: 50px;
   }
 
   .home-section-heading h2 {
-    font-size: 38px;
+    font-size: 36px;
+  }
+
+  .home-section-heading p {
+    margin-top: 10px;
+    font-size: 13.5px;
+    line-height: 1.58;
+  }
+
+  .news-grid {
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .news-card {
+    min-height: 0;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .news-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .news-card strong {
+    margin-top: 5px;
+    font-size: 21px;
+  }
+
+  .news-card em {
+    margin-top: 6px;
+    font-size: 12.5px;
+    line-height: 1.48;
   }
 
   .home-vision {
-    padding: 78px 20px;
+    padding: 64px 16px;
+  }
+
+  .vision-card-grid {
+    gap: 10px;
+    margin-top: 32px;
+  }
+
+  .vision-card {
+    padding: 22px 20px;
+    border-radius: 12px;
+  }
+
+  .team-grid {
+    gap: 10px;
+    margin-top: 26px;
+  }
+
+  .team-photo-wrap {
+    aspect-ratio: 1 / 1.12;
+  }
+
+  .team-piece {
+    right: 8px;
+    bottom: 8px;
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+  }
+
+  .team-card-copy {
+    min-height: 96px;
+    padding: 13px 12px 15px;
+  }
+
+  .team-card h4 {
+    margin-top: 6px;
+    font-size: clamp(18px, 5.2vw, 21px);
+    line-height: 1.02;
+  }
+
+  .team-card-copy > strong {
+    font-size: 8.5px;
+    letter-spacing: 0.09em;
+  }
+
+  .team-card-copy p {
+    margin-top: 5px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .team-join-action {
+    margin-top: 22px;
+  }
+
+  .home-app {
+    padding-top: 40px;
+    padding-bottom: 48px;
   }
 
   .home-app-panel {
-    padding: 34px 24px;
+    gap: 24px;
+    padding: 27px 18px;
     border-radius: 14px;
   }
 
   .app-copy h2 {
-    font-size: 36px;
+    font-size: 33px;
+  }
+
+  .app-copy p {
+    margin-top: 13px;
+    font-size: 13.5px;
+    line-height: 1.55;
   }
 
   .contact-side {
@@ -1404,12 +1560,21 @@
   }
 
   .contact-logo {
-    width: 78px;
-    height: 78px;
+    width: 62px;
+    height: 62px;
   }
 
   .contact-heading {
-    gap: 16px;
+    gap: 13px;
+  }
+
+  .contact-options {
+    gap: 9px;
+  }
+
+  .contact-options > a {
+    min-height: 62px;
+    padding: 10px 12px;
   }
 
   .contact-options strong {

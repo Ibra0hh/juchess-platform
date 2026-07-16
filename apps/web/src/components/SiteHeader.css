@@ -9,7 +9,7 @@
 
 .site-header-inner {
   max-width: 1200px;
-  height: 66px;
+  height: 64px;
   margin: 0 auto;
   padding: 0 24px;
   display: grid;
@@ -108,7 +108,7 @@
 
 .sign-in-link {
   color: #f5efe3;
-  background: #111111;
+  background: #7a2431;
   padding: 9px 18px;
 }
 
@@ -118,7 +118,7 @@
 }
 
 .sign-in-link:hover {
-  background: #7a2431;
+  background: #5f1b26;
 }
 
 .profile-link {
@@ -192,11 +192,11 @@
 
   .site-header-inner {
     height: auto;
-    min-height: 108px;
+    min-height: 96px;
     padding: 0 14px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: 63px 45px;
+    grid-template-rows: 56px 40px;
     grid-template-areas:
       "brand auth"
       "nav nav";
@@ -222,7 +222,7 @@
     grid-area: nav;
     position: static;
     width: 100%;
-    min-height: 45px;
+    min-height: 40px;
     padding: 0;
     gap: 0;
     display: grid;
@@ -236,7 +236,7 @@
   .main-nav a,
   .main-nav .disabled {
     min-width: 0;
-    min-height: 44px;
+    min-height: 40px;
     padding: 0 4px;
     display: flex;
     align-items: center;
@@ -276,8 +276,8 @@
   }
 
   .brand-link img {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
   }
 
   .auth-nav {
@@ -290,15 +290,15 @@
   }
 
   .sign-in-link {
-    min-height: 44px;
-    padding: 0 16px;
+    min-height: 42px;
+    padding: 0 15px;
     display: inline-flex;
     align-items: center;
   }
 
   .profile-link {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
   }
 }
 
@@ -312,8 +312,8 @@
   }
 
   .brand-link img {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
   }
 
   .brand-link strong {

@@ -14,8 +14,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import SiteFooter from '../components/SiteFooter'
 import SiteHeader from '../components/SiteHeader'
 import { loadTournamentSummaries, type Tournament, type TournamentStatus } from '../lib/juchess'
+import { isPublicTournament } from '../lib/publicContent'
 import './TournamentsPage.css'
 
 type ViewMode = 'list' | 'grid'
@@ -35,7 +37,7 @@ function TournamentsPage() {
 
     loadTournamentSummaries().then((result) => {
       if (!alive) return
-      setTournaments(result.tournaments)
+      setTournaments(result.tournaments.filter(isPublicTournament))
       setCloudError(Boolean(result.error))
       setLoading(false)
     })
@@ -63,6 +65,12 @@ function TournamentsPage() {
       return matchesStatus && (!needle || haystack.includes(needle))
     })
   }, [filter, query, tournaments])
+
+  const statusCounts = useMemo(() => Object.fromEntries(
+    filters.map((status) => [status, tournaments.filter((tournament) => tournament.status === status).length]),
+  ) as Record<TournamentStatus, number>, [tournaments])
+
+  const alternativeFilter = filters.find((status) => status !== filter && statusCounts[status] > 0)
 
   return (
     <div className="tournaments-screen" data-screen-label="Tournaments">
@@ -98,28 +106,30 @@ function TournamentsPage() {
             ))}
           </div>
 
-          <div className="view-toggle" aria-label="Tournament view">
-            <button
-              type="button"
-              className={view === 'list' ? 'active' : undefined}
-              onClick={() => setView('list')}
-              aria-label="List view"
-              title="List view"
-            >
-              <List size={14} aria-hidden="true" />
-              <span>List</span>
-            </button>
-            <button
-              type="button"
-              className={view === 'grid' ? 'active' : undefined}
-              onClick={() => setView('grid')}
-              aria-label="Grid view"
-              title="Grid view"
-            >
-              <LayoutGrid size={14} aria-hidden="true" />
-              <span>Grid</span>
-            </button>
-          </div>
+          {visibleTournaments.length > 0 ? (
+            <div className="view-toggle" aria-label="Tournament view">
+              <button
+                type="button"
+                className={view === 'list' ? 'active' : undefined}
+                onClick={() => setView('list')}
+                aria-label="List view"
+                title="List view"
+              >
+                <List size={14} aria-hidden="true" />
+                <span>List</span>
+              </button>
+              <button
+                type="button"
+                className={view === 'grid' ? 'active' : undefined}
+                onClick={() => setView('grid')}
+                aria-label="Grid view"
+                title="Grid view"
+              >
+                <LayoutGrid size={14} aria-hidden="true" />
+                <span>Grid</span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {cloudError ? (
@@ -136,10 +146,21 @@ function TournamentsPage() {
               <TournamentCard key={tournament.id} tournament={tournament} />
             ))
           ) : (
-            <EmptyState hasAnyTournaments={tournaments.length > 0} filter={filter} />
+            <EmptyState
+              alternativeFilter={alternativeFilter}
+              filter={filter}
+              hasAnyTournaments={tournaments.length > 0}
+              query={query}
+              onClearSearch={() => setQuery('')}
+              onSelectFilter={(status) => {
+                setQuery('')
+                setFilter(status)
+              }}
+            />
           )}
         </section>
       </main>
+      <SiteFooter />
     </div>
   )
 }
@@ -217,17 +238,54 @@ function LoadingState() {
 }
 
 function EmptyState({
+  alternativeFilter,
   filter,
   hasAnyTournaments,
+  onClearSearch,
+  onSelectFilter,
+  query,
 }: {
+  alternativeFilter?: TournamentStatus
   filter: TournamentStatus
   hasAnyTournaments: boolean
+  onClearSearch: () => void
+  onSelectFilter: (status: TournamentStatus) => void
+  query: string
 }) {
+  const searching = Boolean(query.trim())
+  const title = searching
+    ? 'No tournaments match your search'
+    : !hasAnyTournaments
+      ? 'No tournaments announced yet'
+      : filter === 'Upcoming'
+        ? 'No upcoming tournaments yet'
+        : filter === 'Active'
+          ? 'No live tournament right now'
+          : 'No completed tournaments yet'
+  const body = searching
+    ? 'Try another tournament name, format, or venue.'
+    : !hasAnyTournaments
+      ? 'New JuChess events will appear here as soon as they are announced.'
+      : filter === 'Upcoming'
+        ? 'The next club event will appear here as soon as registration opens.'
+        : filter === 'Active'
+          ? 'Live boards and standings will appear here when play begins.'
+          : 'Finished events will appear here with their final results.'
+
   return (
     <div className="empty-state">
       <Trophy size={34} aria-hidden="true" />
-      <h2>{hasAnyTournaments ? `No ${filter.toLowerCase()} tournaments match` : 'No tournaments published yet'}</h2>
-      <p>{hasAnyTournaments ? 'Try a different search or filter.' : 'Create a tournament in the control center to publish it here.'}</p>
+      <h2>{title}</h2>
+      <p>{body}</p>
+      {searching ? (
+        <button type="button" onClick={onClearSearch}>Clear search</button>
+      ) : alternativeFilter ? (
+        <button type="button" onClick={() => onSelectFilter(alternativeFilter)}>
+          View {alternativeFilter.toLowerCase()} tournaments
+        </button>
+      ) : !hasAnyTournaments ? (
+        <Link to="/sign-up" className="empty-state-link">Join the club</Link>
+      ) : null}
     </div>
   )
 }

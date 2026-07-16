@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react'
-import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import { AuthProvider } from './context/AuthContext'
 import { TournamentPlayProvider } from './context/TournamentPlayContext'
@@ -39,9 +39,20 @@ function ToolsRoute() {
   return <GamesPage />
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo({ left: 0, top: 0 })
+  }, [pathname])
+
+  return null
+}
+
 function App() {
   return (
     <AuthProvider>
+      <ScrollToTop />
       <ProfileCompletionGuard>
         <TournamentPlayProvider>
           <TournamentPlayGuard>

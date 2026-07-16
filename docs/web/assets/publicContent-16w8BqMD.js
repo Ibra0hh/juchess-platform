@@ -1,0 +1,1 @@
+var e=new Set([`test`,`test tournament`,`tt`]);function t(e){let t=e.title.trim().toLowerCase(),n=e.body.trim().toLowerCase();return!e.id.startsWith(`seed_`)&&!t.includes(`seeded club data`)&&!n.includes(`seed script`)}function n(t){let n=t.name.trim().toLowerCase();return!t.id.startsWith(`seed_`)&&!e.has(n)}export{n,t};

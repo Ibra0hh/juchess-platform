@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ArrowRight, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import SiteFooter from '../components/SiteFooter'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
 import { loadAnnouncements, loadTournamentSummaries, type Announcement, type Tournament } from '../lib/juchess'
+import { isPublicAnnouncement, isPublicTournament } from '../lib/publicContent'
 import './HomePage.css'
 
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
@@ -111,8 +113,8 @@ function HomePage() {
 
     Promise.all([loadTournamentSummaries(), loadAnnouncements()]).then(([tournamentResult, announcementResult]) => {
       if (!alive) return
-      setTournaments(tournamentResult.tournaments)
-      setAnnouncements(announcementResult.announcements)
+      setTournaments(tournamentResult.tournaments.filter(isPublicTournament))
+      setAnnouncements(announcementResult.announcements.filter(isPublicAnnouncement))
       setCloudError(Boolean(tournamentResult.error))
       setLoading(false)
       setNewsLoading(false)
@@ -209,7 +211,7 @@ function HomePage() {
         <TeamSection />
         <AppSection />
       </main>
-      <HomeFooter />
+      <SiteFooter />
     </div>
   )
 }
@@ -378,7 +380,7 @@ function NewsSection({ items, loading }: { items: HomeNewsItem[]; loading: boole
       <div className="home-section-heading">
         <span>Club news</span>
         <h2 id="home-news-title">Latest from JuChess</h2>
-        <p>Published announcements and tournament updates from the same backend used by the app.</p>
+        <p>Club announcements, upcoming events, and results from across the JuChess community.</p>
       </div>
       <div className="news-grid">
         {loading ? (
@@ -485,11 +487,11 @@ function AppSection() {
         </div>
         <div className="contact-side">
           <div className="contact-options" aria-label="Club contact details">
-            <a href="mailto:Juchess180@gmail.com" aria-label="Email JuChess at Juchess180@gmail.com">
+            <a href="mailto:JuChess180@gmail.com" aria-label="Email JuChess at JuChess180@gmail.com">
               <span className="contact-option-icon contact-option-icon--email">
                 <img src={gmailGlyphUrl} alt="" aria-hidden="true" />
               </span>
-              <span><small>Email</small><strong>Juchess180@gmail.com</strong></span>
+              <span><small>Email</small><strong>JuChess180@gmail.com</strong></span>
               <ArrowRight className="contact-option-arrow" aria-hidden="true" size={17} />
             </a>
             <a
@@ -508,29 +510,6 @@ function AppSection() {
         </div>
       </div>
     </section>
-  )
-}
-
-function HomeFooter() {
-  return (
-    <footer className="home-footer">
-      <div className="footer-inner">
-        <div className="footer-brand">
-          <img src={crestUrl} alt="" />
-          <span>
-            <strong>JuChess</strong>
-            <small>University of Jordan Chess Club</small>
-          </span>
-        </div>
-        <nav aria-label="Footer navigation">
-          <Link to="/tournaments">Tournaments</Link>
-          <Link to="/tools">Tools</Link>
-          <Link to="/sign-up">Join the club</Link>
-          <Link to="/join-the-team">Join the team</Link>
-        </nav>
-      </div>
-      <p>© 2026 JuChess / University of Jordan Chess Club / Amman</p>
-    </footer>
   )
 }
 
