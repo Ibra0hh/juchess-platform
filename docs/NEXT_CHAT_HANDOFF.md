@@ -955,12 +955,13 @@ Player Management email is implemented in source and in the active
   Its active Resend credential is send-only and restricted to `juchess.page`;
   Appwrite stores it server-side. A superseded setup key was revoked during
   configuration, and no provider secret is stored in the repository.
-- Three user-confirmed production test emails were sent through Appwrite
-  Messaging on July 16, 2026; all three reported `status: sent` and
+- Four user-confirmed production test emails were sent through Appwrite
+  Messaging on July 16, 2026; all four reported `status: sent` and
   `deliveredTotal: 1`. The recipient address is intentionally not stored in
-  this handoff. The user confirmed the first Gmail render, then requested the
-  crest-loading optimization. The optimized follow-up awaits Gmail feedback;
-  reply-to behavior also remains unconfirmed.
+  this handoff. The user confirmed the first Gmail render, requested the
+  crest-loading optimization, then requested the original transparent style
+  again. The restored-style follow-up awaits Gmail feedback; reply-to behavior
+  also remains unconfirmed.
 
 ## 21. Game Review And Analysis
 
@@ -1221,8 +1222,8 @@ test reached `status: sent` with one delivery; the recipient confirmed Gmail
 rendering and reported only the crest's initial loading delay. After the asset
 optimization, two more user-confirmed emails also reached `status: sent` with
 one delivery each. The original transparent crest markup was then restored at
-the user's request. Gmail rendering of that final style and reply-to behavior
-await confirmation.
+the user's request, and a fourth restored-style test also reached `status: sent`
+with one delivery. Its Gmail rendering and reply-to behavior await confirmation.
 
 At commit `31179d1`, the latest authentication work passed:
 
