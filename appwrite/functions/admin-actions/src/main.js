@@ -419,6 +419,129 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+const PLAYER_EMAIL_RECIPIENT_LIMIT = 50;
+const PLAYER_EMAIL_SUBJECT_LIMIT = 120;
+const PLAYER_EMAIL_BODY_LIMIT = 5000;
+
+export function normalizePlayerEmailInput(input = {}) {
+  const profileIds = Array.isArray(input.profileIds)
+    ? Array.from(new Set(input.profileIds.map((profileId) => String(profileId).trim()).filter(Boolean)))
+    : [];
+  const subject = String(input.subject ?? '').trim().replace(/\s+/g, ' ');
+  const message = String(input.message ?? '').replace(/\r\n?/g, '\n').trim();
+
+  if (!profileIds.length) throw new HttpError(400, 'Select at least one player to email.');
+  if (profileIds.length > PLAYER_EMAIL_RECIPIENT_LIMIT) {
+    throw new HttpError(400, `Email at most ${PLAYER_EMAIL_RECIPIENT_LIMIT} players at a time.`);
+  }
+  if (!subject) throw new HttpError(400, 'Write an email subject.');
+  if (subject.length > PLAYER_EMAIL_SUBJECT_LIMIT) {
+    throw new HttpError(400, `Email subjects are limited to ${PLAYER_EMAIL_SUBJECT_LIMIT} characters.`);
+  }
+  if (!message) throw new HttpError(400, 'Write an email message.');
+  if (message.length > PLAYER_EMAIL_BODY_LIMIT) {
+    throw new HttpError(400, `Email messages are limited to ${PLAYER_EMAIL_BODY_LIMIT} characters.`);
+  }
+
+  return { profileIds, subject, message };
+}
+
+export function buildPlayerEmailHtml({ subject, message }) {
+  const safeSubject = escapeHtml(subject);
+  const safeMessage = escapeHtml(message).replaceAll('\n', '<br>');
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${safeSubject}</title>
+  </head>
+  <body style="margin:0;background:#f2ede3;color:#171310;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${safeSubject}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f2ede3;">
+      <tr>
+        <td align="center" style="padding:32px 14px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;border:1px solid #ded4c4;border-radius:16px;background:#fffdf8;overflow:hidden;box-shadow:0 16px 38px rgba(45,31,28,.10);">
+            <tr>
+              <td style="height:7px;background:#7d2434;font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:28px 36px 18px;">
+                <img src="https://juchess.page/email/juchess-email-logo.png" width="72" height="72" alt="JuChess" style="display:block;width:72px;height:72px;margin:0 auto 12px;object-fit:contain;">
+                <div style="font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:700;color:#171310;">JuChess</div>
+                <div style="margin-top:5px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8d7d63;">University of Jordan Chess Club</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 36px 34px;">
+                <div style="height:1px;background:#ede6da;margin-bottom:24px;"></div>
+                <h1 style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;color:#171310;">${safeSubject}</h1>
+                <div style="font-size:15px;line-height:1.75;color:#4f463d;">${safeMessage}</div>
+                <div style="margin-top:28px;padding:17px 18px;border-left:4px solid #a98a3f;border-radius:0 9px 9px 0;background:#f8f2e8;font-size:13px;line-height:1.55;color:#655b4f;">
+                  This message was sent by the JuChess administration team. Reply to this email to contact the club.
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:18px 28px;background:#171310;color:#d9cdbb;font-size:11px;line-height:1.6;">
+                JuChess · University of Jordan Chess Club<br>
+                You received this email because you have a registered JuChess account.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+async function playerEmailProviderStatus(messaging) {
+  const response = await messaging.listProviders({
+    queries: [Query.equal('type', 'email'), Query.equal('enabled', true), Query.limit(10)],
+    total: false,
+  });
+  const provider = response.providers[0] ?? null;
+  return {
+    ready: Boolean(provider),
+    provider: provider ? (provider.name || provider.provider || 'Email provider') : null,
+  };
+}
+
+export async function resolvePlayerEmailRecipients(tablesDB, databaseId, profileIds) {
+  const [profiles, privateRows] = await Promise.all([
+    listAllRows(tablesDB, databaseId, tableIds.profiles),
+    listAllRows(tablesDB, databaseId, tableIds.profilePrivate),
+  ]);
+  const profilesById = new Map(profiles.map((profile) => [profile.$id, profile]));
+  const privateById = new Map(privateRows.map((identity) => [identity.$id, identity]));
+  const accountIds = new Set();
+  const recipients = [];
+  const skipped = [];
+
+  for (const profileId of profileIds) {
+    const profile = profilesById.get(profileId);
+    const identity = privateById.get(profileId) ?? legacyIdentityForProfile(profile);
+    const name = profile?.displayName || profileId;
+    if (!profile) {
+      skipped.push({ profileId, name, reason: 'Player profile was not found.' });
+      continue;
+    }
+    if (!identity?.accountId || !identity?.email) {
+      skipped.push({ profileId, name, reason: 'No registered email address.' });
+      continue;
+    }
+    if (accountIds.has(identity.accountId)) {
+      skipped.push({ profileId, name, reason: 'This account is already included.' });
+      continue;
+    }
+    accountIds.add(identity.accountId);
+    recipients.push({ profileId, name, accountId: identity.accountId });
+  }
+
+  return { recipients, skipped };
+}
+
 function isConflict(error) {
   return error?.code === 409 || error?.response?.code === 409;
 }
@@ -3422,6 +3545,8 @@ export default async ({ req, res, log, error }) => {
         'POST /player/games/:id/messages/send',
         'POST /player/games/:id/fair-play',
         'GET /players',
+        'GET /players/email/status',
+        'POST /players/email',
         'POST /profiles/lookup',
         'DELETE /players',
         'GET /admin/session',
@@ -3590,6 +3715,53 @@ export default async ({ req, res, log, error }) => {
         };
       }).toSorted((left, right) => right.riskScore - left.riskScore);
       return res.json({ ok: true, action: 'fairPlayReport', events: response.rows, byProfile });
+    }
+
+    if (method === 'GET' && segments[0] === 'players' && segments[1] === 'email' && segments[2] === 'status') {
+      const status = await playerEmailProviderStatus(messaging);
+      return res.json({ ok: true, action: 'playerEmailStatus', ...status });
+    }
+
+    if (method === 'POST' && segments[0] === 'players' && segments[1] === 'email' && segments.length === 2) {
+      const input = normalizePlayerEmailInput(body);
+      const providerStatus = await playerEmailProviderStatus(messaging);
+      if (!providerStatus.ready) {
+        throw new HttpError(503, 'Player email delivery is not configured yet.');
+      }
+
+      const { recipients, skipped } = await resolvePlayerEmailRecipients(tablesDB, databaseId, input.profileIds);
+      if (!recipients.length) throw new HttpError(409, 'None of the selected players has a deliverable email account.');
+
+      const email = await messaging.createEmail({
+        messageId: ID.unique(),
+        subject: input.subject,
+        content: buildPlayerEmailHtml(input),
+        users: recipients.map((recipient) => recipient.accountId),
+        draft: false,
+        html: true,
+      });
+
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'players.email.send',
+        targetTable: tableIds.profiles,
+        targetRowId: email.$id,
+        payload: {
+          messageId: email.$id,
+          subject: input.subject,
+          profileIds: recipients.map((recipient) => recipient.profileId),
+          skipped,
+        },
+      });
+
+      return res.json({
+        ok: true,
+        action: 'sendPlayerEmail',
+        messageId: email.$id,
+        status: email.status,
+        queued: recipients.map(({ profileId, name }) => ({ profileId, name })),
+        skipped,
+      });
     }
 
     if (method === 'DELETE' && segments[0] === 'players' && segments.length === 1) {

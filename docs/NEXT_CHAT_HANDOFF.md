@@ -271,7 +271,7 @@ Appwrite:
 
 Live Function IDs and latest ready deployments at handoff time:
 
-- `admin-actions`: deployment `6a5804c4e80f7913e518`, ready and active
+- `admin-actions`: deployment `6a5880628791d61de9b5`, ready and active
 - `player-actions`: deployment `6a5804c43a59bae2fb6d`, ready and active
 - `attendance-actions`: deployment `6a53cd75ade72590f33d`, ready and active
 - `access-guards`: deployment `6a57ee981310b683f32f`, ready and active
@@ -934,6 +934,25 @@ Announcements/broadcast intent:
 Check the actual implementation before claiming every broadcast channel is
 fully delivered; provider integrations may still be incomplete.
 
+Player Management email is implemented in source and in the active
+`admin-actions` deployment:
+
+- An organizer can open the branded email composer from one player's row or
+  profile.
+- Multiple selected players can be emailed from the selection toolbar.
+- Subject and message content are validated server-side and escaped into the
+  JuChess burgundy, cream, black, and gold HTML email template.
+- Recipient account IDs are resolved only from `profile_private`; email
+  addresses and provider credentials are never sent back as delivery data.
+- Appwrite Messaging receives one private email message targeted by user ID,
+  and the action is recorded in `admin_audit` without storing the message body.
+- Production still has zero Appwrite Messaging email providers. The next step
+  is to create and enable a send-only Resend provider in Appwrite Messaging.
+  Until that provider exists, the composer correctly reports delivery as not
+  configured and keeps Send disabled.
+- No real player email has been sent from this workflow. Obtain confirmation
+  of the recipient and exact test content immediately before the first send.
+
 ## 21. Game Review And Analysis
 
 Web implementation:
@@ -1171,6 +1190,19 @@ in production:
 No Android/iOS device was connected, so the APK was not installed or visually
 verified on a physical device.
 
+The July 16 Player Management email implementation passed before commit:
+
+- Admin lint and production build
+- Three tournament-wizard tests and 65 admin Function/engine tests, including
+  three email validation/template/private-recipient tests
+- Function syntax checks and 16 player/attendance/access Function tests
+- Desktop rendered composer interaction with no console warnings/errors
+- A 390x844 phone render showing the stacked, scrollable composer
+- `admin-actions` deployment `6a5880628791d61de9b5` reached ready and active
+
+The Appwrite Messaging provider remains an external configuration blocker, so
+these checks do not constitute a real inbox delivery test.
+
 At commit `31179d1`, the latest authentication work passed:
 
 - Web lint and production TypeScript/Vite build
@@ -1234,8 +1266,10 @@ These are real limitations, not optional wording issues:
     `appwrite/schema.json`, source code, deployment status, and this handoff.
 11. The latest mobile board/pre-game change has not been visually installed on
     a phone because no adb device was connected at handoff time.
-12. Provider-dependent Email/SMS/Push broadcast delivery may be incomplete;
-    inspect credentials/provider code before claiming it works.
+12. Player Management email delivery code is deployed, but Appwrite Messaging
+    has no enabled email provider. Create a send-only Resend provider before
+    claiming player emails can be delivered. Email/SMS/Push announcement
+    broadcast delivery also remains incomplete.
 13. The verification/recovery provider is configured, but a real inbox flow has
     not yet been completed. This is the highest-priority auth verification gap.
 14. Email verification is currently implemented on the web client. Audit the

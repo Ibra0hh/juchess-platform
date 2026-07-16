@@ -723,6 +723,18 @@ export type ClubPlayersResult = {
   error?: string
 }
 
+export type PlayerEmailStatus = {
+  ready: boolean
+  provider: string | null
+}
+
+export type PlayerEmailSendResult = {
+  messageId: string
+  status?: string
+  queued: Array<{ profileId: string; name: string }>
+  skipped: Array<{ profileId: string; name: string; reason: string }>
+}
+
 export async function loadClubPlayers(): Promise<ClubPlayersResult> {
   if (!appwriteReady) return { players: [] }
 
@@ -791,6 +803,21 @@ export async function deleteClubPlayers(profileIds: string[]) {
   })
 
   return response.deleted
+}
+
+export async function loadPlayerEmailStatus(): Promise<PlayerEmailStatus> {
+  return await runAdminAction<PlayerEmailStatus>({
+    method: ExecutionMethod.GET,
+    path: '/players/email/status',
+  })
+}
+
+export async function sendPlayerEmail(input: { profileIds: string[]; subject: string; message: string }) {
+  return await runAdminAction<PlayerEmailSendResult>({
+    method: ExecutionMethod.POST,
+    path: '/players/email',
+    body: input,
+  })
 }
 
 export async function countPendingRegistrations(): Promise<number> {

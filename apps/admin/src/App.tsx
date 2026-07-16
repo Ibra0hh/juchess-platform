@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Clock3, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
 import RecruitmentScreen from './screens/RecruitmentScreen'
+import PlayerEmailComposer from './components/PlayerEmailComposer'
 import {
   JuCapturedPieces,
   JuChessBoard,
@@ -4465,6 +4466,7 @@ function PlayersScreen({
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [editPlayer, setEditPlayer] = useState<Player | null>(null)
   const [deleteTargets, setDeleteTargets] = useState<Player[]>([])
+  const [emailTargets, setEmailTargets] = useState<Player[]>([])
   const [deletingPlayers, setDeletingPlayers] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -4513,6 +4515,18 @@ function PlayersScreen({
     setMessage(null)
   }
 
+  function requestPlayerEmail(targets: Player[]) {
+    const deliverable = targets.filter((player) => player.email.trim())
+    if (!deliverable.length) {
+      setMessage('The selected player does not have a registered email address.')
+      return
+    }
+    const excluded = targets.length - deliverable.length
+    setMessage(excluded ? `${excluded} selected player${excluded === 1 ? '' : 's'} without an email address will be excluded.` : null)
+    setEditPlayer(null)
+    setEmailTargets(deliverable)
+  }
+
   async function handlePlayerDelete() {
     if (!deleteTargets.length) return
 
@@ -4551,7 +4565,7 @@ function PlayersScreen({
       {selectedCount ? (
         <div className="selection-bar">
           <strong>{selectedCount} selected</strong>
-          <button type="button">✉ Message selected</button>
+          <button type="button" onClick={() => requestPlayerEmail(players.filter((player) => selected[player.id]))}>✉ Message selected</button>
           <button
             type="button"
             disabled={deletingPlayers}
@@ -4603,6 +4617,7 @@ function PlayersScreen({
                   <td className="mono">{player.record}</td>
                   <td className="right">
                     <div className="tournament-action-row">
+                      <button type="button" className="mini-button ghost" disabled={!player.email} onClick={() => requestPlayerEmail([player])}>Message</button>
                       <button type="button" className="mini-button ghost" onClick={() => setEditPlayer(player)}>Edit</button>
                       <button type="button" className="mini-button ghost danger" disabled={deletingPlayers} onClick={() => requestPlayerDelete([player])}>Remove</button>
                     </div>
@@ -4620,6 +4635,7 @@ function PlayersScreen({
         <PlayerModal
           player={editPlayer}
           onClose={() => setEditPlayer(null)}
+          onMessage={() => requestPlayerEmail([editPlayer])}
           onToggleBlock={() => {
             setPlayers((current) => current.map((player) => (
               player.id === editPlayer.id ? { ...player, blocked: !player.blocked } : player
@@ -4663,16 +4679,34 @@ function PlayersScreen({
           </section>
         </div>
       ) : null}
+
+      {emailTargets.length ? (
+        <PlayerEmailComposer
+          recipients={emailTargets}
+          onClose={() => setEmailTargets([])}
+          onSent={(result) => {
+            setEmailTargets([])
+            setSelected({})
+            const queuedCount = result.queued.length
+            const skippedCount = result.skipped.length
+            setMessage(
+              `${queuedCount} player email${queuedCount === 1 ? '' : 's'} queued for delivery.${skippedCount ? ` ${skippedCount} recipient${skippedCount === 1 ? ' was' : 's were'} skipped.` : ''}`,
+            )
+          }}
+        />
+      ) : null}
     </div>
   )
 }
 
 function PlayerModal({
   onClose,
+  onMessage,
   onToggleBlock,
   player,
 }: {
   onClose: () => void
+  onMessage: () => void
   onToggleBlock: () => void
   player: Player
 }) {
@@ -4725,7 +4759,7 @@ function PlayerModal({
           ))}
         </div>
         <div className="modal-actions">
-          <button type="button">✉ Message</button>
+          <button type="button" onClick={onMessage} disabled={!player.email}>✉ Message</button>
           <button type="button" className="danger-button" onClick={onToggleBlock}>
             {player.blocked ? 'Unblock player' : 'Block player'}
           </button>
