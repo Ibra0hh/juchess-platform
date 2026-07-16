@@ -957,11 +957,15 @@
 }
 
 .contact-option-icon--email {
-  color: #7a2431;
-  background: linear-gradient(145deg, #fffaf0, #eadfca);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 50%;
-  box-shadow: 0 5px 14px rgba(27, 7, 11, 0.2);
+  background: transparent;
+}
+
+.contact-option-icon--email img {
+  width: 40px;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 10px rgba(35, 6, 20, 0.2));
 }
 
 .contact-option-icon--instagram {

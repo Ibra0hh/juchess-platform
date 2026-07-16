@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { ArrowRight, AtSign, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-react'
+import { ArrowRight, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
@@ -7,6 +7,7 @@ import { loadAnnouncements, loadTournamentSummaries, type Announcement, type Tou
 import './HomePage.css'
 
 const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
+const gmailGlyphUrl = `${import.meta.env.BASE_URL}prototype/assets/gmail-glyph-gradient.svg`
 const instagramGlyphUrl = `${import.meta.env.BASE_URL}prototype/assets/instagram-glyph-gradient.svg`
 
 const fallers = [
@@ -485,7 +486,9 @@ function AppSection() {
         <div className="contact-side">
           <div className="contact-options" aria-label="Club contact details">
             <a href="mailto:Juchess180@gmail.com" aria-label="Email JuChess at Juchess180@gmail.com">
-              <span className="contact-option-icon contact-option-icon--email"><AtSign aria-hidden="true" size={23} strokeWidth={2.25} /></span>
+              <span className="contact-option-icon contact-option-icon--email">
+                <img src={gmailGlyphUrl} alt="" aria-hidden="true" />
+              </span>
               <span><small>Email</small><strong>Juchess180@gmail.com</strong></span>
               <ArrowRight className="contact-option-arrow" aria-hidden="true" size={17} />
             </a>
