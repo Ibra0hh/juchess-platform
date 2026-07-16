@@ -1,10 +1,35 @@
 import { account, appwriteReady } from './appwrite'
 
 export type VerificationResendResult = 'sent' | 'already-verified'
+export type CurrentEmailVerificationState = 'verified' | 'unverified' | 'unknown'
+
+export function isEmailAlreadyVerifiedError(error: unknown) {
+  return Boolean(
+    error
+    && typeof error === 'object'
+    && 'type' in error
+    && error.type === 'user_email_already_verified',
+  )
+}
+
+export async function getCurrentEmailVerificationState(
+  expectedUserId: string,
+): Promise<CurrentEmailVerificationState> {
+  if (!appwriteReady) return 'unknown'
+
+  try {
+    const user = await account.get()
+    if (user.$id !== expectedUserId) return 'unknown'
+    return user.emailVerification ? 'verified' : 'unverified'
+  } catch {
+    return 'unknown'
+  }
+}
 
 export async function resendEmailVerification(
   email: string,
   password: string,
+  expectedUserId = '',
 ): Promise<VerificationResendResult> {
   if (!appwriteReady) {
     throw new Error('Cloud accounts are not configured for this app.')
@@ -24,6 +49,9 @@ export async function resendEmailVerification(
     sessionCreated = true
 
     const user = await account.get()
+    if (expectedUserId && user.$id !== expectedUserId) {
+      throw new Error('Use the JuChess account associated with this verification link.')
+    }
     if (user.emailVerification) return 'already-verified'
 
     await account.createEmailVerification({

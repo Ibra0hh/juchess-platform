@@ -320,8 +320,9 @@ The web email/password flow is live in commit `31179d1`:
    signed-in account to create a verification token, so JuChess asks for the
    registered email and password, creates a short-lived session, sends the new
    seven-day link, and deletes that session immediately. Already-verified
-   accounts are directed back to normal sign-in instead of receiving another
-   link.
+   accounts are detected from Appwrite's explicit already-verified response or
+   the matching signed-in account state, receive a short thank-you confirmation,
+   and can return directly to Home instead of seeing the resend form.
 
 Important semantic point: the Appwrite account technically exists before email
 verification, but it cannot obtain JuChess app access. Do not promise that no

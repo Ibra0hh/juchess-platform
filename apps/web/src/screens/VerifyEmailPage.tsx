@@ -3,7 +3,11 @@ import { CheckCircle2, MailCheck } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { completeEmailVerification, formatAppwriteError } from '../lib/auth'
-import { resendEmailVerification } from '../lib/emailVerification'
+import {
+  getCurrentEmailVerificationState,
+  isEmailAlreadyVerifiedError,
+  resendEmailVerification,
+} from '../lib/emailVerification'
 import './AuthPage.css'
 import './VerifyEmailPage.css'
 
@@ -38,9 +42,21 @@ export default function VerifyEmailPage() {
         const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
         window.history.replaceState(null, '', `${routeBase}verify-email?verified=1`)
         setStatus('verified')
-        setMessage('Your email is verified. You can now sign in to JuChess.')
+        setMessage('Your email is verified. Thank you.')
       })
-      .catch(() => {
+      .catch(async (error: unknown) => {
+        const currentState = isEmailAlreadyVerifiedError(error)
+          ? 'verified'
+          : await getCurrentEmailVerificationState(userId)
+
+        if (currentState === 'verified') {
+          const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
+          window.history.replaceState(null, '', `${routeBase}verify-email?verified=1`)
+          setStatus('verified')
+          setMessage('Your email is verified. Thank you.')
+          return
+        }
+
         setStatus('error')
         setMessage('This verification link is invalid, expired, or has already been used.')
       })
@@ -53,14 +69,14 @@ export default function VerifyEmailPage() {
     setResending(true)
     setResendError('')
     try {
-      const result = await resendEmailVerification(resendEmail, resendPassword)
+      const result = await resendEmailVerification(resendEmail, resendPassword, userId)
       const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
       window.history.replaceState(null, '', `${routeBase}verify-email`)
       setResendPassword('')
 
       if (result === 'already-verified') {
         setStatus('verified')
-        setMessage('Your email is already verified. You can sign in to JuChess.')
+        setMessage('Your email is verified. Thank you.')
         return
       }
 
@@ -124,8 +140,8 @@ export default function VerifyEmailPage() {
             </>
           ) : null}
           {status !== 'checking' ? (
-            <Link className="auth-secondary-button" to="/sign-in">
-              {verified ? 'Continue to sign in' : 'Return to sign in'}
+            <Link className="auth-secondary-button" to={verified ? '/home' : '/sign-in'}>
+              {verified ? 'Go to home' : 'Return to sign in'}
             </Link>
           ) : null}
         </section>
