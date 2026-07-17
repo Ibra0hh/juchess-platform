@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#f7efe2" />
+    <title>JuChess Homepage Redesign Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body id="top">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="site-header">
+      <div class="header-top">
+        <a class="brand" href="#top" aria-label="JuChess prototype home">
+          <img src="./assets/crest.png" alt="" />
+          <strong>JuChess</strong>
+        </a>
+        <a class="sign-in" href="/sign-in/">Sign in</a>
+      </div>
+      <nav class="main-nav" aria-label="Primary navigation">
+        <a class="active" href="#top" aria-current="page">Home</a>
+        <a href="/tournaments/">Tournaments</a>
+        <a href="/tools/">Tools</a>
+        <a href="/profile/">Profile</a>
+      </nav>
+    </header>
+
+    <main id="main-content">
+      <section class="hero" aria-labelledby="hero-title">
+        <img
+          class="hero-photo"
+          src="./assets/campus-chess-hero.webp"
+          alt="Two students playing chess in a limestone campus courtyard"
+          fetchpriority="high"
+        />
+        <div class="hero-wash" aria-hidden="true"></div>
+        <div class="hero-shell">
+          <div class="hero-copy">
+            <h1 id="hero-title">Chess belongs <em>at JU.</em></h1>
+            <p>Tournaments, weekly meetups, and a club built by students.</p>
+            <div class="hero-actions">
+              <a class="button-primary" href="/sign-up/">
+                <span aria-hidden="true">♞</span>
+                Join the Club
+              </a>
+              <a class="text-action" href="/tournaments/">
+                Explore tournaments
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              </a>
+            </div>
+          </div>
+
+          <a class="tournament-preview" href="/tournaments/">
+            <span class="calendar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" /></svg>
+            </span>
+            <span class="tournament-copy">
+              <small>Next tournament</small>
+              <strong>To be announced</strong>
+            </span>
+            <span class="tournament-link">
+              View tournaments
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </span>
+          </a>
+        </div>
+      </section>
+
+      <section class="format-rail" aria-label="JuChess activities">
+        <div class="format-track">
+          <span>Swiss Opens</span>
+          <span>Single elimination</span>
+          <span>Team Matches</span>
+          <span>Arenas &amp; Leagues</span>
+          <span>Game Review</span>
+        </div>
+      </section>
+
+      <section class="vision" id="vision" aria-labelledby="vision-title">
+        <div class="vision-intro">
+          <span>Our Vision</span>
+          <h2 id="vision-title">A board for <em>every</em> student.</h2>
+          <p>Meet people. Play over the board. Grow together.</p>
+        </div>
+
+        <figure class="vision-photo">
+          <img src="./assets/campus-chess-vision.webp" alt="Students gathered around a chessboard on campus" loading="lazy" />
+        </figure>
+
+        <div class="vision-principles">
+          <article>
+            <span>01</span>
+            <h3>Meet</h3>
+            <p>Find your people.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Play</h3>
+            <p>Weekly games and campus tournaments.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Grow</h3>
+            <p>Practice, review, improve.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="team" id="team" aria-labelledby="team-title">
+        <div class="section-heading">
+          <span>The people behind the board</span>
+          <h2 id="team-title">Meet the club team</h2>
+          <p>Meet the students leading JuChess, shaping its events and identity, and building the platform behind the club.</p>
+        </div>
+
+        <div class="team-grid">
+          <article class="team-card">
+            <img src="./assets/maya-erani.webp" alt="Maya Erani, President" loading="lazy" />
+            <div><strong>President</strong><h3>Maya Erani</h3><p>Social Media Manager</p></div>
+          </article>
+          <article class="team-card">
+            <img src="./assets/ruba-al-qudah.webp" alt="Ruba Al Qudah, Vice President" loading="lazy" />
+            <div><strong>Vice President</strong><h3>Ruba Al Qudah</h3><p>HR Manager</p></div>
+          </article>
+          <article class="team-card">
+            <img src="./assets/yazan-shalan.webp" alt="Yazan Shalan, Vice President" loading="lazy" />
+            <div><strong>Vice President</strong><h3>Yazan Shalan</h3><p>Public Relations Manager</p></div>
+          </article>
+          <article class="team-card">
+            <img src="./assets/lameea-sakhriah.webp" alt="Lameea Sakhriah, Design Manager" loading="lazy" />
+            <div><strong>Design Manager</strong><h3>Lameea Sakhriah</h3></div>
+          </article>
+          <article class="team-card">
+            <img src="./assets/dalya-yousef.jpg" alt="Dalya Yousef, Events and PR Manager" loading="lazy" />
+            <div><strong>Events and PR Manager</strong><h3>Dalya Yousef</h3></div>
+          </article>
+          <article class="team-card">
+            <img src="./assets/ibrahim-aladily.webp" alt="Ibrahim Aladily, Software Developer" loading="lazy" />
+            <div><strong>Software Developer</strong><h3>Ibrahim Aladily</h3></div>
+          </article>
+          <article class="team-card">
+            <img src="./assets/retal-aljubeh.jpg" alt="Retal Aljubeh, Design Manager" loading="lazy" />
+            <div><strong>Design Manager</strong><h3>Retal Aljubeh</h3></div>
+          </article>
+        </div>
+
+        <a class="team-action" href="/join-the-team/">
+          Join the working team
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </a>
+      </section>
+
+      <section class="contact" id="contact" aria-labelledby="contact-title">
+        <div class="contact-panel">
+          <div class="contact-heading">
+            <img src="./assets/crest.png" alt="" />
+            <div>
+              <span>Contact the club</span>
+              <h2 id="contact-title">Get in touch with us.</h2>
+            </div>
+          </div>
+          <p class="contact-intro">Questions about membership, tournaments, or club activities? Contact the JuChess team by email or Instagram.</p>
+          <div class="contact-options">
+            <a href="mailto:JuChess180@gmail.com">
+              <img src="./assets/gmail.svg" alt="" />
+              <span><small>Email</small><strong>JuChess180@gmail.com</strong></span>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </a>
+            <a href="https://www.instagram.com/ju.chess" target="_blank" rel="noreferrer">
+              <img src="./assets/instagram.svg" alt="" />
+              <span><small>Instagram</small><strong>@ju.chess</strong></span>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-shell">
+        <a class="footer-brand" href="#top">
+          <img src="./assets/crest.png" alt="" />
+          <span><strong>JuChess</strong><small>University of Jordan Chess Club</small></span>
+        </a>
+
+        <nav class="footer-nav" aria-label="Footer navigation">
+          <a href="/tournaments/"><span>Tournaments</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></a>
+          <a href="/tools/"><span>Tools</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></a>
+          <a class="footer-primary" href="/sign-up/"><span>Join the club</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></a>
+          <a href="/join-the-team/"><span>Join the team</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></a>
+        </nav>
+      </div>
+      <p>© 2026 JuChess / University of Jordan Chess Club / Amman</p>
+    </footer>
+  </body>
+</html>
