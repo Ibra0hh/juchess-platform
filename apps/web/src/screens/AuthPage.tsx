@@ -1,15 +1,26 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import GoogleMark from '../components/GoogleMark'
 import {
+  EmailVerificationRequiredError,
   formatAppwriteError,
   startOAuthSession,
   type SocialAuthProvider,
 } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
-import { profileNeedsCompletion } from '../lib/profileCompletion'
+import { postAuthenticationDestination, profileNeedsCompletion } from '../lib/profileCompletion'
+import {
+  ACCOUNT_EMAIL_MAX_LENGTH,
+  ACCOUNT_NAME_MAX_LENGTH,
+  ACCOUNT_PASSWORD_MAX_LENGTH,
+  normalizeAuthEmail,
+  validateAccountEmail,
+  validateAccountName,
+  validateNewPassword,
+  validateSignInPassword,
+} from '../lib/authValidation'
 import './AuthPage.css'
 
 type AuthPageProps = {
@@ -26,7 +37,9 @@ function AuthPage({ mode }: AuthPageProps) {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const submissionInFlight = useRef(false)
   const [oauthProvider, setOauthProvider] = useState<SocialAuthProvider | null>(null)
   const [message, setMessage] = useState<string | null>(() => (
     searchParams.get('oauth') === 'failed'
@@ -40,7 +53,6 @@ function AuthPage({ mode }: AuthPageProps) {
     number: /[0-9]/.test(password),
   }), [password])
   const passwordStrength = useMemo(() => getPasswordStrength(password), [password])
-  const passwordReady = passwordRules.length && passwordRules.uppercase && passwordRules.number
   const passwordsMatch = confirmPassword.length > 0 && confirmPassword === password
 
   if (!loading && user) {
@@ -49,10 +61,16 @@ function AuthPage({ mode }: AuthPageProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (loading || submissionInFlight.current || oauthProvider) return
     setMessage(null)
 
-    if (isSignup && !passwordReady) {
-      setMessage('Use at least 8 characters with one uppercase letter and one number.')
+    const normalizedEmail = normalizeAuthEmail(email)
+    const validationProblem = validateAccountEmail(normalizedEmail)
+      || (isSignup
+        ? validateAccountName(fullName) || validateNewPassword(password)
+        : validateSignInPassword(password))
+    if (validationProblem) {
+      setMessage(validationProblem)
       return
     }
     if (isSignup && !passwordsMatch) {
@@ -60,27 +78,36 @@ function AuthPage({ mode }: AuthPageProps) {
       return
     }
 
+    submissionInFlight.current = true
     setSubmitting(true)
     try {
       if (isSignup) {
         await signUp({
           fullName: fullName.trim(),
-          email: email.trim(),
+          email: normalizedEmail,
           password,
         })
-        navigate(`/verify-email?sent=1&email=${encodeURIComponent(email.trim())}`)
+        navigate('/verify-email?sent=1', {
+          state: { email: normalizedEmail },
+        })
       } else {
-        await signIn({ email: email.trim(), password })
-        navigate('/profile')
+        const session = await signIn({ email: normalizedEmail, password })
+        navigate(postAuthenticationDestination(session.profile), { replace: true })
       }
     } catch (error) {
+      if (error instanceof EmailVerificationRequiredError) {
+        navigate('/verify-email?sent=1', { state: { email: error.email } })
+        return
+      }
       setMessage(formatAppwriteError(error))
     } finally {
+      submissionInFlight.current = false
       setSubmitting(false)
     }
   }
 
   function handleOAuth(provider: SocialAuthProvider) {
+    if (loading || submitting || oauthProvider) return
     setMessage(null)
     setOauthProvider(provider)
     try {
@@ -91,7 +118,7 @@ function AuthPage({ mode }: AuthPageProps) {
     }
   }
 
-  const busy = submitting || oauthProvider !== null
+  const busy = loading || submitting || oauthProvider !== null
 
   return (
     <div className="auth-screen" data-screen-label={isSignup ? 'Sign Up' : 'Sign In'}>
@@ -119,7 +146,7 @@ function AuthPage({ mode }: AuthPageProps) {
 
           {isSignup ? (
             <p className="auth-legal-copy">
-              By creating an account, you agree to the <Link to="/terms">terms of use</Link> and acknowledge the <Link to="/privacy">privacy policy</Link>.
+              By creating an account, you agree to the <Link to="/terms" target="_blank" rel="noopener noreferrer">terms of use</Link> and acknowledge the <Link to="/privacy" target="_blank" rel="noopener noreferrer">privacy policy</Link>.
             </p>
           ) : null}
 
@@ -129,19 +156,20 @@ function AuthPage({ mode }: AuthPageProps) {
             <span />
           </div>
 
-          <form className="auth-form prototype-auth-form" onSubmit={handleSubmit}>
+          <form className="auth-form prototype-auth-form" onSubmit={handleSubmit} aria-busy={busy}>
             {isSignup ? (
               <>
                 <AuthField label="Full name">
-                  <input value={fullName} onChange={(event) => setFullName(event.target.value)} required autoComplete="name" placeholder="e.g. Ibrahim Ahmad" />
+                  <input name="name" value={fullName} onChange={(event) => setFullName(event.target.value)} required maxLength={ACCOUNT_NAME_MAX_LENGTH} autoComplete="name" placeholder="e.g. Ibrahim Ahmad" />
                 </AuthField>
 
                 <AuthField label="Email">
-                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="name@email.com" />
+                  <input name="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={ACCOUNT_EMAIL_MAX_LENGTH} autoComplete="email" placeholder="name@email.com" />
                 </AuthField>
 
                 <PasswordField
                   label="Password"
+                  name="password"
                   value={password}
                   showPassword={showPassword}
                   onChange={setPassword}
@@ -158,10 +186,11 @@ function AuthPage({ mode }: AuthPageProps) {
 
                 <PasswordField
                   label="Confirm password"
+                  name="confirm-password"
                   value={confirmPassword}
-                  showPassword={showPassword}
+                  showPassword={showConfirmation}
                   onChange={setConfirmPassword}
-                  onToggle={() => setShowPassword((visible) => !visible)}
+                  onToggle={() => setShowConfirmation((visible) => !visible)}
                   autoComplete="new-password"
                 />
                 {confirmPassword && !passwordsMatch ? <small className="auth-mismatch">Passwords do not match yet.</small> : null}
@@ -170,10 +199,11 @@ function AuthPage({ mode }: AuthPageProps) {
             ) : (
               <>
                 <AuthField label="Email">
-                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="name@email.com" />
+                  <input name="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={ACCOUNT_EMAIL_MAX_LENGTH} autoComplete="email" placeholder="name@email.com" />
                 </AuthField>
                 <PasswordField
                   label="Password"
+                  name="password"
                   value={password}
                   showPassword={showPassword}
                   onChange={setPassword}
@@ -189,7 +219,11 @@ function AuthPage({ mode }: AuthPageProps) {
             {message ? <div className="auth-error" role="alert">{message}</div> : null}
 
             <button className="auth-submit-button" type="submit" disabled={!ready || busy}>
-              {submitting ? 'Working...' : isSignup ? 'Create Account' : 'Sign In'}
+              {loading
+                ? 'Checking session...'
+                : submitting
+                  ? isSignup ? 'Creating account...' : 'Signing in...'
+                  : isSignup ? 'Create Account' : 'Sign In'}
             </button>
 
             {!isSignup ? (
@@ -247,9 +281,10 @@ function AuthField({ children, help, label }: { children: ReactNode; help?: stri
   )
 }
 
-function PasswordField({ autoComplete, label, onChange, onToggle, showPassword, value }: {
+function PasswordField({ autoComplete, label, name, onChange, onToggle, showPassword, value }: {
   autoComplete: 'current-password' | 'new-password'
   label: ReactNode
+  name: string
   onChange: (value: string) => void
   onToggle: () => void
   showPassword: boolean
@@ -260,10 +295,12 @@ function PasswordField({ autoComplete, label, onChange, onToggle, showPassword, 
       <span className="auth-password-field">
         <input
           type={showPassword ? 'text' : 'password'}
+          name={name}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           required
           minLength={8}
+          maxLength={ACCOUNT_PASSWORD_MAX_LENGTH}
           autoComplete={autoComplete}
           placeholder="Enter your password"
         />

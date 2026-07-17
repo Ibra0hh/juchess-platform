@@ -4,6 +4,7 @@ import {
   profileCompletionAuthMethod,
   profileNeedsCompletion,
   postAuthenticationDestination,
+  routeRequiresAuthenticatedSession,
   shouldRedirectToProfileCompletion,
 } from './profileCompletion.ts'
 
@@ -76,4 +77,15 @@ test('profile completion uses the current session provider instead of linked ide
   assert.equal(profileCompletionAuthMethod('google'), 'google')
   assert.equal(profileCompletionAuthMethod(''), 'account')
   assert.equal(profileCompletionAuthMethod('github'), 'account')
+})
+
+test('public and auth routes stay available while session bootstrap is unavailable', () => {
+  assert.equal(routeRequiresAuthenticatedSession('/profile'), true)
+  assert.equal(routeRequiresAuthenticatedSession('/profile/'), true)
+  assert.equal(routeRequiresAuthenticatedSession('/complete-profile'), true)
+  assert.equal(routeRequiresAuthenticatedSession('/join-the-team'), true)
+  assert.equal(routeRequiresAuthenticatedSession('/home'), false)
+  assert.equal(routeRequiresAuthenticatedSession('/tournaments'), false)
+  assert.equal(routeRequiresAuthenticatedSession('/sign-in'), false)
+  assert.equal(routeRequiresAuthenticatedSession('/forgot-password'), false)
 })

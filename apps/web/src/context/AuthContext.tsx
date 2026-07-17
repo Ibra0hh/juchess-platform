@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -38,40 +39,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionProvider, setSessionProvider] = useState<string | null>(previewSession?.sessionProvider ?? null)
   const [loading, setLoading] = useState(!previewSession)
   const [error, setError] = useState<string | null>(null)
+  const refreshGeneration = useRef(0)
+  const refreshInFlight = useRef<Promise<AuthSession | null> | null>(null)
+
+  const invalidateRefresh = useCallback(() => {
+    refreshGeneration.current += 1
+    refreshInFlight.current = null
+    setLoading(false)
+  }, [])
 
   const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current
     if (previewSession) {
-      setUser(previewSession.user)
-      setProfile(previewSession.profile)
-      setSessionProvider(previewSession.sessionProvider)
-      setLoading(false)
-      setError(null)
-      return
+      if (generation === refreshGeneration.current) {
+        setUser(previewSession.user)
+        setProfile(previewSession.profile)
+        setSessionProvider(previewSession.sessionProvider)
+        setLoading(false)
+        setError(null)
+      }
+      return previewSession
     }
 
     if (!appwriteReady) {
-      setUser(null)
-      setProfile(null)
-      setSessionProvider(null)
-      setLoading(false)
-      return
+      if (generation === refreshGeneration.current) {
+        setUser(null)
+        setProfile(null)
+        setSessionProvider(null)
+        setLoading(false)
+      }
+      return null
     }
 
     setLoading(true)
     setError(null)
 
     try {
-      const session = await getCurrentSession()
-      setUser(session?.user ?? null)
-      setProfile(session?.profile ?? null)
-      setSessionProvider(session?.sessionProvider ?? null)
+      let request = refreshInFlight.current
+      if (!request) {
+        request = getCurrentSession()
+        refreshInFlight.current = request
+        void request.finally(() => {
+          if (refreshInFlight.current === request) refreshInFlight.current = null
+        }).catch(() => undefined)
+      }
+      const session = await request
+      if (generation === refreshGeneration.current) {
+        setUser(session?.user ?? null)
+        setProfile(session?.profile ?? null)
+        setSessionProvider(session?.sessionProvider ?? null)
+      }
+      return session
     } catch (caught) {
-      setError(formatAppwriteError(caught))
-      setUser(null)
-      setProfile(null)
-      setSessionProvider(null)
+      if (generation === refreshGeneration.current) {
+        setError(formatAppwriteError(caught))
+        setUser(null)
+        setProfile(null)
+        setSessionProvider(null)
+      }
+      return null
     } finally {
-      setLoading(false)
+      if (generation === refreshGeneration.current) setLoading(false)
     }
   }, [previewSession])
 
@@ -80,13 +108,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   const signIn = useCallback(async (input: SignInInput) => {
+    invalidateRefresh()
     if (previewSession) {
       const nextSession = createPreviewSession(input.email)
       setUser(nextSession.user)
       setProfile(nextSession.profile)
       setSessionProvider(nextSession.sessionProvider)
       setError(null)
-      return
+      return nextSession
     }
 
     setError(null)
@@ -94,18 +123,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session.user)
     setProfile(session.profile)
     setSessionProvider(session.sessionProvider)
-  }, [previewSession])
+    return session
+  }, [invalidateRefresh, previewSession])
 
   const completeOAuth = useCallback(async (userId: string, secret: string) => {
+    invalidateRefresh()
     setError(null)
     const session = await completeOAuthTokenSession(userId, secret)
     setUser(session.user)
     setProfile(session.profile)
     setSessionProvider(session.sessionProvider)
     return session
-  }, [])
+  }, [invalidateRefresh])
 
   const signUp = useCallback(async (input: SignUpInput) => {
+    invalidateRefresh()
     if (previewSession) {
       const nextSession = createPreviewSession(input.email, input.fullName)
       setUser(nextSession.user)
@@ -120,9 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setProfile(null)
     setSessionProvider(null)
-  }, [previewSession])
+  }, [invalidateRefresh, previewSession])
 
   const signOut = useCallback(async () => {
+    invalidateRefresh()
     if (previewSession) {
       setUser(previewSession.user)
       setProfile(previewSession.profile)
@@ -138,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSessionProvider(null)
       setError(null)
     }
-  }, [previewSession])
+  }, [invalidateRefresh, previewSession])
 
   const linkExternalGameUsername = useCallback(async (
     source: 'chess.com' | 'lichess',
@@ -252,6 +285,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 function createPreviewSessionFromUrl() {
+  const previewEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_ADMIN_PREVIEW === 'true'
+  if (!previewEnabled) return null
   const params = new URLSearchParams(window.location.search)
   if (params.get('adminPreview') !== '1' || params.get('mode') === 'guest') return null
   return createPreviewSession(params.get('previewEmail') || 'student.preview@ju.edu.jo')

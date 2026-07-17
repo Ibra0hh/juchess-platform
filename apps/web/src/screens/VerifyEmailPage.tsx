@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, MailCheck } from 'lucide-react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { formatAppwriteError } from '../lib/auth'
 import {
@@ -9,6 +9,13 @@ import {
   getCurrentEmailVerificationState,
   resendEmailVerification,
 } from '../lib/emailVerification'
+import {
+  ACCOUNT_EMAIL_MAX_LENGTH,
+  ACCOUNT_PASSWORD_MAX_LENGTH,
+  normalizeAuthEmail,
+  validateAccountEmail,
+  validateSignInPassword,
+} from '../lib/authValidation'
 import './AuthPage.css'
 import './VerifyEmailPage.css'
 
@@ -17,12 +24,17 @@ type VerifiedAction = 'home' | 'sign-in'
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
   const started = useRef(false)
   const challengeId = searchParams.get('challenge') ?? ''
   const challengeToken = searchParams.get('token') ?? ''
   const legacyUserId = searchParams.get('userId') ?? ''
   const legacySecret = searchParams.get('secret') ?? ''
-  const email = searchParams.get('email') ?? ''
+  const stateEmail = typeof (location.state as { email?: unknown } | null)?.email === 'string'
+    ? String((location.state as { email: string }).email)
+    : ''
+  const email = searchParams.get('email') ?? stateEmail
   const hasChallengeLink = Boolean(challengeId && challengeToken)
   const hasLegacyLink = Boolean(legacyUserId && legacySecret)
   const hasVerificationToken = hasChallengeLink || hasLegacyLink
@@ -47,12 +59,12 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     if (!hasVerificationToken || started.current) return
     started.current = true
+    navigate('/verify-email', { replace: true })
 
     if (hasChallengeLink) {
       void confirmEmailVerificationLink(challengeId, challengeToken)
         .then((result) => {
-          const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
-          window.history.replaceState(null, '', `${routeBase}verify-email?verified=1`)
+          navigate('/verify-email?verified=1', { replace: true })
           setStatus('verified')
           setVerifiedAction(result.alreadyVerified ? 'home' : 'sign-in')
           setMessage(result.alreadyVerified
@@ -76,8 +88,7 @@ export default function VerifyEmailPage() {
           setMessage('This older verification link is no longer active. Request a fresh two-hour email below.')
           return
         }
-        const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
-        window.history.replaceState(null, '', `${routeBase}verify-email?verified=1`)
+        navigate('/verify-email?verified=1', { replace: true })
         setStatus('verified')
         setVerifiedAction('home')
         setMessage('Your email is already verified. Thank you.')
@@ -86,7 +97,7 @@ export default function VerifyEmailPage() {
         setStatus('error')
         setMessage('This older verification link is no longer active. Request a fresh two-hour email below.')
       })
-  }, [challengeId, challengeToken, hasChallengeLink, hasVerificationToken, legacyUserId])
+  }, [challengeId, challengeToken, hasChallengeLink, hasVerificationToken, legacyUserId, navigate])
 
   async function handleCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -95,9 +106,12 @@ export default function VerifyEmailPage() {
     setCheckingCode(true)
     setCodeError('')
     try {
-      const result = await confirmEmailVerificationCode(codeEmail, verificationCode)
-      const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
-      window.history.replaceState(null, '', `${routeBase}verify-email?verified=1`)
+      const normalizedEmail = normalizeAuthEmail(codeEmail)
+      const validationProblem = validateAccountEmail(normalizedEmail)
+        || (/^\d{6}$/.test(verificationCode) ? null : 'Enter the six-digit code from your latest JuChess email.')
+      if (validationProblem) throw new Error(validationProblem)
+      const result = await confirmEmailVerificationCode(normalizedEmail, verificationCode)
+      navigate('/verify-email?verified=1', { replace: true })
       setStatus('verified')
       setVerifiedAction(result.alreadyVerified ? 'home' : 'sign-in')
       setMessage(result.alreadyVerified
@@ -118,11 +132,14 @@ export default function VerifyEmailPage() {
     setResending(true)
     setResendError('')
     try {
-      const result = await resendEmailVerification(resendEmail, resendPassword, legacyUserId)
-      const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
-      window.history.replaceState(null, '', `${routeBase}verify-email`)
+      const normalizedEmail = normalizeAuthEmail(resendEmail)
+      const validationProblem = validateAccountEmail(normalizedEmail)
+        || validateSignInPassword(resendPassword)
+      if (validationProblem) throw new Error(validationProblem)
+      const result = await resendEmailVerification(normalizedEmail, resendPassword, legacyUserId)
+      navigate('/verify-email', { replace: true })
       setResendPassword('')
-      setCodeEmail(resendEmail.trim())
+      setCodeEmail(normalizedEmail)
       setVerificationCode('')
       setCodeError('')
 
@@ -134,7 +151,7 @@ export default function VerifyEmailPage() {
       }
 
       setStatus('sent')
-      setMessage(`We sent a fresh verification link and six-digit code to ${resendEmail.trim()}.`)
+      setMessage(`We sent a fresh verification link and six-digit code to ${normalizedEmail}.`)
     } catch (error) {
       setResendError(formatAppwriteError(error))
     } finally {
@@ -172,6 +189,7 @@ export default function VerifyEmailPage() {
                   type="email"
                   name="verification-email"
                   autoComplete="email"
+                  maxLength={ACCOUNT_EMAIL_MAX_LENGTH}
                   value={codeEmail}
                   onChange={(event) => setCodeEmail(event.target.value)}
                   required
@@ -210,6 +228,7 @@ export default function VerifyEmailPage() {
                     type="email"
                     name="email"
                     autoComplete="email"
+                    maxLength={ACCOUNT_EMAIL_MAX_LENGTH}
                     value={resendEmail}
                     onChange={(event) => setResendEmail(event.target.value)}
                     required
@@ -221,6 +240,7 @@ export default function VerifyEmailPage() {
                     type="password"
                     name="password"
                     autoComplete="current-password"
+                    maxLength={ACCOUNT_PASSWORD_MAX_LENGTH}
                     value={resendPassword}
                     onChange={(event) => setResendPassword(event.target.value)}
                     required

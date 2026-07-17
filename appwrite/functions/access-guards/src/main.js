@@ -1,7 +1,6 @@
 import { Client, Query, TablesDB } from 'node-appwrite';
 
 const tableIds = {
-  profiles: 'profiles',
   profilePrivate: 'profile_private',
   identityBlocks: 'identity_blocks',
   ipBlocks: 'ip_blocks',
@@ -65,42 +64,39 @@ export function mergeCandidates(...groups) {
   return [...merged.values()];
 }
 
-async function loadStoredCandidates(tablesDB, databaseId, accountId) {
-  if (!accountId) return [];
+export function storedIdentityLookup(accountId, submittedEmail) {
+  const normalizedAccountId = String(accountId ?? '').trim();
+  if (normalizedAccountId) return { field: 'accountId', value: normalizedAccountId };
 
-  try {
-    const response = await tablesDB.listRows({
-      databaseId,
-      tableId: tableIds.profilePrivate,
-      queries: [Query.equal('accountId', accountId), Query.limit(1)],
-      total: false,
-    });
-    if (response.rows[0]) return normalizeCandidates(response.rows[0]);
-  } catch {
-    // Additive-deployment compatibility while profile_private is introduced.
-  }
-
-  try {
-    const legacy = await tablesDB.listRows({
-      databaseId,
-      tableId: tableIds.profiles,
-      queries: [Query.equal('accountId', accountId), Query.limit(1)],
-      total: false,
-    });
-    return legacy.rows[0] ? normalizeCandidates(legacy.rows[0]) : [];
-  } catch {
-    return [];
-  }
+  const normalizedEmail = String(submittedEmail ?? '').trim().toLowerCase();
+  if (normalizedEmail) return { field: 'email', value: normalizedEmail };
+  return null;
 }
 
-function getRequestIp(req) {
+async function loadStoredCandidates(tablesDB, databaseId, accountId, submittedEmail) {
+  const lookup = storedIdentityLookup(accountId, submittedEmail);
+  if (!lookup) return [];
+
+  // profile_private is the finalized canonical identity boundary. A failed
+  // lookup must fail the entire guard instead of silently allowing a session
+  // without checking its University ID and phone blocks.
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.profilePrivate,
+    queries: [Query.equal(lookup.field, lookup.value), Query.limit(1)],
+    total: false,
+  });
+  return response.rows[0] ? normalizeCandidates(response.rows[0]) : [];
+}
+
+export function getRequestIp(req) {
   const headers = req.headers ?? {};
   const raw =
+    headers['x-appwrite-client-ip'] ||
     headers['x-forwarded-for'] ||
     headers['x-real-ip'] ||
     headers['cf-connecting-ip'] ||
     headers['client-ip'] ||
-    headers['x-appwrite-user-ip'] ||
     '';
 
   return String(raw).split(',')[0].trim();
@@ -134,14 +130,25 @@ function ipMatchesRange(ip, range) {
 }
 
 async function listRows(tablesDB, databaseId, tableId, fields) {
-  const response = await tablesDB.listRows({
-    databaseId,
-    tableId,
-    queries: [Query.select(fields), Query.limit(500)],
-    total: false,
-  });
+  const rows = [];
+  let cursor = '';
 
-  return response.rows;
+  do {
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId,
+      queries: [
+        Query.select(fields),
+        Query.limit(500),
+        ...(cursor ? [Query.cursorAfter(cursor)] : []),
+      ],
+      total: false,
+    });
+    rows.push(...response.rows);
+    cursor = response.rows.length === 500 ? response.rows.at(-1)?.$id ?? '' : '';
+  } while (cursor);
+
+  return rows;
 }
 
 export default async ({ req, res, log, error }) => {
@@ -169,18 +176,20 @@ export default async ({ req, res, log, error }) => {
     log('Access guard check started.');
     const requestIp = getRequestIp(req);
     const accountId = String(req.headers?.['x-appwrite-user-id'] ?? '').trim();
+    const submittedCandidates = normalizeCandidates(body);
+    const submittedEmail = submittedCandidates.find((candidate) => candidate.type === 'email')?.value ?? '';
     const [identityBlocks, ipBlocks, storedCandidates] = await Promise.all([
       listRows(tablesDB, databaseId, tableIds.identityBlocks, ['type', 'value', 'reason', 'status']),
       listRows(tablesDB, databaseId, tableIds.ipBlocks, ['ipRange', 'reason', 'status']),
-      loadStoredCandidates(tablesDB, databaseId, accountId),
+      loadStoredCandidates(tablesDB, databaseId, accountId, submittedEmail),
     ]);
 
     log(`Access guard data loaded in ${Date.now() - startedAt}ms.`);
 
-    // Before sign-up there is no authenticated account, so submitted values
-    // are the only candidates. Authenticated checks also include the canonical
-    // owner-only identity row and cannot evade a block by omitting body fields.
-    const candidates = mergeCandidates(normalizeCandidates(body), storedCandidates);
+    // Before session creation, a submitted email resolves the canonical
+    // owner-only identity row. Authenticated checks prefer the account ID, so
+    // neither path can evade University ID or phone blocks by omitting fields.
+    const candidates = mergeCandidates(submittedCandidates, storedCandidates);
     const identityMatch = identityBlocks.find((block) => (
       block.status === 'active' &&
       candidates.some((candidate) => candidate.type === block.type && candidate.value === block.value)

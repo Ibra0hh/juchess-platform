@@ -510,7 +510,8 @@
 }
 
 .auth-submit-button,
-.auth-form > button[type="submit"] {
+.auth-form > button[type="submit"],
+.auth-submit-link {
   height: 46px;
   border: none;
   border-radius: 8px;
@@ -522,12 +523,24 @@
   cursor: pointer;
 }
 
+.auth-submit-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin-top: 20px;
+  padding: 0 16px;
+  text-decoration: none;
+}
+
 .auth-submit-button {
   margin-top: 4px;
 }
 
 .auth-submit-button:hover:not(:disabled),
-.auth-form > button[type="submit"]:hover:not(:disabled) {
+.auth-form > button[type="submit"]:hover:not(:disabled),
+.auth-submit-link:hover {
   background: #5f1b26;
 }
 
@@ -617,6 +630,19 @@ button.auth-secondary-button:disabled {
 .auth-callback-panel .auth-secondary-button {
   width: 100%;
   margin-top: 8px;
+}
+
+.auth-callback-actions {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.auth-callback-actions .auth-submit-button,
+.auth-callback-actions .auth-secondary-button {
+  width: 100%;
+  margin: 0;
 }
 
 .profile-creation-note {
@@ -763,6 +789,15 @@ button.auth-secondary-button:disabled {
 @media (max-width: 640px) {
   .auth-site-header {
     padding: 16px 18px;
+  }
+
+  .auth-screen .auth-form input,
+  .auth-screen .auth-field input,
+  .auth-screen .auth-form select,
+  .auth-screen .university-field select,
+  .auth-screen .verification-resend-form input,
+  .auth-screen .verification-code-form input:not(.verification-code-input) {
+    font-size: 16px;
   }
 
   .prototype-auth-main,

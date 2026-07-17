@@ -7,6 +7,54 @@ AI chat. It describes the intended product, the actual implementation, the
 backend contract, deployment state, known limitations, and the working rules
 that must not be lost between chats.
 
+## July 17 deep authentication hardening
+
+- The web authentication lifecycle was reviewed end to end. Session bootstrap
+  requests are coalesced and generation-guarded, sign-in/signup controls remain
+  disabled while bootstrap is unresolved, duplicate submissions are blocked,
+  OAuth/recovery/verification secrets are removed from the address bar
+  immediately, and partial callbacks now have explicit recovery actions.
+- Email/password signup creates only the Appwrite account, opens a temporary
+  verification-only session, sends the custom two-hour link plus six-digit
+  code, and deletes that session. A failed send now explains that the account
+  exists and that signing in will request a fresh proof. No JuChess profile is
+  created before verification and complete club details.
+- Access and profile reads now use idempotent hedged requests with explicit
+  deadlines. Access checks hedge after four seconds and fail closed after 12;
+  owner-profile reads hedge after five seconds and stop after 15. Profile POST
+  mutations are never duplicated.
+- `access-guards` resolves canonical private identity by account ID or normalized
+  pre-session email, scans all block rows with pagination, trusts Appwrite's
+  client-IP header first, and propagates identity lookup failures instead of
+  allowing access without a decision.
+- `player-actions` now validates every editable field against schema-aligned
+  limits, rejects malformed Jordan identity data, checks canonical email,
+  University ID, and phone blocks again at profile activation, and treats
+  private-profile lookup failures as errors rather than as missing profiles.
+  An orphaned unique email/ID/phone reservation is reclaimed only after the
+  Users API confirms that its account was deleted; all releases and the new
+  profile write commit atomically. Active-account and transient lookup conflicts
+  remain denied.
+- Verification proof validation now happens before an already-verified result.
+  A challenge also verifies that the current Appwrite email still matches the
+  hashed address that received the proof, preventing an old-address link/code
+  from verifying a later email change. A failed replacement-email send leaves
+  the previous proof usable. Challenge lookup is explicitly newest-first and
+  paginated.
+- Account and profile inputs share client/server validation, recovery requests
+  do not disclose whether an account exists, cloud error types receive
+  player-facing messages, password fields have correct autocomplete names, and
+  mobile auth inputs use 16px text to avoid browser zoom.
+- Ready and active deployments: `access-guards`
+  `6a5a8ba1eb6aa6b522b1`, `player-actions`
+  `6a5a8bb87eeaed0d0430`, and `verification-actions`
+  `6a5a8bd242c1a883d64d`. Live health probes returned HTTP 200; an authless
+  nonexistent-code probe returned the intended HTTP 400 without mutation.
+- `npm run check:web` passed with 67 tests; `npm run check:functions`,
+  `npm run test:functions` passed with 43 tests; and
+  `npm run check:email-templates` validated all three templates. No real email
+  was sent during this review, so inbox delivery/rendering was not re-verified.
+
 ## July 17 signup timeout incident
 
 - Two real signup preflight executions of `access-guards` timed out at the
@@ -21,11 +69,12 @@ that must not be lost between chats.
   row volume and block-list scanning as the cause. Appwrite's public status page
   showed all services operational, so this is treated as a transient executor
   startup/queue stall rather than a deterministic JuChess logic failure.
-- Web access checks now use an 8-second hedged request. Normal checks still make
-  one Function execution; only a stalled check starts one backup execution. The
-  first valid decision wins, genuine block decisions still fail closed, and two
-  failures show an explicit temporary-security-check message. Signup failures
-  state that no account was created.
+- Web access checks now use a four-second hedged request and a 12-second overall
+  deadline. Normal checks still make one Function execution; only a stalled
+  check starts one backup execution. The first valid decision wins, genuine
+  block decisions still fail closed, and two failures show an explicit
+  temporary-security-check message. Signup failures state that no account was
+  created.
 - The access guard now selects only required block fields and records safe
   start/data-loaded/completion timings without logging submitted identities.
 - `access-guards` deployment `6a5a5cca9dd6b0e4bb3b` is ready and active. Its

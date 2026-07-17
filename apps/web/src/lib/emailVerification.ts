@@ -64,11 +64,11 @@ export async function resendEmailVerification(
     throw new Error('Enter your email and password to request a new verification link.')
   }
 
-  let sessionCreated = false
+  let shouldDeleteSession = false
   try {
     const session = await createVerificationSession(normalizedEmail, password)
-    sessionCreated = session.created
     const { user } = session
+    shouldDeleteSession = session.created || !user.emailVerification
     if (expectedUserId && user.$id !== expectedUserId) {
       throw new Error('Use the JuChess account associated with this verification link.')
     }
@@ -77,7 +77,7 @@ export async function resendEmailVerification(
     await sendEmailVerificationChallenge()
     return 'sent'
   } finally {
-    if (sessionCreated) {
+    if (shouldDeleteSession) {
       try {
         await account.deleteSession({ sessionId: 'current' })
       } catch {
@@ -150,6 +150,10 @@ async function runVerificationAction(
     method: ExecutionMethod.POST,
     headers,
   })
+
+  if (execution.status === 'failed') {
+    throw new Error(execution.errors || 'The email verification service execution failed.')
+  }
 
   let payload: VerificationFunctionResponse
   try {

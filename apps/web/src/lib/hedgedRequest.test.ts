@@ -53,3 +53,29 @@ test('rejects after both requests fail', async () => {
   )
   assert.equal(attempts, 2)
 })
+
+test('rejects at the overall deadline when both requests hang', async () => {
+  let attempts = 0
+  await assert.rejects(
+    runHedgedRequest(() => {
+      attempts += 1
+      return new Promise<string>(() => undefined)
+    }, 0, 20),
+    /did not finish within 20ms/i,
+  )
+  assert.equal(attempts, 2)
+})
+
+test('rejects at the overall deadline when the primary fails and the backup hangs', async () => {
+  let attempts = 0
+  await assert.rejects(
+    runHedgedRequest(() => {
+      attempts += 1
+      return attempts === 1
+        ? Promise.reject(new Error('primary failed'))
+        : new Promise<string>(() => undefined)
+    }, 1_000, 20),
+    /did not finish within 20ms/i,
+  )
+  assert.equal(attempts, 2)
+})

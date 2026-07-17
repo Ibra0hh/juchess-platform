@@ -46,6 +46,7 @@ export default function UniversityField({
       <span>University{!required ? <em> (optional)</em> : null}</span>
       <select
         id={id}
+        name="university"
         autoComplete="organization"
         disabled={disabled}
         onChange={(event) => handleSelection(event.target.value)}
@@ -68,6 +69,7 @@ export default function UniversityField({
           autoComplete="organization"
           disabled={disabled}
           maxLength={160}
+          name="university"
           onChange={(event) => onChange(event.target.value)}
           placeholder="Type your university name"
           required={required}

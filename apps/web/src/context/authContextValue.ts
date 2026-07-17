@@ -17,9 +17,9 @@ export type AuthContextValue = {
   profile: AuthProfile | null
   sessionProvider: string | null
   error: string | null
-  refresh: () => Promise<void>
+  refresh: () => Promise<AuthSession | null>
   completeOAuth: (userId: string, secret: string) => Promise<AuthSession>
-  signIn: (input: SignInInput) => Promise<void>
+  signIn: (input: SignInInput) => Promise<AuthSession>
   signUp: (input: SignUpInput) => Promise<void>
   signOut: () => Promise<void>
   linkExternalGameUsername: (

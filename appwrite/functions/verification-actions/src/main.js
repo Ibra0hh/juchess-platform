@@ -51,7 +51,7 @@ export function normalizeEmail(value) {
 }
 
 export function normalizeVerificationCode(value) {
-  return String(value ?? '').replace(/\D/g, '').slice(0, 6);
+  return String(value ?? '').replace(/\D/g, '');
 }
 
 export function generateVerificationCode() {
@@ -196,13 +196,24 @@ async function requireAccount(req) {
 }
 
 async function listChallenges(tablesDB, databaseId, field, value) {
-  const response = await tablesDB.listRows({
-    databaseId,
-    tableId,
-    queries: [Query.equal(field, value), Query.limit(100)],
-    total: false,
-  });
-  return response.rows.toSorted((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+  const rows = [];
+  let cursor = '';
+
+  do {
+    const queries = [Query.equal(field, value), Query.orderDesc('$createdAt'), Query.limit(100)];
+    if (cursor) queries.push(Query.cursorAfter(cursor));
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId,
+      queries,
+      total: false,
+    });
+    const page = Array.isArray(response.rows) ? response.rows : [];
+    rows.push(...page);
+    cursor = page.length === 100 ? String(page.at(-1)?.$id ?? '') : '';
+  } while (cursor);
+
+  return rows.toSorted((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
 }
 
 async function invalidateActiveChallenges(tablesDB, databaseId, rows, consumedAt) {
@@ -216,7 +227,7 @@ async function invalidateActiveChallenges(tablesDB, databaseId, rows, consumedAt
     })));
 }
 
-async function createVerificationChallenge({ tablesDB, messaging, databaseId, user, secret, publicWebUrl }) {
+export async function createVerificationChallenge({ tablesDB, messaging, databaseId, user, secret, publicWebUrl }) {
   if (user.emailVerification) return { alreadyVerified: true, expiresAt: null };
 
   const nowMs = Date.now();
@@ -226,8 +237,6 @@ async function createVerificationChallenge({ tablesDB, messaging, databaseId, us
   if (newest && !newest.consumedAt && nowMs - Date.parse(newest.createdAt) < RESEND_COOLDOWN_MS) {
     throw new HttpError(429, 'Wait a few seconds before requesting another verification email.');
   }
-  await invalidateActiveChallenges(tablesDB, databaseId, existing, now);
-
   const challengeId = ID.unique();
   const code = generateVerificationCode();
   const linkToken = randomBytes(32).toString('base64url');
@@ -272,11 +281,36 @@ async function createVerificationChallenge({ tablesDB, messaging, databaseId, us
     throw cause;
   }
 
+  // Keep the previous proof usable until Appwrite has accepted the replacement
+  // email. A temporary messaging failure must never strand the player with no
+  // working verification method.
+  await invalidateActiveChallenges(tablesDB, databaseId, existing, now);
+
   return { alreadyVerified: false, expiresAt };
 }
 
-async function completeChallenge(tablesDB, users, databaseId, challenge) {
+export function challengeMatchesCurrentEmail(challenge, user, secret) {
+  return secureHashMatches(
+    hashVerificationEmail(user?.email, secret),
+    challenge?.emailHash,
+  );
+}
+
+async function consumeChallenge(tablesDB, databaseId, challenge) {
+  await tablesDB.updateRow({
+    databaseId,
+    tableId,
+    rowId: challenge.$id,
+    data: { consumedAt: new Date().toISOString() },
+  });
+}
+
+async function completeChallenge(tablesDB, users, databaseId, challenge, secret) {
   const user = await users.get({ userId: challenge.userId });
+  if (!challengeMatchesCurrentEmail(challenge, user, secret)) {
+    await consumeChallenge(tablesDB, databaseId, challenge).catch(() => undefined);
+    throw new HttpError(400, 'This verification link or code is invalid or expired. Request a fresh email.');
+  }
   const alreadyVerified = Boolean(user.emailVerification);
   if (!alreadyVerified) {
     await users.updateEmailVerification({
@@ -284,19 +318,16 @@ async function completeChallenge(tablesDB, users, databaseId, challenge) {
       emailVerification: true,
     });
   }
-  await tablesDB.updateRow({
-    databaseId,
-    tableId,
-    rowId: challenge.$id,
-    data: { consumedAt: new Date().toISOString() },
-  });
+  await consumeChallenge(tablesDB, databaseId, challenge);
   return { verified: true, alreadyVerified };
 }
 
-async function activeChallengeOrThrow(tablesDB, users, databaseId, challenge) {
+async function activeChallengeOrThrow(tablesDB, users, databaseId, challenge, secret) {
   if (challenge.consumedAt) {
     const user = await users.get({ userId: challenge.userId }).catch(() => null);
-    if (user?.emailVerification) return { alreadyVerified: true };
+    if (user?.emailVerification && challengeMatchesCurrentEmail(challenge, user, secret)) {
+      return { alreadyVerified: true };
+    }
     throw new HttpError(400, 'This verification link or code is invalid or expired.');
   }
   if (isVerificationChallengeExpired(challenge)) {
@@ -311,7 +342,7 @@ async function activeChallengeOrThrow(tablesDB, users, databaseId, challenge) {
   return null;
 }
 
-async function confirmLink({ tablesDB, users, databaseId, body, secret }) {
+export async function confirmLink({ tablesDB, users, databaseId, body, secret }) {
   const challengeId = String(body.challengeId ?? '').trim();
   const token = String(body.token ?? '').trim();
   if (!/^[a-zA-Z0-9._-]{1,36}$/.test(challengeId) || token.length < 32 || token.length > 200) {
@@ -321,17 +352,16 @@ async function confirmLink({ tablesDB, users, databaseId, body, secret }) {
   const challenge = await tablesDB.getRow({ databaseId, tableId, rowId: challengeId })
     .catch(() => null);
   if (!challenge) throw new HttpError(400, 'This verification link or code is invalid or expired.');
-  const inactive = await activeChallengeOrThrow(tablesDB, users, databaseId, challenge);
-  if (inactive?.alreadyVerified) return { verified: true, alreadyVerified: true };
-
   const actualHash = hashVerificationValue('link', challengeId, token, secret);
   if (!secureHashMatches(actualHash, challenge.linkHash)) {
     throw new HttpError(400, 'This verification link or code is invalid or expired.');
   }
-  return await completeChallenge(tablesDB, users, databaseId, challenge);
+  const inactive = await activeChallengeOrThrow(tablesDB, users, databaseId, challenge, secret);
+  if (inactive?.alreadyVerified) return { verified: true, alreadyVerified: true };
+  return await completeChallenge(tablesDB, users, databaseId, challenge, secret);
 }
 
-async function confirmCode({ tablesDB, users, databaseId, body, secret }) {
+export async function confirmCode({ tablesDB, users, databaseId, body, secret }) {
   const email = normalizeEmail(body.email);
   const code = normalizeVerificationCode(body.code);
   if (!email || !/^\d{6}$/.test(code)) {
@@ -341,15 +371,14 @@ async function confirmCode({ tablesDB, users, databaseId, body, secret }) {
   const rows = await listChallenges(tablesDB, databaseId, 'emailHash', hashVerificationEmail(email, secret));
   const challenge = rows.find((row) => !row.consumedAt) ?? rows[0] ?? null;
   if (!challenge) throw new HttpError(400, 'This verification link or code is invalid or expired.');
-  const inactive = await activeChallengeOrThrow(tablesDB, users, databaseId, challenge);
-  if (inactive?.alreadyVerified) return { verified: true, alreadyVerified: true };
-
-  if (Number(challenge.attempts ?? 0) >= MAX_CODE_ATTEMPTS) {
-    throw new HttpError(429, 'Too many incorrect attempts. Request a fresh verification email.');
-  }
-
   const actualHash = hashVerificationValue('code', challenge.$id, code, secret);
   if (!secureHashMatches(actualHash, challenge.codeHash)) {
+    if (challenge.consumedAt || isVerificationChallengeExpired(challenge)) {
+      throw new HttpError(400, 'This verification link or code is invalid or expired.');
+    }
+    if (Number(challenge.attempts ?? 0) >= MAX_CODE_ATTEMPTS) {
+      throw new HttpError(429, 'Too many incorrect attempts. Request a fresh verification email.');
+    }
     const attempts = Number(challenge.attempts ?? 0) + 1;
     await tablesDB.updateRow({
       databaseId,
@@ -365,7 +394,9 @@ async function confirmCode({ tablesDB, users, databaseId, body, secret }) {
       : 'This verification link or code is invalid or expired.');
   }
 
-  return await completeChallenge(tablesDB, users, databaseId, challenge);
+  const inactive = await activeChallengeOrThrow(tablesDB, users, databaseId, challenge, secret);
+  if (inactive?.alreadyVerified) return { verified: true, alreadyVerified: true };
+  return await completeChallenge(tablesDB, users, databaseId, challenge, secret);
 }
 
 export default async ({ req, res, log, error }) => {

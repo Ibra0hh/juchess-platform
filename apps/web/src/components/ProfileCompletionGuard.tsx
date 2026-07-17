@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
-import { shouldRedirectToProfileCompletion } from '../lib/profileCompletion'
+import { routeRequiresAuthenticatedSession, shouldRedirectToProfileCompletion } from '../lib/profileCompletion'
 import RouteSkeleton from './RouteSkeleton'
 
 export function ProfileCompletionGuard({ children }: { children: ReactNode }) {
@@ -14,9 +14,11 @@ export function ProfileCompletionGuard({ children }: { children: ReactNode }) {
     navigate('/sign-in', { replace: true })
   }
 
-  if (loading) return <RouteSkeleton />
+  const requiresSession = routeRequiresAuthenticatedSession(location.pathname)
 
-  if (error) {
+  if (loading && requiresSession) return <RouteSkeleton />
+
+  if (error && requiresSession) {
     return (
       <main className="session-recovery" role="alert">
         <section>

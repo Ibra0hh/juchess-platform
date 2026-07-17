@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mergeCandidates, normalizeCandidates, normalizePhone } from '../src/main.js';
+import {
+  mergeCandidates,
+  getRequestIp,
+  normalizeCandidates,
+  normalizePhone,
+  storedIdentityLookup,
+} from '../src/main.js';
 
 test('guard candidates normalize all protected identity types', () => {
   assert.deepEqual(normalizeCandidates({
@@ -24,4 +30,28 @@ test('authenticated stored candidates merge with and override duplicate submissi
     { type: 'phone', value: '+962791234567' },
     { type: 'email', value: 'owner@example.com' },
   ]);
+});
+
+test('pre-session checks resolve canonical private identity by normalized email', () => {
+  assert.deepEqual(storedIdentityLookup('', ' Player@Example.com '), {
+    field: 'email',
+    value: 'player@example.com',
+  });
+  assert.deepEqual(storedIdentityLookup('account-1', 'other@example.com'), {
+    field: 'accountId',
+    value: 'account-1',
+  });
+  assert.equal(storedIdentityLookup('', ''), null);
+});
+
+test('IP checks trust Appwrite client IP ahead of forwarded fallbacks', () => {
+  assert.equal(getRequestIp({
+    headers: {
+      'x-appwrite-client-ip': '203.0.113.20',
+      'x-forwarded-for': '198.51.100.1, 198.51.100.2',
+    },
+  }), '203.0.113.20');
+  assert.equal(getRequestIp({
+    headers: { 'x-forwarded-for': '198.51.100.1, 198.51.100.2' },
+  }), '198.51.100.1');
 });

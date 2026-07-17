@@ -7,11 +7,12 @@ import { postAuthenticationDestination } from '../lib/profileCompletion'
 import './AuthPage.css'
 
 export default function OAuthCallbackPage() {
-  const { completeOAuth } = useAuth()
+  const { completeOAuth, refresh, signOut } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const started = useRef(false)
   const [error, setError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
     if (started.current) return
@@ -19,8 +20,7 @@ export default function OAuthCallbackPage() {
 
     const userId = searchParams.get('userId')
     const secret = searchParams.get('secret')
-    const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
-    window.history.replaceState(null, '', `${routeBase}auth/callback`)
+    navigate('/auth/callback', { replace: true })
 
     if (!userId || !secret) {
       setError('The Google sign-in response is incomplete. Please start again.')
@@ -34,16 +34,41 @@ export default function OAuthCallbackPage() {
       .catch((caught) => setError(formatAppwriteError(caught)))
   }, [completeOAuth, navigate, searchParams])
 
+  async function retrySessionLoad() {
+    if (retrying) return
+    setRetrying(true)
+    setError(null)
+    const session = await refresh()
+    if (session) {
+      navigate(postAuthenticationDestination(session.profile), { replace: true })
+      return
+    }
+    setError('The JuChess session is not available yet. Start Google sign-in again.')
+    setRetrying(false)
+  }
+
+  async function restartSignIn() {
+    await signOut().catch(() => undefined)
+    navigate('/sign-in', { replace: true })
+  }
+
   return (
     <div className="auth-screen">
       <AuthHeader />
       <main className="auth-main prototype-auth-main signin">
         <section className="auth-panel prototype-auth-panel signin auth-callback-panel" aria-live="polite">
           <img src={compactCrestUrl} alt="" />
-          <h1>{error ? 'Sign-in needs attention' : 'Finishing your sign-in'}</h1>
+          <h1>{error ? 'Sign-in needs attention' : retrying ? 'Checking your session' : 'Finishing your sign-in'}</h1>
           <p>{error || 'Checking whether your JuChess player profile is ready...'}</p>
           {!error ? <span className="auth-spinner" aria-hidden="true" /> : null}
-          {error ? <Link className="auth-secondary-button" to="/sign-in">Return to sign in</Link> : null}
+          {error ? (
+            <div className="auth-callback-actions">
+              <button className="auth-submit-button" type="button" disabled={retrying} onClick={() => void retrySessionLoad()}>
+                {retrying ? 'Checking...' : 'Try loading session again'}
+              </button>
+              <button className="auth-secondary-button" type="button" onClick={() => void restartSignIn()}>Start sign-in again</button>
+            </div>
+          ) : null}
         </section>
       </main>
     </div>

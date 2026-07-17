@@ -2,9 +2,18 @@ import { ExecutionMethod, ID, OAuthProvider, Permission, Query, Role, type Model
 import { account, appwriteConfig, appwriteReady, createPlayerFunctionHeaders, functions, storage, tablesDB } from './appwrite'
 import { tableIds } from './juchess'
 import type { BoardPreferences } from './boardAppearance'
-import { isExistingSessionError, normalizeAccountEmail } from './authSession'
+import { isExistingSessionError } from './authSession'
+import { formatAuthError, isUnknownAccountRecoveryError } from './authErrors'
+import {
+  normalizeAuthEmail,
+  validateAccountEmail,
+  validateAccountName,
+  validateNewPassword,
+  validateSignInPassword,
+} from './authValidation'
 import { sendEmailVerificationChallenge } from './emailVerification'
 import { runHedgedRequest } from './hedgedRequest'
+import { normalizeJordanMobile, validateRequiredPlayerProfile } from './profileValidation'
 
 export type ProfileRole = 'member' | 'organizer' | 'admin'
 export type ProfileStatus = 'active' | 'suspended'
@@ -83,11 +92,26 @@ type AccessGuardInput = {
 
 class AccessBlockedError extends Error {}
 
-class EmailVerificationRequiredError extends Error {}
+export class EmailVerificationRequiredError extends Error {
+  email: string
 
-const accessGuardHedgeDelayMs = 8_000
+  constructor(message: string, email: string) {
+    super(message)
+    this.name = 'EmailVerificationRequiredError'
+    this.email = email
+  }
+}
 
-export async function getCurrentSession(): Promise<AuthSession | null> {
+const accessGuardHedgeDelayMs = 4_000
+const accessGuardDeadlineMs = 12_000
+const profileLoadHedgeDelayMs = 5_000
+const profileLoadDeadlineMs = 15_000
+
+type CurrentSessionOptions = {
+  accessPrecheckedEmail?: string
+}
+
+export async function getCurrentSession(options: CurrentSessionOptions = {}): Promise<AuthSession | null> {
   if (!appwriteReady) return null
 
   let user: Models.User
@@ -103,19 +127,24 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
     return null
   }
 
+  return await hydrateCurrentSession(user, options)
+}
+
+async function hydrateCurrentSession(
+  user: Models.User,
+  options: CurrentSessionOptions = {},
+  providerHint?: string,
+): Promise<AuthSession> {
   try {
+    const accessWasPrechecked = normalizeAuthEmail(options.accessPrecheckedEmail ?? '') === normalizeAuthEmail(user.email)
     const [profile, sessionProvider] = await Promise.all([
       loadOwnerProfile(),
-      loadCurrentSessionProvider(),
+      providerHint === undefined ? loadCurrentSessionProvider() : Promise.resolve(providerHint || null),
+      accessWasPrechecked ? Promise.resolve() : assertAccessAllowed({ email: user.email }),
     ])
     if (profile?.status === 'suspended') {
       throw new AccessBlockedError('This account is blocked by club administration.')
     }
-    await assertAccessAllowed({
-      email: user.email,
-      universityId: profile?.universityId ?? undefined,
-      phone: profile?.phone ?? undefined,
-    })
     return { user, profile, sessionProvider }
   } catch (error) {
     if (error instanceof AccessBlockedError) {
@@ -134,15 +163,24 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
 function isMissingAccountSession(error: unknown) {
   return typeof error === 'object'
     && error !== null
-    && 'code' in error
-    && Number((error as { code?: unknown }).code) === 401
+    && (
+      ('code' in error && Number((error as { code?: unknown }).code) === 401)
+      || ('type' in error && (error as { type?: unknown }).type === 'user_session_not_found')
+    )
 }
 
 export async function signInWithEmail(input: SignInInput): Promise<AuthSession> {
   requireAppwriteReady()
-  await assertAccessAllowed({ email: input.email })
+  const email = normalizeAuthEmail(input.email)
+  const emailProblem = validateAccountEmail(email)
+  const passwordProblem = validateSignInPassword(input.password)
+  if (emailProblem || passwordProblem) {
+    throw new Error(emailProblem || passwordProblem || 'Enter your sign-in details.')
+  }
 
-  await createEmailPasswordSessionOrReuseCurrent(input)
+  await assertAccessAllowed({ email })
+
+  const createdSession = await createEmailPasswordSessionOrReuseCurrent({ email, password: input.password })
 
   const user = await account.get()
   if (!user.emailVerification) {
@@ -160,33 +198,40 @@ export async function signInWithEmail(input: SignInInput): Promise<AuthSession> 
       verificationSent
         ? 'Verify your email before signing in. We sent a new two-hour link and six-digit code.'
         : 'Verify your email before signing in. Open the most recent JuChess verification email.',
+      email,
     )
   }
 
-  const session = await getCurrentSession()
-  if (!session) {
-    throw new Error('Sign in succeeded, but the account session could not be loaded.')
-  }
-
-  return session
+  return await hydrateCurrentSession(user, { accessPrecheckedEmail: email }, createdSession?.provider)
 }
 
 export async function signUpWithEmail(input: SignUpInput): Promise<void> {
   requireAppwriteReady()
-  await assertAccessAllowed({ email: input.email }, 'account-creation')
-  await assertNoActiveSessionForAccountCreation(input.email)
+  const email = normalizeAuthEmail(input.email)
+  const fullName = input.fullName.trim()
+  const validationProblem = validateAccountName(fullName)
+    || validateAccountEmail(email)
+    || validateNewPassword(input.password)
+  if (validationProblem) throw new Error(validationProblem)
+
+  await assertAccessAllowed({ email }, 'account-creation')
+  await assertNoActiveSessionForAccountCreation(email)
 
   await account.create({
     userId: ID.unique(),
-    email: input.email,
+    email,
     password: input.password,
-    name: input.fullName,
+    name: fullName,
   })
 
-  await createEmailPasswordSessionOrReuseCurrent(input)
-
   try {
+    await createEmailPasswordSessionOrReuseCurrent({ email, password: input.password })
     await sendCurrentUserEmailVerification()
+  } catch {
+    throw new Error(
+      'Your JuChess account was created, but the verification email could not be sent. '
+      + 'Sign in with the same email and password to request a fresh verification email.',
+    )
   } finally {
     await deleteCurrentSession()
   }
@@ -205,31 +250,46 @@ export function startOAuthSession(provider: SocialAuthProvider) {
 export async function completeOAuthTokenSession(userId: string, secret: string): Promise<AuthSession> {
   requireAppwriteReady()
 
-  await account.createSession({ userId, secret })
-  const session = await getCurrentSession()
-  if (!session) {
-    throw new Error('Google sign-in succeeded, but the JuChess session could not be loaded.')
+  const createdSession = await createTokenSessionOrReuseCurrent(userId, secret)
+  const user = await account.get()
+  if (!user.emailVerification) {
+    await deleteCurrentSession()
+    throw new Error('Google did not provide a verified email address for this account.')
   }
-
-  return session
+  return await hydrateCurrentSession(user, {}, createdSession?.provider)
 }
 
 export async function signOutCurrentUser() {
   if (!appwriteReady) return
-  await account.deleteSession({ sessionId: 'current' })
+  try {
+    await account.deleteSession({ sessionId: 'current' })
+  } catch (error) {
+    if (!isMissingAccountSession(error)) throw error
+  }
 }
 
 export async function requestPasswordRecovery(email: string) {
   requireAppwriteReady()
+  const normalizedEmail = normalizeAuthEmail(email)
+  const emailProblem = validateAccountEmail(normalizedEmail)
+  if (emailProblem) throw new Error(emailProblem)
 
-  await account.createRecovery({
-    email,
-    url: appUrl('/forgot-password'),
-  })
+  try {
+    await account.createRecovery({
+      email: normalizedEmail,
+      url: appUrl('/forgot-password'),
+    })
+  } catch (error) {
+    // Never reveal whether an email address has a JuChess account.
+    if (isUnknownAccountRecoveryError(error)) return
+    throw error
+  }
 }
 
 export async function completePasswordRecovery(userId: string, secret: string, password: string) {
   requireAppwriteReady()
+  const passwordProblem = validateNewPassword(password)
+  if (passwordProblem) throw new Error(passwordProblem)
 
   await account.updateRecovery({
     userId,
@@ -260,13 +320,18 @@ export async function loadClubLeaderboard(): Promise<PublicProfile[]> {
 export async function saveProfileDetails(input: ProfileUpdateInput) {
   requireAppwriteReady()
   const displayName = input.displayName.trim()
-  if (!displayName) throw new Error('Display name is required.')
   const university = input.university?.trim()
-  if (!university) throw new Error('University is required.')
   const universityId = input.universityId?.trim()
-  if (!universityId) throw new Error('University ID is required.')
-  const phone = normalizeJordanPhone(input.phone)
-  if (!phone) throw new Error('Phone number is required.')
+  const phone = normalizeJordanMobile(input.phone)
+  const validationProblem = validateRequiredPlayerProfile({
+    displayName,
+    university,
+    universityId,
+    phone,
+    chessComUsername: input.chessComUsername,
+    lichessUsername: input.lichessUsername,
+  })
+  if (validationProblem) throw new Error(validationProblem)
 
   return await updateOwnerProfile({
     displayName,
@@ -382,14 +447,21 @@ async function runProfileAction(
 ): Promise<AuthProfile | null> {
   requireAppwriteReady()
   const headers = await createPlayerFunctionHeaders()
-  const execution = await functions.createExecution({
-    functionId: appwriteConfig.playerFunctionId,
-    body: JSON.stringify(body),
-    async: false,
-    xpath: '/profile',
-    method,
-    headers,
-  })
+  const execute = () => functions.createExecution({
+      functionId: appwriteConfig.playerFunctionId,
+      body: JSON.stringify(body),
+      async: false,
+      xpath: '/profile',
+      method,
+      headers,
+    })
+  const execution = method === ExecutionMethod.GET
+    ? await runHedgedRequest(execute, profileLoadHedgeDelayMs, profileLoadDeadlineMs)
+    : await execute()
+
+  if (execution.status === 'failed') {
+    throw new Error(execution.errors || 'The player profile service execution failed.')
+  }
 
   let payload: { ok?: boolean; row?: AuthProfile | null; error?: string; detail?: string }
   try {
@@ -408,18 +480,7 @@ async function runProfileAction(
 }
 
 export function formatAppwriteError(error: unknown) {
-  if (error instanceof Error && error.message) return cloudMessage(error.message)
-
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const message = (error as { message?: unknown }).message
-    if (typeof message === 'string') return cloudMessage(message)
-  }
-
-  return 'Something went wrong. Please try again.'
-}
-
-function cloudMessage(value: string) {
-  return value.replace(/appwrite/gi, 'cloud')
+  return formatAuthError(error)
 }
 
 function requireAppwriteReady() {
@@ -442,7 +503,7 @@ async function deleteCurrentSession() {
 
 async function createEmailPasswordSessionOrReuseCurrent(input: SignInInput) {
   try {
-    await account.createEmailPasswordSession({
+    return await account.createEmailPasswordSession({
       email: input.email,
       password: input.password,
     })
@@ -450,19 +511,37 @@ async function createEmailPasswordSessionOrReuseCurrent(input: SignInInput) {
     if (!isExistingSessionError(error)) throw error
 
     const currentUser = await account.get()
-    if (normalizeAccountEmail(currentUser.email) !== normalizeAccountEmail(input.email)) {
+    if (normalizeAuthEmail(currentUser.email) !== normalizeAuthEmail(input.email)) {
       throw new Error(`You are already signed in as ${currentUser.email}. Sign out before switching accounts.`)
     }
 
     // The requested account is already authenticated in this browser. Reuse
     // that secure session instead of asking Appwrite to create a duplicate.
+    return null
+  }
+}
+
+async function createTokenSessionOrReuseCurrent(userId: string, secret: string) {
+  try {
+    return await account.createSession({ userId, secret })
+  } catch (error) {
+    if (!isExistingSessionError(error)) throw error
+
+    const currentUser = await account.get()
+    if (currentUser.$id !== userId) {
+      throw new Error(`You are already signed in as ${currentUser.email}. Sign out before switching accounts.`)
+    }
+
+    // A retried callback can arrive after Appwrite already created the intended
+    // session. Reusing that same session is safe and avoids a false failure.
+    return null
   }
 }
 
 async function assertNoActiveSessionForAccountCreation(email: string) {
   try {
     const currentUser = await account.get()
-    if (normalizeAccountEmail(currentUser.email) === normalizeAccountEmail(email)) {
+    if (normalizeAuthEmail(currentUser.email) === normalizeAuthEmail(email)) {
       throw new Error('This account already exists and is signed in. Continue to your profile instead.')
     }
     throw new Error(`You are already signed in as ${currentUser.email}. Sign out before creating another account.`)
@@ -485,6 +564,7 @@ async function assertAccessAllowed(
     payload = await runHedgedRequest(
       () => requestAccessGuardDecision(input),
       accessGuardHedgeDelayMs,
+      accessGuardDeadlineMs,
     )
   } catch {
     throw new Error(operation === 'account-creation'
@@ -507,7 +587,7 @@ async function requestAccessGuardDecision(input: AccessGuardInput) {
     body: JSON.stringify({
       email: input.email?.trim(),
       universityId: input.universityId?.trim(),
-      phone: normalizeJordanPhone(input.phone),
+      phone: normalizeJordanMobile(input.phone) || undefined,
     }),
     async: false,
     xpath: '/check',
@@ -535,21 +615,6 @@ function parseGuardBody(body: string): { ok?: boolean; allowed?: boolean; reason
   } catch {
     throw new Error('Access guard returned an unreadable response.')
   }
-}
-
-function normalizeJordanPhone(value?: string) {
-  const raw = value?.trim()
-  if (!raw) return undefined
-
-  const compact = raw.replace(/[^\d+]/g, '')
-  if (compact.startsWith('+962')) return `+962${compact.slice(4).replace(/\D/g, '')}`
-  if (compact.startsWith('00962')) return `+962${compact.slice(5).replace(/\D/g, '')}`
-  if (compact.startsWith('962')) return `+962${compact.slice(3).replace(/\D/g, '')}`
-
-  const digits = compact.replace(/\D/g, '')
-  if (digits.startsWith('0')) return `+962${digits.slice(1)}`
-  if (digits.startsWith('7') && digits.length === 9) return `+962${digits}`
-  return raw
 }
 
 function optionalUsername(value?: string) {

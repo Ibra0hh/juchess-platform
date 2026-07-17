@@ -67,8 +67,8 @@ function App() {
               <Route path="/tournaments" element={<TournamentsPage />} />
               <Route path="/attendance-confirm" element={<AttendanceConfirmPage />} />
               <Route path="/tournament/:id" element={<TournamentDetailPage />} />
-              <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
-              <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
+              <Route path="/sign-in" element={<AuthPage key="sign-in" mode="sign-in" />} />
+              <Route path="/sign-up" element={<AuthPage key="sign-up" mode="sign-up" />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="/auth/callback" element={<OAuthCallbackPage />} />

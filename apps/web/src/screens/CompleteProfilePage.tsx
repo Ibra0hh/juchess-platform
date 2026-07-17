@@ -7,6 +7,13 @@ import UniversityField from '../components/UniversityField'
 import { formatAppwriteError } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
 import { profileCompletionAuthMethod, profileNeedsCompletion } from '../lib/profileCompletion'
+import {
+  PROFILE_DISPLAY_NAME_MAX_LENGTH,
+  PROFILE_PHONE_INPUT_MAX_LENGTH,
+  PROFILE_UNIVERSITY_ID_MAX_LENGTH,
+  PROFILE_USERNAME_MAX_LENGTH,
+  validateRequiredPlayerProfile,
+} from '../lib/profileValidation'
 import './AuthPage.css'
 
 type CompletionForm = {
@@ -41,8 +48,9 @@ export default function CompleteProfilePage() {
     event.preventDefault()
     setMessage(null)
 
-    if (!form.displayName.trim() || !form.university.trim() || !form.universityId.trim() || !form.phone.trim()) {
-      setMessage('Full name, university, University ID, and phone number are required.')
+    const validationProblem = validateRequiredPlayerProfile(form)
+    if (validationProblem) {
+      setMessage(validationProblem)
       return
     }
 
@@ -97,16 +105,16 @@ export default function CompleteProfilePage() {
             <span className="social-verification-status"><BadgeCheck size={16} /> Verified</span>
           </div>
 
-          <form className="auth-form prototype-auth-form" onSubmit={handleSubmit}>
-            <AuthInput label="Full name" required value={form.displayName} onChange={(value) => setForm({ ...form, displayName: value })} placeholder="e.g. Ibrahim Ahmad" autoComplete="name" />
+          <form className="auth-form prototype-auth-form" onSubmit={handleSubmit} aria-busy={saving || signingOut}>
+            <AuthInput label="Full name" name="name" required value={form.displayName} onChange={(value) => setForm({ ...form, displayName: value })} placeholder="e.g. Ibrahim Ahmad" autoComplete="name" maxLength={PROFILE_DISPLAY_NAME_MAX_LENGTH} />
             <UniversityField required value={form.university} onChange={(university) => setForm({ ...form, university })} />
             <div className="auth-two-column">
-              <AuthInput label="University ID" required value={form.universityId} onChange={(value) => setForm({ ...form, universityId: value })} placeholder="e.g. 0201234" autoComplete="username" />
-              <AuthInput label="Phone number" required value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} placeholder="07X XXX XXXX" autoComplete="tel" type="tel" />
+              <AuthInput label="University ID" name="university-id" required value={form.universityId} onChange={(value) => setForm({ ...form, universityId: value })} placeholder="e.g. 0201234" autoComplete="username" maxLength={PROFILE_UNIVERSITY_ID_MAX_LENGTH} />
+              <AuthInput label="Phone number" name="phone" required value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} placeholder="07X XXX XXXX" autoComplete="tel" type="tel" maxLength={PROFILE_PHONE_INPUT_MAX_LENGTH} />
             </div>
             <div className="auth-two-column">
-              <AuthInput label="Chess.com username" value={form.chessComUsername} onChange={(value) => setForm({ ...form, chessComUsername: value })} placeholder="username" />
-              <AuthInput label="Lichess username" value={form.lichessUsername} onChange={(value) => setForm({ ...form, lichessUsername: value })} placeholder="username" />
+              <AuthInput label="Chess.com username" name="chess-com-username" value={form.chessComUsername} onChange={(value) => setForm({ ...form, chessComUsername: value })} placeholder="username" maxLength={PROFILE_USERNAME_MAX_LENGTH} />
+              <AuthInput label="Lichess username" name="lichess-username" value={form.lichessUsername} onChange={(value) => setForm({ ...form, lichessUsername: value })} placeholder="username" maxLength={PROFILE_USERNAME_MAX_LENGTH} />
             </div>
 
             {message ? <div className="auth-error" role="alert">{message}</div> : null}
@@ -153,6 +161,8 @@ function completionAuthContent(authMethod: ReturnType<typeof profileCompletionAu
 function AuthInput({
   autoComplete,
   label,
+  maxLength = 128,
+  name,
   onChange,
   placeholder,
   required = false,
@@ -161,6 +171,8 @@ function AuthInput({
 }: {
   autoComplete?: string
   label: string
+  maxLength?: number
+  name: string
   onChange: (value: string) => void
   placeholder: string
   required?: boolean
@@ -170,7 +182,7 @@ function AuthInput({
   return (
     <label className="auth-field">
       <span className="auth-field-label">{label}{!required ? <em> (optional)</em> : null}</span>
-      <input autoComplete={autoComplete} maxLength={128} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} type={type} value={value} />
+      <input autoComplete={autoComplete} maxLength={maxLength} name={name} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} type={type} value={value} />
     </label>
   )
 }

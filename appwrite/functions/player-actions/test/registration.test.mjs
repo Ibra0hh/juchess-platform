@@ -2,12 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   assertCompletePlayerProfile,
+  assertSubmittedIdentityAllowed,
   activateCompleteOwnerProfile,
   attendanceRowId,
   attendanceWindowState,
   buildPrivateProfileData,
+  findReclaimablePrivateIdentities,
   findReclaimablePhoneIdentity,
   isCompletePlayerProfile,
+  loadProfileContext,
   mergeOwnerProfile,
   normalizePhone,
   normalizeProfileUpdate,
@@ -27,6 +30,14 @@ const completePrivateProfile = {
   universityId: '0201234',
   phone: '+962791234567',
 };
+
+function queryAttribute(options) {
+  for (const query of options.queries ?? []) {
+    const parsed = typeof query === 'string' ? JSON.parse(query) : query;
+    if (parsed.method === 'equal') return parsed.attribute;
+  }
+  return null;
+}
 
 test('profile creation requires every membership field before any write can begin', () => {
   assert.equal(isCompletePlayerProfile(completePublicProfile, completePrivateProfile), true);
@@ -129,6 +140,156 @@ test('profile updates separate editable public and private fields', () => {
   assert.equal(normalizePhone('00962 79 123 4567'), '+962791234567');
 });
 
+test('profile validation rejects malformed values before they reach Appwrite', () => {
+  for (const body of [null, [], 'not-an-object']) {
+    assert.throws(
+      () => normalizeProfileUpdate(body),
+      (error) => error.statusCode === 400 && /JSON object/.test(error.message),
+    );
+  }
+
+  for (const [body, message] of [
+    [{ displayName: 'x'.repeat(129) }, /Full name must be 128 characters or fewer/],
+    [{ university: 'x'.repeat(161) }, /University must be 160 characters or fewer/],
+    [{ chessComUsername: 'two words' }, /cannot contain spaces/],
+    [{ lichessUsername: 'x'.repeat(81) }, /80 characters or fewer/],
+    [{ avatarFileId: '../not-a-file-id' }, /Avatar file ID is invalid/],
+    [{ boardTheme: 'x'.repeat(121) }, /Board theme must be 120 characters or fewer/],
+    [{ universityId: 'student id!' }, /University ID may contain only/],
+    [{ phone: '07912abc4567' }, /valid Jordan mobile number/],
+    [{ phone: '+12025550123' }, /valid Jordan mobile number/],
+    [{ displayName: { injected: true } }, /Full name must be text/],
+    [{ university: 'University\u0000Name' }, /unsupported characters/],
+  ]) {
+    assert.throws(
+      () => normalizeProfileUpdate(body),
+      (error) => error.statusCode === 400 && message.test(error.message),
+      JSON.stringify(body),
+    );
+  }
+
+  assert.equal(normalizeProfileUpdate({ displayName: 'x'.repeat(128) }).publicData.displayName.length, 128);
+  assert.equal(normalizeUniversityId('ABC_123/4'), 'abc_123/4');
+});
+
+test('canonical profile lookup propagates database failures instead of inventing a missing profile', async () => {
+  const outage = Object.assign(new Error('database unavailable'), { code: 503 });
+  await assert.rejects(
+    loadProfileContext({ async listRows() { throw outage; } }, 'juchess', 'account-1'),
+    (error) => error === outage,
+  );
+
+  const identity = { $id: 'profile-1', profileId: 'profile-1', accountId: 'account-1' };
+  await assert.rejects(
+    loadProfileContext({
+      async listRows() { return { rows: [identity] }; },
+      async getRow() { throw outage; },
+    }, 'juchess', 'account-1'),
+    (error) => error === outage,
+  );
+
+  assert.deepEqual(
+    await loadProfileContext({
+      async listRows() { return { rows: [identity] }; },
+      async getRow() { throw { code: 404 }; },
+    }, 'juchess', 'account-1'),
+    { profile: null, identity },
+  );
+});
+
+test('profile activation checks the canonical account email against identity blocks', async () => {
+  await assert.rejects(
+    assertSubmittedIdentityAllowed(
+      {
+        async listRows(options) {
+          assert.equal(options.tableId, 'identity_blocks');
+          return {
+            rows: [{
+              $id: 'email-block',
+              type: 'email',
+              value: 'blocked@example.com',
+              status: 'active',
+              reason: 'Membership access revoked.',
+            }],
+          };
+        },
+      },
+      'juchess',
+      { email: 'blocked@example.com', universityId: '0201234', phone: '+962791234567' },
+    ),
+    (error) => error.statusCode === 403 && error.message === 'Membership access revoked.',
+  );
+});
+
+test('saving a profile cannot bypass an email block by omitting email from the request body', async () => {
+  let transactionCalls = 0;
+  await assert.rejects(
+    saveOwnerProfile(
+      {
+        async listRows(options) {
+          if (options.tableId === 'profile_private') return { rows: [] };
+          if (options.tableId === 'identity_blocks') {
+            return {
+              rows: [{
+                $id: 'email-block',
+                type: 'email',
+                value: 'blocked@example.com',
+                status: 'active',
+              }],
+            };
+          }
+          throw new Error(`Unexpected table lookup: ${options.tableId}`);
+        },
+        async createTransaction() {
+          transactionCalls += 1;
+          throw new Error('A blocked profile must not start a transaction.');
+        },
+      },
+      'juchess',
+      { $id: 'blocked-account', email: 'blocked@example.com', emailVerification: true },
+      {
+        displayName: 'Blocked Player',
+        university: 'University of Jordan',
+        universityId: '0201234',
+        phone: '0791234567',
+      },
+    ),
+    (error) => error.statusCode === 403 && /blocked by club administration/i.test(error.message),
+  );
+  assert.equal(transactionCalls, 0);
+});
+
+test('identity-block checks paginate instead of silently stopping at 500 rows', async () => {
+  let calls = 0;
+  const firstPage = Array.from({ length: 500 }, (_, index) => ({
+    $id: `lifted-${index}`,
+    type: 'phone',
+    value: `old-${index}`,
+    status: 'lifted',
+  }));
+  await assert.rejects(
+    assertSubmittedIdentityAllowed(
+      {
+        async listRows() {
+          calls += 1;
+          return calls === 1
+            ? { rows: firstPage }
+            : { rows: [{
+                $id: 'active-block',
+                type: 'phone',
+                value: '+962791234567',
+                status: 'active',
+              }] };
+        },
+      },
+      'juchess',
+      { email: 'student@example.com', phone: '+962791234567' },
+    ),
+    (error) => error.statusCode === 403 && /blocked by club administration/i.test(error.message),
+  );
+  assert.equal(calls, 2);
+});
+
 test('private profile writes always bind the required matching profile ID', () => {
   assert.deepEqual(buildPrivateProfileData(
     'profile-1',
@@ -205,14 +366,101 @@ test('a deleted account cannot reserve a phone number forever', async () => {
   );
 });
 
-test('profile completion clears an orphaned phone reservation in the same transaction', async () => {
+test('active accounts keep every unique private identity reservation', async () => {
+  for (const [field, value, message] of [
+    ['email', 'owner@example.com', /email address is already registered/i],
+    ['universityId', '0201234', /University ID is already registered/i],
+    ['phone', '+962791234567', /phone number is already registered/i],
+  ]) {
+    const tablesDB = {
+      async listRows() {
+        return {
+          rows: [{
+            $id: `other-${field}`,
+            profileId: `other-${field}`,
+            accountId: 'active-account',
+            [field]: value,
+          }],
+        };
+      },
+    };
+    const users = { async get() { return { $id: 'active-account' }; } };
+
+    await assert.rejects(
+      findReclaimablePrivateIdentities(
+        tablesDB,
+        users,
+        'juchess',
+        'current-profile',
+        { [field]: value },
+      ),
+      (error) => error.statusCode === 409 && message.test(error.message),
+      field,
+    );
+  }
+});
+
+test('one deleted account releases email, University ID, and phone together', async () => {
+  const orphan = {
+    $id: 'orphan-profile',
+    profileId: 'orphan-profile',
+    accountId: 'deleted-account',
+    email: 'owner@example.com',
+    universityId: '0201234',
+    phone: '+962791234567',
+  };
+  let userLookups = 0;
+  const reclaimable = await findReclaimablePrivateIdentities(
+    { async listRows() { return { rows: [orphan] }; } },
+    {
+      async get() {
+        userLookups += 1;
+        throw { code: 404 };
+      },
+    },
+    'juchess',
+    'current-profile',
+    {
+      email: orphan.email,
+      universityId: orphan.universityId,
+      phone: orphan.phone,
+    },
+  );
+
+  assert.equal(userLookups, 1);
+  assert.equal(reclaimable.length, 1);
+  assert.equal(reclaimable[0].identity, orphan);
+  assert.match(reclaimable[0].releaseData.email, /^archived\+[a-f0-9]{24}@invalid\.juchess\.page$/);
+  assert.equal(reclaimable[0].releaseData.universityId, null);
+  assert.equal(reclaimable[0].releaseData.phone, null);
+});
+
+test('orphan detection fails closed when user lookup is unavailable', async () => {
+  const outage = Object.assign(new Error('Users API unavailable'), { code: 503 });
+  await assert.rejects(
+    findReclaimablePrivateIdentities(
+      {
+        async listRows() {
+          return { rows: [{ $id: 'conflict', accountId: 'unknown-account', email: 'owner@example.com' }] };
+        },
+      },
+      { async get() { throw outage; } },
+      'juchess',
+      'current-profile',
+      { email: 'owner@example.com' },
+    ),
+    (error) => error === outage,
+  );
+});
+
+test('profile completion releases every orphaned identity reservation in the same transaction', async () => {
   const updates = [];
   const transactionUpdates = [];
-  let listCall = 0;
   const tablesDB = {
-    async listRows() {
-      listCall += 1;
-      if (listCall === 1) {
+    async listRows(options) {
+      if (options.tableId === 'identity_blocks') return { rows: [] };
+      const attribute = queryAttribute(options);
+      if (attribute === 'accountId') {
         return {
           rows: [{
             $id: 'current-profile',
@@ -224,14 +472,19 @@ test('profile completion clears an orphaned phone reservation in the same transa
           }],
         };
       }
-      return {
-        rows: [{
-          $id: 'orphan-profile',
-          profileId: 'orphan-profile',
-          accountId: 'deleted-account',
-          phone: '+962791234567',
-        }],
-      };
+      if (['email', 'universityId', 'phone'].includes(attribute)) {
+        return {
+          rows: [{
+            $id: 'orphan-profile',
+            profileId: 'orphan-profile',
+            accountId: 'deleted-account',
+            email: 'student@example.com',
+            universityId: '0201234',
+            phone: '+962791234567',
+          }],
+        };
+      }
+      return { rows: [] };
     },
     async getRow() {
       return { $id: 'current-profile', displayName: 'Student Knight', status: 'pending' };
@@ -278,13 +531,13 @@ test('profile completion clears an orphaned phone reservation in the same transa
     users,
   );
 
-  assert.deepEqual(updates[0], {
-    databaseId: 'juchess',
-    tableId: 'profile_private',
-    rowId: 'orphan-profile',
-    data: { phone: null },
-    transactionId: 'transaction-1',
-  });
+  assert.equal(updates[0].databaseId, 'juchess');
+  assert.equal(updates[0].tableId, 'profile_private');
+  assert.equal(updates[0].rowId, 'orphan-profile');
+  assert.match(updates[0].data.email, /^archived\+[a-f0-9]{24}@invalid\.juchess\.page$/);
+  assert.equal(updates[0].data.universityId, null);
+  assert.equal(updates[0].data.phone, null);
+  assert.equal(updates[0].transactionId, 'transaction-1');
   assert.equal(updates[1].tableId, 'profiles');
   assert.equal(updates[1].data.status, 'active');
   assert.deepEqual(updates[1].permissions, [

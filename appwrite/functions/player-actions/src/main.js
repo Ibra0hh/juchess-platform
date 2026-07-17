@@ -13,6 +13,7 @@ const tableIds = {
   checkIns: 'check_ins',
   attendance: 'attendance_confirmations',
   crewApplications: 'crew_applications',
+  identityBlocks: 'identity_blocks',
 };
 
 const PROFILE_PUBLIC_FIELDS = [
@@ -28,6 +29,43 @@ const PROFILE_PUBLIC_FIELDS = [
   'markColor',
 ];
 const PROFILE_PRIVATE_FIELDS = ['universityId', 'phone'];
+const PROFILE_TEXT_RULES = {
+  displayName: { label: 'Full name', maxLength: 128 },
+  university: { label: 'University', maxLength: 160 },
+  avatarFileId: {
+    label: 'Avatar file ID',
+    maxLength: 128,
+    pattern: /^[A-Za-z0-9][A-Za-z0-9._-]*$/,
+    patternMessage: 'Avatar file ID is invalid.',
+  },
+  coverFileId: {
+    label: 'Cover file ID',
+    maxLength: 128,
+    pattern: /^[A-Za-z0-9][A-Za-z0-9._-]*$/,
+    patternMessage: 'Cover file ID is invalid.',
+  },
+  chessComUsername: {
+    label: 'Chess.com username',
+    maxLength: 80,
+    lowercase: true,
+    pattern: /^\S+$/u,
+    patternMessage: 'Chess.com username cannot contain spaces.',
+  },
+  lichessUsername: {
+    label: 'Lichess username',
+    maxLength: 80,
+    lowercase: true,
+    pattern: /^\S+$/u,
+    patternMessage: 'Lichess username cannot contain spaces.',
+  },
+  boardTheme: { label: 'Board theme', maxLength: 120 },
+  pieceTheme: { label: 'Piece theme', maxLength: 120 },
+  arrowColor: { label: 'Arrow color', maxLength: 120 },
+  markColor: { label: 'Mark color', maxLength: 120 },
+};
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+const UNIVERSITY_ID_PATTERN = /^[a-z0-9._/-]+$/;
+const JORDAN_MOBILE_PATTERN = /^\+9627\d{8}$/;
 const PROFILE_SERVER_FIELDS = new Set([
   'accountId',
   'email',
@@ -86,31 +124,68 @@ function cleanObject(value) {
   return Object.fromEntries(Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined));
 }
 
-function optionalText(value, { lowercase = false } = {}) {
+function optionalText(value, {
+  label = 'Value',
+  maxLength,
+  lowercase = false,
+  pattern,
+  patternMessage,
+} = {}) {
   if (value === undefined) return undefined;
-  const normalized = String(value ?? '').trim();
+  if (value === null) return null;
+  if (typeof value !== 'string') throw new HttpError(400, `${label} must be text.`);
+
+  const normalized = value.trim();
   if (!normalized) return null;
-  return lowercase ? normalized.toLowerCase() : normalized;
+  if (CONTROL_CHARACTER_PATTERN.test(normalized)) {
+    throw new HttpError(400, `${label} contains unsupported characters.`);
+  }
+  if (maxLength && normalized.length > maxLength) {
+    throw new HttpError(400, `${label} must be ${maxLength} characters or fewer.`);
+  }
+  const result = lowercase ? normalized.toLowerCase() : normalized;
+  if (pattern && !pattern.test(result)) {
+    throw new HttpError(400, patternMessage || `${label} is invalid.`);
+  }
+  return result;
 }
 
 export function normalizeUniversityId(value) {
-  return optionalText(value, { lowercase: true });
+  return optionalText(value, {
+    label: 'University ID',
+    maxLength: 64,
+    lowercase: true,
+    pattern: UNIVERSITY_ID_PATTERN,
+    patternMessage: 'University ID may contain only letters, numbers, dots, underscores, slashes, and hyphens.',
+  });
 }
 
 export function normalizePhone(value) {
   if (value === undefined) return undefined;
-  const raw = String(value ?? '').trim();
+  if (value === null) return null;
+  if (typeof value !== 'string') throw new HttpError(400, 'Phone number must be text.');
+
+  const raw = value.trim();
   if (!raw) return null;
+  if (raw.length > 32 || !/^[+\d\s()-]+$/.test(raw)) {
+    throw new HttpError(400, 'Enter a valid Jordan mobile number, such as 079 123 4567.');
+  }
 
   const compact = raw.replace(/[^\d+]/g, '');
-  if (compact.startsWith('+962')) return `+962${compact.slice(4).replace(/\D/g, '')}`;
-  if (compact.startsWith('00962')) return `+962${compact.slice(5).replace(/\D/g, '')}`;
-  if (compact.startsWith('962')) return `+962${compact.slice(3).replace(/\D/g, '')}`;
+  let normalized;
+  if (compact.startsWith('+962')) normalized = `+962${compact.slice(4).replace(/\D/g, '')}`;
+  else if (compact.startsWith('00962')) normalized = `+962${compact.slice(5).replace(/\D/g, '')}`;
+  else if (compact.startsWith('962')) normalized = `+962${compact.slice(3).replace(/\D/g, '')}`;
+  else {
+    const digits = compact.replace(/\D/g, '');
+    if (digits.startsWith('0')) normalized = `+962${digits.slice(1)}`;
+    else if (digits.startsWith('7') && digits.length === 9) normalized = `+962${digits}`;
+  }
 
-  const digits = compact.replace(/\D/g, '');
-  if (digits.startsWith('0')) return `+962${digits.slice(1)}`;
-  if (digits.startsWith('7') && digits.length === 9) return `+962${digits}`;
-  return raw;
+  if (!normalized || !JORDAN_MOBILE_PATTERN.test(normalized)) {
+    throw new HttpError(400, 'Enter a valid Jordan mobile number, such as 079 123 4567.');
+  }
+  return normalized;
 }
 
 export function profilePermissions(status, accountId) {
@@ -121,6 +196,9 @@ export function profilePermissions(status, accountId) {
 }
 
 export function normalizeProfileUpdate(body = {}) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new HttpError(400, 'Profile changes must be a JSON object.');
+  }
   const restricted = Object.keys(body).filter((field) => PROFILE_SERVER_FIELDS.has(field));
   if (restricted.length) {
     throw new HttpError(400, `These profile fields are managed by JuChess: ${restricted.join(', ')}.`);
@@ -129,11 +207,10 @@ export function normalizeProfileUpdate(body = {}) {
   const publicData = {};
   for (const field of PROFILE_PUBLIC_FIELDS) {
     if (!Object.prototype.hasOwnProperty.call(body, field)) continue;
-    const lowercase = field === 'chessComUsername' || field === 'lichessUsername';
-    publicData[field] = optionalText(body[field], { lowercase });
+    publicData[field] = optionalText(body[field], PROFILE_TEXT_RULES[field]);
   }
   if (Object.prototype.hasOwnProperty.call(body, 'fullName')) {
-    publicData.displayName = optionalText(body.fullName);
+    publicData.displayName = optionalText(body.fullName, PROFILE_TEXT_RULES.displayName);
   }
   if (publicData.displayName === null) throw new HttpError(400, 'Display name is required.');
 
@@ -255,46 +332,29 @@ export async function activateCompleteOwnerProfile(tablesDB, databaseId, user, p
   });
 }
 
-async function loadProfileContext(tablesDB, databaseId, accountId) {
-  // The caught public-table lookup is temporary migration compatibility. Once
-  // every account has a private identity row, profiles never need accountId.
-  try {
-    const response = await tablesDB.listRows({
-      databaseId,
-      tableId: tableIds.profilePrivate,
-      queries: [Query.equal('accountId', accountId), Query.limit(1)],
-      total: false,
-    });
-    const identity = response.rows[0] ?? null;
-    if (identity) {
-      const profile = await tablesDB.getRow({
-        databaseId,
-        tableId: tableIds.profiles,
-        rowId: identity.$id,
-      }).catch(() => null);
-      return { profile, identity };
-    }
-  } catch {
-    // profile_private may not exist during an additive deployment.
-  }
+export async function loadProfileContext(tablesDB, databaseId, accountId) {
+  // profile_private is the finalized owner-only identity boundary. Database
+  // failures must propagate; treating a failed lookup as "no profile" can
+  // create duplicate identities and bypass account restrictions.
+  const response = await tablesDB.listRows({
+    databaseId,
+    tableId: tableIds.profilePrivate,
+    queries: [Query.equal('accountId', accountId), Query.limit(1)],
+    total: false,
+  });
+  const identity = response.rows[0] ?? null;
+  if (!identity) return { profile: null, identity: null };
 
   try {
-    const response = await tablesDB.listRows({
+    const profile = await tablesDB.getRow({
       databaseId,
       tableId: tableIds.profiles,
-      queries: [Query.equal('accountId', accountId), Query.limit(1)],
-      total: false,
+      rowId: identity.$id,
     });
-    const profile = response.rows[0] ?? null;
-    return { profile, identity: profile ? {
-      $id: profile.$id,
-      accountId: profile.accountId,
-      email: profile.email,
-      universityId: profile.universityId,
-      phone: profile.phone,
-    } : null };
-  } catch {
-    return { profile: null, identity: null };
+    return { profile, identity };
+  } catch (cause) {
+    if (isNotFound(cause)) return { profile: null, identity };
+    throw cause;
   }
 }
 
@@ -309,31 +369,139 @@ export async function findReclaimablePhoneIdentity(
   profileId,
   phone,
 ) {
-  if (!phone) return null;
-
-  const response = await tablesDB.listRows({
+  const reclaimable = await findReclaimablePrivateIdentities(
+    tablesDB,
+    users,
     databaseId,
-    tableId: tableIds.profilePrivate,
-    queries: [Query.equal('phone', phone), Query.limit(2)],
-    total: false,
-  });
-  const conflict = response.rows.find((row) => (
-    row.$id !== profileId && row.profileId !== profileId
+    profileId,
+    { phone },
+  );
+  return reclaimable[0]?.identity ?? null;
+}
+
+const PRIVATE_IDENTITY_CONFLICT_RULES = {
+  email: { label: 'email address' },
+  universityId: { label: 'University ID' },
+  phone: { label: 'phone number' },
+};
+
+function privateIdentityConflict(field) {
+  const label = PRIVATE_IDENTITY_CONFLICT_RULES[field]?.label ?? 'identity';
+  return new HttpError(409, `That ${label} is already registered.`);
+}
+
+function archivedEmailForIdentity(identity) {
+  const digest = createHash('sha256')
+    .update(String(identity.$id ?? identity.profileId ?? identity.accountId ?? 'orphan'))
+    .digest('hex')
+    .slice(0, 24);
+  return `archived+${digest}@invalid.juchess.page`;
+}
+
+export async function findReclaimablePrivateIdentities(
+  tablesDB,
+  users,
+  databaseId,
+  profileId,
+  identityData,
+) {
+  const candidates = Object.keys(PRIVATE_IDENTITY_CONFLICT_RULES)
+    .filter((field) => Boolean(identityData?.[field]))
+    .map((field) => ({ field, value: identityData[field] }));
+  if (candidates.length === 0) return [];
+
+  const responses = await Promise.all(candidates.map(async ({ field, value }) => ({
+    field,
+    response: await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.profilePrivate,
+      queries: [Query.equal(field, value), Query.limit(2)],
+      total: false,
+    }),
+  })));
+
+  const conflicts = new Map();
+  for (const { field, response } of responses) {
+    for (const row of response.rows) {
+      if (row.$id === profileId || row.profileId === profileId) continue;
+      const rowId = row.$id ?? row.profileId;
+      if (!rowId) throw privateIdentityConflict(field);
+      const existing = conflicts.get(rowId) ?? { identity: row, fields: new Set() };
+      existing.fields.add(field);
+      conflicts.set(rowId, existing);
+    }
+  }
+
+  const accountLookups = new Map();
+  const accountExists = async (accountId) => {
+    if (!accountLookups.has(accountId)) {
+      accountLookups.set(accountId, (async () => {
+        try {
+          await users.get({ userId: accountId });
+          return true;
+        } catch (cause) {
+          if (isNotFound(cause)) return false;
+          throw cause;
+        }
+      })());
+    }
+    return await accountLookups.get(accountId);
+  };
+
+  const reclaimable = [];
+  for (const conflict of conflicts.values()) {
+    const firstField = conflict.fields.values().next().value;
+    if (!users || !conflict.identity.accountId) throw privateIdentityConflict(firstField);
+    if (await accountExists(conflict.identity.accountId)) throw privateIdentityConflict(firstField);
+
+    const releaseData = {};
+    if (conflict.fields.has('email')) releaseData.email = archivedEmailForIdentity(conflict.identity);
+    if (conflict.fields.has('universityId')) releaseData.universityId = null;
+    if (conflict.fields.has('phone')) releaseData.phone = null;
+    reclaimable.push({ identity: conflict.identity, releaseData });
+  }
+
+  return reclaimable;
+}
+
+async function listAllIdentityBlocks(tablesDB, databaseId) {
+  const rows = [];
+  let cursor = '';
+
+  do {
+    const response = await tablesDB.listRows({
+      databaseId,
+      tableId: tableIds.identityBlocks,
+      queries: [
+        Query.select(['$id', 'type', 'value', 'reason', 'status']),
+        Query.orderAsc('$id'),
+        Query.limit(500),
+        ...(cursor ? [Query.cursorAfter(cursor)] : []),
+      ],
+      total: false,
+    });
+    rows.push(...response.rows);
+    const nextCursor = response.rows.length === 500 ? response.rows.at(-1)?.$id ?? '' : '';
+    cursor = nextCursor && nextCursor !== cursor ? nextCursor : '';
+  } while (cursor);
+
+  return rows;
+}
+
+export async function assertSubmittedIdentityAllowed(tablesDB, databaseId, identityData) {
+  const candidates = ['email', 'universityId', 'phone']
+    .filter((type) => Boolean(identityData?.[type]))
+    .map((type) => ({ type, value: identityData[type] }));
+  if (candidates.length === 0) return;
+
+  const blocks = await listAllIdentityBlocks(tablesDB, databaseId);
+  const match = blocks.find((block) => (
+    block.status === 'active'
+    && candidates.some((candidate) => candidate.type === block.type && candidate.value === block.value)
   ));
-  if (!conflict) return null;
-
-  if (!users || !conflict.accountId) {
-    throw new HttpError(409, 'That phone number is already registered.');
+  if (match) {
+    throw new HttpError(403, match.reason || 'This player is blocked by club administration.');
   }
-
-  try {
-    await users.get({ userId: conflict.accountId });
-  } catch (cause) {
-    if (isNotFound(cause)) return conflict;
-    throw cause;
-  }
-
-  throw new HttpError(409, 'That phone number is already registered.');
 }
 
 async function requirePlayer(req, tablesDB, databaseId) {
@@ -362,24 +530,23 @@ export async function saveOwnerProfile(tablesDB, databaseId, user, body, users =
   const status = 'active';
   const identityData = buildPrivateProfileData(profileId, user, context.identity, privateData);
   assertCompletePlayerProfile({ ...context.profile, ...publicData }, identityData);
-  const reclaimablePhoneIdentity = Object.prototype.hasOwnProperty.call(privateData, 'phone')
-    ? await findReclaimablePhoneIdentity(
-        tablesDB,
-        users,
-        databaseId,
-        profileId,
-        privateData.phone,
-      )
-    : null;
+  await assertSubmittedIdentityAllowed(tablesDB, databaseId, identityData);
+  const reclaimableIdentities = await findReclaimablePrivateIdentities(
+    tablesDB,
+    users,
+    databaseId,
+    profileId,
+    identityData,
+  );
   const transaction = await tablesDB.createTransaction({ ttl: 60 });
 
   try {
-    if (reclaimablePhoneIdentity) {
+    for (const reclaimable of reclaimableIdentities) {
       await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.profilePrivate,
-        rowId: reclaimablePhoneIdentity.$id,
-        data: { phone: null },
+        rowId: reclaimable.identity.$id,
+        data: reclaimable.releaseData,
         transactionId: transaction.$id,
       });
     }
@@ -421,7 +588,7 @@ export async function saveOwnerProfile(tablesDB, databaseId, user, body, users =
   } catch (cause) {
     await tablesDB.updateTransaction({ transactionId: transaction.$id, rollback: true }).catch(() => {});
     if (isConflict(cause)) {
-      throw new HttpError(409, 'That University ID, phone number, or account is already registered.');
+      throw new HttpError(409, 'That email address, University ID, phone number, or account is already registered.');
     }
     throw cause;
   }
