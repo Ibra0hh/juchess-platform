@@ -498,6 +498,17 @@
   font-weight: 500;
 }
 
+.auth-onboarding-note {
+  margin: -2px 0 2px;
+  padding: 10px 12px;
+  border: 1px solid rgba(122, 36, 49, 0.13);
+  border-radius: 8px;
+  background: rgba(122, 36, 49, 0.045);
+  color: #625a52;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
 .auth-submit-button,
 .auth-form > button[type="submit"] {
   height: 46px;

@@ -42,7 +42,7 @@ export default function VerifyEmailPage() {
         const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
         window.history.replaceState(null, '', `${routeBase}verify-email?verified=1`)
         setStatus('verified')
-        setMessage('Your email is verified. Thank you.')
+        setMessage('Your email is verified. Sign in to finish your player profile.')
       })
       .catch(async (error: unknown) => {
         const currentState = isEmailAlreadyVerifiedError(error)
@@ -53,7 +53,7 @@ export default function VerifyEmailPage() {
           const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
           window.history.replaceState(null, '', `${routeBase}verify-email?verified=1`)
           setStatus('verified')
-          setMessage('Your email is verified. Thank you.')
+          setMessage('Your email is verified. Sign in to finish your player profile.')
           return
         }
 
@@ -76,7 +76,7 @@ export default function VerifyEmailPage() {
 
       if (result === 'already-verified') {
         setStatus('verified')
-        setMessage('Your email is verified. Thank you.')
+        setMessage('Your email is verified. Sign in to finish your player profile.')
         return
       }
 
@@ -140,8 +140,8 @@ export default function VerifyEmailPage() {
             </>
           ) : null}
           {status !== 'checking' ? (
-            <Link className="auth-secondary-button" to={verified ? '/home' : '/sign-in'}>
-              {verified ? 'Go to home' : 'Return to sign in'}
+            <Link className="auth-secondary-button" to="/sign-in">
+              {verified ? 'Continue to sign in' : 'Return to sign in'}
             </Link>
           ) : null}
         </section>

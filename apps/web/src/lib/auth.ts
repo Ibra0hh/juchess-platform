@@ -2,6 +2,7 @@ import { ExecutionMethod, ID, OAuthProvider, Permission, Query, Role, type Model
 import { account, appwriteConfig, appwriteReady, createPlayerFunctionHeaders, functions, storage, tablesDB } from './appwrite'
 import { tableIds } from './juchess'
 import type { BoardPreferences } from './boardAppearance'
+import { isExistingSessionError, normalizeAccountEmail } from './authSession'
 
 export type ProfileRole = 'member' | 'organizer' | 'admin'
 export type ProfileStatus = 'pending' | 'active' | 'suspended'
@@ -63,7 +64,7 @@ export type SignInInput = {
 
 export type SignUpInput = SignInInput & {
   fullName: string
-  university: string
+  university?: string
   universityId?: string
   phone?: string
   chessComUsername?: string
@@ -137,10 +138,7 @@ export async function signInWithEmail(input: SignInInput): Promise<AuthSession> 
   requireAppwriteReady()
   await assertAccessAllowed({ email: input.email })
 
-  await account.createEmailPasswordSession({
-    email: input.email,
-    password: input.password,
-  })
+  await createEmailPasswordSessionOrReuseCurrent(input)
 
   const user = await account.get()
   if (!user.emailVerification) {
@@ -171,29 +169,19 @@ export async function signInWithEmail(input: SignInInput): Promise<AuthSession> 
 
 export async function signUpWithEmail(input: SignUpInput): Promise<void> {
   requireAppwriteReady()
-  if (!input.universityId?.trim() || !normalizeJordanPhone(input.phone)) {
-    throw new Error('University ID and phone number are required.')
-  }
-  await assertAccessAllowed({
-    email: input.email,
-    universityId: input.universityId,
-    phone: input.phone,
-  })
+  await assertAccessAllowed({ email: input.email })
+  await assertNoActiveSessionForAccountCreation(input.email)
 
-  const user = await account.create({
+  await account.create({
     userId: ID.unique(),
     email: input.email,
     password: input.password,
     name: input.fullName,
   })
 
-  await account.createEmailPasswordSession({
-    email: input.email,
-    password: input.password,
-  })
+  await createEmailPasswordSessionOrReuseCurrent(input)
 
   try {
-    await createProfileForUser(user, input)
     await sendCurrentUserEmailVerification()
   } finally {
     await deleteCurrentSession()
@@ -439,17 +427,6 @@ function cloudMessage(value: string) {
   return value.replace(/appwrite/gi, 'cloud')
 }
 
-async function createProfileForUser(user: Models.User, input: Partial<SignUpInput>) {
-  return await updateOwnerProfile({
-    displayName: input.fullName?.trim() || user.name || user.email,
-    university: input.university?.trim() || undefined,
-    universityId: input.universityId?.trim() || undefined,
-    phone: normalizeJordanPhone(input.phone),
-    chessComUsername: optionalUsername(input.chessComUsername),
-    lichessUsername: optionalUsername(input.lichessUsername),
-  })
-}
-
 function requireAppwriteReady() {
   if (!appwriteReady) {
     throw new Error('Cloud accounts are not configured for this app.')
@@ -467,6 +444,38 @@ async function deleteCurrentSession() {
     await account.deleteSession({ sessionId: 'current' })
   } catch {
     // A failed or expired session is already signed out from the app's perspective.
+  }
+}
+
+async function createEmailPasswordSessionOrReuseCurrent(input: SignInInput) {
+  try {
+    await account.createEmailPasswordSession({
+      email: input.email,
+      password: input.password,
+    })
+  } catch (error) {
+    if (!isExistingSessionError(error)) throw error
+
+    const currentUser = await account.get()
+    if (normalizeAccountEmail(currentUser.email) !== normalizeAccountEmail(input.email)) {
+      throw new Error(`You are already signed in as ${currentUser.email}. Sign out before switching accounts.`)
+    }
+
+    // The requested account is already authenticated in this browser. Reuse
+    // that secure session instead of asking Appwrite to create a duplicate.
+  }
+}
+
+async function assertNoActiveSessionForAccountCreation(email: string) {
+  try {
+    const currentUser = await account.get()
+    if (normalizeAccountEmail(currentUser.email) === normalizeAccountEmail(email)) {
+      throw new Error('This account already exists and is signed in. Continue to your profile instead.')
+    }
+    throw new Error(`You are already signed in as ${currentUser.email}. Sign out before creating another account.`)
+  } catch (error) {
+    if (isMissingAccountSession(error)) return
+    throw error
   }
 }
 

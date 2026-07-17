@@ -1,4 +1,5 @@
 import { account, appwriteReady } from './appwrite'
+import { isExistingSessionError, normalizeAccountEmail } from './authSession'
 
 export type VerificationResendResult = 'sent' | 'already-verified'
 export type CurrentEmailVerificationState = 'verified' | 'unverified' | 'unknown'
@@ -42,13 +43,9 @@ export async function resendEmailVerification(
 
   let sessionCreated = false
   try {
-    await account.createEmailPasswordSession({
-      email: normalizedEmail,
-      password,
-    })
-    sessionCreated = true
-
-    const user = await account.get()
+    const session = await createVerificationSession(normalizedEmail, password)
+    sessionCreated = session.created
+    const { user } = session
     if (expectedUserId && user.$id !== expectedUserId) {
       throw new Error('Use the JuChess account associated with this verification link.')
     }
@@ -66,6 +63,21 @@ export async function resendEmailVerification(
         // An expired or rejected session is already signed out from JuChess's perspective.
       }
     }
+  }
+}
+
+async function createVerificationSession(email: string, password: string) {
+  try {
+    await account.createEmailPasswordSession({ email, password })
+    return { created: true, user: await account.get() }
+  } catch (error) {
+    if (!isExistingSessionError(error)) throw error
+
+    const user = await account.get()
+    if (normalizeAccountEmail(user.email) !== normalizeAccountEmail(email)) {
+      throw new Error(`You are already signed in as ${user.email}. Sign out before using another account.`)
+    }
+    return { created: false, user }
   }
 }
 

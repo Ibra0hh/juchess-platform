@@ -1,8 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
-import UniversityField from '../components/UniversityField'
 import GoogleMark from '../components/GoogleMark'
 import {
   formatAppwriteError,
@@ -10,6 +9,7 @@ import {
   type SocialAuthProvider,
 } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
+import { profileNeedsCompletion } from '../lib/profileCompletion'
 import './AuthPage.css'
 
 type AuthPageProps = {
@@ -17,16 +17,11 @@ type AuthPageProps = {
 }
 
 function AuthPage({ mode }: AuthPageProps) {
-  const { ready, signIn, signUp } = useAuth()
+  const { loading, profile, ready, signIn, signUp, user } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const isSignup = mode === 'sign-up'
   const [fullName, setFullName] = useState('')
-  const [university, setUniversity] = useState('')
-  const [universityId, setUniversityId] = useState('')
-  const [phone, setPhone] = useState('')
-  const [chessComUsername, setChessComUsername] = useState('')
-  const [lichessUsername, setLichessUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -48,6 +43,10 @@ function AuthPage({ mode }: AuthPageProps) {
   const passwordReady = passwordRules.length && passwordRules.uppercase && passwordRules.number
   const passwordsMatch = confirmPassword.length > 0 && confirmPassword === password
 
+  if (!loading && user) {
+    return <Navigate to={profileNeedsCompletion(profile) ? '/complete-profile' : '/profile'} replace />
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setMessage(null)
@@ -66,11 +65,6 @@ function AuthPage({ mode }: AuthPageProps) {
       if (isSignup) {
         await signUp({
           fullName: fullName.trim(),
-          university: university.trim(),
-          universityId: universityId.trim(),
-          phone: phone.trim(),
-          chessComUsername: chessComUsername.trim(),
-          lichessUsername: lichessUsername.trim(),
           email: email.trim(),
           password,
         })
@@ -106,8 +100,8 @@ function AuthPage({ mode }: AuthPageProps) {
         <section className={`auth-panel prototype-auth-panel ${isSignup ? 'signup' : 'signin'}`} aria-labelledby="auth-title">
           <div className="auth-intro">
             {!isSignup ? <img src={compactCrestUrl} alt="" /> : null}
-            <h1 id="auth-title">{isSignup ? 'Create Player Club Account' : 'Welcome back'}</h1>
-            <p>{isSignup ? 'Join the University of Jordan Chess Club roster' : 'Sign in to your player club account'}</p>
+            <h1 id="auth-title">{isSignup ? 'Create your JuChess account' : 'Welcome back'}</h1>
+            <p>{isSignup ? 'Start with your login. Club details come after email verification.' : 'Sign in to your player club account'}</p>
           </div>
 
           {!ready ? (
@@ -142,29 +136,9 @@ function AuthPage({ mode }: AuthPageProps) {
                   <input value={fullName} onChange={(event) => setFullName(event.target.value)} required autoComplete="name" placeholder="e.g. Ibrahim Ahmad" />
                 </AuthField>
 
-                <div className="auth-two-column">
-                  <AuthField label="Email">
-                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="name@email.com" />
-                  </AuthField>
-                  <AuthField label="Phone number">
-                    <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required autoComplete="tel" inputMode="tel" placeholder="07X XXX XXXX" />
-                  </AuthField>
-                </div>
-
-                <UniversityField required value={university} onChange={setUniversity} />
-
-                <AuthField label="University ID" help="Used for club verification only - never shown publicly.">
-                  <input value={universityId} onChange={(event) => setUniversityId(event.target.value)} required autoComplete="username" placeholder="e.g. 0201234" />
+                <AuthField label="Email">
+                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="name@email.com" />
                 </AuthField>
-
-                <div className="auth-two-column">
-                  <AuthField label={<span>Chess.com username <em>(optional)</em></span>}>
-                    <input value={chessComUsername} onChange={(event) => setChessComUsername(event.target.value)} placeholder="username" />
-                  </AuthField>
-                  <AuthField label={<span>Lichess username <em>(optional)</em></span>}>
-                    <input value={lichessUsername} onChange={(event) => setLichessUsername(event.target.value)} placeholder="username" />
-                  </AuthField>
-                </div>
 
                 <PasswordField
                   label="Password"
@@ -191,6 +165,7 @@ function AuthPage({ mode }: AuthPageProps) {
                   autoComplete="new-password"
                 />
                 {confirmPassword && !passwordsMatch ? <small className="auth-mismatch">Passwords do not match yet.</small> : null}
+                <p className="auth-onboarding-note">Next: verify your email, then add your university and club details.</p>
               </>
             ) : (
               <>
