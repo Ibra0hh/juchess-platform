@@ -36,7 +36,7 @@
     "mobile:analyze": "cd apps/mobile && flutter analyze",
     "mobile:test": "cd apps/mobile && flutter test",
     "test:web-review": "node --experimental-strip-types --test apps/web/src/lib/gameReview.test.ts apps/web/src/lib/externalGames.test.ts apps/web/src/lib/onlineTournamentOptimism.test.ts apps/web/src/lib/storedMoves.test.ts apps/web/src/lib/boardAppearance.test.ts apps/web/src/lib/openingBook.test.ts apps/web/src/lib/tablebase.test.ts apps/web/src/lib/jordanUniversities.test.ts apps/web/src/lib/functionAuth.test.ts apps/web/src/lib/profileImageCrop.test.ts apps/web/src/lib/profileCompletion.test.ts apps/web/src/lib/emailVerification.test.ts apps/web/src/lib/publicContent.test.ts apps/web/src/lib/authSession.test.ts apps/web/src/lib/hedgedRequest.test.ts apps/web/src/components/RouteMetadata.test.ts",
-    "test:admin-wizard": "node --experimental-strip-types --test apps/admin/test/tournamentWizard.test.mjs",
+    "test:admin-wizard": "node --experimental-strip-types --test apps/admin/test/tournamentWizard.test.mjs apps/admin/test/clockTimePicker.test.mjs",
     "test:engine": "cd appwrite/functions/admin-actions && node --test test/*.test.mjs",
     "test:functions": "node --test appwrite/functions/player-actions/test/*.test.mjs appwrite/functions/attendance-actions/test/*.test.mjs appwrite/functions/access-guards/test/*.test.mjs appwrite/functions/verification-actions/test/*.test.mjs",
     "check:functions": "node --check appwrite/functions/admin-actions/src/main.js && node --check appwrite/functions/player-actions/src/main.js && node --check appwrite/functions/attendance-actions/src/main.js && node --check appwrite/functions/access-guards/src/main.js && node --check appwrite/functions/verification-actions/src/main.js",

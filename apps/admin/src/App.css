@@ -980,24 +980,42 @@ button {
   color: #fff8e8;
 }
 
-.clock-picker-display > div:first-child {
+.clock-time-inputs {
   display: flex;
   align-items: center;
   font-size: 42px;
   font-weight: 800;
 }
 
-.clock-picker-display > div:first-child button {
-  padding: 0 3px;
+.clock-time-inputs input {
+  width: 2.15ch;
+  min-width: 0;
+  padding: 2px 3px;
   border: 0;
+  border-radius: 5px;
+  outline: 0;
   background: transparent;
   color: rgba(255, 248, 232, 0.58);
   font: inherit;
-  cursor: pointer;
+  line-height: 1;
+  text-align: center;
+  caret-color: #fff8e8;
 }
 
-.clock-picker-display > div:first-child button.active {
+.clock-time-inputs span {
+  color: rgba(255, 248, 232, 0.72);
+  line-height: 1;
+}
+
+.clock-time-inputs input.active,
+.clock-time-inputs input:focus {
+  background: rgba(255, 248, 232, 0.1);
   color: #fff8e8;
+}
+
+.clock-time-inputs input:focus-visible {
+  outline: 2px solid rgba(255, 248, 232, 0.62);
+  outline-offset: 1px;
 }
 
 .clock-period-control {
@@ -1034,6 +1052,9 @@ button {
 
 .clock-picker-face.minute {
   cursor: crosshair;
+}
+
+.clock-picker-face {
   touch-action: none;
 }
 
@@ -1064,9 +1085,9 @@ button {
   position: absolute;
   z-index: 1;
   left: calc(50% - 1px);
-  top: 18%;
+  bottom: 50%;
   width: 2px;
-  height: 32%;
+  height: 42%;
   background: #7d2434;
   pointer-events: none;
   transform-origin: 50% 100%;

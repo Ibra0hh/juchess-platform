@@ -82,6 +82,12 @@ import {
   nextTournamentWizardStep,
   tournamentWizardSubmitIntent,
 } from './lib/tournamentWizard'
+import {
+  clockHandAngle,
+  clockLabelAngle,
+  clockValueFromPoint,
+  type ClockPickerPhase,
+} from './lib/clockTimePicker'
 
 type Screen = 'dashboard' | 'tournaments' | 'players' | 'recruitment' | 'news' | 'announcements' | 'adminAccess'
 type TournamentTab = TournamentStatus
@@ -154,10 +160,14 @@ function ClockTimePicker({
 }) {
   const initial = timePickerParts(value)
   const [open, setOpen] = useState(false)
-  const [phase, setPhase] = useState<'hour' | 'minute'>('hour')
+  const [phase, setPhase] = useState<ClockPickerPhase>('hour')
   const [hour, setHour] = useState(initial.hour)
   const [minute, setMinute] = useState(initial.minute)
   const [period, setPeriod] = useState<'AM' | 'PM'>(initial.period)
+  const [hourInput, setHourInput] = useState(String(initial.hour).padStart(2, '0'))
+  const [minuteInput, setMinuteInput] = useState(String(initial.minute).padStart(2, '0'))
+  const hourInputRef = useRef<HTMLInputElement>(null)
+  const minuteInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -178,22 +188,81 @@ function ClockTimePicker({
     setHour(next.hour)
     setMinute(next.minute)
     setPeriod(next.period)
+    setHourInput(String(next.hour).padStart(2, '0'))
+    setMinuteInput(String(next.minute).padStart(2, '0'))
     setPhase('hour')
     setOpen(true)
   }
 
-  function chooseMinuteFromFace(event: ReactPointerEvent<HTMLDivElement>) {
+  function setHourValue(nextHour: number) {
+    setHour(nextHour)
+    setHourInput(String(nextHour).padStart(2, '0'))
+  }
+
+  function setMinuteValue(nextMinute: number) {
+    setMinute(nextMinute)
+    setMinuteInput(String(nextMinute).padStart(2, '0'))
+  }
+
+  function chooseTimeFromFace(event: ReactPointerEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect()
     const x = event.clientX - bounds.left - bounds.width / 2
     const y = event.clientY - bounds.top - bounds.height / 2
-    const angle = (Math.atan2(y, x) * 180) / Math.PI + 90
-    setMinute(Math.round(((angle + 360) % 360) / 6) % 60)
+    const nextValue = clockValueFromPoint(phase, x, y)
+    if (phase === 'hour') setHourValue(nextValue)
+    else setMinuteValue(nextValue)
+  }
+
+  function handleFacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    chooseTimeFromFace(event)
+  }
+
+  function handleFacePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+    chooseTimeFromFace(event)
+  }
+
+  function handleFacePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+    chooseTimeFromFace(event)
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    if (phase === 'hour') setPhase('minute')
+  }
+
+  function handleManualTimeChange(nextValue: string, nextPhase: ClockPickerPhase) {
+    const digits = nextValue.replace(/\D/g, '').slice(0, 2)
+    if (nextPhase === 'hour') {
+      setHourInput(digits)
+      const nextHour = Number(digits)
+      if (digits && nextHour >= 1 && nextHour <= 12) setHour(nextHour)
+      return
+    }
+
+    setMinuteInput(digits)
+    const nextMinute = Number(digits)
+    if (digits && nextMinute >= 0 && nextMinute <= 59) setMinute(nextMinute)
+  }
+
+  function commitManualTime(nextPhase: ClockPickerPhase) {
+    if (nextPhase === 'hour') {
+      const nextHour = Number(hourInput)
+      if (hourInput && nextHour >= 1 && nextHour <= 12) setHourValue(nextHour)
+      else setHourInput(String(hour).padStart(2, '0'))
+      return
+    }
+
+    const nextMinute = Number(minuteInput)
+    if (minuteInput && nextMinute >= 0 && nextMinute <= 59) setMinuteValue(nextMinute)
+    else setMinuteInput(String(minute).padStart(2, '0'))
   }
 
   const display = value ? formatClockTime(value) : 'Select time'
-  const handAngle = phase === 'hour' ? (hour % 12) * 30 : minute * 6
+  const handAngle = clockHandAngle(phase, phase === 'hour' ? hour : minute)
 
   function handleClockKeyboard(event: ReactKeyboardEvent<HTMLElement>) {
+    if ((event.target as HTMLElement).tagName === 'INPUT') return
     const direction = event.key === 'ArrowUp' || event.key === 'ArrowRight'
       ? 1
       : event.key === 'ArrowDown' || event.key === 'ArrowLeft'
@@ -202,9 +271,9 @@ function ClockTimePicker({
     if (!direction) return
     event.preventDefault()
     if (phase === 'hour') {
-      setHour((current) => ((current - 1 + direction + 12) % 12) + 1)
+      setHourValue(((hour - 1 + direction + 12) % 12) + 1)
     } else {
-      setMinute((current) => (current + direction + 60) % 60)
+      setMinuteValue((minute + direction + 60) % 60)
     }
   }
 
@@ -232,13 +301,52 @@ function ClockTimePicker({
             onKeyDown={handleClockKeyboard}
           >
             <header className="clock-picker-display">
-              <div>
-                <button type="button" className={phase === 'hour' ? 'active' : undefined} onClick={() => setPhase('hour')}>
-                  {String(hour).padStart(2, '0')}
-                </button>
-                <button type="button" className={phase === 'minute' ? 'active' : undefined} onClick={() => setPhase('minute')}>
-                  {String(minute).padStart(2, '0')}
-                </button>
+              <div className="clock-time-inputs" role="group" aria-label="Edit time manually">
+                <input
+                  ref={hourInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  aria-label={`${label} hour`}
+                  className={phase === 'hour' ? 'active' : undefined}
+                  value={hourInput}
+                  onChange={(event) => handleManualTimeChange(event.target.value, 'hour')}
+                  onFocus={(event) => {
+                    setPhase('hour')
+                    event.currentTarget.select()
+                  }}
+                  onBlur={() => commitManualTime('hour')}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return
+                    event.preventDefault()
+                    commitManualTime('hour')
+                    setPhase('minute')
+                    minuteInputRef.current?.focus()
+                    minuteInputRef.current?.select()
+                  }}
+                />
+                <span aria-hidden="true">:</span>
+                <input
+                  ref={minuteInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  aria-label={`${label} minute`}
+                  className={phase === 'minute' ? 'active' : undefined}
+                  value={minuteInput}
+                  onChange={(event) => handleManualTimeChange(event.target.value, 'minute')}
+                  onFocus={(event) => {
+                    setPhase('minute')
+                    event.currentTarget.select()
+                  }}
+                  onBlur={() => commitManualTime('minute')}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return
+                    event.preventDefault()
+                    commitManualTime('minute')
+                    event.currentTarget.blur()
+                  }}
+                />
               </div>
               <div className="clock-period-control" role="group" aria-label="AM or PM">
                 {(['AM', 'PM'] as const).map((item) => (
@@ -256,7 +364,15 @@ function ClockTimePicker({
             </header>
             <div
               className={`clock-picker-face ${phase}`}
-              onPointerDown={phase === 'minute' ? chooseMinuteFromFace : undefined}
+              aria-label={`Drag to set the ${phase}`}
+              onPointerDown={handleFacePointerDown}
+              onPointerMove={handleFacePointerMove}
+              onPointerUp={handleFacePointerUp}
+              onPointerCancel={(event) => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId)
+                }
+              }}
             >
               <div className="clock-picker-hand" style={{ transform: `rotate(${handAngle}deg)` }}>
                 <span />
@@ -266,7 +382,7 @@ function ClockTimePicker({
                 : Array.from({ length: 12 }, (_, index) => index * 5)
               ).map((number, index) => {
                 const selected = phase === 'hour' ? number === hour : number === minute
-                const angle = ((index + 1) * 30 * Math.PI) / 180
+                const angle = (clockLabelAngle(phase, index) * Math.PI) / 180
                 return (
                   <button
                     type="button"
@@ -278,13 +394,14 @@ function ClockTimePicker({
                       left: `calc(50% + ${Math.sin(angle) * 42}% - 18px)`,
                       top: `calc(50% - ${Math.cos(angle) * 42}% - 18px)`,
                     }}
+                    onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation()
                       if (phase === 'hour') {
-                        setHour(number || 12)
+                        setHourValue(number || 12)
                         setPhase('minute')
                       } else {
-                        setMinute(number)
+                        setMinuteValue(number)
                       }
                     }}
                   >
@@ -299,8 +416,8 @@ function ClockTimePicker({
                 onClick={() => {
                   const now = new Date()
                   const next = timePickerParts(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
-                  setHour(next.hour)
-                  setMinute(next.minute)
+                  setHourValue(next.hour)
+                  setMinuteValue(next.minute)
                   setPeriod(next.period)
                   setPhase('minute')
                 }}
