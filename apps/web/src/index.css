@@ -1,7 +1,40 @@
+@font-face {
+  font-family: "Droid Serif";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("../../../node_modules/connect-fonts-droidserif/fonts/latin/droidserif-regular.woff") format("woff");
+}
+
+@font-face {
+  font-family: "Droid Serif";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url("../../../node_modules/connect-fonts-droidserif/fonts/latin/droidserif-italic.woff") format("woff");
+}
+
+@font-face {
+  font-family: "Droid Serif";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url("../../../node_modules/connect-fonts-droidserif/fonts/latin/droidserif-bold.woff") format("woff");
+}
+
+@font-face {
+  font-family: "Droid Serif";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 700;
+  src: url("../../../node_modules/connect-fonts-droidserif/fonts/latin/droidserif-bolditalic.woff") format("woff");
+}
+
 :root {
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  --font-interface: "FF Providence Sans", "Droid Serif";
+  --font-heading: "Droid Serif";
+  --font-signature: "Beth Ellen";
+  font-family: var(--font-interface);
   color: #111111;
   background: #f6f0e2;
   font-synthesis: none;
@@ -22,6 +55,30 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+}
+
+/*
+ * JuChess typography system
+ *
+ * FF Providence Sans is the preferred interface face. Droid Serif is a
+ * self-hosted, approved fallback so the site never renders in an unrelated
+ * system font while the licensed Providence webfont is unavailable.
+ */
+body,
+body * {
+  font-family: var(--font-interface) !important;
+}
+
+body :where(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-heading) !important;
+}
+
+body :where(
+  .brand-link strong,
+  .site-footer-brand strong,
+  .route-skeleton-brand strong
+) {
+  font-family: var(--font-signature) !important;
 }
 
 a,
