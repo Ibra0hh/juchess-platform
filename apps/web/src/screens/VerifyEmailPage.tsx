@@ -12,6 +12,7 @@ import './AuthPage.css'
 import './VerifyEmailPage.css'
 
 type VerificationStatus = 'checking' | 'sent' | 'verified' | 'error'
+type VerifiedAction = 'home' | 'sign-in'
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams()
@@ -32,6 +33,7 @@ export default function VerifyEmailPage() {
   const [resendPassword, setResendPassword] = useState('')
   const [resending, setResending] = useState(false)
   const [resendError, setResendError] = useState('')
+  const [verifiedAction, setVerifiedAction] = useState<VerifiedAction>('sign-in')
 
   useEffect(() => {
     if (!hasVerificationToken || started.current) return
@@ -42,6 +44,7 @@ export default function VerifyEmailPage() {
         const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
         window.history.replaceState(null, '', `${routeBase}verify-email?verified=1`)
         setStatus('verified')
+        setVerifiedAction('sign-in')
         setMessage('Your email is verified. Sign in to finish your player profile.')
       })
       .catch(async (error: unknown) => {
@@ -53,7 +56,8 @@ export default function VerifyEmailPage() {
           const routeBase = import.meta.env.VITE_ROUTER_BASE || import.meta.env.BASE_URL
           window.history.replaceState(null, '', `${routeBase}verify-email?verified=1`)
           setStatus('verified')
-          setMessage('Your email is verified. Sign in to finish your player profile.')
+          setVerifiedAction('home')
+          setMessage('Your email is already verified. Thank you.')
           return
         }
 
@@ -76,7 +80,8 @@ export default function VerifyEmailPage() {
 
       if (result === 'already-verified') {
         setStatus('verified')
-        setMessage('Your email is verified. Sign in to finish your player profile.')
+        setVerifiedAction('home')
+        setMessage('Your email is already verified. Thank you.')
         return
       }
 
@@ -140,8 +145,10 @@ export default function VerifyEmailPage() {
             </>
           ) : null}
           {status !== 'checking' ? (
-            <Link className="auth-secondary-button" to="/sign-in">
-              {verified ? 'Continue to sign in' : 'Return to sign in'}
+            <Link className="auth-secondary-button" to={verified && verifiedAction === 'home' ? '/home' : '/sign-in'}>
+              {verified
+                ? verifiedAction === 'home' ? 'Go to home' : 'Continue to sign in'
+                : 'Return to sign in'}
             </Link>
           ) : null}
         </section>

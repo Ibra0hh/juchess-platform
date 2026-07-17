@@ -1,8 +1,13 @@
 import { account, appwriteReady } from './appwrite'
 import { isExistingSessionError, normalizeAccountEmail } from './authSession'
+import {
+  resolveCurrentEmailVerificationState,
+  type CurrentEmailVerificationState,
+} from './emailVerificationState'
+
+export type { CurrentEmailVerificationState } from './emailVerificationState'
 
 export type VerificationResendResult = 'sent' | 'already-verified'
-export type CurrentEmailVerificationState = 'verified' | 'unverified' | 'unknown'
 
 export function isEmailAlreadyVerifiedError(error: unknown) {
   return Boolean(
@@ -20,8 +25,7 @@ export async function getCurrentEmailVerificationState(
 
   try {
     const user = await account.get()
-    if (user.$id !== expectedUserId) return 'unknown'
-    return user.emailVerification ? 'verified' : 'unverified'
+    return resolveCurrentEmailVerificationState(user, expectedUserId)
   } catch {
     return 'unknown'
   }

@@ -28,7 +28,12 @@ that must not be lost between chats.
 - `player-actions` deployment `6a5a2d6bcf3c577351e2` is ready and active.
 - `npm run check:web`, `npm run check:functions`, `npm run test:functions`, and
   `npm run check:email-templates` passed. The Function suite has 25 passing
-  tests and the web suite has 50 passing tests.
+  tests and the web suite has 52 passing tests.
+- The verification callback distinguishes a newly verified player from an
+  already verified signed-in player. A successful new verification continues
+  to sign-in; an expired or reused link opened by a verified account says the
+  account is already verified and offers `Go to home`. Unverified accounts are
+  still matched to their own link before the resend form is trusted.
 - Appwrite accepted one real verification request and one real password-
   recovery request for the approved address `7ibrahem0h@gmail.com`. The
   account's verified flag was restored immediately and the temporary test
