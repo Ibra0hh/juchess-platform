@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fontsource/beth-ellen": "^5.2.8",
     "appwrite": "^26.1.0",
     "chess.js": "^1.4.0",
     "connect-fonts-droidserif": "^0.0.1",

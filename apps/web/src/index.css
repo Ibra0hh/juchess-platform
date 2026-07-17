@@ -33,7 +33,6 @@
 :root {
   --font-interface: "FF Providence Sans", "Droid Serif";
   --font-heading: "Droid Serif";
-  --font-signature: "Beth Ellen";
   font-family: var(--font-interface);
   color: #111111;
   background: #f6f0e2;
@@ -78,7 +77,7 @@ body :where(
   .site-footer-brand strong,
   .route-skeleton-brand strong
 ) {
-  font-family: var(--font-signature) !important;
+  font-family: var(--font-heading) !important;
 }
 
 a,

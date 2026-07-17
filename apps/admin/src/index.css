@@ -33,7 +33,6 @@
 :root {
   --font-interface: "FF Providence Sans", "Droid Serif";
   --font-heading: "Droid Serif";
-  --font-signature: "Beth Ellen";
   font-family: var(--font-interface);
   color: #111111;
   background: #eef1f4;
@@ -68,7 +67,7 @@ body :where(
   .sidebar-brand strong,
   .player-email-preview-brand strong
 ) {
-  font-family: var(--font-signature) !important;
+  font-family: var(--font-heading) !important;
 }
 
 :focus-visible {
