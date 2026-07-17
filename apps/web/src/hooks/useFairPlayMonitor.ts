@@ -44,7 +44,9 @@ export function useFairPlayMonitor(gameId: string | null, active: boolean) {
       visibility: document.visibilityState,
     })
 
-    const heartbeat = window.setInterval(() => send('heartbeat'), 15_000)
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState === 'visible') send('heartbeat')
+    }, 60_000)
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         hiddenAtRef.current = Date.now()

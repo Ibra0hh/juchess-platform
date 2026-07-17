@@ -44,7 +44,7 @@ type TournamentGameChoice = {
   tournament: Tournament
 }
 
-const LIVE_GAME_POLL_MS = 1_000
+const LIVE_GAME_POLL_MS = 15_000
 const STANDARD_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
 function OnlineGamesPage() {
@@ -167,7 +167,12 @@ function OnlineGamesPage() {
     let unsubscribe: (() => void) | undefined
     let alive = true
     const refresh = () => void openTournamentGame(selectedGameId, false)
-    const timer = window.setInterval(refresh, LIVE_GAME_POLL_MS)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    const timer = window.setInterval(refreshWhenVisible, LIVE_GAME_POLL_MS)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
     void subscribeToTournamentGameRow(selectedGameId, refresh)
       .then((stop) => {
         if (alive) unsubscribe = stop
@@ -179,6 +184,8 @@ function OnlineGamesPage() {
     return () => {
       alive = false
       window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
       unsubscribe?.()
     }
   }, [openTournamentGame, selectedGame?.status, selectedGameId])

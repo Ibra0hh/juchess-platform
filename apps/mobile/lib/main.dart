@@ -7,6 +7,7 @@ import 'package:appwrite/enums.dart' as enums;
 import 'package:appwrite/models.dart' as models;
 import 'package:chess/chess.dart' as chess;
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -105,6 +106,10 @@ class AppConfig {
     'APPWRITE_GAMES_TABLE_ID',
     defaultValue: 'games',
   );
+  static const standingsTableId = String.fromEnvironment(
+    'APPWRITE_STANDINGS_TABLE_ID',
+    defaultValue: 'standings',
+  );
   static const tournamentAssetsBucketId = String.fromEnvironment(
     'APPWRITE_TOURNAMENT_ASSETS_BUCKET_ID',
     defaultValue: 'tournament-assets',
@@ -117,14 +122,234 @@ class AppConfig {
     'APPWRITE_PLAYER_FUNCTION_ID',
     defaultValue: 'player-actions',
   );
+  static const verificationFunctionId = String.fromEnvironment(
+    'APPWRITE_VERIFICATION_FUNCTION_ID',
+    defaultValue: 'verification-actions',
+  );
   static const adminFunctionId = String.fromEnvironment(
     'APPWRITE_ADMIN_FUNCTION_ID',
     defaultValue: 'admin-actions',
   );
   static const recoveryUrl = String.fromEnvironment(
     'APPWRITE_RECOVERY_URL',
-    defaultValue: 'https://juchess.ju.edu.jo/reset-password',
+    defaultValue: 'https://juchess.page/forgot-password',
   );
+}
+
+class EmailSignUpResult {
+  const EmailSignUpResult({required this.email});
+
+  final String email;
+
+  String get message =>
+      'Account created. Check $email for the JuChess verification link or six-digit code. Both expire in two hours.';
+}
+
+class EmailVerificationRequiredException implements Exception {
+  const EmailVerificationRequiredException({required this.challengeSent});
+
+  final bool challengeSent;
+
+  String get message => challengeSent
+      ? 'Verify your email before signing in. We sent a fresh two-hour verification link and code.'
+      : 'Verify your email before signing in. Use your latest verification email or try again shortly to request a new one.';
+
+  @override
+  String toString() => message;
+}
+
+class AccountBlockedException implements Exception {
+  const AccountBlockedException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class PlayerProfileIdentity {
+  const PlayerProfileIdentity({
+    required this.profileId,
+    this.displayName,
+    this.university,
+    this.universityId,
+    this.phone,
+    this.status,
+    this.chessComUsername,
+    this.lichessUsername,
+  });
+
+  factory PlayerProfileIdentity.fromRow(Map<String, dynamic> row) {
+    final profileId = row['\$id']?.toString();
+    if (profileId == null || profileId.isEmpty) {
+      throw const FormatException(
+        'The club server returned a profile without an ID.',
+      );
+    }
+    return PlayerProfileIdentity(
+      profileId: profileId,
+      displayName: row['displayName']?.toString(),
+      university: row['university']?.toString(),
+      universityId: row['universityId']?.toString(),
+      phone: row['phone']?.toString(),
+      status: row['status']?.toString(),
+      chessComUsername: row['chessComUsername']?.toString(),
+      lichessUsername: row['lichessUsername']?.toString(),
+    );
+  }
+
+  final String profileId;
+  final String? displayName;
+  final String? university;
+  final String? universityId;
+  final String? phone;
+  final String? status;
+  final String? chessComUsername;
+  final String? lichessUsername;
+}
+
+sealed class ProfileIdentityLookup {
+  const ProfileIdentityLookup();
+}
+
+class ProfileIdentityFound extends ProfileIdentityLookup {
+  const ProfileIdentityFound(this.profile);
+
+  final PlayerProfileIdentity profile;
+}
+
+class ProfileIdentityMissing extends ProfileIdentityLookup {
+  const ProfileIdentityMissing();
+}
+
+class ProfileIdentityFailure extends ProfileIdentityLookup {
+  const ProfileIdentityFailure(this.cause);
+
+  final Object cause;
+}
+
+Map<String, dynamic> _decodeFunctionPayload(
+  String responseBody, {
+  required String fallback,
+}) {
+  try {
+    final payload = jsonDecode(responseBody);
+    if (payload is Map<String, dynamic>) return payload;
+  } catch (_) {
+    // The caller receives a stable, club-facing error below.
+  }
+  throw AppwriteException(fallback, 502, 'function_response_invalid');
+}
+
+Future<T> runWithTemporaryVerificationSession<T>({
+  required Future<void> Function() createSession,
+  required Future<T> Function() action,
+  required Future<void> Function() deleteSession,
+  bool Function(Object error)? shouldDeleteAfterCreateFailure,
+}) async {
+  try {
+    await createSession();
+  } catch (error, stackTrace) {
+    if (shouldDeleteAfterCreateFailure?.call(error) ?? true) {
+      await deleteSession();
+    }
+    Error.throwWithStackTrace(error, stackTrace);
+  }
+  try {
+    return await action();
+  } finally {
+    await deleteSession();
+  }
+}
+
+void validateAccessGuardResponse(
+  Map<String, dynamic> payload, {
+  required int statusCode,
+  String responseBody = '',
+}) {
+  if (payload['allowed'] == false) {
+    throw AccountBlockedException(
+      payload['reason']?.toString() ??
+          payload['error']?.toString() ??
+          'This account is blocked by club administration.',
+    );
+  }
+  if (statusCode >= 400 ||
+      payload['ok'] == false ||
+      payload['allowed'] != true) {
+    throw AppwriteException(
+      payload['error']?.toString() ??
+          'Account access could not be checked right now.',
+      statusCode,
+      'access_guard_failed',
+      responseBody,
+    );
+  }
+}
+
+bool isUnknownAccountRecoveryError(Object error) {
+  if (error is! AppwriteException) return false;
+  return error.type == 'user_not_found' ||
+      error.type == 'user_email_not_found' ||
+      (error.code == 404 &&
+          RegExp(
+            r'user|account|email',
+            caseSensitive: false,
+          ).hasMatch(error.message ?? ''));
+}
+
+/// Caches a short-lived Appwrite JWT only for the account session that minted
+/// it. Clearing the cache invalidates both cached and in-flight credentials.
+class SessionScopedJwtCache {
+  SessionScopedJwtCache({this.cacheDuration = const Duration(minutes: 13)});
+
+  final Duration cacheDuration;
+  String? _cachedJwt;
+  DateTime? _cachedJwtExpiresAt;
+  Future<String>? _inFlight;
+  int _generation = 0;
+
+  Future<String> get(Future<String> Function() createJwt) async {
+    final now = DateTime.now();
+    final cached = _cachedJwt;
+    final expiresAt = _cachedJwtExpiresAt;
+    if (cached != null && expiresAt != null && now.isBefore(expiresAt)) {
+      return cached;
+    }
+
+    final pending = _inFlight;
+    if (pending != null) return pending;
+
+    final requestGeneration = _generation;
+    final request = () async {
+      final jwt = await createJwt();
+      if (requestGeneration != _generation) {
+        throw AppwriteException(
+          'The account session changed while JuChess was authorizing this request. Please try again.',
+          401,
+          'session_changed_during_jwt_mint',
+        );
+      }
+      _cachedJwt = jwt;
+      _cachedJwtExpiresAt = DateTime.now().add(cacheDuration);
+      return jwt;
+    }();
+    _inFlight = request;
+    try {
+      return await request;
+    } finally {
+      if (identical(_inFlight, request)) {
+        _inFlight = null;
+      }
+    }
+  }
+
+  void clear() {
+    _generation += 1;
+    _cachedJwt = null;
+    _cachedJwtExpiresAt = null;
+    _inFlight = null;
+  }
 }
 
 enum MobileGameSource { chessCom, lichess, tournament }
@@ -502,6 +727,8 @@ class AppwriteService {
   late final TablesDB tablesDB = TablesDB(client);
   late final Storage storage = Storage(client);
   late final Functions functions = Functions(client);
+  late final Realtime realtime = Realtime(client);
+  final SessionScopedJwtCache _functionJwtCache = SessionScopedJwtCache();
 
   bool get ready =>
       enabled &&
@@ -513,115 +740,293 @@ class AppwriteService {
     return account.get();
   }
 
-  Future<Map<String, String?>> loadProfileIdentity() async {
+  Future<ProfileIdentityLookup> loadProfileIdentity() async {
     try {
       final response = await _runPlayerAction(
         '/profile',
         method: enums.ExecutionMethod.gET,
       );
       final row = response['row'];
-      if (row is! Map<String, dynamic>) return <String, String?>{};
-      return {
-        'profileId': row['\$id']?.toString(),
-        'displayName': row['displayName']?.toString(),
-        'universityId': row['universityId']?.toString(),
-        'phone': row['phone']?.toString(),
-        'status': row['status']?.toString(),
-        'chessComUsername': row['chessComUsername']?.toString(),
-        'lichessUsername': row['lichessUsername']?.toString(),
-      };
-    } catch (_) {
-      return <String, String?>{};
+      if (row is! Map<String, dynamic>) {
+        return const ProfileIdentityFailure(
+          FormatException('The club server returned an unreadable profile.'),
+        );
+      }
+      return ProfileIdentityFound(PlayerProfileIdentity.fromRow(row));
+    } on AppwriteException catch (error) {
+      if (error.code == 404) return const ProfileIdentityMissing();
+      return ProfileIdentityFailure(error);
+    } catch (error) {
+      return ProfileIdentityFailure(error);
     }
   }
 
-  Future<Map<String, String?>> ensureProfileIdentity(models.User user) async {
-    var profile = await loadProfileIdentity();
-    if (profile['profileId'] != null) return profile;
-
-    await _saveProfile(
-      displayName: user.name,
-      university: 'University of Jordan',
-    );
-    return loadProfileIdentity();
-  }
-
-  Future<Map<String, String?>> assertCurrentUserAllowed(
+  Future<void> assertCurrentUserAllowed(
     models.User user,
+    PlayerProfileIdentity profile,
   ) async {
-    final profile = await ensureProfileIdentity(user);
-    if (profile['status'] == 'suspended') {
-      throw Exception('This account is blocked by club administration.');
+    if (profile.status == 'suspended') {
+      throw const AccountBlockedException(
+        'This account is blocked by club administration.',
+      );
     }
 
     await assertAccessAllowed(
       email: user.email,
-      universityId: profile['universityId'],
-      phone: profile['phone'],
+      universityId: profile.universityId,
+      phone: profile.phone,
     );
-    return profile;
   }
 
   Future<models.User> signIn({
     required String email,
     required String password,
   }) async {
-    await assertAccessAllowed(email: email);
-    await account.createEmailPasswordSession(email: email, password: password);
+    final normalizedEmail = email.trim().toLowerCase();
+    await assertAccessAllowed(email: normalizedEmail);
+    _clearFunctionJwt();
+    var createdSession = false;
+    late models.User user;
     try {
-      final user = await account.get();
-      await assertCurrentUserAllowed(user);
+      await account.createEmailPasswordSession(
+        email: normalizedEmail,
+        password: password,
+      );
+      createdSession = true;
+    } on AppwriteException catch (caught) {
+      if (caught.type != 'user_session_already_exists') rethrow;
+      user = await account.get();
+      if (user.email.trim().toLowerCase() != normalizedEmail) {
+        throw AppwriteException(
+          'You are already signed in as ${user.email}. Sign out before using another account.',
+          409,
+          'user_session_already_exists',
+        );
+      }
+    }
+
+    if (createdSession) {
+      try {
+        user = await account.get();
+      } catch (_) {
+        try {
+          await signOut();
+        } catch (_) {}
+        rethrow;
+      }
+    }
+
+    try {
+      if (!user.emailVerification) {
+        var challengeSent = false;
+        try {
+          await sendEmailVerificationChallenge();
+          challengeSent = true;
+        } catch (_) {
+          // The latest challenge may still be valid (for example, during the
+          // resend cooldown). The session is removed either way below.
+        } finally {
+          await _deleteTemporaryVerificationSession(
+            expectedEmail: normalizedEmail,
+          );
+        }
+        throw EmailVerificationRequiredException(challengeSent: challengeSent);
+      }
       return user;
     } catch (_) {
-      try {
-        await signOut();
-      } catch (_) {}
+      if (createdSession) {
+        // Unverified sessions are already removed by the branch above. For all
+        // other failures, do not retain a newly-created private session.
+        try {
+          await signOut();
+        } catch (_) {}
+      }
       rethrow;
     }
   }
 
-  Future<models.User> signUp({
+  Future<EmailSignUpResult> signUp({
     required String name,
     required String email,
     required String password,
-    String? universityId,
-    String? phone,
-    String? chessComUsername,
-    String? lichessUsername,
   }) async {
-    await assertAccessAllowed(
-      email: email,
-      universityId: universityId,
-      phone: phone,
-    );
+    final normalizedEmail = email.trim();
+    await assertAccessAllowed(email: normalizedEmail);
+    await _assertNoActiveSession();
+    _clearFunctionJwt();
 
-    final user = await account.create(
+    await account.create(
       userId: ID.unique(),
-      email: email,
+      email: normalizedEmail,
       password: password,
       name: name,
     );
 
-    await account.createEmailPasswordSession(email: email, password: password);
-    await _saveProfile(
-      displayName: user.name,
-      university: 'University of Jordan',
-      universityId: universityId,
-      phone: phone,
-      chessComUsername: chessComUsername,
-      lichessUsername: lichessUsername,
+    return runWithTemporaryVerificationSession(
+      createSession: () async {
+        await account.createEmailPasswordSession(
+          email: normalizedEmail,
+          password: password,
+        );
+      },
+      action: () async {
+        await sendEmailVerificationChallenge();
+        return EmailSignUpResult(email: normalizedEmail);
+      },
+      deleteSession: () =>
+          _deleteTemporaryVerificationSession(expectedEmail: normalizedEmail),
+      shouldDeleteAfterCreateFailure: (error) =>
+          error is! AppwriteException ||
+          error.type != 'user_session_already_exists',
     );
-    final currentUser = await account.get();
-    await assertCurrentUserAllowed(currentUser);
-    return currentUser;
+  }
+
+  Future<void> sendEmailVerificationChallenge() async {
+    final jwt = await _functionJwt();
+    final execution = await functions.createExecution(
+      functionId: AppConfig.verificationFunctionId,
+      body: '{}',
+      xasync: false,
+      path: '/send',
+      method: enums.ExecutionMethod.pOST,
+      headers: {'content-type': 'application/json', 'juchess-account-jwt': jwt},
+    );
+    if (execution.status == enums.ExecutionStatus.failed) {
+      throw AppwriteException(
+        execution.errors.isEmpty
+            ? 'The email verification service execution failed.'
+            : execution.errors,
+        execution.responseStatusCode,
+        'verification_execution_failed',
+      );
+    }
+    final payload = _decodeFunctionPayload(
+      execution.responseBody,
+      fallback:
+          'The email verification service returned an unreadable response.',
+    );
+    if (execution.responseStatusCode >= 400 || payload['ok'] == false) {
+      throw AppwriteException(
+        payload['error']?.toString() ??
+            'Email verification could not be sent right now.',
+        execution.responseStatusCode,
+        'verification_send_failed',
+        execution.responseBody,
+      );
+    }
+  }
+
+  Future<void> _assertNoActiveSession() async {
+    try {
+      final user = await account.get();
+      throw AppwriteException(
+        'You are already signed in as ${user.email}. Sign out before creating another account.',
+        409,
+        'user_session_already_exists',
+      );
+    } on AppwriteException catch (caught) {
+      if (caught.code == 401) return;
+      rethrow;
+    }
+  }
+
+  Future<void> _deleteTemporaryVerificationSession({
+    String? expectedEmail,
+  }) async {
+    Object? lastError;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (expectedEmail != null) {
+          final current = await account.get();
+          if (current.email.trim().toLowerCase() !=
+              expectedEmail.trim().toLowerCase()) {
+            throw AppwriteException(
+              'JuChess refused to close a session belonging to another account.',
+              409,
+              'verification_session_owner_mismatch',
+            );
+          }
+        }
+        await account.deleteSession(sessionId: 'current');
+        _clearFunctionJwt();
+        return;
+      } on AppwriteException catch (error) {
+        if (error.code == 401 || error.code == 404) {
+          _clearFunctionJwt();
+          return;
+        }
+        if (error.type == 'verification_session_owner_mismatch') rethrow;
+        lastError = error;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw AppwriteException(
+      'JuChess could not safely close the temporary verification session. Please close the app and try again.',
+      503,
+      'verification_session_cleanup_failed',
+      lastError?.toString(),
+    );
+  }
+
+  Future<String> _functionJwt() async {
+    return _functionJwtCache.get(() async {
+      final jwt = await account.createJWT(duration: 900);
+      return jwt.jwt;
+    });
+  }
+
+  void _clearFunctionJwt() {
+    _functionJwtCache.clear();
   }
 
   Future<void> signOut() async {
-    await account.deleteSession(sessionId: 'current');
+    try {
+      await account.deleteSession(sessionId: 'current');
+    } finally {
+      _clearFunctionJwt();
+    }
   }
 
   Future<void> sendPasswordRecovery(String email) async {
-    await account.createRecovery(email: email, url: AppConfig.recoveryUrl);
+    try {
+      await account.createRecovery(email: email, url: AppConfig.recoveryUrl);
+    } catch (error) {
+      if (isUnknownAccountRecoveryError(error)) return;
+      rethrow;
+    }
+  }
+
+  Future<PlayerProfileIdentity> completePlayerProfile({
+    required String displayName,
+    required String university,
+    required String universityId,
+    required String phone,
+    String? chessComUsername,
+    String? lichessUsername,
+  }) async {
+    final response = await _runPlayerAction(
+      '/profile',
+      body: {
+        'displayName': displayName.trim(),
+        'university': university.trim(),
+        'universityId': universityId.trim(),
+        'phone': normalizeJordanPhone(phone),
+        if (chessComUsername != null && chessComUsername.trim().isNotEmpty)
+          'chessComUsername': chessComUsername.trim().toLowerCase(),
+        if (lichessUsername != null && lichessUsername.trim().isNotEmpty)
+          'lichessUsername': lichessUsername.trim().toLowerCase(),
+      },
+    );
+    final row = response['row'];
+    if (row is! Map<String, dynamic>) {
+      throw AppwriteException(
+        'The club server saved an unreadable player profile.',
+        502,
+        'profile_response_invalid',
+      );
+    }
+    return PlayerProfileIdentity.fromRow(row);
   }
 
   Future<void> saveExternalGameUsername({
@@ -656,28 +1061,26 @@ class AppwriteService {
     Map<String, dynamic> body = const {},
     enums.ExecutionMethod method = enums.ExecutionMethod.pOST,
   }) async {
-    final jwt = await account.createJWT(duration: 900);
+    final jwt = await _functionJwt();
     final execution = await functions.createExecution(
       functionId: AppConfig.playerFunctionId,
       body: jsonEncode(body),
       xasync: false,
       path: path,
       method: method,
-      headers: {
-        'content-type': 'application/json',
-        'juchess-player-jwt': jwt.jwt,
-      },
+      headers: {'content-type': 'application/json', 'juchess-player-jwt': jwt},
     );
 
-    final payload = jsonDecode(execution.responseBody);
-    if (payload is! Map<String, dynamic>) {
-      throw AppwriteException(
-        'The club server returned an unreadable response.',
-      );
-    }
+    final payload = _decodeFunctionPayload(
+      execution.responseBody,
+      fallback: 'The club server returned an unreadable response.',
+    );
     if (execution.responseStatusCode >= 400 || payload['ok'] == false) {
       throw AppwriteException(
         payload['error']?.toString() ?? 'Could not update your registration.',
+        execution.responseStatusCode,
+        'player_action_failed',
+        execution.responseBody,
       );
     }
     return payload;
@@ -687,17 +1090,14 @@ class AppwriteService {
     String path, {
     Map<String, dynamic> body = const {},
   }) async {
-    final jwt = await account.createJWT(duration: 900);
+    final jwt = await _functionJwt();
     final execution = await functions.createExecution(
       functionId: AppConfig.adminFunctionId,
       body: jsonEncode(body),
       xasync: false,
       path: path,
       method: enums.ExecutionMethod.pOST,
-      headers: {
-        'content-type': 'application/json',
-        'juchess-player-jwt': jwt.jwt,
-      },
+      headers: {'content-type': 'application/json', 'juchess-player-jwt': jwt},
     );
     final decoded = jsonDecode(execution.responseBody);
     if (decoded is! Map<String, dynamic>) {
@@ -773,30 +1173,23 @@ class AppwriteService {
   Future<Map<String, MyRegistrationInfo>> loadMyRegistrations(
     String profileId,
   ) async {
-    final response = await tablesDB.listRows(
-      databaseId: AppConfig.databaseId,
-      tableId: AppConfig.registrationsTableId,
+    final registrationRows = await _listAllRows(
+      AppConfig.registrationsTableId,
       queries: [
         Query.equal('profileId', profileId),
         Query.notEqual('status', 'cancelled'),
-        Query.limit(500),
       ],
-      total: false,
-      ttl: 0,
     );
 
     // Attendance rows are private. Row permissions return only this player's
     // accepted registrations and never expose another player's response.
     final attendanceByTournament = <String, Map<String, dynamic>>{};
     try {
-      final attendance = await tablesDB.listRows(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.attendanceTableId,
-        queries: [Query.equal('profileId', profileId), Query.limit(500)],
-        total: false,
-        ttl: 0,
+      final attendanceRows = await _listAllRows(
+        AppConfig.attendanceTableId,
+        queries: [Query.equal('profileId', profileId)],
       );
-      for (final row in attendance.rows) {
+      for (final row in attendanceRows) {
         final tournamentId = row.data['tournamentId']?.toString();
         if (tournamentId != null) {
           attendanceByTournament[tournamentId] = row.data;
@@ -807,7 +1200,7 @@ class AppwriteService {
     }
 
     final registrations = <String, MyRegistrationInfo>{};
-    for (final row in response.rows) {
+    for (final row in registrationRows) {
       final tournamentId = row.data['tournamentId']?.toString();
       if (tournamentId == null) continue;
       final attendance = attendanceByTournament[tournamentId];
@@ -844,35 +1237,27 @@ class AppwriteService {
       headers: {'content-type': 'application/json'},
     );
 
-    final payload = jsonDecode(execution.responseBody);
-    if (payload is! Map<String, dynamic>) {
-      throw Exception('Access guard returned an unreadable response.');
-    }
+    final payload = _decodeFunctionPayload(
+      execution.responseBody,
+      fallback: 'The access guard returned an unreadable response.',
+    );
 
-    if (execution.responseStatusCode >= 400 ||
-        payload['ok'] == false ||
-        payload['allowed'] == false) {
-      throw Exception(
-        payload['reason']?.toString() ??
-            payload['error']?.toString() ??
-            'This account is blocked by club administration.',
-      );
-    }
+    validateAccessGuardResponse(
+      payload,
+      statusCode: execution.responseStatusCode,
+      responseBody: execution.responseBody,
+    );
   }
 
   Future<List<TournamentSeed>> loadTournaments() async {
-    final cloudData = await _loadTournamentCloudData();
-    final response = await tablesDB.listRows(
-      databaseId: AppConfig.databaseId,
-      tableId: AppConfig.tournamentsTableId,
-      queries: [Query.limit(100)],
-      total: false,
-      ttl: 0,
-    );
+    final cloudDataFuture = _loadTournamentCloudData();
+    final tournamentRowsFuture = _listAllRows(AppConfig.tournamentsTableId);
+    final cloudData = await cloudDataFuture;
+    final tournamentRows = await tournamentRowsFuture;
 
     final rows =
         uniqueTournamentsByFormat(
-          response.rows
+          tournamentRows
               .map((row) => _mapTournament(row, cloudData))
               .whereType<TournamentSeed>(),
         )..sort((a, b) {
@@ -943,33 +1328,15 @@ class AppwriteService {
     if (!ready) return const [];
 
     try {
-      final gamesFuture = tablesDB.listRows(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.gamesTableId,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 0,
-      );
-      final profilesFuture = tablesDB.listRows(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.profilesTableId,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 0,
-      );
-      final tournamentsFuture = tablesDB.listRows(
-        databaseId: AppConfig.databaseId,
-        tableId: AppConfig.tournamentsTableId,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 0,
-      );
+      final gamesFuture = _listAllRows(AppConfig.gamesTableId);
+      final profilesFuture = _listAllRows(AppConfig.profilesTableId);
+      final tournamentsFuture = _listAllRows(AppConfig.tournamentsTableId);
 
       final games = await gamesFuture;
-      final profiles = _mapProfileRows((await profilesFuture).rows);
+      final profiles = _mapProfileRows(await profilesFuture);
       final tournaments = await tournamentsFuture;
       final tournamentNames = <String, String>{};
-      for (final row in tournaments.rows) {
+      for (final row in tournaments) {
         final data = row.data;
         tournamentNames[row.$id] =
             data['name']?.toString().trim().isNotEmpty == true
@@ -980,7 +1347,7 @@ class AppwriteService {
       }
 
       final rows =
-          games.rows.where((row) {
+          games.where((row) {
             final data = row.data;
             final whiteProfileId = data['whiteProfileId']?.toString();
             final blackProfileId = data['blackProfileId']?.toString();
@@ -1033,77 +1400,94 @@ class AppwriteService {
   }
 
   Future<_TournamentCloudData> _loadTournamentCloudData() async {
-    final registrationsFuture = _tryListRows(AppConfig.registrationsTableId);
-    final profilesFuture = _tryListRows(AppConfig.profilesTableId);
-    final gamesFuture = _tryListRows(AppConfig.gamesTableId);
+    final registrationsFuture = _listAllRows(AppConfig.registrationsTableId);
+    final profilesFuture = _listAllRows(AppConfig.profilesTableId);
+    final gamesFuture = _listAllRows(AppConfig.gamesTableId);
+    final standingsFuture = _listAllRows(AppConfig.standingsTableId);
     final mediaFuture = _tryListTournamentMedia();
 
     final registrations = await registrationsFuture;
     final profiles = _mapProfileRows(await profilesFuture);
     final games = await gamesFuture;
+    final standings = await standingsFuture;
     final media = await mediaFuture;
 
     return _TournamentCloudData(
       playerCountsByTournament: _groupRegistrationCounts(registrations),
       playersByTournament: _groupRegisteredPlayers(registrations, profiles),
       roundsByTournament: _groupPublishedRounds(games, profiles),
-      mediaByTournament: _groupTournamentMedia(media),
+      standingsByTournament: _groupTournamentStandings(standings, profiles),
+      mediaByTournament: _groupTournamentMedia(media.files),
+      mediaAvailable: media.available,
     );
   }
 
-  Future<List<models.File>> _tryListTournamentMedia() async {
+  Future<_TournamentMediaLoad> _tryListTournamentMedia() async {
     try {
-      final response = await storage.listFiles(
-        bucketId: AppConfig.tournamentAssetsBucketId,
-        queries: [Query.limit(500)],
-        total: false,
-      );
-      return response.files;
+      final files = <models.File>[];
+      final seenCursors = <String>{};
+      String? cursor;
+      do {
+        final response = await storage.listFiles(
+          bucketId: AppConfig.tournamentAssetsBucketId,
+          queries: [
+            Query.limit(100),
+            if (cursor != null) Query.cursorAfter(cursor),
+          ],
+          total: false,
+        );
+        files.addAll(response.files);
+        final nextCursor = response.files.length == 100
+            ? response.files.last.$id
+            : null;
+        if (nextCursor != null && !seenCursors.add(nextCursor)) {
+          throw StateError('Tournament media pagination repeated a cursor.');
+        }
+        cursor = nextCursor;
+      } while (cursor != null);
+      return _TournamentMediaLoad(files: files, available: true);
     } catch (_) {
-      return const [];
+      return const _TournamentMediaLoad(files: [], available: false);
     }
   }
 
-  Future<List<models.Row>> _tryListRows(String tableId) async {
-    try {
+  Future<List<models.Row>> _listAllRows(
+    String tableId, {
+    List<String> queries = const [],
+  }) async {
+    final rows = <models.Row>[];
+    final seenCursors = <String>{};
+    String? cursor;
+    do {
       final response = await tablesDB.listRows(
         databaseId: AppConfig.databaseId,
         tableId: tableId,
-        queries: [Query.limit(1000)],
+        queries: [
+          ...queries,
+          Query.limit(100),
+          if (cursor != null) Query.cursorAfter(cursor),
+        ],
         total: false,
         ttl: 0,
       );
-      return response.rows;
-    } catch (_) {
-      return const [];
-    }
+      rows.addAll(response.rows);
+      final nextCursor = response.rows.length == 100
+          ? response.rows.last.$id
+          : null;
+      if (nextCursor != null && !seenCursors.add(nextCursor)) {
+        throw StateError('Appwrite row pagination repeated a cursor.');
+      }
+      cursor = nextCursor;
+    } while (cursor != null);
+    return rows;
   }
 
-  Future<void> _saveProfile({
-    String? displayName,
-    String? university,
-    String? universityId,
-    String? phone,
-    String? chessComUsername,
-    String? lichessUsername,
-  }) async {
-    await _runPlayerAction(
-      '/profile',
-      body: {
-        if (displayName != null && displayName.trim().isNotEmpty)
-          'displayName': displayName.trim(),
-        if (university != null && university.trim().isNotEmpty)
-          'university': university.trim(),
-        if (universityId != null && universityId.trim().isNotEmpty)
-          'universityId': universityId.trim(),
-        if (normalizeJordanPhone(phone) != null)
-          'phone': normalizeJordanPhone(phone),
-        if (chessComUsername != null && chessComUsername.trim().isNotEmpty)
-          'chessComUsername': chessComUsername.trim().toLowerCase(),
-        if (lichessUsername != null && lichessUsername.trim().isNotEmpty)
-          'lichessUsername': lichessUsername.trim().toLowerCase(),
-      },
-    );
+  RealtimeSubscription subscribeToTournamentGame(String gameId) {
+    return realtime.subscribe([
+      Channel.tablesdb(
+        AppConfig.databaseId,
+      ).table(AppConfig.gamesTableId).row(gameId),
+    ]);
   }
 
   TournamentSeed? _mapTournament(
@@ -1188,8 +1572,12 @@ class AppwriteService {
       status: rawStatus,
       registeredPlayers: registeredPlayers,
       publishedRounds: publishedRounds,
+      standings:
+          cloudData.standingsByTournament[row.$id] ??
+          const <TournamentStandingSeed>[],
       bracketSnapshot: bracketSnapshot,
       media: cloudData.mediaByTournament[row.$id] ?? const [],
+      mediaAvailable: cloudData.mediaAvailable,
     );
   }
 }
@@ -1287,13 +1675,24 @@ class _TournamentCloudData {
     this.playerCountsByTournament = const {},
     this.playersByTournament = const {},
     this.roundsByTournament = const {},
+    this.standingsByTournament = const {},
     this.mediaByTournament = const {},
+    this.mediaAvailable = true,
   });
 
   final Map<String, int> playerCountsByTournament;
   final Map<String, List<PlayerSeed>> playersByTournament;
   final Map<String, List<RoundSeed>> roundsByTournament;
+  final Map<String, List<TournamentStandingSeed>> standingsByTournament;
   final Map<String, List<TournamentMediaSeed>> mediaByTournament;
+  final bool mediaAvailable;
+}
+
+class _TournamentMediaLoad {
+  const _TournamentMediaLoad({required this.files, required this.available});
+
+  final List<models.File> files;
+  final bool available;
 }
 
 Map<String, List<TournamentMediaSeed>> _groupTournamentMedia(
@@ -1427,6 +1826,61 @@ Map<String, int> _groupRegistrationCounts(List<models.Row> rows) {
   return groups;
 }
 
+Map<String, List<TournamentStandingSeed>> _groupTournamentStandings(
+  List<models.Row> rows,
+  Map<String, PlayerSeed> profiles,
+) {
+  final groups = <String, List<TournamentStandingSeed>>{};
+  for (final row in rows) {
+    final data = row.data;
+    final tournamentId = data['tournamentId']?.toString();
+    final profileId = data['profileId']?.toString();
+    final profile = profileId == null ? null : profiles[profileId];
+    final rank = _asInt(data['rank']);
+    final points = _asDouble(data['points']);
+    if (tournamentId == null ||
+        tournamentId.isEmpty ||
+        profileId == null ||
+        profile == null ||
+        rank == null ||
+        rank < 1 ||
+        points == null ||
+        !points.isFinite) {
+      continue;
+    }
+
+    groups
+        .putIfAbsent(tournamentId, () => [])
+        .add(
+          TournamentStandingSeed(
+            profileId: profileId,
+            rank: rank,
+            name: profile.name,
+            rating: profile.rating,
+            points: points,
+            tieBreak: _asDouble(data['tieBreak']) ?? 0,
+            played: math.max(0, _asInt(data['played']) ?? 0),
+            wins: math.max(0, _asInt(data['wins']) ?? 0),
+            draws: math.max(0, _asInt(data['draws']) ?? 0),
+            losses: math.max(0, _asInt(data['losses']) ?? 0),
+          ),
+        );
+  }
+
+  for (final standings in groups.values) {
+    standings.sort((left, right) {
+      final rankOrder = left.rank.compareTo(right.rank);
+      if (rankOrder != 0) return rankOrder;
+      final pointsOrder = right.points.compareTo(left.points);
+      if (pointsOrder != 0) return pointsOrder;
+      final tieBreakOrder = right.tieBreak.compareTo(left.tieBreak);
+      if (tieBreakOrder != 0) return tieBreakOrder;
+      return left.profileId.compareTo(right.profileId);
+    });
+  }
+  return groups;
+}
+
 Map<String, List<RoundSeed>> _groupPublishedRounds(
   List<models.Row> rows,
   Map<String, PlayerSeed> profiles,
@@ -1438,11 +1892,17 @@ Map<String, List<RoundSeed>> _groupPublishedRounds(
     final tournamentId = data['tournamentId']?.toString();
     final whiteProfileId = data['whiteProfileId']?.toString();
     final blackProfileId = data['blackProfileId']?.toString();
+    final whiteName = whiteProfileId == 'system_bye'
+        ? bracketByeName
+        : profiles[whiteProfileId]?.name;
+    final blackName = blackProfileId == 'system_bye'
+        ? bracketByeName
+        : profiles[blackProfileId]?.name;
     if (tournamentId == null ||
         whiteProfileId == null ||
         blackProfileId == null ||
-        !profiles.containsKey(whiteProfileId) ||
-        !profiles.containsKey(blackProfileId)) {
+        whiteName == null ||
+        blackName == null) {
       continue;
     }
 
@@ -1451,14 +1911,15 @@ Map<String, List<RoundSeed>> _groupPublishedRounds(
     final status = data['status']?.toString();
     final result = data['result']?.toString();
     final match = MatchSeed(
-      profiles[whiteProfileId]!.name,
-      profiles[blackProfileId]!.name,
+      whiteName,
+      blackName,
       status == 'live'
           ? 'live'
           : result == '*' || result == null
           ? '-'
           : result,
       gameId: row.$id,
+      board: board,
       blackProfileId: blackProfileId,
       blackTimeMs: _asInt(data['blackTimeMs']),
       moveVersion: _asInt(data['moveVersion']) ?? 0,
@@ -1515,21 +1976,8 @@ PublishedBracketSnapshot? parsePublishedBracketSnapshot(String? value) {
     if (type == 'double') {
       final brackets = parsed['brackets'];
       if (brackets is! Map<String, dynamic>) return null;
-      final version = _asInt(parsed['version']) ?? 1;
       final winners = _snapshotRounds(brackets['winners']);
-      // Version 2+ snapshots carry authoritative server-generated labels;
-      // only legacy snapshots need lower-bracket label re-derivation.
-      final losers = version >= 2
-          ? _snapshotRounds(brackets['losers'])
-          : _normalizeLowerBracketRounds(
-              _snapshotRounds(brackets['losers']),
-              preferredLabels: _lowerBracketRoundLabelsFromWinnerRounds([
-                for (final round in winners) round.label,
-              ]),
-              firstWinnerRoundCode: winners.isNotEmpty
-                  ? _bracketRoundCode(winners.first.label)
-                  : null,
-            );
+      final losers = _snapshotRounds(brackets['losers']);
       final finalRounds = _snapshotRounds(brackets['final']);
       if (winners.isEmpty && losers.isEmpty && finalRounds.isEmpty) {
         return null;
@@ -1579,6 +2027,7 @@ MatchSeed? _snapshotMatch(dynamic value) {
     white,
     black,
     _snapshotResult(value),
+    board: _asInt(value['board']),
     matchNumber: _asInt(value['matchNumber']),
     nextIndex: _asInt(value['next']),
     gameId: value['gameId']?.toString(),
@@ -1599,15 +2048,19 @@ String _snapshotResult(Map<dynamic, dynamic> value) {
   return '-';
 }
 
+enum ProfileGateState { ready, completionRequired, loadFailure }
+
 class AppState extends ChangeNotifier {
-  AppState(this.service) {
+  AppState(this.service) : authRestoring = service.ready {
     unawaited(bootstrap());
   }
 
   final AppwriteService service;
   int tab = _initialPreviewTab();
   bool authLoading = false;
+  bool authRestoring;
   bool dataLoading = false;
+  bool tournamentDataUnavailable = false;
   String tournamentFilter = 'upcoming';
   String? userName = _initialPreviewUserName();
   String? userEmail = _initialPreviewEmail();
@@ -1615,6 +2068,8 @@ class AppState extends ChangeNotifier {
   String? chessComUsername;
   String? lichessUsername;
   String? error;
+  String? profileLoadError;
+  ProfileGateState profileGateState = ProfileGateState.ready;
   List<TournamentSeed> tournamentItems = const [];
   Map<String, MyRegistrationInfo> myRegistrations = {};
   final Set<String> _registrationMutations = {};
@@ -1624,6 +2079,10 @@ class AppState extends ChangeNotifier {
 
   bool get appwriteReady => service.ready;
   bool get signedIn => userEmail != null;
+  bool get needsProfileCompletion =>
+      signedIn && profileGateState == ProfileGateState.completionRequired;
+  bool get profileLoadFailed =>
+      signedIn && profileGateState == ProfileGateState.loadFailure;
 
   String linkedExternalUsername(MobileGameSource source) {
     return switch (source) {
@@ -1702,46 +2161,56 @@ class AppState extends ChangeNotifier {
       userName = _initialPreviewUserName();
       userEmail = previewEmail;
       profileId = 'preview-profile';
-
+      profileGateState = ProfileGateState.ready;
+      authRestoring = false;
       error = null;
       notifyListeners();
       return;
     }
 
-    if (!service.ready) return;
+    if (!service.ready) {
+      authRestoring = false;
+      notifyListeners();
+      return;
+    }
 
     try {
       final user = await service.currentUser();
-      final profile = await service.assertCurrentUserAllowed(user);
-      final displayName = profile['displayName'];
-      _applyProfileIdentity(profile);
-      userName = displayName != null && displayName.isNotEmpty
-          ? displayName
-          : user.name.isNotEmpty
-          ? user.name
-          : user.email;
-      userEmail = user.email;
-      error = null;
-      if (profileId != null) {
-        myRegistrations = await service.loadMyRegistrations(profileId!);
-      }
-    } catch (caught) {
-      if (service.ready) {
+      if (!user.emailVerification) {
         try {
           await service.signOut();
         } catch (_) {}
+        _clearAccountIdentity();
+        error =
+            'Verify your email before signing in. Use the link or code from your latest JuChess verification email.';
+        return;
       }
-      userName = null;
-      userEmail = null;
-      profileId = null;
-      chessComUsername = null;
-      lichessUsername = null;
-      error = caught is AppwriteException && caught.type != 'user_blocked'
-          ? null
-          : appwriteMessage(caught);
-    }
 
-    notifyListeners();
+      _applyVerifiedAccount(user);
+      await _resolveProfileIdentity(user);
+      error = null;
+      await _loadCurrentRegistrations();
+    } on AccountBlockedException catch (caught) {
+      try {
+        await service.signOut();
+      } catch (_) {}
+      _clearAccountIdentity();
+      error = caught.message;
+    } on AppwriteException catch (caught) {
+      if (caught.code == 401) {
+        _clearAccountIdentity();
+        error = null;
+      } else {
+        _clearAccountIdentity();
+        error = appwriteMessage(caught);
+      }
+    } catch (caught) {
+      _clearAccountIdentity();
+      error = appwriteMessage(caught);
+    } finally {
+      authRestoring = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> signIn(String email, String password) async {
@@ -1766,14 +2235,17 @@ class AppState extends ChangeNotifier {
 
     try {
       final user = await service.signIn(email: email, password: password);
-      final profile = await service.ensureProfileIdentity(user);
-      userName = user.name.isNotEmpty ? user.name : user.email;
-      userEmail = user.email;
-      _applyProfileIdentity(profile);
-      if (profileId != null) {
-        myRegistrations = await service.loadMyRegistrations(profileId!);
-      }
+      _applyVerifiedAccount(user);
+      await _resolveProfileIdentity(user);
+      await _loadCurrentRegistrations();
       return true;
+    } on AccountBlockedException catch (caught) {
+      try {
+        await service.signOut();
+      } catch (_) {}
+      _clearAccountIdentity();
+      error = caught.message;
+      return false;
     } catch (caught) {
       error = appwriteMessage(caught);
       return false;
@@ -1783,36 +2255,21 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<bool> signUp(
+  Future<EmailSignUpResult?> signUp(
     String name,
     String email,
     String password,
-    String universityId,
-    String phone,
-    String chessComUsername,
-    String lichessUsername,
   ) async {
     if (_isAdminPreview()) {
-      userName = name.trim().isEmpty
-          ? _displayNameFromEmail(email)
-          : name.trim();
-      userEmail = email.trim().isEmpty ? _initialPreviewEmail() : email.trim();
-      profileId = 'preview-profile';
-      this.chessComUsername = chessComUsername.trim().isEmpty
-          ? null
-          : chessComUsername.trim().toLowerCase();
-      this.lichessUsername = lichessUsername.trim().isEmpty
-          ? null
-          : lichessUsername.trim().toLowerCase();
       error = null;
       notifyListeners();
-      return true;
+      return EmailSignUpResult(email: email.trim());
     }
 
     if (!service.ready) {
       error = 'Account service is not ready yet.';
       notifyListeners();
-      return false;
+      return null;
     }
 
     authLoading = true;
@@ -1820,26 +2277,10 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final user = await service.signUp(
-        name: name,
-        email: email,
-        password: password,
-        universityId: universityId,
-        phone: phone,
-        chessComUsername: chessComUsername,
-        lichessUsername: lichessUsername,
-      );
-      final profile = await service.ensureProfileIdentity(user);
-      userName = user.name.isNotEmpty ? user.name : user.email;
-      userEmail = user.email;
-      _applyProfileIdentity(profile);
-      if (profileId != null) {
-        myRegistrations = await service.loadMyRegistrations(profileId!);
-      }
-      return true;
+      return await service.signUp(name: name, email: email, password: password);
     } catch (caught) {
       error = appwriteMessage(caught);
-      return false;
+      return null;
     } finally {
       authLoading = false;
       notifyListeners();
@@ -1883,12 +2324,8 @@ class AppState extends ChangeNotifier {
       } catch (_) {}
     }
 
-    userName = null;
-    userEmail = null;
-    profileId = null;
-    chessComUsername = null;
-    lichessUsername = null;
-    myRegistrations = {};
+    _clearAccountIdentity();
+    error = null;
     notifyListeners();
   }
 
@@ -1910,46 +2347,174 @@ class AppState extends ChangeNotifier {
 
   Future<bool> ensurePlayerProfile() async {
     if (profileId != null) return true;
-
-    if (!service.ready) {
-      error = 'Account service is not ready yet.';
+    if (needsProfileCompletion) {
+      error =
+          'Complete your player profile before using private JuChess features.';
       notifyListeners();
       return false;
     }
+    return retryProfileIdentity();
+  }
+
+  Future<bool> retryProfileIdentity() async {
+    if (!signedIn || !service.ready) {
+      error = 'Sign in again before loading your player profile.';
+      notifyListeners();
+      return false;
+    }
+
+    authLoading = true;
+    profileLoadError = null;
+    notifyListeners();
 
     try {
       final user = await service.currentUser();
-      final profile = await service.ensureProfileIdentity(user);
-      final displayName = profile['displayName'];
-      userName = displayName != null && displayName.isNotEmpty
-          ? displayName
-          : user.name.isNotEmpty
-          ? user.name
-          : user.email;
-      userEmail = user.email;
-      _applyProfileIdentity(profile);
+      if (!user.emailVerification) {
+        await signOut();
+        error = 'Verify your email before loading your JuChess profile.';
+        return false;
+      }
+      _applyVerifiedAccount(user);
+      await _resolveProfileIdentity(user);
       if (profileId != null) {
-        myRegistrations = await service.loadMyRegistrations(profileId!);
+        await _loadCurrentRegistrations();
         error = null;
-        notifyListeners();
         return true;
       }
-
-      error =
-          'Your player profile is not ready yet. Please try signing out and signing in again.';
-      notifyListeners();
+      return false;
+    } on AccountBlockedException catch (caught) {
+      await signOut();
+      error = caught.message;
       return false;
     } catch (caught) {
-      error = appwriteMessage(caught);
-      notifyListeners();
+      profileGateState = ProfileGateState.loadFailure;
+      profileLoadError = appwriteMessage(caught);
       return false;
+    } finally {
+      authLoading = false;
+      notifyListeners();
     }
   }
 
-  void _applyProfileIdentity(Map<String, String?> profile) {
-    profileId = profile['profileId'];
-    chessComUsername = profile['chessComUsername']?.trim();
-    lichessUsername = profile['lichessUsername']?.trim();
+  Future<bool> completePlayerProfile({
+    required String displayName,
+    required String university,
+    required String universityId,
+    required String phone,
+    String? chessComUsername,
+    String? lichessUsername,
+  }) async {
+    if (!signedIn || !service.ready) {
+      error = 'Sign in again before completing your player profile.';
+      notifyListeners();
+      return false;
+    }
+
+    authLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final user = await service.currentUser();
+      if (!user.emailVerification) {
+        throw const EmailVerificationRequiredException(challengeSent: false);
+      }
+      final profile = await service.completePlayerProfile(
+        displayName: displayName,
+        university: university,
+        universityId: universityId,
+        phone: phone,
+        chessComUsername: chessComUsername,
+        lichessUsername: lichessUsername,
+      );
+      await service.assertCurrentUserAllowed(user, profile);
+      _applyVerifiedAccount(user);
+      _applyProfileIdentity(profile);
+      profileGateState = ProfileGateState.ready;
+      profileLoadError = null;
+      await _loadCurrentRegistrations();
+      return true;
+    } on AccountBlockedException catch (caught) {
+      await signOut();
+      error = caught.message;
+      return false;
+    } catch (caught) {
+      error = appwriteMessage(caught);
+      return false;
+    } finally {
+      authLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _resolveProfileIdentity(models.User user) async {
+    final lookup = await service.loadProfileIdentity();
+    switch (lookup) {
+      case ProfileIdentityFound(:final profile):
+        try {
+          await service.assertCurrentUserAllowed(user, profile);
+        } on AccountBlockedException {
+          rethrow;
+        } catch (caught) {
+          profileId = null;
+          profileGateState = ProfileGateState.loadFailure;
+          profileLoadError = appwriteMessage(caught);
+          return;
+        }
+        _applyProfileIdentity(profile);
+        profileGateState = ProfileGateState.ready;
+        profileLoadError = null;
+      case ProfileIdentityMissing():
+        profileId = null;
+        chessComUsername = null;
+        lichessUsername = null;
+        profileGateState = ProfileGateState.completionRequired;
+        profileLoadError = null;
+      case ProfileIdentityFailure(:final cause):
+        profileId = null;
+        chessComUsername = null;
+        lichessUsername = null;
+        profileGateState = ProfileGateState.loadFailure;
+        profileLoadError = appwriteMessage(cause);
+    }
+  }
+
+  void _applyVerifiedAccount(models.User user) {
+    userName = user.name.isNotEmpty ? user.name : user.email;
+    userEmail = user.email;
+  }
+
+  void _applyProfileIdentity(PlayerProfileIdentity profile) {
+    profileId = profile.profileId;
+    final displayName = profile.displayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) userName = displayName;
+    chessComUsername = profile.chessComUsername?.trim();
+    lichessUsername = profile.lichessUsername?.trim();
+  }
+
+  void _clearAccountIdentity() {
+    userName = null;
+    userEmail = null;
+    profileId = null;
+    chessComUsername = null;
+    lichessUsername = null;
+    profileGateState = ProfileGateState.ready;
+    profileLoadError = null;
+    myRegistrations = {};
+  }
+
+  Future<void> _loadCurrentRegistrations() async {
+    final currentProfileId = profileId;
+    if (currentProfileId == null) {
+      myRegistrations = {};
+      return;
+    }
+    try {
+      myRegistrations = await service.loadMyRegistrations(currentProfileId);
+    } catch (_) {
+      // Registration availability must not downgrade or sign out an otherwise
+      // valid verified account. The tournament screen can refresh it later.
+      myRegistrations = {};
+    }
   }
 
   Future<bool> registerForTournament(TournamentSeed event) async {
@@ -2110,10 +2675,10 @@ class AppState extends ChangeNotifier {
     try {
       final loaded = await service.loadTournaments();
       tournamentItems = loaded;
+      tournamentDataUnavailable = false;
       error = null;
-    } catch (caught) {
-      tournamentItems = const [];
-      error = null;
+    } catch (_) {
+      tournamentDataUnavailable = true;
     } finally {
       dataLoading = false;
       notifyListeners();
@@ -2131,9 +2696,10 @@ class AppState extends ChangeNotifier {
         } catch (_) {}
       }
       tournamentItems = loaded;
+      tournamentDataUnavailable = false;
       error = null;
     } catch (_) {
-      error = null;
+      tournamentDataUnavailable = true;
     } finally {
       notifyListeners();
     }
@@ -2194,7 +2760,8 @@ TournamentSeed? _firstTournamentByStatus(
   return null;
 }
 
-bool _isAdminPreview() => Uri.base.queryParameters['adminPreview'] == '1';
+bool _isAdminPreview() =>
+    kDebugMode && Uri.base.queryParameters['adminPreview'] == '1';
 
 bool _isMemberPreview() =>
     _isAdminPreview() && Uri.base.queryParameters['mode'] != 'guest';
@@ -2249,6 +2816,8 @@ String _displayNameFromEmail(String email) {
 }
 
 String appwriteMessage(Object error) {
+  if (error is EmailVerificationRequiredException) return error.message;
+  if (error is AccountBlockedException) return error.message;
   if (error is AppwriteException && error.message != null) {
     return _serviceMessage(error.message!);
   }
@@ -2288,6 +2857,12 @@ int? _asInt(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value);
+  return null;
+}
+
+double? _asDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value);
   return null;
 }
 
@@ -2692,6 +3267,14 @@ class _PrototypeShellState extends State<PrototypeShell> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    if (state.authRestoring) return const AccountRestoreScreen();
+    if (state.profileLoadFailed) return const ProfileLoadFailureScreen();
+    if (state.needsProfileCompletion) {
+      return CompletePlayerProfileScreen(
+        initialName: state.userName ?? '',
+        email: state.userEmail ?? '',
+      );
+    }
     final pages = const [
       HomeScreen(),
       TournamentsScreen(),
@@ -2826,6 +3409,305 @@ class _PrototypeShellState extends State<PrototypeShell> {
           ),
         );
       },
+    );
+  }
+}
+
+class AccountRestoreScreen extends StatelessWidget {
+  const AccountRestoreScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: PrototypeColors.screen,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AuthBrandHeader(logoSize: 54, titleSize: 22),
+              SizedBox(height: 22),
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: PrototypeColors.burgundy,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Loading your JuChess account...',
+                style: TextStyle(color: Color(0x99111111), fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ProfileLoadFailureScreen extends StatelessWidget {
+  const ProfileLoadFailureScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    return Scaffold(
+      backgroundColor: PrototypeColors.screen,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(24),
+              children: [
+                const AuthBrandHeader(logoSize: 52, titleSize: 21),
+                const SizedBox(height: 28),
+                const SerifText(
+                  'Your profile could not be loaded',
+                  size: 22,
+                  weight: FontWeight.w700,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Your verified session is still protected. JuChess will not create or change a profile after a failed read.',
+                  style: TextStyle(
+                    color: Color(0xa6111111),
+                    fontSize: 13.5,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                AuthErrorText(error: state.profileLoadError),
+                PrototypeAuthButton(
+                  label: state.authLoading ? 'Retrying...' : 'Try again',
+                  onTap: state.authLoading
+                      ? null
+                      : () => state.retryProfileIdentity(),
+                ),
+                const SizedBox(height: 10),
+                PrototypeOutlineButton(
+                  label: 'Sign out',
+                  onTap: state.authLoading ? null : () => state.signOut(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class CompletePlayerProfileScreen extends StatefulWidget {
+  const CompletePlayerProfileScreen({
+    required this.initialName,
+    required this.email,
+    super.key,
+  });
+
+  final String initialName;
+  final String email;
+
+  @override
+  State<CompletePlayerProfileScreen> createState() =>
+      _CompletePlayerProfileScreenState();
+}
+
+class _CompletePlayerProfileScreenState
+    extends State<CompletePlayerProfileScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _universityController;
+  final _universityIdController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _chessComController = TextEditingController();
+  final _lichessController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName);
+    _universityController = TextEditingController(text: 'University of Jordan');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _universityController.dispose();
+    _universityIdController.dispose();
+    _phoneController.dispose();
+    _chessComController.dispose();
+    _lichessController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    await context.read<AppState>().completePlayerProfile(
+      displayName: _nameController.text,
+      university: _universityController.text,
+      universityId: _universityIdController.text,
+      phone: _phoneController.text,
+      chessComUsername: _chessComController.text,
+      lichessUsername: _lichessController.text,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: PrototypeColors.screen,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(22, 24, 22, 40),
+                  children: [
+                    const AuthBrandHeader(logoSize: 50, titleSize: 21),
+                    const SizedBox(height: 24),
+                    const SerifText(
+                      'Complete your player profile',
+                      size: 22,
+                      weight: FontWeight.w700,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Your email is verified. Add the required membership details before opening private JuChess features.',
+                      style: TextStyle(
+                        color: Color(0xa6111111),
+                        fontSize: 13.5,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(13),
+                      decoration: BoxDecoration(
+                        color: const Color(0x0f2f6f56),
+                        border: Border.all(color: const Color(0x40306f56)),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.verified_outlined,
+                            color: Color(0xff2f6f56),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'VERIFIED EMAIL',
+                                  style: TextStyle(
+                                    color: Color(0xff2f6f56),
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.7,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.email,
+                                  style: const TextStyle(
+                                    color: PrototypeColors.black,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    AuthField(
+                      controller: _nameController,
+                      label: 'Full name',
+                      hintText: 'e.g. Ibrahim Ahmad',
+                      textInputAction: TextInputAction.next,
+                      validator: requiredValue,
+                    ),
+                    const SizedBox(height: 14),
+                    AuthField(
+                      controller: _universityController,
+                      label: 'University',
+                      hintText: 'Enter your university',
+                      textInputAction: TextInputAction.next,
+                      validator: requiredValue,
+                    ),
+                    const SizedBox(height: 14),
+                    AuthField(
+                      controller: _universityIdController,
+                      label: 'University ID',
+                      hintText: 'e.g. 0201234',
+                      helperText:
+                          'Private - visible only to you and club admins',
+                      textInputAction: TextInputAction.next,
+                      validator: universityIdValue,
+                    ),
+                    const SizedBox(height: 14),
+                    AuthField(
+                      controller: _phoneController,
+                      label: 'Phone number',
+                      hintText: '07X XXX XXXX',
+                      helperText:
+                          'Private - visible only to you and club admins',
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      validator: jordanPhoneValue,
+                    ),
+                    const SizedBox(height: 14),
+                    AuthField(
+                      controller: _chessComController,
+                      label: 'Chess.com username',
+                      optional: true,
+                      hintText: 'username',
+                      textInputAction: TextInputAction.next,
+                      validator: optionalChessUsernameValue,
+                    ),
+                    const SizedBox(height: 14),
+                    AuthField(
+                      controller: _lichessController,
+                      label: 'Lichess username',
+                      optional: true,
+                      hintText: 'username',
+                      textInputAction: TextInputAction.done,
+                      validator: optionalChessUsernameValue,
+                    ),
+                    const SizedBox(height: 18),
+                    AuthErrorText(error: state.error),
+                    PrototypeAuthButton(
+                      label: state.authLoading
+                          ? 'Saving profile...'
+                          : 'Continue to JuChess',
+                      onTap: state.authLoading ? null : _submit,
+                    ),
+                    const SizedBox(height: 10),
+                    PrototypeOutlineButton(
+                      label: 'Sign out without creating a profile',
+                      onTap: state.authLoading ? null : () => state.signOut(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -3541,6 +4423,11 @@ class TournamentsScreen extends StatelessWidget {
         children: [
           const PrototypeHeader(title: 'Tournaments'),
           const TournamentTabs(),
+          if (state.tournamentDataUnavailable)
+            const AppNotice(
+              text:
+                  'Tournament data is temporarily unavailable. Showing the last confirmed data on this device.',
+            ),
           if (state.error != null && state.appwriteReady)
             AppNotice(text: state.error!),
           Padding(
@@ -3720,7 +4607,8 @@ class TournamentDetailScreen extends StatefulWidget {
   State<TournamentDetailScreen> createState() => _TournamentDetailScreenState();
 }
 
-class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
+class _TournamentDetailScreenState extends State<TournamentDetailScreen>
+    with WidgetsBindingObserver {
   Timer? _tournamentRefreshTimer;
   bool _refreshingTournament = false;
   String tab = 'overview';
@@ -3728,21 +4616,46 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.event.status == 'active') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_refreshTournament());
       });
-      _tournamentRefreshTimer = Timer.periodic(
-        const Duration(seconds: 5),
-        (_) => unawaited(_refreshTournament()),
-      );
+      _startTournamentFallback();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tournamentRefreshTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTournamentFallback();
+      unawaited(_refreshTournament());
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _tournamentRefreshTimer?.cancel();
+      _tournamentRefreshTimer = null;
+    }
+  }
+
+  void _startTournamentFallback() {
+    if (!mounted ||
+        widget.event.status != 'active' ||
+        _tournamentRefreshTimer != null) {
+      return;
+    }
+    _tournamentRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_refreshTournament()),
+    );
   }
 
   Future<void> _refreshTournament() async {
@@ -3755,6 +4668,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       if (!mounted) return;
       if (_currentEvent(state).status != 'active') {
         _tournamentRefreshTimer?.cancel();
+        _tournamentRefreshTimer = null;
       }
     } finally {
       _refreshingTournament = false;
@@ -3948,7 +4862,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     else if (tab == 'photos')
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                        child: _TournamentMediaGallery(items: event.media),
+                        child: _TournamentMediaGallery(
+                          items: event.media,
+                          available: event.mediaAvailable,
+                        ),
                       )
                     else
                       _TournamentPlayersTab(event: event),
@@ -4146,9 +5063,10 @@ class _TournamentOverview extends StatelessWidget {
 }
 
 class _TournamentMediaGallery extends StatelessWidget {
-  const _TournamentMediaGallery({required this.items});
+  const _TournamentMediaGallery({required this.items, required this.available});
 
   final List<TournamentMediaSeed> items;
+  final bool available;
 
   @override
   Widget build(BuildContext context) {
@@ -4174,7 +5092,31 @@ class _TournamentMediaGallery extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        if (items.isEmpty)
+        if (!available)
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: PrototypeColors.surface,
+              border: Border.all(color: const Color(0x26111111)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.cloud_off_outlined, color: Color(0x99111111)),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Tournament media is temporarily unavailable. Try again when the connection recovers.',
+                    style: TextStyle(
+                      color: PrototypeColors.black,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (items.isEmpty)
           Container(
             height: 150,
             alignment: Alignment.center,
@@ -4854,34 +5796,33 @@ class _TournamentMainTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (_mainTabLabel(event) == 'Bracket') {
       if (!_hasPublishedBracket(event)) {
-        return const Padding(
-          padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: TournamentEmptyPanel(
-            title: 'Bracket not published',
-            subtitle:
-                'The bracket will appear after the organizer publishes it.',
+            title: event.publishedRounds.isEmpty
+                ? 'Bracket not published'
+                : 'Bracket unavailable',
+            subtitle: event.publishedRounds.isEmpty
+                ? 'The bracket will appear after the organizer publishes it.'
+                : 'The official bracket snapshot is unavailable. JuChess will not generate a replacement on this device.',
           ),
         );
       }
-      final snapshot = event.bracketSnapshot;
-      if (snapshot != null &&
-          !snapshot.isDouble &&
-          snapshot.rounds.isNotEmpty) {
+      final snapshot = event.bracketSnapshot!;
+      if (!snapshot.isDouble) {
         return TournamentBracketView(rounds: snapshot.rounds);
       }
-      if (_isDoubleElimination(event)) {
-        return TournamentDoubleEliminationBracketView(event: event);
-      }
-      return TournamentBracketView(rounds: buildSingleEliminationRounds(event));
+      return TournamentDoubleEliminationBracketView(event: event);
     }
 
-    final players = event.registeredPlayers;
-    if (players.isEmpty) {
+    final standings = event.standings;
+    if (standings.isEmpty) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
         child: TournamentEmptyPanel(
-          title: 'No players yet',
-          subtitle: 'Registered players will appear here.',
+          title: 'Standings unavailable',
+          subtitle:
+              'Official standings will appear after the organizer publishes results.',
         ),
       );
     }
@@ -4892,13 +5833,13 @@ class _TournamentMainTab extends StatelessWidget {
         margin: EdgeInsets.zero,
         padding: EdgeInsets.zero,
         child: Column(
-          children: players.map((player) {
+          children: standings.map((standing) {
             return StandingRow(
-              rank: player.rank,
-              name: player.name,
-              rating: player.rating,
-              points: '0',
-              record: '0-0-0',
+              rank: standing.rank,
+              name: standing.name,
+              rating: standing.rating,
+              points: _formatTournamentPoints(standing.points),
+              record: '${standing.wins}-${standing.draws}-${standing.losses}',
             );
           }).toList(),
         ),
@@ -4925,20 +5866,11 @@ class _TournamentDoubleEliminationBracketViewState
   int _selectedView = 0;
 
   List<RoundSeed> get _rounds {
-    final snapshot = widget.event.bracketSnapshot;
-    if (snapshot != null && snapshot.isDouble) {
-      return switch (_selectedView) {
-        1 => snapshot.losers,
-        2 => snapshot.finalRounds,
-        _ => snapshot.winners,
-      };
-    }
-
-    final brackets = buildDoubleEliminationRounds(widget.event);
+    final snapshot = widget.event.bracketSnapshot!;
     return switch (_selectedView) {
-      1 => brackets.losers,
-      2 => brackets.finalRounds,
-      _ => brackets.winners,
+      1 => snapshot.losers,
+      2 => snapshot.finalRounds,
+      _ => snapshot.winners,
     };
   }
 
@@ -4969,10 +5901,20 @@ class _TournamentDoubleEliminationBracketViewState
             ),
           ),
         ),
-        TournamentBracketView(
-          key: ValueKey('double-bracket-$_selectedView'),
-          rounds: _rounds,
-        ),
+        if (_rounds.isEmpty)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: TournamentEmptyPanel(
+              title: 'Bracket section unavailable',
+              subtitle:
+                  'The organizer has not published this section of the official bracket.',
+            ),
+          )
+        else
+          TournamentBracketView(
+            key: ValueKey('double-bracket-$_selectedView'),
+            rounds: _rounds,
+          ),
       ],
     );
   }
@@ -5781,7 +6723,7 @@ class TournamentRoundPanel extends StatelessWidget {
           ),
           for (var index = 0; index < round.games.length; index++)
             TournamentPairingRow(
-              board: index + 1,
+              board: round.games[index].board ?? index + 1,
               bottomBorder: index != round.games.length - 1,
               event: event,
               match: round.games[index],
@@ -6158,19 +7100,18 @@ bool _hasBracketTab(TournamentSeed event) {
 
 bool _hasPublishedBracket(TournamentSeed event) {
   final snapshot = event.bracketSnapshot;
-  if (snapshot != null) {
-    if (snapshot.isDouble) {
-      return snapshot.winners.isNotEmpty ||
-          snapshot.losers.isNotEmpty ||
-          snapshot.finalRounds.isNotEmpty;
-    }
-    return snapshot.rounds.isNotEmpty;
+  if (snapshot == null) return false;
+  if (snapshot.isDouble) {
+    return snapshot.winners.isNotEmpty ||
+        snapshot.losers.isNotEmpty ||
+        snapshot.finalRounds.isNotEmpty;
   }
-  return event.publishedRounds.isNotEmpty;
+  return snapshot.rounds.isNotEmpty;
 }
 
-bool _isDoubleElimination(TournamentSeed event) {
-  return event.format.toLowerCase().contains('double elimination');
+String _formatTournamentPoints(double value) {
+  if (value == value.roundToDouble()) return value.toInt().toString();
+  return value.toStringAsFixed(1);
 }
 
 class TournamentInfoTile extends StatelessWidget {
@@ -9492,10 +10433,12 @@ class TournamentGameDetailScreen extends StatefulWidget {
       _TournamentGameDetailScreenState();
 }
 
-class _TournamentGameDetailScreenState
-    extends State<TournamentGameDetailScreen> {
+class _TournamentGameDetailScreenState extends State<TournamentGameDetailScreen>
+    with WidgetsBindingObserver {
   Timer? _liveRefreshTimer;
   Timer? _clockTimer;
+  RealtimeSubscription? _liveSubscription;
+  StreamSubscription<dynamic>? _liveSubscriptionListener;
   bool _refreshing = false;
   bool _movePending = false;
   late List<String> moves;
@@ -9520,6 +10463,7 @@ class _TournamentGameDetailScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     moves = _parseStoredMoves(widget.match.pgn);
     currentPly = moves.length;
     currentResult = widget.match.result;
@@ -9534,12 +10478,9 @@ class _TournamentGameDetailScreenState
 
     if (widget.match.gameId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startLiveSync();
         unawaited(_refreshLiveGame());
       });
-      _liveRefreshTimer = Timer.periodic(
-        const Duration(seconds: 1),
-        (_) => unawaited(_refreshLiveGame()),
-      );
       _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted &&
             ((currentStatus == 'live' && turnStartedAt != null) ||
@@ -9552,9 +10493,62 @@ class _TournamentGameDetailScreenState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopLiveSync();
     _liveRefreshTimer?.cancel();
     _clockTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startLiveSync();
+      unawaited(_refreshLiveGame());
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopLiveSync();
+    }
+  }
+
+  void _startLiveSync() {
+    final gameId = widget.match.gameId;
+    if (!mounted ||
+        gameId == null ||
+        _liveRefreshTimer != null ||
+        (currentStatus != 'live' && currentStatus != 'scheduled')) {
+      return;
+    }
+    _liveRefreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => unawaited(_refreshLiveGame()),
+    );
+    try {
+      final subscription = context
+          .read<AppState>()
+          .service
+          .subscribeToTournamentGame(gameId);
+      _liveSubscription = subscription;
+      _liveSubscriptionListener = subscription.stream.listen(
+        (_) => unawaited(_refreshLiveGame()),
+        onError: (_) {
+          // The visible five-second fallback remains active.
+        },
+      );
+    } catch (_) {
+      // The visible five-second fallback remains active.
+    }
+  }
+
+  void _stopLiveSync() {
+    _liveRefreshTimer?.cancel();
+    _liveRefreshTimer = null;
+    unawaited(_liveSubscriptionListener?.cancel());
+    _liveSubscriptionListener = null;
+    unawaited(_liveSubscription?.close());
+    _liveSubscription = null;
   }
 
   Future<void> _refreshLiveGame() async {
@@ -9571,7 +10565,7 @@ class _TournamentGameDetailScreenState
 
       _applyLiveGameState(liveGame);
       if (liveGame.status != 'live' && liveGame.status != 'scheduled') {
-        _liveRefreshTimer?.cancel();
+        _stopLiveSync();
         _clockTimer?.cancel();
       }
     } finally {
@@ -10198,6 +11192,7 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final signedIn = context.select<AppState, bool>((state) => state.signedIn);
     final shownMoves = moves.sublist(0, currentPly);
     final currentGame = _mobileGameFromMoves(
       shownMoves,
@@ -10423,25 +11418,18 @@ class _AnalysisBoardScreenState extends State<AnalysisBoardScreen> {
                   },
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: PrototypeButton(
-                  label: 'Save Analysis',
-                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Analysis saved.')),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'Guest mode - sign in to keep saved analyses',
+            signedIn
+                ? 'Analysis saving is not available in this build yet.'
+                : 'Guest mode - analysis is not saved.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0x80111111), fontSize: 12),
+            style: const TextStyle(color: Color(0x80111111), fontSize: 12),
           ),
         ),
       ],
@@ -11865,13 +12853,28 @@ class SavedAnalysesScreen extends StatelessWidget {
             ),
           )
         else
-          ...savedAnalyses.map(
-            (item) => PrototypeOptionTile(
-              title: item.title,
-              subtitle: item.subtitle,
-              icon: '♜',
-              onTap: () =>
-                  openPrototypeRoute(context, const AnalysisBoardScreen()),
+          const PrototypeCard(
+            margin: EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: PrototypeColors.burgundy,
+                  size: 26,
+                ),
+                SizedBox(height: 8),
+                SerifText(
+                  'Saved analyses unavailable',
+                  size: 17,
+                  weight: FontWeight.w700,
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'JuChess does not store mobile analyses yet. Nothing has been fabricated for this account.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0x99111111), fontSize: 12.5),
+                ),
+              ],
             ),
           ),
       ],
@@ -11997,7 +13000,7 @@ class PrototypeOutlineButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -12995,10 +13998,6 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _universityController = TextEditingController();
-  final _chessComController = TextEditingController();
-  final _lichessController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _recoveryController = TextEditingController();
@@ -13007,16 +14006,13 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
   bool _showSignInPassword = false;
   bool _showSignUpPassword = false;
   bool _showConfirmPassword = false;
+  String _authNotice = '';
   String _recoveryNotice = '';
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
-    _universityController.dispose();
-    _chessComController.dispose();
-    _lichessController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _recoveryController.dispose();
@@ -13117,6 +14113,10 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
             child: const Text('Forgot password?'),
           ),
         ),
+        if (_authNotice.isNotEmpty) ...[
+          AuthNoticeText(message: _authNotice),
+          const SizedBox(height: 12),
+        ],
         AuthErrorText(error: state.error),
         PrototypeAuthButton(
           label: state.authLoading ? 'Working...' : 'Sign in',
@@ -13126,25 +14126,6 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
         ),
         const SizedBox(height: 10),
         AuthGuestButton(onTap: _continueAsGuest),
-        const AuthDivider(),
-        AuthSocialButton(
-          icon: const Icon(Icons.apple, size: 20, color: Colors.black),
-          label: 'Continue with Apple',
-          onTap: _showSocialUnavailable,
-        ),
-        const SizedBox(height: 10),
-        AuthSocialButton(
-          icon: const Text(
-            'G',
-            style: TextStyle(
-              color: PrototypeColors.burgundy,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          label: 'Continue with Google',
-          onTap: _showSocialUnavailable,
-        ),
         AuthInlineSwitch(
           prefix: 'New to the club?',
           action: 'Sign up',
@@ -13188,38 +14169,6 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
           validator: emailValue,
-        ),
-        const SizedBox(height: 14),
-        AuthField(
-          controller: _phoneController,
-          label: 'Phone number',
-          hintText: '07** *** ***',
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 14),
-        AuthField(
-          controller: _universityController,
-          label: 'University ID',
-          hintText: 'Enter University ID',
-          helperText: 'Kept private - never shown on your public profile',
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 14),
-        AuthField(
-          controller: _chessComController,
-          label: 'Chess.com username',
-          optional: true,
-          hintText: 'Enter username',
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 14),
-        AuthField(
-          controller: _lichessController,
-          label: 'Lichess username',
-          optional: true,
-          hintText: 'Enter username',
-          textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 14),
         AuthField(
@@ -13294,7 +14243,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Enter your username, email, or University ID, then choose how you would like to receive your one-time code.',
+          'Enter the email address tied to your JuChess account. We will send a secure password-reset link.',
           style: TextStyle(
             color: Color(0xa6111111),
             fontSize: 13.5,
@@ -13304,36 +14253,11 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
         const SizedBox(height: 20),
         AuthField(
           controller: _recoveryController,
-          label: 'Username, email, or University ID',
-          hintText: 'Enter username, email, or University ID',
+          label: 'Email address',
+          hintText: 'Enter your account email',
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.done,
-          validator: requiredValue,
-        ),
-        const SizedBox(height: 18),
-        const Text(
-          'Send code via',
-          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: const [
-            Expanded(
-              child: RecoveryMethodCard(
-                icon: Icons.mail_outline,
-                label: 'Email',
-                selected: true,
-              ),
-            ),
-            SizedBox(width: 10),
-            Expanded(
-              child: RecoveryMethodCard(
-                icon: Icons.phone_iphone,
-                label: 'SMS',
-                selected: false,
-              ),
-            ),
-          ],
+          validator: emailValue,
         ),
         const SizedBox(height: 22),
         AuthErrorText(error: state.error),
@@ -13358,7 +14282,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
         ),
         const SizedBox(height: 14),
         const Text(
-          'If an account matches, a recovery link will be sent. Password recovery is email based.',
+          'For privacy, JuChess shows the same result whether or not an account matches that email.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Color(0x80111111),
@@ -13384,17 +14308,21 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
   Future<void> _submitSignUp() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final success = await context.read<AppState>().signUp(
+    final result = await context.read<AppState>().signUp(
       _nameController.text.trim(),
       _emailController.text.trim(),
       _passwordController.text,
-      _universityController.text.trim(),
-      _phoneController.text.trim(),
-      _chessComController.text.trim(),
-      _lichessController.text.trim(),
     );
 
-    if (success && mounted) Navigator.of(context).pop();
+    if (result != null && mounted) {
+      setState(() {
+        _mode = AuthMode.signIn;
+        _emailController.text = result.email;
+        _passwordController.clear();
+        _confirmPasswordController.clear();
+        _authNotice = result.message;
+      });
+    }
   }
 
   Future<void> _submitForgot() async {
@@ -13411,15 +14339,10 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     final success = await context.read<AppState>().sendPasswordRecovery(value);
     if (success && mounted) {
       setState(() {
-        _recoveryNotice = 'Recovery email sent. Check your inbox.';
+        _recoveryNotice =
+            'If an account matches, check that inbox for a recovery link.';
       });
     }
-  }
-
-  void _showSocialUnavailable() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Social sign-in will be available soon.')),
-    );
   }
 
   void _backFromSignUp() {
@@ -13986,6 +14909,33 @@ class AuthErrorText extends StatelessWidget {
   }
 }
 
+class AuthNoticeText extends StatelessWidget {
+  const AuthNoticeText({required this.message, super.key});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0x0f2f6f56),
+        border: Border.all(color: const Color(0x40306f56)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        message,
+        style: const TextStyle(
+          color: Color(0xff2f6f56),
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          height: 1.4,
+        ),
+      ),
+    );
+  }
+}
+
 String? requiredValue(String? value) {
   if (value == null || value.trim().isEmpty) return 'Required';
   return null;
@@ -14003,6 +14953,36 @@ String? emailValue(String? value) {
 
 String? passwordValue(String? value) {
   if (value == null || value.length < 8) return 'Use at least 8 characters';
+  return null;
+}
+
+String? jordanPhoneValue(String? value) {
+  final required = requiredValue(value);
+  if (required != null) return required;
+  final normalized = normalizeJordanPhone(value);
+  if (normalized == null || !RegExp(r'^\+9627\d{8}$').hasMatch(normalized)) {
+    return 'Enter a valid Jordan mobile number';
+  }
+  return null;
+}
+
+String? universityIdValue(String? value) {
+  final required = requiredValue(value);
+  if (required != null) return required;
+  final normalized = value!.trim().toLowerCase();
+  if (normalized.length > 64 ||
+      !RegExp(r'^[a-z0-9._/-]+$').hasMatch(normalized)) {
+    return 'Use letters, numbers, dots, slashes, underscores, or hyphens';
+  }
+  return null;
+}
+
+String? optionalChessUsernameValue(String? value) {
+  final normalized = value?.trim() ?? '';
+  if (normalized.isEmpty) return null;
+  if (normalized.length > 80 || RegExp(r'\s').hasMatch(normalized)) {
+    return 'Use 80 characters or fewer, without spaces';
+  }
   return null;
 }
 
@@ -14036,7 +15016,9 @@ class TournamentSeed {
     this.status = 'active',
     this.registeredPlayers = const [],
     this.publishedRounds = const [],
+    this.standings = const [],
     this.media = const [],
+    this.mediaAvailable = true,
     this.bracketSnapshot,
   });
 
@@ -14060,7 +15042,9 @@ class TournamentSeed {
   final String status;
   final List<PlayerSeed> registeredPlayers;
   final List<RoundSeed> publishedRounds;
+  final List<TournamentStandingSeed> standings;
   final List<TournamentMediaSeed> media;
+  final bool mediaAvailable;
   final PublishedBracketSnapshot? bracketSnapshot;
 
   String get playerLabel {
@@ -14115,6 +15099,32 @@ class PlayerSeed {
   final String name;
   final int rating;
   final String subtitle;
+}
+
+class TournamentStandingSeed {
+  const TournamentStandingSeed({
+    required this.profileId,
+    required this.rank,
+    required this.name,
+    required this.rating,
+    required this.points,
+    required this.tieBreak,
+    required this.played,
+    required this.wins,
+    required this.draws,
+    required this.losses,
+  });
+
+  final String profileId;
+  final int rank;
+  final String name;
+  final int rating;
+  final double points;
+  final double tieBreak;
+  final int played;
+  final int wins;
+  final int draws;
+  final int losses;
 }
 
 class GameSeed {
@@ -14227,6 +15237,7 @@ class MatchSeed {
     this.black,
     this.result, {
     this.gameId,
+    this.board,
     this.blackProfileId,
     this.blackTimeMs,
     this.matchNumber,
@@ -14244,6 +15255,7 @@ class MatchSeed {
   final String black;
   final String result;
   final String? gameId;
+  final int? board;
   final String? blackProfileId;
   final int? blackTimeMs;
   final int? matchNumber;
@@ -14255,13 +15267,6 @@ class MatchSeed {
   final String? turnStartedAt;
   final String? whiteProfileId;
   final int? whiteTimeMs;
-}
-
-class SavedAnalysisSeed {
-  const SavedAnalysisSeed(this.title, this.subtitle);
-
-  final String title;
-  final String subtitle;
 }
 
 class PuzzleSeed {
@@ -14444,10 +15449,19 @@ List<MatchSeed> _mergePublishedBracketMatches(
         publishedMatch.white,
         publishedMatch.black,
         publishedMatch.result,
+        board: publishedMatch.board,
+        blackProfileId: publishedMatch.blackProfileId,
+        blackTimeMs: publishedMatch.blackTimeMs,
         gameId: publishedMatch.gameId,
         matchNumber: generatedMatch.matchNumber ?? publishedMatch.matchNumber,
+        moveVersion: publishedMatch.moveVersion,
         nextIndex: generatedMatch.nextIndex ?? publishedMatch.nextIndex,
         pgn: publishedMatch.pgn,
+        scheduledStartAt: publishedMatch.scheduledStartAt,
+        status: publishedMatch.status,
+        turnStartedAt: publishedMatch.turnStartedAt,
+        whiteProfileId: publishedMatch.whiteProfileId,
+        whiteTimeMs: publishedMatch.whiteTimeMs,
       ),
     );
   }
@@ -15094,186 +16108,6 @@ String _matchLoser(MatchSeed? match, String sourceLabel, int matchNumber) {
   if (match.matchNumber != null) return 'Loser of ${match.matchNumber}';
   return 'Loser ${_bracketRoundCode(sourceLabel)}-$matchNumber';
 }
-
-const sampleGames = [
-  GameSeed('Ibrahim Ahmad vs Rania Odeh', 'Blitz 3+2 · Jun 29', '1-0'),
-  GameSeed('Omar Saleh vs Ibrahim Ahmad', 'Rapid 10+0 · Jun 27', '1/2'),
-  GameSeed('Ibrahim Ahmad vs Yazan Khaled', 'Blitz 5+0 · Jun 25', '1-0'),
-  GameSeed('Leen Haddad vs Ibrahim Ahmad', 'Rapid 15+10 · Jun 21', '0-1'),
-];
-
-const liveBoards = [
-  LiveBoardSeed(1, 'Ibrahim Ahmad', 'Rania Odeh', 'Semifinal'),
-  LiveBoardSeed(2, 'Omar Saleh', 'Leen Haddad', 'Semifinal'),
-  LiveBoardSeed(3, 'Yazan Khaled', 'Mira Nasser', 'Round game'),
-];
-
-const sampleRounds = [
-  RoundSeed('Round 4', [
-    MatchSeed('Ibrahim Ahmad', 'Rania Odeh', '1-0'),
-    MatchSeed('Omar Saleh', 'Leen Haddad', 'live'),
-    MatchSeed('Yazan Khaled', 'Mira Nasser', '1/2'),
-  ]),
-  RoundSeed('Round 3', [
-    MatchSeed('Ibrahim Ahmad', 'Omar Saleh', '1/2'),
-    MatchSeed('Rania Odeh', 'Yazan Khaled', '1-0'),
-    MatchSeed('Leen Haddad', 'Mira Nasser', '0-1'),
-  ]),
-];
-
-const stageOneRounds = [
-  RoundSeed('Stage One - Round 1', [
-    MatchSeed('Ibrahim Ahmad', 'Jana Taha', '1-0'),
-    MatchSeed('Rania Odeh', 'Adam Kareem', '1-0'),
-    MatchSeed('Omar Saleh', 'Salma Nouri', '1/2'),
-  ]),
-  RoundSeed('Stage One - Round 2', [
-    MatchSeed('Leen Haddad', 'Hadi Zaid', '1-0'),
-    MatchSeed('Yazan Khaled', 'Dina Faris', '0-1'),
-    MatchSeed('Mira Nasser', 'Laith Hani', '1-0'),
-  ]),
-];
-
-const stageTwoRounds = [
-  RoundSeed('Stage Two - Playoffs', [
-    MatchSeed('Ibrahim Ahmad', 'Rania Odeh', 'live'),
-    MatchSeed('Omar Saleh', 'Leen Haddad', 'live'),
-    MatchSeed('Dina Faris', 'Mira Nasser', '-'),
-  ]),
-  RoundSeed('Stage Two - Finals', [
-    MatchSeed('Semifinal winner', 'Semifinal winner', '-'),
-    MatchSeed('Third-place match', 'Pending opponent', '-'),
-  ]),
-];
-
-const bracketRounds = [
-  RoundSeed('Round of 16', [
-    MatchSeed('Ibrahim Ahmad', 'Jana Taha', '1-0'),
-    MatchSeed('Rania Odeh', 'Adam Kareem', '1-0'),
-    MatchSeed('Omar Saleh', 'Salma Nouri', '1-0'),
-    MatchSeed('Leen Haddad', 'Hadi Zaid', '1-0'),
-    MatchSeed('Yazan Khaled', 'Dina Faris', '0-1'),
-    MatchSeed('Mira Nasser', 'Laith Hani', '1-0'),
-    MatchSeed('Khaled Mansour', 'Tamer Qasem', '1-0'),
-    MatchSeed('Sara Haddad', 'Nour Alami', '0-1'),
-  ]),
-  RoundSeed('Quarterfinal', [
-    MatchSeed('Ibrahim Ahmad', 'Rania Odeh', '1-0'),
-    MatchSeed('Omar Saleh', 'Leen Haddad', '1-0'),
-    MatchSeed('Dina Faris', 'Mira Nasser', '0-1'),
-    MatchSeed('Khaled Mansour', 'Nour Alami', '1-0'),
-  ]),
-  RoundSeed('Semifinal', [
-    MatchSeed('Ibrahim Ahmad', 'Rania Odeh', 'live'),
-    MatchSeed('Omar Saleh', 'Leen Haddad', 'live'),
-  ]),
-  RoundSeed('Final', [MatchSeed('TBD', 'TBD', '-')]),
-];
-
-const doubleEliminationWinnersRounds = [
-  RoundSeed('W-Round of 16', [
-    MatchSeed('Ibrahim Ahmad', 'Zaid Hamdan', '1-0', matchNumber: 1),
-    MatchSeed('Sara Nasser', 'Hasan Qasem', '1-0', matchNumber: 2),
-    MatchSeed('Leen Haddad', 'Noor Barakat', '1-0', matchNumber: 3),
-    MatchSeed('Yazan Khaled', 'Khaled Mansour', '1-0', matchNumber: 4),
-    MatchSeed('Omar Saleh', 'Tala Suleiman', '1-0', matchNumber: 5),
-    MatchSeed('Mohammad Al-Khatib', 'Rania Odeh', '1-0', matchNumber: 6),
-    MatchSeed('Amr Zaidan', 'Lina Shami', '1-0', matchNumber: 7),
-    MatchSeed('Dana Aqel', 'Fadi Rimawi', '1-0', matchNumber: 8),
-  ]),
-  RoundSeed('W-Quarterfinal', [
-    MatchSeed('Ibrahim Ahmad', 'Sara Nasser', '1-0', matchNumber: 13),
-    MatchSeed('Leen Haddad', 'Yazan Khaled', '1-0', matchNumber: 14),
-    MatchSeed('Omar Saleh', 'Mohammad Al-Khatib', '1-0', matchNumber: 15),
-    MatchSeed('Dana Aqel', 'Amr Zaidan', '1-0', matchNumber: 16),
-  ]),
-  RoundSeed('W-Semifinal', [
-    MatchSeed('Ibrahim Ahmad', 'Leen Haddad', '1-0', matchNumber: 23),
-    MatchSeed('Omar Saleh', 'Dana Aqel', '1-0', matchNumber: 24),
-  ]),
-  RoundSeed('W-Final', [
-    MatchSeed('Ibrahim Ahmad', 'Omar Saleh', '1-0', matchNumber: 28),
-  ]),
-];
-
-const doubleEliminationLosersRounds = [
-  RoundSeed('Lower Round 1', [
-    MatchSeed(
-      'Zaid Hamdan',
-      'Hasan Qasem',
-      '1-0',
-      matchNumber: 9,
-      nextIndex: 0,
-    ),
-    MatchSeed(
-      'Noor Barakat',
-      'Khaled Mansour',
-      '1-0',
-      matchNumber: 10,
-      nextIndex: 1,
-    ),
-    MatchSeed(
-      'Tala Suleiman',
-      'Rania Odeh',
-      '1-0',
-      matchNumber: 11,
-      nextIndex: 2,
-    ),
-    MatchSeed(
-      'Lina Shami',
-      'Fadi Rimawi',
-      '1-0',
-      matchNumber: 12,
-      nextIndex: 3,
-    ),
-  ]),
-  RoundSeed('Lower Round 2', [
-    MatchSeed('Sara Nasser', 'Zaid Hamdan', '1-0', matchNumber: 20),
-    MatchSeed('Yazan Khaled', 'Noor Barakat', '1-0', matchNumber: 19),
-    MatchSeed('Mohammad Al-Khatib', 'Tala Suleiman', '1-0', matchNumber: 18),
-    MatchSeed('Amr Zaidan', 'Lina Shami', '1-0', matchNumber: 17),
-  ]),
-  RoundSeed('Lower Round 3', [
-    MatchSeed(
-      'Sara Nasser',
-      'Yazan Khaled',
-      '1-0',
-      matchNumber: 22,
-      nextIndex: 0,
-    ),
-    MatchSeed(
-      'Mohammad Al-Khatib',
-      'Amr Zaidan',
-      '1-0',
-      matchNumber: 21,
-      nextIndex: 1,
-    ),
-  ]),
-  RoundSeed('Lower Round 4', [
-    MatchSeed('Leen Haddad', 'Sara Nasser', '0-1', matchNumber: 25),
-    MatchSeed('Dana Aqel', 'Mohammad Al-Khatib', '0-1', matchNumber: 26),
-  ]),
-  RoundSeed('Lower Round 5', [
-    MatchSeed('Sara Nasser', 'Mohammad Al-Khatib', '1-0', matchNumber: 27),
-  ]),
-  RoundSeed('Lower Final', [
-    MatchSeed('Omar Saleh', 'Sara Nasser', 'live', matchNumber: 29),
-  ]),
-];
-
-const doubleEliminationFinalRounds = [
-  RoundSeed('Grand Final', [
-    MatchSeed('Ibrahim Ahmad', 'Winner of 29', '-', matchNumber: 30),
-  ]),
-  RoundSeed('Reset if needed', [
-    MatchSeed('Winner of 30', 'Reset only if needed', '-', matchNumber: 31),
-  ]),
-];
-
-const savedAnalyses = [
-  SavedAnalysisSeed("King's Indian prep vs Omar", '32 moves · Jun 25'),
-  SavedAnalysisSeed('Rapid round 2 endgame', '18 moves · Jun 28'),
-];
 
 const puzzleSeeds = [
   PuzzleSeed(

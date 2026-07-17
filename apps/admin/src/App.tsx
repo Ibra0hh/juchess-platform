@@ -17,6 +17,9 @@ import {
   type JuCapturedPiece,
 } from './components/JuChessRules'
 import { appwriteReady } from './lib/appwrite'
+import { compactCrestUrl } from './lib/brand'
+import { createSingleFlightTask, resolveTournamentSnapshot } from './lib/adminTournamentRefresh'
+import { subscribeToAdminTournamentChanges } from './lib/adminTournamentRealtime'
 import {
   advanceTournamentRound,
   addTournamentParticipant,
@@ -690,81 +693,7 @@ const pageText: Record<Screen, { title: string; sub: string }> = {
   adminAccess: { title: 'Admin access', sub: 'Manage admin-only accounts and permissions' },
 }
 
-const demoPlayers: Player[] = [
-  {
-    id: 'p1',
-    name: 'Ibrahim Ahmad',
-    initials: 'IA',
-    universityId: '0249115',
-    email: 'ibrahim.ahmad@ju.edu.jo',
-    phone: '0791201102',
-    rating: 1810,
-    record: '18-4-7',
-    avatarColor: '#7d2434',
-    tournaments: 7,
-  },
-  {
-    id: 'p2',
-    name: 'Omar Saleh',
-    initials: 'OS',
-    universityId: '0221840',
-    email: 'omar.saleh@ju.edu.jo',
-    phone: '0788894411',
-    rating: 1740,
-    record: '15-5-8',
-    avatarColor: '#111111',
-    tournaments: 5,
-  },
-  {
-    id: 'p3',
-    name: 'Leen Haddad',
-    initials: 'LH',
-    universityId: '0231088',
-    email: 'leen.haddad@ju.edu.jo',
-    phone: '0775500139',
-    rating: 1685,
-    record: '12-7-8',
-    avatarColor: '#2E7D5B',
-    tournaments: 6,
-  },
-  {
-    id: 'p4',
-    name: 'Yazan Khaled',
-    initials: 'YK',
-    universityId: '0217742',
-    email: 'yazan.khaled@ju.edu.jo',
-    phone: '0792214770',
-    rating: 1602,
-    record: '11-3-12',
-    avatarColor: '#8a6f28',
-    tournaments: 4,
-  },
-  {
-    id: 'p5',
-    name: 'Sara Nasser',
-    initials: 'SN',
-    universityId: '0234109',
-    email: 'sara.nasser@ju.edu.jo',
-    phone: '0784401277',
-    rating: 1558,
-    record: '9-4-10',
-    avatarColor: '#5E60CE',
-    tournaments: 3,
-  },
-  {
-    id: 'p6',
-    name: 'Kareem Mansour',
-    initials: 'KM',
-    universityId: '0209971',
-    email: 'kareem.mansour@ju.edu.jo',
-    phone: '0771012020',
-    rating: 1498,
-    record: '8-2-14',
-    avatarColor: '#B23A3A',
-    tournaments: 4,
-    blocked: true,
-  },
-]
+const playerAvatarColors = ['#7d2434', '#111111', '#2E7D5B', '#8a6f28', '#5E60CE', '#B23A3A'] as const
 
 function App() {
   const [session, setSession] = useState<AdminSession | null>(null)
@@ -776,13 +705,20 @@ function App() {
   const [dataSource, setDataSource] = useState<TournamentDataSource>('unavailable')
   const [message, setMessage] = useState<string | null>(null)
   const [sessionNotice, setSessionNotice] = useState<string | null>(null)
+  const [loadTournamentsSingleFlight] = useState(() => createSingleFlightTask(loadAdminTournaments))
 
-  async function refreshTournaments() {
-    const result = await loadAdminTournaments()
-    setTournaments(result.tournaments)
-    setDataSource(result.source)
-    setMessage(result.error ? 'Cloud tournaments are unavailable right now.' : null)
-  }
+  const applyTournamentResult = useCallback((result: Awaited<ReturnType<typeof loadAdminTournaments>>) => {
+    setTournaments((previous) => resolveTournamentSnapshot(previous, result).tournaments)
+    setDataSource(result.source === 'cloud' && !result.error ? 'cloud' : 'unavailable')
+    setMessage(result.source === 'cloud' && !result.error
+      ? null
+      : 'Tournament data could not be verified. Last known data is shown read-only until the cloud reconnects.')
+  }, [])
+
+  const refreshTournaments = useCallback(async () => {
+    const result = await loadTournamentsSingleFlight()
+    applyTournamentResult(result)
+  }, [applyTournamentResult, loadTournamentsSingleFlight])
 
   async function refreshBlocks(currentSession = session) {
     if (!currentSession?.allowed) {
@@ -817,7 +753,7 @@ function App() {
     async function boot() {
       const [loadedSession, tournamentResult] = await Promise.all([
         getAdminSession(),
-        loadAdminTournaments(),
+        loadTournamentsSingleFlight(),
       ])
       const [blockResult, adminProfileResult] = loadedSession?.allowed
         ? await Promise.all([
@@ -832,12 +768,13 @@ function App() {
           ]
 
       if (!alive) return
+      const tournamentSnapshot = resolveTournamentSnapshot([], tournamentResult)
       setSession(loadedSession)
-      setTournaments(tournamentResult.tournaments)
+      setTournaments(tournamentSnapshot.tournaments)
       setBlocks(blockResult)
       setAdminProfiles(adminProfileResult)
-      setDataSource(tournamentResult.source)
-      setMessage(tournamentResult.error ? 'Cloud tournaments are unavailable right now.' : null)
+      setDataSource(tournamentSnapshot.source)
+      setMessage(tournamentSnapshot.error ? 'Cloud tournaments are unavailable right now.' : null)
       setLoading(false)
     }
 
@@ -846,7 +783,7 @@ function App() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [loadTournamentsSingleFlight])
 
   useEffect(() => {
     if (!session?.allowed) return
@@ -871,7 +808,9 @@ function App() {
     const verifyWhenVisible = () => {
       if (document.visibilityState === 'visible') void verifyLease()
     }
-    const timer = window.setInterval(() => void verifyLease(), 15_000)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void verifyLease()
+    }, 15_000)
     window.addEventListener('focus', verifyWhenVisible)
     document.addEventListener('visibilitychange', verifyWhenVisible)
 
@@ -886,34 +825,80 @@ function App() {
   useEffect(() => {
     if (!session?.allowed || screen !== 'tournaments') return
     let alive = true
-    let refreshing = false
+    let burstTimer: number | null = null
+    let subscription: Awaited<ReturnType<typeof subscribeToAdminTournamentChanges>> = null
+    let connecting = false
 
-    const refreshVisibleTournaments = async () => {
-      if (refreshing) return
-      refreshing = true
+    const refreshWhenVisible = () => {
+      if (!alive || document.visibilityState !== 'visible') return
+      if (burstTimer !== null) window.clearTimeout(burstTimer)
+      burstTimer = window.setTimeout(() => {
+        burstTimer = null
+        if (alive && document.visibilityState === 'visible') void refreshTournaments()
+      }, 0)
+    }
+    const refreshAfterRealtimeBurst = () => {
+      if (!alive || document.visibilityState !== 'visible') return
+      if (burstTimer !== null) window.clearTimeout(burstTimer)
+      burstTimer = window.setTimeout(() => {
+        burstTimer = null
+        if (alive && document.visibilityState === 'visible') void refreshTournaments()
+      }, 300)
+    }
+    const connectRealtime = async () => {
+      if (!alive || connecting || subscription || document.visibilityState !== 'visible') return
+      connecting = true
       try {
-        const result = await loadAdminTournaments()
-        if (!alive || result.error) return
-        setTournaments(result.tournaments)
-        setDataSource(result.source)
+        const nextSubscription = await subscribeToAdminTournamentChanges(refreshAfterRealtimeBurst)
+        if (!alive) {
+          await nextSubscription?.unsubscribe()
+          return
+        }
+        subscription = nextSubscription
+      } catch (error) {
+        console.warn('Admin tournament realtime subscription is unavailable; the fallback refresh remains active.', error)
       } finally {
-        refreshing = false
+        connecting = false
       }
     }
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') void refreshVisibleTournaments()
+    const refreshAndEnsureRealtimeWhenVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      refreshWhenVisible()
+      void connectRealtime()
     }
-    const timer = window.setInterval(() => void refreshVisibleTournaments(), 2_000)
-    window.addEventListener('focus', refreshWhenVisible)
-    document.addEventListener('visibilitychange', refreshWhenVisible)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void refreshTournaments()
+      if (!subscription) void connectRealtime()
+    }, 60_000)
+    window.addEventListener('focus', refreshAndEnsureRealtimeWhenVisible)
+    document.addEventListener('visibilitychange', refreshAndEnsureRealtimeWhenVisible)
+    refreshAndEnsureRealtimeWhenVisible()
 
     return () => {
       alive = false
       window.clearInterval(timer)
+      if (burstTimer !== null) window.clearTimeout(burstTimer)
+      window.removeEventListener('focus', refreshAndEnsureRealtimeWhenVisible)
+      document.removeEventListener('visibilitychange', refreshAndEnsureRealtimeWhenVisible)
+      if (subscription) void subscription.unsubscribe()
+    }
+  }, [refreshTournaments, screen, session?.allowed])
+
+  useEffect(() => {
+    if (!session?.allowed || screen !== 'dashboard') return
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshTournaments()
+    }
+    const timer = window.setInterval(refreshWhenVisible, 60_000)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      window.clearInterval(timer)
       window.removeEventListener('focus', refreshWhenVisible)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
-  }, [screen, session?.allowed])
+  }, [refreshTournaments, screen, session?.allowed])
 
   if (loading) return <PrototypeLoading />
 
@@ -958,7 +943,6 @@ function App() {
           blocks={blocks}
           goTournaments={() => setScreen('tournaments')}
           goPlayers={() => setScreen('players')}
-          goNews={() => setScreen('news')}
         />
       ) : null}
       {screen === 'tournaments' ? (
@@ -974,7 +958,7 @@ function App() {
       ) : null}
       {screen === 'recruitment' ? <RecruitmentScreen /> : null}
       {screen === 'news' ? <NewsScreen /> : null}
-      {screen === 'announcements' ? <AnnouncementsScreen tournaments={tournaments} /> : null}
+      {screen === 'announcements' ? <AnnouncementsScreen /> : null}
       {screen === 'adminAccess' ? (
         <AdminAccessScreen
           adminProfiles={adminProfiles}
@@ -1011,7 +995,7 @@ function LoginScreen({ notice, onLogin }: { notice?: string | null; onLogin: (se
     <main className="prototype-login">
       <section className="prototype-login-card" aria-labelledby="admin-login-title">
         <div className="login-brand">
-          <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="JuChess" />
+          <img src={compactCrestUrl} alt="JuChess" />
           <strong>JuChess</strong>
           <span>University of Jordan Chess Club</span>
         </div>
@@ -1057,7 +1041,7 @@ function AccessDenied({ onSignOut, session }: { onSignOut: () => Promise<void>; 
     <main className="prototype-login">
       <section className="prototype-login-card" aria-labelledby="admin-denied-title">
         <div className="login-brand">
-          <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="JuChess" />
+          <img src={compactCrestUrl} alt="JuChess" />
           <strong>JuChess</strong>
           <span>University of Jordan Chess Club</span>
         </div>
@@ -1074,7 +1058,7 @@ function PrototypeLoading() {
     <main className="prototype-login">
       <section className="prototype-login-card compact-card">
         <div className="login-brand">
-          <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="JuChess" />
+          <img src={compactCrestUrl} alt="JuChess" />
           <strong>JuChess</strong>
           <span>Control Center</span>
         </div>
@@ -1110,7 +1094,7 @@ function AdminAppShell({
     <div className="prototype-admin">
       <aside className="prototype-sidebar">
         <div className="sidebar-brand">
-          <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="JuChess" />
+          <img src={compactCrestUrl} alt="JuChess" />
           <span>
             <strong>JuChess</strong>
             <small>Control Center</small>
@@ -1151,16 +1135,6 @@ function AdminAppShell({
             <h1>{page.title}</h1>
             <p>{page.sub}</p>
           </div>
-          <div className="topbar-tools">
-            <label className="topbar-search">
-              <span>⌕</span>
-              <input placeholder="Search players, events..." />
-            </label>
-            <button type="button" className="bell-button" aria-label="Notifications">
-              🔔
-              <span />
-            </button>
-          </div>
         </header>
         <main className="prototype-content">{children}</main>
       </div>
@@ -1185,13 +1159,11 @@ function ConfigNotice({ tournaments }: { tournaments: AdminTournament[] }) {
 
 function DashboardScreen({
   blocks,
-  goNews,
   goPlayers,
   goTournaments,
   tournaments,
 }: {
   blocks: BlockListLoadResult
-  goNews: () => void
   goPlayers: () => void
   goTournaments: () => void
   tournaments: AdminTournament[]
@@ -1203,28 +1175,40 @@ function DashboardScreen({
 
   const [playerCount, setPlayerCount] = useState<number | null>(null)
   const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const [dashboardCountsLoaded, setDashboardCountsLoaded] = useState(false)
 
   useEffect(() => {
     let alive = true
-    void (async () => {
-      const [{ players }, pending] = await Promise.all([
+    const refreshCounts = async () => {
+      const [playerResult, pending] = await Promise.all([
         loadClubPlayers(),
         countPendingRegistrations(),
       ])
       if (!alive) return
-      setPlayerCount(players.length)
+      setPlayerCount(playerResult.error ? null : playerResult.players.length)
       setPendingCount(pending)
-    })()
+      setDashboardCountsLoaded(true)
+    }
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshCounts()
+    }
+    void refreshCounts()
+    const timer = window.setInterval(refreshWhenVisible, 60_000)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
     return () => {
       alive = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
   }, [])
 
   const statCards = [
-    { label: 'Total players', value: playerCount === null ? '-' : String(playerCount), icon: '◍', tint: '#F3E4E6', delta: 'Registered club profiles', color: '#8B8577' },
+    { label: 'Total players', value: playerCount === null ? '-' : String(playerCount), icon: '◍', tint: '#F3E4E6', delta: playerCount === null ? (dashboardCountsLoaded ? 'Unavailable' : 'Loading') : 'Registered club profiles', color: '#8B8577' },
     { label: 'Active tournaments', value: String(activeCount), icon: '♞', tint: '#EAF0FA', delta: `${activeCount} live now`, color: '#8B8577' },
     { label: 'Upcoming tournaments', value: String(upcomingCount), icon: '⚔', tint: '#EAF6F0', delta: `${tournaments.length} total events`, color: '#8B8577' },
-    { label: 'Pending registrations', value: pendingCount === null ? '-' : String(pendingCount), icon: '⏳', tint: '#FBF1E2', delta: pendingCount ? 'Needs review' : 'All reviewed', color: pendingCount ? '#C77D0A' : '#8B8577' },
+    { label: 'Pending registrations', value: pendingCount === null ? '-' : String(pendingCount), icon: '⏳', tint: '#FBF1E2', delta: pendingCount === null ? (dashboardCountsLoaded ? 'Unavailable' : 'Loading') : pendingCount ? 'Needs review' : 'All reviewed', color: pendingCount ? '#C77D0A' : '#8B8577' },
   ]
 
   // Derived from real tournament rows. Nothing here is invented: an empty club
@@ -1279,7 +1263,7 @@ function DashboardScreen({
             {pendingCount ? <span className="pill danger">{pendingCount} open</span> : null}
           </div>
           {pendingCount === null ? (
-            <div className="empty-row">Loading registrations...</div>
+            <div className="empty-row">{dashboardCountsLoaded ? 'Registration count is unavailable.' : 'Loading registrations...'}</div>
           ) : pendingCount === 0 ? (
             <div className="empty-row">Every registration has been reviewed.</div>
           ) : (
@@ -1301,9 +1285,7 @@ function DashboardScreen({
         </section>
         <section className="panel-card">
           <div className="panel-title">Operational queues</div>
-          <QueueRow icon="⏳" tint="#FBF1E2" label="Pending registrations" count={pendingCount ?? 0} action="Review" onClick={goTournaments} />
-          <QueueRow icon="⚑" tint="#FBEAEA" label="Disputed results" count={3} action="Resolve" onClick={goTournaments} />
-          <QueueRow icon="✉" tint="#EAF0FA" label="Message drafts" count={5} action="Open" onClick={goNews} />
+          {pendingCount !== null ? <QueueRow icon="⏳" tint="#FBF1E2" label="Pending registrations" count={pendingCount} action="Review" onClick={goTournaments} /> : null}
           <QueueRow icon="⛔" tint="#FBEAEA" label="Active blocks" count={activeBlocks} action="Open" onClick={goPlayers} />
         </section>
       </div>
@@ -1390,13 +1372,18 @@ function TournamentsScreen({
   const selectedTournament = filtered.find((item) => tournamentKey(item) === selectedTournamentKey) ?? filtered[0] ?? null
   const managedTournament = tournaments.find((item) => tournamentKey(item) === manageTournamentKey) ?? null
   const mediaTournament = tournaments.find((item) => tournamentKey(item) === mediaTournamentKey) ?? null
-  const createEnabled = tab === 'draft'
+  const canonicalDataAvailable = dataSource === 'cloud'
+  const createEnabled = tab === 'draft' && canonicalDataAvailable
   const swissRoundsValid = form.format !== 'Swiss'
     || (Number.isInteger(form.roundsTotal) && Number(form.roundsTotal) >= 1 && Number(form.roundsTotal) <= 50)
   const onlinePlatformValid = form.playMode !== 'online' || Boolean(form.onlinePlatform)
-  const canSaveDraft = Boolean(form.name.trim() && form.format.trim()) && swissRoundsValid && onlinePlatformValid && !submitting
+  const canSaveDraft = Boolean(form.name.trim() && form.format.trim())
+    && swissRoundsValid
+    && onlinePlatformValid
+    && !submitting
+    && canonicalDataAvailable
   const isEditing = Boolean(editingTournament)
-  const showRegistrationQueue = tab === 'upcoming' && !managedTournament
+  const showRegistrationQueue = tab === 'upcoming' && !managedTournament && canonicalDataAvailable
   const selectedTournamentRowId = showRegistrationQueue ? selectedTournament?.rowId : undefined
 
   useEffect(() => {
@@ -1420,11 +1407,19 @@ function TournamentsScreen({
   }, [isEditing, showCreate, tab])
 
   useEffect(() => {
+    if (canonicalDataAvailable) return
+    setShowCreate(false)
+    setDeleteTarget(null)
+    setMediaTournamentKey('')
+  }, [canonicalDataAvailable])
+
+  useEffect(() => {
     setManageTournamentKey('')
   }, [tab])
 
   useEffect(() => {
     let alive = true
+    let inFlight = false
 
     async function loadQueue(showLoading = false) {
       if (!selectedTournamentRowId) {
@@ -1432,28 +1427,42 @@ function TournamentsScreen({
         setRegistrationsLoading(false)
         return
       }
+      if (inFlight) return
 
+      inFlight = true
       if (showLoading) setRegistrationsLoading(true)
-      const result = await loadTournamentRegistrations(selectedTournamentRowId)
-      if (!alive) return
-      setRegistrations(result.registrations)
-      if (result.error) setMessage('Registration queue is unavailable right now.')
-      setRegistrationsLoading(false)
+      try {
+        const result = await loadTournamentRegistrations(selectedTournamentRowId)
+        if (!alive) return
+        if (result.error) setMessage('Registration queue is unavailable right now. The last verified list is preserved.')
+        else setRegistrations(result.registrations)
+      } finally {
+        inFlight = false
+        if (alive) setRegistrationsLoading(false)
+      }
     }
 
     void loadQueue(true)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void loadQueue()
+    }
     const timer = selectedTournamentRowId
-      ? window.setInterval(() => void loadQueue(), 4_000)
+      ? window.setInterval(refreshWhenVisible, 20_000)
       : undefined
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
 
     return () => {
       alive = false
       if (timer) window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
   }, [selectedTournamentRowId])
 
   useEffect(() => {
     let alive = true
+    let inFlight = false
 
     async function loadManagedRegistrations(showLoading = false) {
       if (!managedTournament?.rowId) {
@@ -1461,24 +1470,36 @@ function TournamentsScreen({
         setManagedRegistrationsLoading(false)
         return
       }
+      if (inFlight) return
 
+      inFlight = true
       if (showLoading) setManagedRegistrationsLoading(true)
-      const result = await loadManagedTournamentParticipantRows(managedTournament.rowId)
-      if (!alive) return
-
-      setManagedRegistrations(result.registrations)
-      if (result.error) setMessage('Tournament participants are unavailable right now.')
-      setManagedRegistrationsLoading(false)
+      try {
+        const result = await loadManagedTournamentParticipantRows(managedTournament.rowId)
+        if (!alive) return
+        if (result.error) setMessage('Tournament participants are unavailable right now. The last verified list is preserved.')
+        else setManagedRegistrations(result.registrations)
+      } finally {
+        inFlight = false
+        if (alive) setManagedRegistrationsLoading(false)
+      }
     }
 
     void loadManagedRegistrations(true)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void loadManagedRegistrations()
+    }
     const timer = managedTournament?.rowId
-      ? window.setInterval(() => void loadManagedRegistrations(), 4_000)
+      ? window.setInterval(refreshWhenVisible, 20_000)
       : undefined
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
 
     return () => {
       alive = false
       if (timer) window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
   }, [managedTournament?.rowId])
 
@@ -1501,7 +1522,14 @@ function TournamentsScreen({
     setTimeIncrement('10')
   }
 
+  function requireCanonicalData() {
+    if (canonicalDataAvailable) return true
+    setMessage('Tournament actions are paused because the canonical cloud snapshot is unavailable. Retry the cloud load first.')
+    return false
+  }
+
   function openCreatePanel() {
+    if (!requireCanonicalData()) return
     if (!createEnabled) {
       setMessage('Create tournament is available only in Draft.')
       return
@@ -1513,6 +1541,7 @@ function TournamentsScreen({
   }
 
   function openEditPanel(item: AdminTournament) {
+    if (!requireCanonicalData()) return
     setEditingTournament(item)
     setCreateStep(0)
     setForm(tournamentToEditForm(item))
@@ -1605,6 +1634,10 @@ function TournamentsScreen({
       advanceCreateWizard()
       return
     }
+    if (!requireCanonicalData()) {
+      setShowCreate(false)
+      return
+    }
     if (!isEditing && !createEnabled) {
       setMessage('Create tournament is available only in Draft.')
       setShowCreate(false)
@@ -1676,6 +1709,7 @@ function TournamentsScreen({
   }
 
   async function handleStatusChange(item: AdminTournament, status: TournamentTab) {
+    if (!requireCanonicalData()) return
     if (!item.rowId) {
       setMessage('Only cloud tournaments can be updated.')
       return
@@ -1699,6 +1733,7 @@ function TournamentsScreen({
   }
 
   function requestTournamentDelete(item: AdminTournament) {
+    if (!requireCanonicalData()) return
     if (!['draft', 'archived'].includes(item.status)) {
       setMessage('Only Draft and Archived tournaments can be deleted.')
       return
@@ -1709,6 +1744,10 @@ function TournamentsScreen({
   }
 
   async function handleTournamentDelete() {
+    if (!requireCanonicalData()) {
+      setDeleteTarget(null)
+      return
+    }
     if (!deleteTarget?.rowId) {
       setMessage('Only cloud tournaments can be deleted.')
       setDeleteTarget(null)
@@ -1732,6 +1771,7 @@ function TournamentsScreen({
   }
 
   function handlePhotos(item: AdminTournament) {
+    if (!requireCanonicalData()) return
     if (!item.rowId) {
       setMessage('Only cloud tournaments can store media.')
       return
@@ -1741,6 +1781,7 @@ function TournamentsScreen({
   }
 
   function handleShufflePairings(item: AdminTournament) {
+    if (!requireCanonicalData()) return
     const key = tournamentKey(item)
     if (item.publishedGames > 0) {
       setMessage(`${item.name} is published. Shuffle is locked.`)
@@ -1752,6 +1793,7 @@ function TournamentsScreen({
   }
 
   async function handlePublishPairings(item: AdminTournament, games: PairingPublishInput[], bracketSnapshot?: string) {
+    if (!requireCanonicalData()) return
     if (!item.rowId) {
       setMessage('Only cloud tournaments can publish pairings.')
       return
@@ -1786,6 +1828,7 @@ function TournamentsScreen({
   }
 
   async function handleUnpublishPairings(item: AdminTournament) {
+    if (!requireCanonicalData()) return
     if (!item.rowId) {
       setMessage('Only cloud tournaments can unpublish pairings.')
       return
@@ -1820,6 +1863,7 @@ function TournamentsScreen({
   }
 
   async function handleRegistrationStatus(item: AdminRegistration, status: AdminRegistrationStatus) {
+    if (!requireCanonicalData()) return
     setRegistrationActionId(item.rowId)
     setMessage(null)
 
@@ -1836,6 +1880,7 @@ function TournamentsScreen({
   }
 
   async function handleAddParticipant(item: AdminTournament, profileId: string) {
+    if (!requireCanonicalData()) return false
     if (!item.rowId) {
       setMessage('Only cloud tournaments can add participants.')
       return false
@@ -1869,6 +1914,7 @@ function TournamentsScreen({
     status?: 'live' | 'completed'
     pgn?: string
   }) {
+    if (!requireCanonicalData()) return
     setSubmitting(true)
     setMessage(null)
 
@@ -1884,6 +1930,7 @@ function TournamentsScreen({
   }
 
   async function handleProcedureConfigure(item: AdminTournament, physicalBoards: number) {
+    if (!requireCanonicalData()) return
     if (!item.rowId) {
       setMessage('Only cloud tournaments can save a procedure plan.')
       return
@@ -1908,6 +1955,7 @@ function TournamentsScreen({
   }
 
   async function handleGameStart(gameId: string, physicalBoard: number) {
+    if (!requireCanonicalData()) return
     setSubmitting(true)
     setMessage(null)
     try {
@@ -1923,6 +1971,11 @@ function TournamentsScreen({
   }
 
   async function handleGamePgn(gameId: string, pgn: string, silent = false) {
+    if (!canonicalDataAvailable) {
+      const error = new Error('Tournament actions are paused because the canonical cloud snapshot is unavailable.')
+      if (!silent) setMessage(error.message)
+      throw error
+    }
     if (!silent) {
       setSubmitting(true)
       setMessage(null)
@@ -1942,6 +1995,7 @@ function TournamentsScreen({
   }
 
   async function handleAdvanceRound(item: AdminTournament) {
+    if (!requireCanonicalData()) return
     if (!item.rowId) {
       setMessage('Only cloud tournaments can advance rounds.')
       return
@@ -1985,7 +2039,7 @@ function TournamentsScreen({
     return (
       <div className="tournament-screen">
         <TournamentManageView
-          disabled={submitting}
+          disabled={submitting || dataSource !== 'cloud'}
           onAddParticipant={handleAddParticipant}
           onAdvanceRound={handleAdvanceRound}
           onBack={() => setManageTournamentKey('')}
@@ -2027,9 +2081,13 @@ function TournamentsScreen({
         <button
           type="button"
           className="primary-button"
-          disabled={!createEnabled}
+            disabled={!createEnabled || submitting}
           onClick={openCreatePanel}
-          title={createEnabled ? 'Create a draft tournament' : 'Switch to Draft to create a tournament'}
+          title={createEnabled
+            ? 'Create a draft tournament'
+            : canonicalDataAvailable
+              ? 'Switch to Draft to create a tournament'
+              : 'Canonical cloud data must load before tournament actions are available'}
         >
           <span>+</span> Create tournament
         </button>
@@ -2270,7 +2328,7 @@ function TournamentsScreen({
       <section className="panel-card table-card">
         {filtered.length ? (
           <TournamentTable
-            disabled={submitting}
+            disabled={submitting || !canonicalDataAvailable}
             onDelete={requestTournamentDelete}
             onEdit={openEditPanel}
             onManage={openManagePanel}
@@ -3377,8 +3435,17 @@ function TournamentFairPlayPanel({
     setLoading(true)
     void refresh()
     if (!active) return
-    const timer = window.setInterval(() => void refresh(), 5_000)
-    return () => window.clearInterval(timer)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    const timer = window.setInterval(refreshWhenVisible, 30_000)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
   }, [active, refresh])
 
   return (
@@ -4621,6 +4688,7 @@ function PlayersScreen({
 }) {
   const [players, setPlayers] = useState<Player[]>([])
   const [playersLoading, setPlayersLoading] = useState(true)
+  const [playersError, setPlayersError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [editPlayer, setEditPlayer] = useState<Player | null>(null)
@@ -4632,9 +4700,15 @@ function PlayersScreen({
   useEffect(() => {
     let alive = true
     void (async () => {
-      const { players: clubPlayers } = await loadClubPlayers()
+      const result = await loadClubPlayers()
       if (!alive) return
-      setPlayers(clubPlayers.map((player) => ({
+      if (result.error) {
+        setPlayersError(result.error)
+        setPlayersLoading(false)
+        return
+      }
+      setPlayersError(null)
+      setPlayers(result.players.map((player) => ({
         id: player.id,
         profileId: player.id,
         name: player.name,
@@ -4645,7 +4719,7 @@ function PlayersScreen({
         rating: player.rating,
         // Per-player win/loss records are not computed yet; show nothing
         // rather than a fabricated record.
-        record: '-',
+        record: 'Not calculated',
         avatarColor: avatarColorFor(player.id),
         avatarUrl: player.avatarUrl,
         coverUrl: player.coverUrl,
@@ -4711,23 +4785,24 @@ function PlayersScreen({
       <div className="table-toolbar">
         <div className="filter-row">
           <label className="inline-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filter by name or ID..." /></label>
-          <select><option>All players</option><option>Swiss</option><option>Single elimination</option></select>
           <span>
             {playersLoading
               ? 'Loading players...'
+              : playersError
+              ? 'Player directory unavailable'
               : `${visiblePlayers.length} of ${players.length} player${players.length === 1 ? '' : 's'}`}
           </span>
         </div>
-        <button type="button" className="primary-button"><span>+</span> Add player</button>
+        <button type="button" className="primary-button" disabled title="Player accounts must currently be created through the verified signup flow."><span>+</span> Add player unavailable</button>
       </div>
 
       {selectedCount ? (
         <div className="selection-bar">
           <strong>{selectedCount} selected</strong>
-          <button type="button" onClick={() => requestPlayerEmail(players.filter((player) => selected[player.id]))}>✉ Message selected</button>
+          <button type="button" disabled={Boolean(playersError)} onClick={() => requestPlayerEmail(players.filter((player) => selected[player.id]))}>✉ Message selected</button>
           <button
             type="button"
-            disabled={deletingPlayers}
+            disabled={Boolean(playersError) || deletingPlayers}
             onClick={() => requestPlayerDelete(players.filter((player) => selected[player.id]))}
           >
             <Trash2 size={15} aria-hidden="true" /> Remove selected
@@ -4737,6 +4812,11 @@ function PlayersScreen({
       ) : null}
 
       {message ? <div className="prototype-note" role="status">{message}</div> : null}
+      {playersError ? (
+        <div className="prototype-note" role="alert">
+          The canonical player directory could not be loaded. Player actions are disabled until it recovers. {playersError}
+        </div>
+      ) : null}
 
       <section className="panel-card table-card">
         <div className="table-scroll">
@@ -4747,7 +4827,6 @@ function PlayersScreen({
                 <th>Name</th>
                 <th>University ID</th>
                 <th>Rating</th>
-                <th>Record</th>
                 <th className="right">Actions</th>
               </tr>
             </thead>
@@ -4773,12 +4852,11 @@ function PlayersScreen({
                   </td>
                   <td className="mono">{player.universityId}</td>
                   <td className="mono"><strong>{player.rating}</strong></td>
-                  <td className="mono">{player.record}</td>
                   <td className="right">
                     <div className="tournament-action-row">
-                      <button type="button" className="mini-button ghost" disabled={!player.email} onClick={() => requestPlayerEmail([player])}>Message</button>
-                      <button type="button" className="mini-button ghost" onClick={() => setEditPlayer(player)}>Edit</button>
-                      <button type="button" className="mini-button ghost danger" disabled={deletingPlayers} onClick={() => requestPlayerDelete([player])}>Remove</button>
+                      <button type="button" className="mini-button ghost" disabled={Boolean(playersError) || !player.email} onClick={() => requestPlayerEmail([player])}>Message</button>
+                      <button type="button" className="mini-button ghost" disabled={Boolean(playersError)} onClick={() => setEditPlayer(player)}>View</button>
+                      <button type="button" className="mini-button ghost danger" disabled={Boolean(playersError) || deletingPlayers} onClick={() => requestPlayerDelete([player])}>Remove</button>
                     </div>
                   </td>
                 </tr>
@@ -4795,12 +4873,6 @@ function PlayersScreen({
           player={editPlayer}
           onClose={() => setEditPlayer(null)}
           onMessage={() => requestPlayerEmail([editPlayer])}
-          onToggleBlock={() => {
-            setPlayers((current) => current.map((player) => (
-              player.id === editPlayer.id ? { ...player, blocked: !player.blocked } : player
-            )))
-            setEditPlayer((current) => current ? { ...current, blocked: !current.blocked } : current)
-          }}
         />
       ) : null}
 
@@ -4861,12 +4933,10 @@ function PlayersScreen({
 function PlayerModal({
   onClose,
   onMessage,
-  onToggleBlock,
   player,
 }: {
   onClose: () => void
   onMessage: () => void
-  onToggleBlock: () => void
   player: Player
 }) {
   const [coverFailed, setCoverFailed] = useState(false)
@@ -4877,8 +4947,6 @@ function PlayerModal({
     ['Email', player.email],
     ['Phone number', player.phone],
     ['Rating', String(player.rating)],
-    ['Record (W-D-L)', player.record],
-    ['Tournaments joined', String(player.tournaments)],
   ]
 
   return (
@@ -4919,9 +4987,6 @@ function PlayerModal({
         </div>
         <div className="modal-actions">
           <button type="button" onClick={onMessage} disabled={!player.email}>✉ Message</button>
-          <button type="button" className="danger-button" onClick={onToggleBlock}>
-            {player.blocked ? 'Unblock player' : 'Block player'}
-          </button>
         </div>
       </section>
     </div>
@@ -5053,196 +5118,34 @@ function BlockList<T extends IdentityBlock | IpBlock>({
 }
 
 function NewsScreen() {
-  const [posts, setPosts] = useState([
-    { id: 'n1', title: 'Summer training camp registration opens July 10', body: 'Members can reserve seats from the app.', date: 'Jul 1, 2026' },
-    { id: 'n2', title: 'Club general assembly and board elections', body: 'Voting opens after Swiss.', date: 'Jun 28, 2026' },
-  ])
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const [imageAttached, setImageAttached] = useState(false)
-
-  function publish() {
-    if (!title.trim()) return
-    setPosts((current) => [{ id: String(Date.now()), title: title.trim(), body: body.trim(), date: 'Jul 6, 2026' }, ...current])
-    setTitle('')
-    setBody('')
-    setImageAttached(false)
-  }
-
   return (
     <div className="news-screen">
       <section className="panel-card">
         <div className="panel-head">
-          <strong>Write a post</strong>
-          <span>Public</span>
+          <strong>News publishing</strong>
+          <span>Not connected</span>
         </div>
-        <p className="muted">Published publicly to the ChessJU app and website - no audience targeting.</p>
+        <p className="muted">Public news publishing is unavailable until it is connected to canonical Appwrite content. Nothing entered here will be presented as published.</p>
         <div className="post-form">
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. JuChess wins the regional final" />
-          <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write the post..." />
-          <button type="button" className="upload-box" onClick={() => setImageAttached(true)}>{imageAttached ? '✓ news-cover.png' : 'Upload cover image'}</button>
-          <button type="button" className="primary-button" onClick={publish}>Publish to app & website</button>
+          <button type="button" className="primary-button" disabled>Publishing unavailable</button>
         </div>
-      </section>
-      <section className="panel-card">
-        <div className="panel-title">Published posts</div>
-        {posts.map((post) => (
-          <article className="post-row" key={post.id}>
-            <span>📰</span>
-            <div>
-              <strong>{post.title}</strong>
-              <p>{post.body}</p>
-              <small>{post.date}</small>
-            </div>
-            <button type="button" className="mini-button ghost" onClick={() => setPosts((current) => current.filter((item) => item.id !== post.id))}>Delete</button>
-          </article>
-        ))}
       </section>
     </div>
   )
 }
 
-const broadcastChannels = [
-  { key: 'app', label: 'App', detail: 'In-app notification feed' },
-  { key: 'email', label: 'Email', detail: 'Send to registered email addresses' },
-  { key: 'sms', label: 'SMS', detail: 'Send to verified phone numbers' },
-] as const
-
-type BroadcastChannel = typeof broadcastChannels[number]['key']
-type AnnouncementAudienceMode = 'all' | 'tournament'
-
-function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournament[] }) {
-  const eligibleTournaments = useMemo(() => (
-    tournaments.filter((item) => item.status === 'upcoming' || item.status === 'active')
-  ), [tournaments])
-  const [audienceMode, setAudienceMode] = useState<AnnouncementAudienceMode>('all')
-  const [selectedTournamentKeys, setSelectedTournamentKeys] = useState<string[]>([])
-  const [channels, setChannels] = useState<Record<BroadcastChannel, boolean>>({
-    app: true,
-    email: true,
-    sms: false,
-  })
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const selectedChannels = broadcastChannels.filter((item) => channels[item.key])
-  const selectedTournaments = eligibleTournaments.filter((item) => selectedTournamentKeys.includes(tournamentKey(item)))
-  const audienceCount = audienceMode === 'all'
-    ? 248
-    : selectedTournaments.reduce((total, item) => total + item.players, 0)
-  const audienceLabel = audienceMode === 'all'
-    ? 'All users'
-    : selectedTournaments.length === 1
-    ? selectedTournaments[0].name
-    : selectedTournaments.length > 1
-    ? `${selectedTournaments.length} tournaments`
-    : 'Tournament audience'
-  const channelLabel = selectedChannels.length
-    ? selectedChannels.map((item) => item.label).join(' + ')
-    : 'No channel selected'
-
-  useEffect(() => {
-    const validKeys = new Set(eligibleTournaments.map((item) => tournamentKey(item)))
-    setSelectedTournamentKeys((current) => current.filter((key) => validKeys.has(key)))
-  }, [eligibleTournaments])
-
-  function toggleChannel(channel: BroadcastChannel) {
-    setChannels((current) => ({
-      ...current,
-      [channel]: !current[channel],
-    }))
-  }
-
-  function toggleTournamentAudience(key: string) {
-    setSelectedTournamentKeys((current) => (
-      current.includes(key)
-        ? current.filter((item) => item !== key)
-        : [...current, key]
-    ))
-  }
-
+function AnnouncementsScreen() {
   return (
     <div className="announcements-screen">
       <section className="panel-card announcement-card">
         <div className="panel-head">
-          <strong>Broadcast composer</strong>
-          <span>{channelLabel}</span>
+          <strong>Broadcast announcements</strong>
+          <span>Not connected</span>
         </div>
-        <div className="audience-choice-row">
-          <button type="button" className={audienceMode === 'all' ? 'active' : undefined} onClick={() => setAudienceMode('all')}>
-            <strong>All users</strong>
-            <small>Send to the full user base</small>
-          </button>
-          <button type="button" className={audienceMode === 'tournament' ? 'active' : undefined} onClick={() => setAudienceMode('tournament')}>
-            <strong>Tournament</strong>
-            <small>Pick upcoming or live tournaments</small>
-          </button>
-        </div>
-        {audienceMode === 'tournament' ? (
-          <div className="tournament-check-list">
-            {eligibleTournaments.length ? eligibleTournaments.map((item) => {
-              const key = tournamentKey(item)
-              const checked = selectedTournamentKeys.includes(key)
-              return (
-                <label className={checked ? 'active' : undefined} key={key}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleTournamentAudience(key)}
-                  />
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>{item.status === 'active' ? 'Live' : 'Upcoming'} · {item.players}/{item.capacity || 'open'} players · {item.format}</small>
-                  </span>
-                </label>
-              )
-            }) : (
-              <div className="empty-row">No upcoming or live tournaments available.</div>
-            )}
-          </div>
-        ) : null}
-        <div className="channel-picker" aria-label="Broadcast delivery channels">
-          {broadcastChannels.map((item) => (
-            <label className={channels[item.key] ? 'active' : undefined} key={item.key}>
-              <input
-                type="checkbox"
-                checked={channels[item.key]}
-                onChange={() => toggleChannel(item.key)}
-              />
-              <span>
-                <strong>{item.label}</strong>
-                <small>{item.detail}</small>
-              </span>
-            </label>
-          ))}
-        </div>
+        <p className="muted">App, email, and SMS broadcasts are unavailable until delivery, audience resolution, and reporting are backed by Appwrite. No message will be shown as sent without a real delivery result.</p>
         <div className="post-form">
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Announcement title" />
-          <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write the message..." />
-          <button type="button" className="primary-button" disabled={!selectedChannels.length || (audienceMode === 'tournament' && !selectedTournaments.length)}>Send announcement</button>
+          <button type="button" className="primary-button" disabled>Broadcasting unavailable</button>
         </div>
-      </section>
-      <section className="panel-card">
-        <div className="panel-title">Delivery status</div>
-        <QueueRow
-          icon="◈"
-          tint="#EAF0FA"
-          label={audienceLabel}
-          count={audienceCount}
-          action={audienceMode === 'all' ? 'All users' : selectedTournaments.length ? 'Selected' : 'Choose'}
-          onClick={() => undefined}
-        />
-        <QueueRow icon="▣" tint="#FBF1E2" label="Selected channels" count={selectedChannels.length} action={selectedChannels.length ? channelLabel : 'Choose'} onClick={() => undefined} />
-        {broadcastChannels.map((item) => (
-          <QueueRow
-            icon={item.key === 'email' ? '✉' : item.key === 'sms' ? '▣' : '◈'}
-            tint={item.key === 'email' ? '#EAF6F0' : item.key === 'sms' ? '#FBF1E2' : '#EAF0FA'}
-            label={`${item.label} channel`}
-            count={channels[item.key] ? 1 : 0}
-            action={channels[item.key] ? 'On' : 'Off'}
-            onClick={() => toggleChannel(item.key)}
-            key={item.key}
-          />
-        ))}
       </section>
     </div>
   )
@@ -5463,7 +5366,7 @@ function buildTournamentPlayers(seed: number, registrations: AdminRegistration[]
       phone: '',
       rating: registration.rating ?? 1200,
       record: '0-0-0',
-      avatarColor: demoPlayers[index % demoPlayers.length]?.avatarColor ?? '#111111',
+      avatarColor: playerAvatarColors[index % playerAvatarColors.length] ?? '#111111',
       tournaments: 1,
     }))
 

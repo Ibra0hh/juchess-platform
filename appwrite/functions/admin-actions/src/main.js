@@ -289,7 +289,8 @@ async function loadPrivateIdentityForProfile(tablesDB, databaseId, profile) {
       tableId: tableIds.profilePrivate,
       rowId: profile.$id,
     });
-  } catch {
+  } catch (cause) {
+    if (Number(cause?.code) !== 404) throw cause;
     // Temporary additive-deployment fallback until every legacy row is moved.
     return legacyIdentityForProfile(profile);
   }
@@ -298,8 +299,14 @@ async function loadPrivateIdentityForProfile(tablesDB, databaseId, profile) {
 async function joinProfilesWithPrivate(tablesDB, databaseId, profiles) {
   let privateRows = [];
   try {
-    privateRows = await listAllRows(tablesDB, databaseId, tableIds.profilePrivate);
-  } catch {
+    privateRows = await listRowsByIds(
+      tablesDB,
+      databaseId,
+      tableIds.profilePrivate,
+      profiles.map((profile) => profile.$id),
+    );
+  } catch (cause) {
+    if (Number(cause?.code) !== 404) throw cause;
     // profile_private can be absent during the additive deployment window.
   }
   const byProfileId = new Map(privateRows.map((row) => [row.$id, row]));
@@ -519,8 +526,8 @@ async function playerEmailProviderStatus(messaging) {
 
 export async function resolvePlayerEmailRecipients(tablesDB, databaseId, profileIds) {
   const [profiles, privateRows] = await Promise.all([
-    listAllRows(tablesDB, databaseId, tableIds.profiles),
-    listAllRows(tablesDB, databaseId, tableIds.profilePrivate),
+    listRowsByIds(tablesDB, databaseId, tableIds.profiles, profileIds),
+    listRowsByIds(tablesDB, databaseId, tableIds.profilePrivate, profileIds),
   ]);
   const profilesById = new Map(profiles.map((profile) => [profile.$id, profile]));
   const privateById = new Map(privateRows.map((identity) => [identity.$id, identity]));
@@ -556,13 +563,13 @@ function isConflict(error) {
 }
 
 async function dispatchAttendanceReminders(tablesDB, messaging, databaseId, nowMs = Date.now()) {
-  const tournamentResponse = await tablesDB.listRows({
+  const tournamentRows = await listRowsPaginated(
+    tablesDB,
     databaseId,
-    tableId: tableIds.tournaments,
-    queries: [Query.equal('status', 'upcoming'), Query.limit(100)],
-    total: false,
-  });
-  const dueTournaments = tournamentResponse.rows.filter((row) => isAttendanceReminderDue(row, nowMs));
+    tableIds.tournaments,
+    [Query.equal('status', 'upcoming')],
+  );
+  const dueTournaments = tournamentRows.filter((row) => isAttendanceReminderDue(row, nowMs));
   if (!dueTournaments.length) {
     return { dueTournaments: 0, prompted: 0, emailSent: 0, pushSent: 0, emailProvider: false, pushProvider: false };
   }
@@ -576,24 +583,21 @@ async function dispatchAttendanceReminders(tablesDB, messaging, databaseId, nowM
   }
   const emailProvider = providers.some((provider) => provider.enabled && provider.type === 'email');
   const pushProvider = providers.some((provider) => provider.enabled && provider.type === 'push');
-  const publicWebUrl = String(process.env.JUCHESS_PUBLIC_WEB_URL ?? 'https://ibra0hh.github.io/juchess-platform/web').replace(/\/$/, '');
+  const publicWebUrl = String(process.env.JUCHESS_PUBLIC_WEB_URL ?? 'https://juchess.page').replace(/\/$/, '');
   const tokenSecret = process.env.ATTENDANCE_TOKEN_SECRET ?? '';
   let prompted = 0;
   let emailSent = 0;
   let pushSent = 0;
 
   for (const tournament of dueTournaments) {
-    const registrations = await tablesDB.listRows({
+    const registrations = await listRowsByTournament(
+      tablesDB,
       databaseId,
-      tableId: tableIds.registrations,
-      queries: [
-        Query.equal('tournamentId', tournament.$id),
-        Query.limit(500),
-      ],
-      total: false,
-    });
+      tableIds.registrations,
+      tournament.$id,
+    );
 
-    for (const registration of registrations.rows.filter((row) => row.status === 'confirmed')) {
+    for (const registration of registrations.filter((row) => row.status === 'confirmed')) {
       let attendance;
       try {
         attendance = await ensureAttendanceConfirmation(tablesDB, databaseId, registration);
@@ -1283,6 +1287,155 @@ function assertPublishedParticipantSet(tournament, games, registrations) {
   }
 
   return { confirmed, published };
+}
+
+function unorderedPairKey(first, second) {
+  return [String(first), String(second)].sort().join('\u0000');
+}
+
+export function assertPublishedPairingStructure(tournament, games, registrations) {
+  const confirmed = [...new Set(registrations.map((row) => row.profileId).filter(Boolean).map(String))];
+  const confirmedSet = new Set(confirmed);
+  const gamesByRound = new Map();
+  const boardKeys = new Set();
+
+  for (const game of games) {
+    const round = Number(game.round);
+    const board = Number(game.board);
+    const white = String(game.whiteProfileId ?? '');
+    const black = String(game.blackProfileId ?? '');
+    if (!Number.isInteger(round) || round < 1 || !Number.isInteger(board) || board < 1) {
+      throw new HttpError(409, 'Published rounds and boards must be positive whole numbers.');
+    }
+    if (!white || !black || white === black) {
+      throw new HttpError(409, 'Every published board must contain two different player identifiers.');
+    }
+    if (game.status !== undefined && game.status !== 'scheduled') {
+      throw new HttpError(409, 'Newly published games must start as scheduled.');
+    }
+    if (game.result !== undefined && game.result !== '*') {
+      throw new HttpError(409, 'Newly published games cannot contain a result.');
+    }
+    if (!confirmedSet.has(white) || (black !== SYSTEM_BYE_PROFILE_ID && !confirmedSet.has(black))) {
+      throw new HttpError(409, 'A published board contains a player who is not confirmed for this tournament.');
+    }
+
+    const key = `${round}:${board}`;
+    if (boardKeys.has(key)) {
+      throw new HttpError(409, `Round ${round} contains duplicate board ${board}.`);
+    }
+    boardKeys.add(key);
+    const roundGames = gamesByRound.get(round) ?? [];
+    roundGames.push({ ...game, round, board, whiteProfileId: white, blackProfileId: black });
+    gamesByRound.set(round, roundGames);
+  }
+
+  const rounds = [...gamesByRound.keys()].sort((a, b) => a - b);
+  if (!rounds.length || rounds.some((round, index) => round !== index + 1)) {
+    throw new HttpError(409, 'Published round numbers must be contiguous and start at round 1.');
+  }
+
+  for (const round of rounds) {
+    const roundGames = gamesByRound.get(round).toSorted((a, b) => a.board - b.board);
+    if (roundGames.some((game, index) => game.board !== index + 1)) {
+      throw new HttpError(409, `Boards in round ${round} must be contiguous and start at board 1.`);
+    }
+    const appearances = new Set();
+    let byes = 0;
+    for (const game of roundGames) {
+      if (appearances.has(game.whiteProfileId)) {
+        throw new HttpError(409, `A player appears more than once in round ${round}.`);
+      }
+      appearances.add(game.whiteProfileId);
+      if (game.blackProfileId === SYSTEM_BYE_PROFILE_ID) {
+        byes += 1;
+      } else {
+        if (appearances.has(game.blackProfileId)) {
+          throw new HttpError(409, `A player appears more than once in round ${round}.`);
+        }
+        appearances.add(game.blackProfileId);
+      }
+    }
+    if (byes > 1) {
+      throw new HttpError(409, `Round ${round} contains more than one bye.`);
+    }
+  }
+
+  if (isRoundRobinTournament(tournament)) {
+    if (games.some((game) => game.blackProfileId === SYSTEM_BYE_PROFILE_ID)) {
+      throw new HttpError(409, 'Round-robin schedules represent the idle player without a bye game row.');
+    }
+    const cycles = isDoubleRoundRobinTournament(tournament) ? 2 : 1;
+    const expectedRoundsPerCycle = confirmed.length % 2 === 0 ? confirmed.length - 1 : confirmed.length;
+    const expectedRounds = expectedRoundsPerCycle * cycles;
+    const expectedGames = (confirmed.length * (confirmed.length - 1) * cycles) / 2;
+    if (rounds.length !== expectedRounds || games.length !== expectedGames) {
+      throw new HttpError(409, 'The round-robin schedule does not contain the complete expected round and game matrix.');
+    }
+    const pairGames = new Map();
+    for (const game of games) {
+      const key = unorderedPairKey(game.whiteProfileId, game.blackProfileId);
+      const values = pairGames.get(key) ?? [];
+      values.push(game);
+      pairGames.set(key, values);
+    }
+    for (let first = 0; first < confirmed.length; first += 1) {
+      for (let second = first + 1; second < confirmed.length; second += 1) {
+        const pair = pairGames.get(unorderedPairKey(confirmed[first], confirmed[second])) ?? [];
+        if (pair.length !== cycles) {
+          throw new HttpError(409, 'Every round-robin opponent pair must appear exactly once per cycle.');
+        }
+        if (cycles === 2 && pair[0].whiteProfileId === pair[1].whiteProfileId) {
+          throw new HttpError(409, 'Double round-robin rematches must reverse White and Black.');
+        }
+      }
+    }
+    return { confirmed, rounds };
+  }
+
+  if (isKnockoutTournament(tournament)) {
+    const snapshot = parsedBracketSnapshot(tournament.bracketSnapshot);
+    const entrants = knockoutEntrantsFromSnapshot(snapshot) ?? [];
+    const expectedType = isDoubleEliminationTournament(tournament) ? 'double' : 'single';
+    if (snapshot?.type !== expectedType) {
+      throw new HttpError(409, `This tournament requires a ${expectedType}-elimination bracket snapshot.`);
+    }
+    if (entrants.length !== confirmed.length || new Set(entrants).size !== entrants.length) {
+      throw new HttpError(409, 'The bracket must contain every confirmed entrant exactly once.');
+    }
+    if (rounds.length !== 1 || games.some((game) => game.blackProfileId === SYSTEM_BYE_PROFILE_ID)) {
+      throw new HttpError(409, 'Knockout publication may contain only the playable first-round games; structural byes stay in the bracket.');
+    }
+    const expectedPairs = openingKnockoutPairs(entrants.length)
+      .filter((pair) => pair.a !== null && pair.b !== null)
+      .map((pair) => unorderedPairKey(entrants[pair.a.e], entrants[pair.b.e]));
+    const actualPairs = games.map((game) => unorderedPairKey(game.whiteProfileId, game.blackProfileId));
+    if (
+      expectedPairs.length !== actualPairs.length
+      || expectedPairs.some((pair) => !actualPairs.includes(pair))
+    ) {
+      throw new HttpError(409, 'The published knockout games do not match the bracket entrant order.');
+    }
+    return { confirmed, rounds, entrants };
+  }
+
+  if (rounds.length !== 1) {
+    throw new HttpError(409, 'This format publishes only its opening round; later rounds are generated from canonical results.');
+  }
+  const openingGames = gamesByRound.get(1);
+  const appearances = openingGames.flatMap((game) => [game.whiteProfileId, game.blackProfileId])
+    .filter((profileId) => profileId !== SYSTEM_BYE_PROFILE_ID);
+  const expectedByeCount = confirmed.length % 2;
+  const actualByeCount = openingGames.filter((game) => game.blackProfileId === SYSTEM_BYE_PROFILE_ID).length;
+  if (
+    appearances.length !== confirmed.length
+    || new Set(appearances).size !== confirmed.length
+    || actualByeCount !== expectedByeCount
+    || openingGames.length !== Math.ceil(confirmed.length / 2)
+  ) {
+    throw new HttpError(409, 'The opening round must schedule every confirmed player exactly once, with one bye only when needed.');
+  }
+  return { confirmed, rounds };
 }
 
 function buildKnockoutSnapshot(structure, entrants, games, names, tournament, options = {}) {
@@ -2217,14 +2370,12 @@ async function advanceTournamentIfReady(tablesDB, databaseId, tournamentId, comp
 }
 
 async function listRowsByTournament(tablesDB, databaseId, tableId, tournamentId) {
-  const response = await tablesDB.listRows({
+  return await listRowsPaginated(
+    tablesDB,
     databaseId,
     tableId,
-    queries: [Query.equal('tournamentId', tournamentId), Query.limit(500)],
-    total: false,
-  });
-
-  return response.rows;
+    [Query.equal('tournamentId', tournamentId)],
+  );
 }
 
 function isDeletableTournamentStatus(status) {
@@ -2261,6 +2412,43 @@ async function deleteTournamentRows(tablesDB, databaseId, tableId, tournamentId)
 }
 
 async function listAllRows(tablesDB, databaseId, tableId) {
+  return await listRowsPaginated(tablesDB, databaseId, tableId);
+}
+
+export function changedCompetitionFields(currentTournament, patch = {}) {
+  const normalized = {
+    format: (value) => normalizeTournamentFormat(value),
+    timeControl: (value) => String(value ?? '').trim(),
+    playMode: (value) => String(value ?? 'inPerson'),
+    onlinePlatform: (value) => String(value ?? ''),
+    roundsTotal: (value) => Number(value) || 0,
+  };
+
+  return Object.entries(normalized)
+    .filter(([field]) => patch[field] !== undefined)
+    .filter(([field, normalize]) => normalize(currentTournament[field]) !== normalize(patch[field]))
+    .map(([field]) => field);
+}
+
+async function listRowsByIds(tablesDB, databaseId, tableId, ids, chunkSize = 100) {
+  const uniqueIds = Array.from(new Set(ids.map((id) => String(id ?? '').trim()).filter(Boolean)));
+  if (!uniqueIds.length) return [];
+
+  const chunks = [];
+  for (let index = 0; index < uniqueIds.length; index += chunkSize) {
+    chunks.push(uniqueIds.slice(index, index + chunkSize));
+  }
+
+  const responses = await Promise.all(chunks.map((chunk) => tablesDB.listRows({
+    databaseId,
+    tableId,
+    queries: [Query.equal('$id', chunk), Query.limit(chunk.length)],
+    total: false,
+  })));
+  return responses.flatMap((response) => response.rows);
+}
+
+async function listRowsPaginated(tablesDB, databaseId, tableId, queries = [], pageSize = 500) {
   const rows = [];
   let cursor;
 
@@ -2268,11 +2456,11 @@ async function listAllRows(tablesDB, databaseId, tableId) {
     const response = await tablesDB.listRows({
       databaseId,
       tableId,
-      queries: [Query.limit(500), ...(cursor ? [Query.cursorAfter(cursor)] : [])],
+      queries: [...queries, Query.limit(pageSize), ...(cursor ? [Query.cursorAfter(cursor)] : [])],
       total: false,
     });
     rows.push(...response.rows);
-    if (response.rows.length < 500) return rows;
+    if (response.rows.length < pageSize) return rows;
     cursor = response.rows[response.rows.length - 1].$id;
   }
 }
@@ -2395,6 +2583,141 @@ async function createTournamentGames(tablesDB, databaseId, tournamentId, games, 
   }
 
   return rows;
+}
+
+function atomicTournamentGameRows(tournament, games, physicalBoards = 3) {
+  const plannedGames = buildProcedureAssignments(games, physicalBoards);
+  const hostedSetup = isJuChessHostedTournament(tournament)
+    ? (() => {
+      const control = parseHostedTimeControl(tournament.timeControl);
+      return {
+        ...hostedGameSchedule(tournament),
+        whiteTimeMs: control.initialMs,
+        blackTimeMs: control.initialMs,
+      };
+    })()
+    : null;
+  const finishedAt = new Date().toISOString();
+
+  return plannedGames.map((game) => {
+    const bye = game.blackProfileId === SYSTEM_BYE_PROFILE_ID;
+    return cleanObject({
+      $id: ID.unique(),
+      $permissions: [Permission.read(Role.any())],
+      tournamentId: tournament.$id,
+      round: Number(game.round),
+      board: Number(game.board),
+      whiteProfileId: String(game.whiteProfileId),
+      blackProfileId: String(game.blackProfileId),
+      status: bye ? 'completed' : 'scheduled',
+      result: bye ? '1-0' : '*',
+      pgn: bye ? 'bye' : undefined,
+      finishedAt: bye ? finishedAt : undefined,
+      ...hostedSetup,
+      procedureWave: game.procedureWave,
+      physicalBoard: game.physicalBoard,
+      queuePosition: game.queuePosition,
+    });
+  });
+}
+
+export async function replaceTournamentPairingsAtomically(
+  tablesDB,
+  databaseId,
+  tournament,
+  games,
+  bracketSnapshot,
+) {
+  const rows = atomicTournamentGameRows(
+    tournament,
+    games,
+    normalizePhysicalBoards(tournament.physicalBoards),
+  );
+  // Appwrite Cloud currently rejects bulk createRows calls inside transactions,
+  // while individual createRow operations with a transactionId are supported.
+  // Keep enough room below the Free-plan 100-operation ceiling for the bulk
+  // delete and tournament metadata update, and fail before opening a transaction
+  // instead of risking a partially published schedule.
+  const maxAtomicGames = 96;
+  if (rows.length > maxAtomicGames) {
+    throw new HttpError(
+      409,
+      `This schedule contains ${rows.length} games. Atomic publication currently supports at most ${maxAtomicGames}; reduce the field or choose a shorter format.`,
+    );
+  }
+  const roundsTotal = Math.max(...games.map((game) => Number(game.round)).filter(Number.isFinite));
+  const transaction = await tablesDB.createTransaction({ ttl: 60 });
+
+  try {
+    await tablesDB.deleteRows({
+      databaseId,
+      tableId: tableIds.games,
+      queries: [Query.equal('tournamentId', tournament.$id)],
+      transactionId: transaction.$id,
+    });
+    const createdRows = [];
+    for (let offset = 0; offset < rows.length; offset += 12) {
+      const batch = rows.slice(offset, offset + 12);
+      const createdBatch = await Promise.all(batch.map((row) => {
+        const { $id: rowId, $permissions: permissions, ...data } = row;
+        return tablesDB.createRow({
+          databaseId,
+          tableId: tableIds.games,
+          rowId,
+          data,
+          permissions,
+          transactionId: transaction.$id,
+        });
+      }));
+      createdRows.push(...createdBatch);
+    }
+    await tablesDB.updateRow({
+      databaseId,
+      tableId: tableIds.tournaments,
+      rowId: tournament.$id,
+      data: cleanObject({
+        currentRound: 1,
+        roundsTotal: roundsTotal > 1 ? roundsTotal : undefined,
+        bracketSnapshot,
+      }),
+      transactionId: transaction.$id,
+    });
+    await tablesDB.updateTransaction({ transactionId: transaction.$id, commit: true });
+    return { rows: createdRows, roundsTotal };
+  } catch (cause) {
+    await tablesDB.updateTransaction({
+      transactionId: transaction.$id,
+      rollback: true,
+    }).catch(() => undefined);
+    throw cause;
+  }
+}
+
+export async function unpublishTournamentPairingsAtomically(tablesDB, databaseId, tournamentId) {
+  const transaction = await tablesDB.createTransaction({ ttl: 60 });
+  try {
+    const deleted = await tablesDB.deleteRows({
+      databaseId,
+      tableId: tableIds.games,
+      queries: [Query.equal('tournamentId', tournamentId)],
+      transactionId: transaction.$id,
+    });
+    await tablesDB.updateRow({
+      databaseId,
+      tableId: tableIds.tournaments,
+      rowId: tournamentId,
+      data: { currentRound: null, bracketSnapshot: null },
+      transactionId: transaction.$id,
+    });
+    await tablesDB.updateTransaction({ transactionId: transaction.$id, commit: true });
+    return deleted.rows.length;
+  } catch (cause) {
+    await tablesDB.updateTransaction({
+      transactionId: transaction.$id,
+      rollback: true,
+    }).catch(() => undefined);
+    throw cause;
+  }
 }
 
 async function startTournamentIfNeeded(tablesDB, databaseId, tournamentId, nextData = {}, currentTournament) {
@@ -3118,7 +3441,7 @@ async function listPlayerGameMessages(tablesDB, databaseId, gameId, profile) {
   const response = await tablesDB.listRows({
     databaseId,
     tableId: tableIds.gameMessages,
-    queries: [Query.equal('gameId', gameId), Query.limit(200)],
+    queries: [Query.equal('gameId', gameId), Query.orderDesc('createdAt'), Query.limit(200)],
     total: false,
   });
   return response.rows
@@ -3163,6 +3486,53 @@ async function sendPlayerGameMessage(tablesDB, databaseId, gameId, body, profile
   });
 }
 
+export function fairPlayHeartbeatRowId(gameId, profileId, sessionId) {
+  const digest = createHash('sha256')
+    .update(`${gameId}:${profileId}:${sessionId}`)
+    .digest('hex')
+    .slice(0, 32);
+  return `fph_${digest}`;
+}
+
+function accumulateFairPlayEvent(groups, event) {
+  const current = groups[event.profileId] ?? {
+    profileId: event.profileId,
+    events: 0,
+    hiddenCount: 0,
+    hiddenDurationMs: 0,
+    fullscreenExits: 0,
+    disconnects: 0,
+    analysisAttempts: 0,
+    lastEventAt: null,
+  };
+  current.events += 1;
+  if (event.eventType === 'tabHidden') current.hiddenCount += 1;
+  if (event.eventType === 'tabVisible') current.hiddenDurationMs += Number(event.durationMs) || 0;
+  if (event.eventType === 'fullscreenExit') current.fullscreenExits += 1;
+  if (event.eventType === 'disconnect') current.disconnects += 1;
+  if (event.eventType === 'analysisAttempt') current.analysisAttempts += 1;
+  if (!current.lastEventAt || String(event.occurredAt) > current.lastEventAt) current.lastEventAt = event.occurredAt;
+  groups[event.profileId] = current;
+}
+
+export function fairPlaySummaries(groups) {
+  return Object.values(groups).map((summary) => {
+    const hiddenTimePoints = Math.min(30, Math.floor(summary.hiddenDurationMs / 10000));
+    const riskScore = Math.min(100, (
+      Math.min(24, summary.hiddenCount * 4)
+      + hiddenTimePoints
+      + Math.min(16, summary.disconnects * 8)
+      + Math.min(10, summary.fullscreenExits * 5)
+      + Math.min(40, summary.analysisAttempts * 40)
+    ));
+    return {
+      ...summary,
+      riskScore,
+      riskLevel: riskScore >= 60 ? 'high' : riskScore >= 30 ? 'medium' : 'low',
+    };
+  }).toSorted((left, right) => right.riskScore - left.riskScore);
+}
+
 async function recordFairPlayEvent(tablesDB, databaseId, gameId, body, profile) {
   const { game } = await loadHostedGameContext(tablesDB, databaseId, gameId, profile);
   const eventType = String(body.eventType ?? '');
@@ -3170,20 +3540,52 @@ async function recordFairPlayEvent(tablesDB, databaseId, gameId, body, profile) 
   const sessionId = String(body.sessionId ?? '').trim().slice(0, 96);
   if (!sessionId) throw new HttpError(400, 'A fair-play session is required.');
   const metadata = body.metadata === undefined ? undefined : JSON.stringify(body.metadata).slice(0, 2000);
+  const data = cleanObject({
+    gameId,
+    tournamentId: game.tournamentId,
+    profileId: profile.$id,
+    sessionId,
+    eventType,
+    durationMs: Math.max(0, Math.min(2147483647, Math.floor(Number(body.durationMs) || 0))),
+    metadata,
+    occurredAt: new Date().toISOString(),
+  });
+  if (eventType === 'heartbeat') {
+    const rowId = fairPlayHeartbeatRowId(gameId, profile.$id, sessionId);
+    try {
+      return await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.fairPlayEvents,
+        rowId,
+        data,
+      });
+    } catch (cause) {
+      if (Number(cause?.code) !== 404) throw cause;
+    }
+    try {
+      return await tablesDB.createRow({
+        databaseId,
+        tableId: tableIds.fairPlayEvents,
+        rowId,
+        data,
+        permissions: [],
+      });
+    } catch (cause) {
+      if (Number(cause?.code) !== 409) throw cause;
+      return await tablesDB.updateRow({
+        databaseId,
+        tableId: tableIds.fairPlayEvents,
+        rowId,
+        data,
+      });
+    }
+  }
+
   return await tablesDB.createRow({
     databaseId,
     tableId: tableIds.fairPlayEvents,
     rowId: ID.unique(),
-    data: cleanObject({
-      gameId,
-      tournamentId: game.tournamentId,
-      profileId: profile.$id,
-      sessionId,
-      eventType,
-      durationMs: Math.max(0, Math.min(2147483647, Math.floor(Number(body.durationMs) || 0))),
-      metadata,
-      occurredAt: new Date().toISOString(),
-    }),
+    data,
     permissions: [],
   });
 }
@@ -3206,25 +3608,26 @@ async function listActiveHostedGamesForPlayer(tablesDB, databaseId, profile) {
     });
     rows = response.rows;
   } catch {
-    const response = await tablesDB.listRows({
-      databaseId,
-      tableId: tableIds.games,
-      queries: [Query.limit(500)],
-      total: false,
-    });
-    rows = response.rows.filter((row) => (
+    const allGames = await listAllRows(tablesDB, databaseId, tableIds.games);
+    rows = allGames.filter((row) => (
       (row.whiteProfileId === profile.$id || row.blackProfileId === profile.$id)
       && (row.status === 'scheduled' || row.status === 'live')
     ));
   }
 
   const active = [];
+  const tournaments = new Map();
   for (const game of rows) {
-    const tournament = await tablesDB.getRow({
-      databaseId,
-      tableId: tableIds.tournaments,
-      rowId: game.tournamentId,
-    }).catch(() => null);
+    let tournamentRequest = tournaments.get(game.tournamentId);
+    if (!tournamentRequest) {
+      tournamentRequest = tablesDB.getRow({
+        databaseId,
+        tableId: tableIds.tournaments,
+        rowId: game.tournamentId,
+      }).catch(() => null);
+      tournaments.set(game.tournamentId, tournamentRequest);
+    }
+    const tournament = await tournamentRequest;
     if (!tournament || tournament.status !== 'active' || !isJuChessHostedTournament(tournament)) continue;
     if (Number(game.round) !== (Number(tournament.currentRound) || 1)) continue;
     const timeout = await syncHostedGameTimeout(tablesDB, databaseId, game, tournament);
@@ -3250,27 +3653,23 @@ function selectActiveHostedGame(activeGames, preferredGameId) {
 }
 
 async function sweepHostedGameDeadlines(tablesDB, databaseId, nowMs = Date.now()) {
-  let response;
+  let rows;
   try {
-    response = await tablesDB.listRows({
+    rows = await listRowsPaginated(
+      tablesDB,
       databaseId,
-      tableId: tableIds.games,
-      queries: [Query.equal('status', ['scheduled', 'live']), Query.limit(500)],
-      total: false,
-    });
+      tableIds.games,
+      [Query.equal('status', ['scheduled', 'live'])],
+    );
   } catch {
-    response = await tablesDB.listRows({
-      databaseId,
-      tableId: tableIds.games,
-      queries: [Query.limit(500)],
-      total: false,
-    });
+    rows = await listAllRows(tablesDB, databaseId, tableIds.games);
   }
 
   const tournaments = new Map();
   let initialized = 0;
   let finished = 0;
-  for (let game of response.rows.filter((row) => row.status === 'scheduled' || row.status === 'live')) {
+  const activeRows = rows.filter((row) => row.status === 'scheduled' || row.status === 'live');
+  for (let game of activeRows) {
     let tournament = tournaments.get(game.tournamentId);
     if (tournament === undefined) {
       tournament = await tablesDB.getRow({
@@ -3310,7 +3709,7 @@ async function sweepHostedGameDeadlines(tablesDB, databaseId, nowMs = Date.now()
     const result = await syncHostedGameTimeout(tablesDB, databaseId, game, tournament, nowMs);
     if (result.expired) finished += 1;
   }
-  return { checked: response.rows.length, finished, initialized };
+  return { checked: activeRows.length, finished, initialized };
 }
 
 async function findTournamentGameByBoard(tablesDB, databaseId, tournamentId, round, board) {
@@ -3367,24 +3766,14 @@ async function setProfileStatus(tablesDB, databaseId, profileId, status) {
 }
 
 async function listBlockRows(tablesDB, databaseId) {
-  const [identityResponse, ipResponse] = await Promise.all([
-    tablesDB.listRows({
-      databaseId,
-      tableId: tableIds.identityBlocks,
-      queries: [Query.limit(500)],
-      total: false,
-    }),
-    tablesDB.listRows({
-      databaseId,
-      tableId: tableIds.ipBlocks,
-      queries: [Query.limit(500)],
-      total: false,
-    }),
+  const [identityBlocks, ipBlocks] = await Promise.all([
+    listAllRows(tablesDB, databaseId, tableIds.identityBlocks),
+    listAllRows(tablesDB, databaseId, tableIds.ipBlocks),
   ]);
 
   return {
-    identityBlocks: identityResponse.rows.toSorted(compareCreatedAtDesc),
-    ipBlocks: ipResponse.rows.toSorted(compareCreatedAtDesc),
+    identityBlocks: identityBlocks.toSorted(compareCreatedAtDesc),
+    ipBlocks: ipBlocks.toSorted(compareCreatedAtDesc),
   };
 }
 
@@ -3438,13 +3827,18 @@ async function requirePlayerActor(req, tablesDB, databaseId) {
     });
     if (response.rows[0]) {
       identity = response.rows[0];
-      profile = await tablesDB.getRow({
-        databaseId,
-        tableId: tableIds.profiles,
-        rowId: response.rows[0].$id,
-      }).catch(() => null);
+      try {
+        profile = await tablesDB.getRow({
+          databaseId,
+          tableId: tableIds.profiles,
+          rowId: response.rows[0].$id,
+        });
+      } catch (cause) {
+        if (Number(cause?.code) !== 404) throw cause;
+      }
     }
-  } catch {
+  } catch (cause) {
+    if (Number(cause?.code) !== 404) throw cause;
     // Temporary fallback for executions during the additive migration.
   }
   if (!profile) {
@@ -3457,9 +3851,8 @@ async function requirePlayerActor(req, tablesDB, databaseId) {
       });
       profile = legacy.rows[0] ?? null;
       identity = legacyIdentityForProfile(profile);
-    } catch {
-      profile = null;
-      identity = null;
+    } catch (cause) {
+      if (Number(cause?.code) !== 404) throw cause;
     }
   }
   if (!profile) throw new HttpError(403, 'No JuChess player profile exists for this account.');
@@ -3470,7 +3863,17 @@ async function requirePlayerActor(req, tablesDB, databaseId) {
   return profile;
 }
 
-async function requireAdminActor(req, tablesDB, databaseId) {
+export function isConfirmedAdminMembership(membership, accountId, teamId) {
+  return Boolean(
+    membership
+    && membership.userId === accountId
+    && membership.teamId === teamId
+    && membership.confirm === true
+    && membership.joined,
+  );
+}
+
+async function requireAdminActor(req, tablesDB, databaseId, teams) {
   const accountId = await getAuthenticatedAccountId(req);
   const profile = await loadAdminProfile(tablesDB, databaseId, accountId);
   if (!profile) {
@@ -3483,6 +3886,24 @@ async function requireAdminActor(req, tablesDB, databaseId) {
 
   if (!['superAdmin', 'admin', 'organizer'].includes(profile.role)) {
     throw new HttpError(403, 'This admin role is not allowed.');
+  }
+
+  const expectedTeamId = adminTeamForRole(profile.role);
+  if (profile.teamId !== expectedTeamId || !profile.membershipId) {
+    throw new HttpError(403, 'This admin profile is not linked to its required Appwrite team membership.');
+  }
+
+  let membership = null;
+  try {
+    membership = await teams.getMembership({
+      teamId: expectedTeamId,
+      membershipId: profile.membershipId,
+    });
+  } catch (cause) {
+    if (Number(cause?.code) !== 404) throw cause;
+  }
+  if (!isConfirmedAdminMembership(membership, accountId, expectedTeamId)) {
+    throw new HttpError(403, 'This account is no longer an active member of the required admin team.');
   }
 
   return profile;
@@ -3702,7 +4123,7 @@ export default async ({ req, res, log, error }) => {
       return res.json({ ok: true, action: 'recordFairPlayEvent', event });
     }
 
-    const actor = await requireAdminActor(req, tablesDB, databaseId);
+    const actor = await requireAdminActor(req, tablesDB, databaseId, teams);
 
     if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'session' && segments.length === 2) {
       return res.json({ ok: true, allowed: true, profile: actor });
@@ -3741,54 +4162,32 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (method === 'POST' && segments[0] === 'fair-play' && segments[1] === 'report') {
-      const queries = [Query.limit(500)];
-      if (body.gameId) queries.unshift(Query.equal('gameId', String(body.gameId)));
-      else if (body.tournamentId) queries.unshift(Query.equal('tournamentId', String(body.tournamentId)));
+      const queries = [];
+      if (body.gameId) queries.push(Query.equal('gameId', String(body.gameId)));
+      else if (body.tournamentId) queries.push(Query.equal('tournamentId', String(body.tournamentId)));
       else throw new HttpError(400, 'Choose a game or tournament for the fair-play report.');
-      const response = await tablesDB.listRows({
-        databaseId,
-        tableId: tableIds.fairPlayEvents,
-        queries,
-        total: false,
-      });
-      const byProfile = Object.values(response.rows.reduce((groups, event) => {
-        const current = groups[event.profileId] ?? {
-          profileId: event.profileId,
-          events: 0,
-          hiddenCount: 0,
-          hiddenDurationMs: 0,
-          fullscreenExits: 0,
-          disconnects: 0,
-          analysisAttempts: 0,
-          lastEventAt: null,
-        };
-        current.events += 1;
-        if (event.eventType === 'tabHidden') {
-          current.hiddenCount += 1;
-        }
-        if (event.eventType === 'tabVisible') current.hiddenDurationMs += Number(event.durationMs) || 0;
-        if (event.eventType === 'fullscreenExit') current.fullscreenExits += 1;
-        if (event.eventType === 'disconnect') current.disconnects += 1;
-        if (event.eventType === 'analysisAttempt') current.analysisAttempts += 1;
-        if (!current.lastEventAt || String(event.occurredAt) > current.lastEventAt) current.lastEventAt = event.occurredAt;
-        groups[event.profileId] = current;
-        return groups;
-      }, {})).map((summary) => {
-        const hiddenTimePoints = Math.min(30, Math.floor(summary.hiddenDurationMs / 10000));
-        const riskScore = Math.min(100, (
-          Math.min(24, summary.hiddenCount * 4)
-          + hiddenTimePoints
-          + Math.min(16, summary.disconnects * 8)
-          + Math.min(10, summary.fullscreenExits * 5)
-          + Math.min(40, summary.analysisAttempts * 40)
-        ));
-        return {
-          ...summary,
-          riskScore,
-          riskLevel: riskScore >= 60 ? 'high' : riskScore >= 30 ? 'medium' : 'low',
-        };
-      }).toSorted((left, right) => right.riskScore - left.riskScore);
-      return res.json({ ok: true, action: 'fairPlayReport', events: response.rows, byProfile });
+      const groups = {};
+      let cursor;
+      const pageSize = 500;
+      do {
+        const response = await tablesDB.listRows({
+          databaseId,
+          tableId: tableIds.fairPlayEvents,
+          queries: [
+            ...queries,
+            Query.select(['profileId', 'eventType', 'durationMs', 'occurredAt']),
+            Query.limit(pageSize),
+            ...(cursor ? [Query.cursorAfter(cursor)] : []),
+          ],
+          total: false,
+        });
+        response.rows.forEach((event) => accumulateFairPlayEvent(groups, event));
+        if (response.rows.length < pageSize) break;
+        const nextCursor = response.rows.at(-1)?.$id;
+        if (!nextCursor || nextCursor === cursor) throw new Error('Fair-play report pagination did not advance.');
+        cursor = nextCursor;
+      } while (cursor);
+      return res.json({ ok: true, action: 'fairPlayReport', byProfile: fairPlaySummaries(groups) });
     }
 
     if (method === 'GET' && segments[0] === 'players' && segments[1] === 'email' && segments[2] === 'status') {
@@ -3926,14 +4325,7 @@ export default async ({ req, res, log, error }) => {
         return res.json({ ok: true, rows: [] });
       }
 
-      const response = await tablesDB.listRows({
-        databaseId,
-        tableId: tableIds.profiles,
-        queries: [Query.limit(500)],
-        total: false,
-      });
-
-      const profiles = response.rows.filter((row) => ids.includes(row.$id));
+      const profiles = await listRowsByIds(tablesDB, databaseId, tableIds.profiles, ids);
       const rows = await joinProfilesWithPrivate(tablesDB, databaseId, profiles);
       return res.json({ ok: true, rows });
     }
@@ -3941,14 +4333,9 @@ export default async ({ req, res, log, error }) => {
     if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'admins' && segments.length === 2) {
       requireSuperAdmin(actor);
 
-      const response = await tablesDB.listRows({
-        databaseId,
-        tableId: tableIds.adminProfiles,
-        queries: [Query.limit(500)],
-        total: false,
-      });
+      const admins = await listAllRows(tablesDB, databaseId, tableIds.adminProfiles);
 
-      return res.json({ ok: true, admins: response.rows.toSorted(compareCreatedAtDesc) });
+      return res.json({ ok: true, admins: admins.toSorted(compareCreatedAtDesc) });
     }
 
     if (method === 'POST' && segments[0] === 'admin' && segments[1] === 'admins' && segments.length === 2) {
@@ -4200,7 +4587,7 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (method === 'POST' && segments[0] === 'tournaments' && segments.length === 1) {
-      const missing = requireFields(body, ['slug', 'name', 'format', 'timeControl', 'status']);
+      const missing = requireFields(body, ['slug', 'name', 'format', 'timeControl']);
       if (missing.length > 0) {
         return badRequest(res, 'Missing required tournament fields.', { missing });
       }
@@ -4215,7 +4602,9 @@ export default async ({ req, res, log, error }) => {
         data: cleanObject({
           slug: body.slug,
           name: body.name,
-          status: body.status,
+          // Tournament creation is intentionally incapable of bypassing the
+          // Draft lifecycle, even when a caller supplies another status.
+          status: 'draft',
           format: body.format,
           timeControl: body.timeControl,
           roundsTotal,
@@ -4244,6 +4633,21 @@ export default async ({ req, res, log, error }) => {
         tableId: tableIds.tournaments,
         rowId: segments[1],
       });
+      const competitionChanges = changedCompetitionFields(currentTournament, body);
+      if (competitionChanges.length && currentTournament.status !== 'draft') {
+        const publishedGames = await listRowsByTournament(
+          tablesDB,
+          databaseId,
+          tableIds.games,
+          segments[1],
+        );
+        if (publishedGames.length || currentTournament.status !== 'upcoming') {
+          throw new HttpError(
+            409,
+            `Unpublish pairings and return the tournament to Draft before changing ${competitionChanges.join(', ')}.`,
+          );
+        }
+      }
       const onlinePlatform = body.playMode === undefined && body.onlinePlatform === undefined
         ? undefined
         : validateTournamentOnlinePlatform(playMode ?? currentTournament.playMode, body.onlinePlatform ?? currentTournament.onlinePlatform);
@@ -4332,18 +4736,21 @@ export default async ({ req, res, log, error }) => {
         throw new HttpError(409, 'Opening pairings can be published only while the tournament is Upcoming.');
       }
 
-      const existing = await tablesDB.listRows({
+      const existing = await listRowsByTournament(
+        tablesDB,
         databaseId,
-        tableId: tableIds.games,
-        queries: [Query.equal('tournamentId', tournamentId), Query.limit(500)],
-        total: false,
-      });
+        tableIds.games,
+        tournamentId,
+      );
 
-      const startedGame = existing.rows.find((row) => (
+      const startedGame = existing.find((row) => (
         row.blackProfileId !== SYSTEM_BYE_PROFILE_ID && row.status !== 'scheduled'
       ));
       if (startedGame) {
         throw new HttpError(409, 'Pairings cannot be replaced after a game has started.');
+      }
+      if (existing.length > 0) {
+        throw new HttpError(409, 'Pairings are already published. Unpublish them before publishing a new schedule.');
       }
 
       const registrations = await listConfirmedRegistrations(tablesDB, databaseId, tournamentId);
@@ -4352,56 +4759,43 @@ export default async ({ req, res, log, error }) => {
         games,
         registrations,
       );
-
-      for (const row of existing.rows) {
-        await tablesDB.deleteRow({
-          databaseId,
-          tableId: tableIds.games,
-          rowId: row.$id,
-        });
+      const structure = assertPublishedPairingStructure(
+        { ...tournament, bracketSnapshot },
+        games,
+        registrations,
+      );
+      let canonicalBracketSnapshot = bracketSnapshot;
+      if (isKnockoutTournament(tournament)) {
+        const entrants = structure.entrants;
+        const bracket = buildKnockoutStructure(
+          entrants.length,
+          isDoubleEliminationTournament(tournament),
+        );
+        const names = await loadProfileNames(tablesDB, databaseId, entrants);
+        canonicalBracketSnapshot = buildKnockoutSnapshot(
+          bracket,
+          entrants,
+          games,
+          names,
+          tournament,
+        );
       }
 
-      const rows = await createTournamentGames(
+      const published = await replaceTournamentPairingsAtomically(
         tablesDB,
         databaseId,
-        tournamentId,
+        tournament,
         games,
-        normalizePhysicalBoards(tournament.physicalBoards),
+        canonicalBracketSnapshot,
       );
-
-      for (const row of rows) {
-        if (row.blackProfileId !== SYSTEM_BYE_PROFILE_ID) continue;
-        await tablesDB.updateRow({
-          databaseId,
-          tableId: tableIds.games,
-          rowId: row.$id,
-          data: {
-            status: 'completed',
-            result: '1-0',
-            pgn: 'bye',
-            finishedAt: new Date().toISOString(),
-          },
-        });
-      }
-
-      const roundsTotal = Math.max(...games.map((game) => Number(game.round)).filter(Number.isFinite));
-      await tablesDB.updateRow({
-        databaseId,
-        tableId: tableIds.tournaments,
-        rowId: tournamentId,
-        data: cleanObject({
-          currentRound: 1,
-          roundsTotal: roundsTotal > 1 ? roundsTotal : undefined,
-          bracketSnapshot,
-        }),
-      }).catch(() => undefined);
+      const { rows, roundsTotal } = published;
 
       await writeAudit(tablesDB, databaseId, {
         actorProfileId: actor.$id,
         action: 'publishTournamentPairings',
         targetTable: tableIds.tournaments,
         targetRowId: tournamentId,
-        payload: { games: rows.length, roundsTotal, bracketSnapshot: Boolean(bracketSnapshot) },
+        payload: { games: rows.length, roundsTotal, bracketSnapshot: Boolean(canonicalBracketSnapshot) },
       });
 
       return res.json({ ok: true, action: 'publishTournamentPairings', rows });
@@ -4419,44 +4813,34 @@ export default async ({ req, res, log, error }) => {
         throw new HttpError(409, 'Pairings can be unpublished only while the tournament is Upcoming.');
       }
 
-      const existing = await tablesDB.listRows({
+      const existing = await listRowsByTournament(
+        tablesDB,
         databaseId,
-        tableId: tableIds.games,
-        queries: [Query.equal('tournamentId', tournamentId), Query.limit(500)],
-        total: false,
-      });
+        tableIds.games,
+        tournamentId,
+      );
 
-      const startedGame = existing.rows.find((row) => (
+      const startedGame = existing.find((row) => (
         row.blackProfileId !== SYSTEM_BYE_PROFILE_ID && row.status !== 'scheduled'
       ));
       if (startedGame) {
         throw new HttpError(409, 'Pairings cannot be unpublished after a game has started.');
       }
 
-      for (const row of existing.rows) {
-        await tablesDB.deleteRow({
-          databaseId,
-          tableId: tableIds.games,
-          rowId: row.$id,
-        });
-      }
-
-      await tablesDB.updateRow({
+      const deleted = await unpublishTournamentPairingsAtomically(
+        tablesDB,
         databaseId,
-        tableId: tableIds.tournaments,
-        rowId: tournamentId,
-        data: { currentRound: null, bracketSnapshot: null },
-      }).catch(() => undefined);
+        tournamentId,
+      );
 
       await writeAudit(tablesDB, databaseId, {
         actorProfileId: actor.$id,
         action: 'unpublishTournamentPairings',
         targetTable: tableIds.tournaments,
         targetRowId: tournamentId,
-        payload: { games: existing.rows.length },
+        payload: { games: deleted },
       });
-
-      return res.json({ ok: true, action: 'unpublishTournamentPairings', deleted: existing.rows.length });
+      return res.json({ ok: true, action: 'unpublishTournamentPairings', deleted });
     }
 
     if (method === 'DELETE' && segments[0] === 'tournaments' && segments[1]) {
@@ -4632,14 +5016,14 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (method === 'GET' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'attendance') {
-      const response = await tablesDB.listRows({
+      const attendance = await listRowsByTournament(
+        tablesDB,
         databaseId,
-        tableId: tableIds.attendance,
-        queries: [Query.equal('tournamentId', segments[1]), Query.limit(500)],
-        total: false,
-      });
+        tableIds.attendance,
+        segments[1],
+      );
 
-      return res.json({ ok: true, action: 'listAttendanceConfirmations', attendance: response.rows });
+      return res.json({ ok: true, action: 'listAttendanceConfirmations', attendance });
     }
 
     if (method === 'POST' && segments[0] === 'tournaments' && segments[1] && segments[2] === 'procedure' && segments[3] === 'configure') {

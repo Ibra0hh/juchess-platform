@@ -19,15 +19,23 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
   const { loading: authLoading, profile, user } = useAuth()
   const accountId = user?.$id ?? null
   const profileId = profile?.$id ?? null
-  const canCheckAssignments = Boolean(accountId && profileId)
+  const assignmentKey = accountId && profileId ? `${accountId}:${profileId}` : null
+  const canCheckAssignments = Boolean(assignmentKey)
   const [activeGame, setActiveGame] = useState<HostedGameRow | null>(null)
   const [activeTournament, setActiveTournament] = useState<HostedTournamentRow | null>(null)
   const [checking, setChecking] = useState(canCheckAssignments)
   const [error, setError] = useState<string | null>(null)
   const requestRef = useRef<Promise<void> | null>(null)
+  const requestKeyRef = useRef<string | null>(null)
+  const requestGenerationRef = useRef(0)
+  const settledAssignmentKeyRef = useRef<string | null>(null)
 
   const refresh = useCallback(async () => {
-    if (!canCheckAssignments) {
+    if (!canCheckAssignments || !assignmentKey) {
+      requestGenerationRef.current += 1
+      requestRef.current = null
+      requestKeyRef.current = null
+      settledAssignmentKeyRef.current = null
       setActiveGame(null)
       setActiveTournament(null)
       setChecking(false)
@@ -35,27 +43,37 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
       clearOnlineTournamentPlayLock()
       return
     }
-    if (requestRef.current) return requestRef.current
+    if (requestRef.current && requestKeyRef.current === assignmentKey) return requestRef.current
+
+    const generation = ++requestGenerationRef.current
+    requestKeyRef.current = assignmentKey
+    if (settledAssignmentKeyRef.current !== assignmentKey) setChecking(true)
 
     const request = (async () => {
       try {
         const currentLock = getOnlineTournamentPlayLock()
         const response = await loadActiveHostedTournamentGame(currentLock?.gameId)
+        if (generation !== requestGenerationRef.current) return
         setActiveGame(response.game)
         setActiveTournament(response.tournament)
         setError(null)
         if (response.game?.$id) setOnlineTournamentPlayLock(response.game.$id)
         else clearOnlineTournamentPlayLock()
       } catch (caught) {
+        if (generation !== requestGenerationRef.current) return
         setError(caught instanceof Error ? caught.message : 'Could not check your tournament assignment.')
       } finally {
-        setChecking(false)
-        requestRef.current = null
+        if (generation === requestGenerationRef.current) {
+          settledAssignmentKeyRef.current = assignmentKey
+          setChecking(false)
+          requestRef.current = null
+          requestKeyRef.current = null
+        }
       }
     })()
     requestRef.current = request
     return request
-  }, [canCheckAssignments])
+  }, [assignmentKey, canCheckAssignments])
 
   useEffect(() => {
     if (authLoading) return
@@ -65,7 +83,9 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!canCheckAssignments) return
-    const timer = window.setInterval(() => void refresh(), ACTIVE_GAME_POLL_MS)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh()
+    }, ACTIVE_GAME_POLL_MS)
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') void refresh()
     }
@@ -96,13 +116,17 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
     }
   }, [accountId, activeGame, profileId, refresh])
 
+  const assignmentChecking = Boolean(
+    assignmentKey
+    && (checking || settledAssignmentKeyRef.current !== assignmentKey),
+  )
   const value = useMemo<TournamentPlayContextValue>(() => ({
     activeGame,
     activeTournament,
-    checking,
+    checking: assignmentChecking,
     error,
     refresh,
-  }), [activeGame, activeTournament, checking, error, refresh])
+  }), [activeGame, activeTournament, assignmentChecking, error, refresh])
 
   return <TournamentPlayContext.Provider value={value}>{children}</TournamentPlayContext.Provider>
 }

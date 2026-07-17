@@ -7,6 +7,7 @@ import SiteHeader from '../components/SiteHeader'
 import UniversityField from '../components/UniversityField'
 import { useAuth } from '../context/useAuth'
 import { formatAppwriteError, profileMediaUrl, type ProfileMediaKind } from '../lib/auth'
+import { compactCrestUrl } from '../lib/brand'
 import { loadProfileGameHistory, type SampleGame } from '../lib/juchess'
 import './ClubScreens.css'
 import './ProfilePage.css'
@@ -24,8 +25,6 @@ type PendingProfileImage = {
   file: File
   kind: ProfileMediaKind
 }
-
-const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 
 function ProfilePage() {
   const navigate = useNavigate()
@@ -166,7 +165,7 @@ function ProfilePage() {
         <main className="member-profile-main">
           <section className="member-profile-guest">
             <div className="member-profile-guest-copy">
-              <img className="member-profile-guest-crest" src={crestUrl} alt="JuChess crest" />
+              <img className="member-profile-guest-crest" src={compactCrestUrl} alt="JuChess crest" />
               <span className="member-profile-guest-label">Member profile</span>
               <h1>Your chess life at JuChess</h1>
               <p>Sign in to manage your club details and open the tournament games connected to you.</p>
@@ -400,7 +399,7 @@ function ProfileStatus({ body, title }: { body: string; title: string }) {
       <main className="member-profile-main">
         <section className="member-profile-guest member-profile-status">
           <div className="member-profile-guest-copy">
-            <img className="member-profile-guest-crest" src={crestUrl} alt="JuChess crest" />
+            <img className="member-profile-guest-crest" src={compactCrestUrl} alt="JuChess crest" />
             <h1>{title}</h1>
             <p>{body}</p>
           </div>

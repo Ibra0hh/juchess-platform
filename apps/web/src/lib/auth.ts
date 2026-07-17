@@ -1,6 +1,6 @@
 import { ExecutionMethod, ID, OAuthProvider, Permission, Query, Role, type Models } from 'appwrite'
-import { account, appwriteConfig, appwriteReady, createPlayerFunctionHeaders, functions, storage, tablesDB } from './appwrite'
-import { tableIds } from './juchess'
+import { account, appwriteConfig, appwriteReady, clearFunctionJwtCache, createPlayerFunctionHeaders, functions, storage, tablesDB } from './appwrite'
+import { publicTableIds } from './tableIds'
 import type { BoardPreferences } from './boardAppearance'
 import { isExistingSessionError } from './authSession'
 import { formatAuthError, isUnknownAccountRecoveryError } from './authErrors'
@@ -152,6 +152,8 @@ async function hydrateCurrentSession(
         await account.deleteSession({ sessionId: 'current' })
       } catch {
         // The session may already be invalid on the cloud side.
+      } finally {
+        clearFunctionJwtCache()
       }
       throw error
     }
@@ -265,6 +267,8 @@ export async function signOutCurrentUser() {
     await account.deleteSession({ sessionId: 'current' })
   } catch (error) {
     if (!isMissingAccountSession(error)) throw error
+  } finally {
+    clearFunctionJwtCache()
   }
 }
 
@@ -301,15 +305,29 @@ export async function completePasswordRecovery(userId: string, secret: string, p
 export async function loadClubLeaderboard(): Promise<PublicProfile[]> {
   if (!appwriteReady) return []
 
-  const response = await tablesDB.listRows<PublicProfile>({
-    databaseId: appwriteConfig.databaseId,
-    tableId: tableIds.profiles,
-    queries: [Query.limit(5000)],
-    total: false,
-    ttl: 30,
-  })
+  const rows: PublicProfile[] = []
+  let cursor: string | undefined
+  const pageSize = 100
+  do {
+    const response = await tablesDB.listRows<PublicProfile>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: publicTableIds.profiles,
+      queries: [
+        Query.equal('status', 'active'),
+        Query.limit(pageSize),
+        ...(cursor ? [Query.cursorAfter(cursor)] : []),
+      ],
+      total: false,
+      ttl: 30,
+    })
+    rows.push(...response.rows)
+    if (response.rows.length < pageSize) break
+    const nextCursor = response.rows.at(-1)?.$id
+    if (!nextCursor || nextCursor === cursor) throw new Error('Leaderboard pagination did not advance.')
+    cursor = nextCursor
+  } while (cursor)
 
-  return response.rows
+  return rows
     .filter((profile) => profile.status === 'active' && !isSeedProfile(profile))
     .sort((left, right) => (
       (right.rating ?? 0) - (left.rating ?? 0)
@@ -498,15 +516,19 @@ async function deleteCurrentSession() {
     await account.deleteSession({ sessionId: 'current' })
   } catch {
     // A failed or expired session is already signed out from the app's perspective.
+  } finally {
+    clearFunctionJwtCache()
   }
 }
 
 async function createEmailPasswordSessionOrReuseCurrent(input: SignInInput) {
   try {
-    return await account.createEmailPasswordSession({
+    const session = await account.createEmailPasswordSession({
       email: input.email,
       password: input.password,
     })
+    clearFunctionJwtCache()
+    return session
   } catch (error) {
     if (!isExistingSessionError(error)) throw error
 
@@ -523,7 +545,9 @@ async function createEmailPasswordSessionOrReuseCurrent(input: SignInInput) {
 
 async function createTokenSessionOrReuseCurrent(userId: string, secret: string) {
   try {
-    return await account.createSession({ userId, secret })
+    const session = await account.createSession({ userId, secret })
+    clearFunctionJwtCache()
+    return session
   } catch (error) {
     if (!isExistingSessionError(error)) throw error
 

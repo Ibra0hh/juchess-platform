@@ -1,5 +1,6 @@
 import { Account, Client, Functions, Realtime, Storage, TablesDB } from 'appwrite'
 import { playerFunctionHeaders } from './functionAuth'
+import { createFunctionJwtCache } from './functionJwt'
 
 export { playerFunctionHeaders } from './functionAuth'
 
@@ -39,15 +40,19 @@ export const storage = new Storage(client)
 export const functions = new Functions(client)
 export const realtime = new Realtime(client)
 
+const functionJwt = createFunctionJwtCache(() => account.createJWT({ duration: 900 }))
+
+export function clearFunctionJwtCache() {
+  functionJwt.clear()
+}
+
 export async function createPlayerFunctionHeaders() {
-  const token = await account.createJWT({ duration: 900 })
-  return playerFunctionHeaders(token.jwt)
+  return playerFunctionHeaders(await functionJwt.get())
 }
 
 export async function createAccountFunctionHeaders() {
-  const token = await account.createJWT({ duration: 900 })
   return {
     'content-type': 'application/json',
-    'juchess-account-jwt': token.jwt,
+    'juchess-account-jwt': await functionJwt.get(),
   }
 }

@@ -3,6 +3,7 @@ import {
   account,
   appwriteConfig,
   appwriteReady,
+  clearFunctionJwtCache,
   createAccountFunctionHeaders,
   functions,
 } from './appwrite'
@@ -77,11 +78,22 @@ export async function resendEmailVerification(
     await sendEmailVerificationChallenge()
     return 'sent'
   } finally {
+    if (!shouldDeleteSession) {
+      try {
+        const currentUser = await account.get()
+        shouldDeleteSession = !currentUser.emailVerification
+          && normalizeAccountEmail(currentUser.email) === normalizeAccountEmail(normalizedEmail)
+      } catch {
+        // No matching session was created, or its state could not be confirmed safely.
+      }
+    }
     if (shouldDeleteSession) {
       try {
         await account.deleteSession({ sessionId: 'current' })
       } catch {
         // An expired or rejected session is already signed out from JuChess's perspective.
+      } finally {
+        clearFunctionJwtCache()
       }
     }
   }
@@ -90,6 +102,7 @@ export async function resendEmailVerification(
 async function createVerificationSession(email: string, password: string) {
   try {
     await account.createEmailPasswordSession({ email, password })
+    clearFunctionJwtCache()
     return { created: true, user: await account.get() }
   } catch (error) {
     if (!isExistingSessionError(error)) throw error

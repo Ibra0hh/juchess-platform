@@ -40,6 +40,7 @@ test('player email template keeps the JuChess theme and escapes admin content', 
 });
 
 test('player email recipients are resolved only from private account identities', async () => {
+  const calls = [];
   const rowsByTable = {
     profiles: [
       { $id: 'player-1', displayName: 'Amina Member', email: 'legacy-public@example.com' },
@@ -51,7 +52,9 @@ test('player email recipients are resolved only from private account identities'
     ],
   };
   const tablesDB = {
-    async listRows({ tableId }) {
+    async listRows(input) {
+      calls.push(input);
+      const { tableId } = input;
       return { rows: rowsByTable[tableId] ?? [] };
     },
   };
@@ -65,4 +68,6 @@ test('player email recipients are resolved only from private account identities'
   ]);
   assert.equal(JSON.stringify(result).includes('private@example.com'), false);
   assert.equal(JSON.stringify(result).includes('legacy-public@example.com'), false);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every((call) => call.queries.length === 2));
 });

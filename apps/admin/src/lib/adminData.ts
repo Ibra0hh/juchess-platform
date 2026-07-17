@@ -1,5 +1,6 @@
 import { ExecutionMethod, ID, Query, type Models } from 'appwrite'
 import { account, appwriteConfig, appwriteReady, functions, storage, tablesDB } from './appwrite'
+import { createAdminJwtCache } from './adminJwt'
 import { tableIds, type TournamentStatus } from './juchess'
 
 export type AdminRole = 'superAdmin' | 'admin' | 'organizer'
@@ -9,6 +10,7 @@ export type RecruitmentStatus = 'submitted' | 'reviewing' | 'shortlisted' | 'int
 
 const tournamentAssetsBucketId = 'tournament-assets'
 const tournamentMediaPrefix = 'ju-media'
+const appwritePageSize = 500
 const profileMediaBucketId = 'avatars'
 
 export type TournamentMedia = {
@@ -356,11 +358,13 @@ export type AdminProfileLoadResult = {
 
 const adminFunctionId = import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions'
 const adminPanelSessionStorageKey = 'juchess:admin-panel-session'
+const adminJwt = createAdminJwtCache(() => account.createJWT({ duration: 900 }))
 
 export async function signInAdmin(email: string, password: string) {
   requireAppwriteReady()
   await clearCurrentSession()
   await account.createEmailPasswordSession({ email, password })
+  adminJwt.clear()
   const session = await getAdminSession()
   if (!session?.allowed) {
     await signOutAdmin().catch(() => undefined)
@@ -372,7 +376,11 @@ export async function signInAdmin(email: string, password: string) {
 
 export async function signOutAdmin() {
   if (!appwriteReady) return
-  await account.deleteSession({ sessionId: 'current' })
+  try {
+    await account.deleteSession({ sessionId: 'current' })
+  } finally {
+    adminJwt.clear()
+  }
 }
 
 async function clearCurrentSession() {
@@ -441,21 +449,13 @@ export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult>
 
   try {
     const [rows, participantCounts, gamesByTournament, standingsByTournament] = await Promise.all([
-      tablesDB.listRows<AppwriteTournamentRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.tournaments,
-        queries: [Query.limit(100)],
-        total: false,
-        // Tournament edits must be reflected immediately after Save changes.
-        // Appwrite list caches are not invalidated by row updates.
-        ttl: 0,
-      }),
+      listAllAdminRows<AppwriteTournamentRow>(tableIds.tournaments),
       loadRegistrationCounts(),
       loadPublishedGamesByTournament(),
       loadStandingsByTournament(),
     ])
 
-    const tournaments = uniqueTournamentsByFormat(rows.rows
+    const tournaments = uniqueTournamentsByFormat(rows
       .map((row) => mapTournament(row, participantCounts, gamesByTournament, standingsByTournament))
       .filter((tournament): tournament is AdminTournament => Boolean(tournament)))
       .sort(compareTournaments)
@@ -564,13 +564,24 @@ export async function submitTournamentGameResult(input: {
 }
 
 export async function listTournamentMedia(tournamentId: string): Promise<TournamentMedia[]> {
-  const response = await storage.listFiles({
-    bucketId: tournamentAssetsBucketId,
-    queries: [Query.limit(500)],
-    total: false,
-  })
+  const files: Models.File[] = []
+  let cursor: string | undefined
+  do {
+    const response = await storage.listFiles({
+      bucketId: tournamentAssetsBucketId,
+      queries: [
+        Query.startsWith('name', `${tournamentMediaPrefix}--${tournamentId}--`),
+        Query.limit(appwritePageSize),
+        ...(cursor ? [Query.cursorAfter(cursor)] : []),
+      ],
+      total: false,
+    })
+    files.push(...response.files)
+    if (response.files.length < appwritePageSize) break
+    cursor = response.files.at(-1)?.$id
+  } while (cursor)
 
-  return response.files
+  return files
     .map(mapTournamentMedia)
     .filter((item): item is TournamentMedia => item?.tournamentId === tournamentId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -692,7 +703,6 @@ export type FairPlayProfileSummary = {
 
 export type FairPlayReport = {
   byProfile: FairPlayProfileSummary[]
-  events: Array<Record<string, unknown>>
 }
 
 export async function loadTournamentFairPlayReport(tournamentId: string) {
@@ -841,19 +851,16 @@ export async function sendPlayerEmail(input: { profileIds: string[]; subject: st
   })
 }
 
-export async function countPendingRegistrations(): Promise<number> {
-  if (!appwriteReady) return 0
+export async function countPendingRegistrations(): Promise<number | null> {
+  if (!appwriteReady) return null
 
   try {
-    const response = await tablesDB.listRows({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.registrations,
-      queries: [Query.equal('status', 'pending'), Query.limit(1000)],
-      total: false,
-    })
-    return response.rows.length
+    return (await listAllAdminRows(
+      tableIds.registrations,
+      [Query.equal('status', 'pending')],
+    )).length
   } catch {
-    return 0
+    return null
   }
 }
 
@@ -930,20 +937,17 @@ export async function loadTournamentRegistrations(tournamentRowId: string): Prom
   if (!appwriteReady || !tournamentRowId) return { registrations: [] }
 
   try {
-    const [response, attendanceRows] = await Promise.all([
-      tablesDB.listRows<AppwriteRegistrationRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.registrations,
-        queries: [Query.equal('tournamentId', tournamentRowId), Query.limit(500)],
-        total: false,
-        ttl: 0,
-      }),
+    const [registrationRows, attendanceRows] = await Promise.all([
+      listAllAdminRows<AppwriteRegistrationRow>(
+        tableIds.registrations,
+        [Query.equal('tournamentId', tournamentRowId)],
+      ),
       loadTournamentAttendance(tournamentRowId),
     ])
-    const profiles = await loadProfilesById(response.rows.map((row) => row.profileId).filter(Boolean) as string[])
+    const profiles = await loadProfilesById(registrationRows.map((row) => row.profileId).filter(Boolean) as string[])
     const attendanceByRegistration = new Map(attendanceRows.map((row) => [row.registrationId, row]))
 
-    const registrations = response.rows
+    const registrations = registrationRows
       .map((row) => mapRegistration(row, profiles, attendanceByRegistration.get(row.$id)))
       .filter((row): row is AdminRegistration => Boolean(row))
 
@@ -1092,15 +1096,9 @@ async function loadRegistrationCounts() {
   const countedPlayers = new Set<string>()
 
   try {
-    const response = await tablesDB.listRows<AppwriteRegistrationRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.registrations,
-      queries: [Query.limit(500)],
-      total: false,
-      ttl: 0,
-    })
+    const rows = await listAllAdminRows<AppwriteRegistrationRow>(tableIds.registrations)
 
-    response.rows.forEach((row) => {
+    rows.forEach((row) => {
       if (!row.tournamentId || row.status !== 'confirmed') return
       const key = `${row.tournamentId}:${row.profileId}`
       if (!row.profileId || countedPlayers.has(key)) return
@@ -1108,7 +1106,7 @@ async function loadRegistrationCounts() {
       counts.set(row.tournamentId, (counts.get(row.tournamentId) ?? 0) + 1)
     })
   } catch (error) {
-    console.warn('Admin registration count read failed.', error)
+    throw new Error('Canonical tournament registrations could not be loaded.', { cause: error })
   }
 
   return counts
@@ -1118,25 +1116,12 @@ async function loadPublishedGamesByTournament() {
   const gamesByTournament = new Map<string, AdminGame[]>()
 
   try {
-    const [gameResponse, profileResponse] = await Promise.all([
-      tablesDB.listRows<AppwriteGameRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.games,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 0,
-      }),
-      tablesDB.listRows<AppwriteProfileRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.profiles,
-        queries: [Query.limit(1000)],
-        total: false,
-        ttl: 0,
-      }),
-    ])
-    const profiles = new Map(profileResponse.rows.map((row) => [row.$id, row]))
+    const gameRows = await listAllAdminRows<AppwriteGameRow>(tableIds.games)
+    const profiles = await loadPublicProfilesById(gameRows.flatMap((row) => (
+      [row.whiteProfileId, row.blackProfileId].filter(Boolean) as string[]
+    )))
 
-    gameResponse.rows.forEach((row) => {
+    gameRows.forEach((row) => {
       if (!row.tournamentId || !row.whiteProfileId || !row.blackProfileId) return
       const white = profiles.get(row.whiteProfileId)
       const black = profiles.get(row.blackProfileId)
@@ -1164,7 +1149,7 @@ async function loadPublishedGamesByTournament() {
       gamesByTournament.set(row.tournamentId, list)
     })
   } catch (error) {
-    console.warn('Admin game read failed.', error)
+    throw new Error('Canonical tournament games or player profiles could not be loaded.', { cause: error })
   }
 
   return new Map(Array.from(gamesByTournament.entries()).map(([tournamentId, games]) => [
@@ -1177,15 +1162,9 @@ async function loadStandingsByTournament() {
   const standingsByTournament = new Map<string, AdminStanding[]>()
 
   try {
-    const response = await tablesDB.listRows<AppwriteStandingRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.standings,
-      queries: [Query.limit(1000)],
-      total: false,
-      ttl: 0,
-    })
+    const rows = await listAllAdminRows<AppwriteStandingRow>(tableIds.standings)
 
-    response.rows.forEach((row) => {
+    rows.forEach((row) => {
       if (!row.tournamentId || !row.profileId) return
       const list = standingsByTournament.get(row.tournamentId) ?? []
       list.push({
@@ -1203,7 +1182,7 @@ async function loadStandingsByTournament() {
       standingsByTournament.set(row.tournamentId, list)
     })
   } catch (error) {
-    console.warn('Admin standings read failed.', error)
+    throw new Error('Canonical tournament standings could not be loaded.', { cause: error })
   }
 
   return new Map(Array.from(standingsByTournament.entries()).map(([tournamentId, standings]) => [
@@ -1231,21 +1210,71 @@ async function loadProfilesById(profileIds: string[]) {
   }
 
   try {
-    const response = await tablesDB.listRows<AppwriteProfileRow>({
+    const chunks = Array.from(
+      { length: Math.ceil(uniqueIds.length / 100) },
+      (_value, index) => uniqueIds.slice(index * 100, (index + 1) * 100),
+    )
+    const responses = await Promise.all(chunks.map((chunk) => tablesDB.listRows<AppwriteProfileRow>({
       databaseId: appwriteConfig.databaseId,
       tableId: tableIds.profiles,
-      queries: [Query.limit(500)],
+      queries: [Query.equal('$id', chunk), Query.limit(chunk.length)],
       total: false,
-    })
-
-    response.rows.forEach((row) => {
-      if (uniqueIds.includes(row.$id)) profiles.set(row.$id, row)
-    })
+    })))
+    responses.flatMap((response) => response.rows).forEach((row) => profiles.set(row.$id, row))
   } catch (error) {
     console.warn('Admin profile lookup for registrations failed.', error)
   }
 
   return profiles
+}
+
+async function loadPublicProfilesById(profileIds: string[]) {
+  const uniqueIds = Array.from(new Set(profileIds.filter((id) => id && id !== 'system_bye')))
+  const profiles = new Map<string, AppwriteProfileRow>()
+  if (!uniqueIds.length) return profiles
+
+  const chunks = Array.from(
+    { length: Math.ceil(uniqueIds.length / 100) },
+    (_value, index) => uniqueIds.slice(index * 100, (index + 1) * 100),
+  )
+  const responses = await Promise.all(chunks.map((chunk) => tablesDB.listRows<AppwriteProfileRow>({
+    databaseId: appwriteConfig.databaseId,
+    tableId: tableIds.profiles,
+    queries: [Query.equal('$id', chunk), Query.limit(chunk.length)],
+    total: false,
+    ttl: 0,
+  })))
+  responses.flatMap((response) => response.rows).forEach((row) => profiles.set(row.$id, row))
+  return profiles
+}
+
+async function listAllAdminRows<T extends Models.Row>(tableId: string, queries: string[] = []) {
+  const rows: T[] = []
+  let cursor: string | undefined
+
+  do {
+    const response = await tablesDB.listRows<T>({
+      databaseId: appwriteConfig.databaseId,
+      tableId,
+      queries: [
+        ...queries,
+        Query.limit(appwritePageSize),
+        ...(cursor ? [Query.cursorAfter(cursor)] : []),
+      ],
+      total: false,
+      // Canonical admin reads must reflect the latest server write.
+      ttl: 0,
+    })
+    rows.push(...response.rows)
+    if (response.rows.length < appwritePageSize) break
+    const nextCursor = response.rows.at(-1)?.$id
+    if (!nextCursor || nextCursor === cursor) {
+      throw new Error(`Could not continue paginating ${tableId}.`)
+    }
+    cursor = nextCursor
+  } while (cursor)
+
+  return rows
 }
 
 function mapTournament(
@@ -1411,7 +1440,7 @@ async function runAdminAction<T>({
   body?: Record<string, unknown>
 }): Promise<T> {
   requireAppwriteReady()
-  const adminJwt = await account.createJWT({ duration: 900 })
+  const jwt = await adminJwt.get()
 
   const execution = await functions.createExecution({
     functionId: adminFunctionId,
@@ -1421,7 +1450,7 @@ async function runAdminAction<T>({
     method,
     headers: {
       'content-type': 'application/json',
-      'juchess-admin-jwt': adminJwt.jwt,
+      'juchess-admin-jwt': jwt,
       'juchess-admin-panel-session': getAdminPanelSessionToken(),
     },
   })

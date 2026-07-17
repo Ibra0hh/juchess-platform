@@ -67,6 +67,8 @@ const EXPORTED = [
   'isDeletableTournamentStatus',
   'assertTournamentStatusTransition',
   'deleteTournamentRows',
+  'listRowsPaginated',
+  'listRowsByIds',
   'assertPlayersCanBeDeleted',
   'assertParticipantCanBeAdded',
   'isCompletePlayerProfile',
@@ -98,6 +100,81 @@ function loadEngine() {
 }
 
 const engine = await loadEngine()
+
+test('paginated table reads preserve filters and return every row', async () => {
+  const calls = []
+  const pages = [
+    { rows: [{ $id: 'row-1' }, { $id: 'row-2' }] },
+    { rows: [{ $id: 'row-3' }] },
+  ]
+  const tablesDB = {
+    async listRows(input) {
+      calls.push(input)
+      return pages[calls.length - 1]
+    },
+  }
+
+  const rows = await engine.listRowsPaginated(tablesDB, 'juchess', 'games', ['status-filter'], 2)
+
+  assert.deepEqual(rows.map((row) => row.$id), ['row-1', 'row-2', 'row-3'])
+  assert.equal(calls.length, 2)
+  assert.equal(calls[0].queries[0], 'status-filter')
+  assert.equal(calls[0].total, false)
+  assert.equal(calls[1].queries[0], 'status-filter')
+})
+
+test('ID-scoped reads deduplicate and batch large lookups', async () => {
+  const calls = []
+  const tablesDB = {
+    async listRows(input) {
+      calls.push(input)
+      return { rows: [{ $id: `batch-${calls.length}` }] }
+    },
+  }
+
+  const rows = await engine.listRowsByIds(
+    tablesDB,
+    'juchess',
+    'profiles',
+    ['profile-1', 'profile-1', 'profile-2', 'profile-3'],
+    2,
+  )
+
+  assert.deepEqual(rows.map((row) => row.$id), ['batch-1', 'batch-2'])
+  assert.equal(calls.length, 2)
+  assert.equal(calls.every((call) => call.total === false), true)
+})
+
+test('fair-play heartbeats use one stable Appwrite-safe row per game, player, and session', () => {
+  const first = engine.fairPlayHeartbeatRowId('game-1', 'player-1', 'session-1')
+  const repeated = engine.fairPlayHeartbeatRowId('game-1', 'player-1', 'session-1')
+  const otherSession = engine.fairPlayHeartbeatRowId('game-1', 'player-1', 'session-2')
+
+  assert.equal(first, repeated)
+  assert.notEqual(first, otherSession)
+  assert.match(first, /^fph_[a-f0-9]{32}$/)
+  assert.ok(first.length <= 36)
+})
+
+test('fair-play summary scoring stays bounded and preserves the latest signal time', () => {
+  const [summary] = engine.fairPlaySummaries({
+    player: {
+      profileId: 'player',
+      events: 9,
+      hiddenCount: 8,
+      hiddenDurationMs: 500_000,
+      fullscreenExits: 3,
+      disconnects: 2,
+      analysisAttempts: 1,
+      lastEventAt: '2026-07-18T12:00:00.000Z',
+    },
+  })
+
+  assert.equal(summary.profileId, 'player')
+  assert.equal(summary.riskScore, 100)
+  assert.equal(summary.riskLevel, 'high')
+  assert.equal(summary.lastEventAt, '2026-07-18T12:00:00.000Z')
+})
 
 test('hosted play requires a complete public and private player profile', () => {
   const profile = { displayName: 'Student Knight', university: 'University of Jordan' }
@@ -822,6 +899,195 @@ test('published pairings must contain exactly the confirmed participants', () =>
     ),
     (error) => error.statusCode === 409 && /no longer match/i.test(error.message),
   )
+})
+
+test('pairing publication rejects duplicate boards and repeated players in a round', () => {
+  const registrations = ['p1', 'p2', 'p3', 'p4'].map((profileId) => ({ profileId }))
+  const tournament = { format: 'Swiss' }
+  const valid = [
+    { round: 1, board: 1, whiteProfileId: 'p1', blackProfileId: 'p2', status: 'scheduled', result: '*' },
+    { round: 1, board: 2, whiteProfileId: 'p3', blackProfileId: 'p4', status: 'scheduled', result: '*' },
+  ]
+
+  assert.doesNotThrow(() => engine.assertPublishedPairingStructure(tournament, valid, registrations))
+  assert.throws(
+    () => engine.assertPublishedPairingStructure(tournament, [valid[0], { ...valid[1], board: 1 }], registrations),
+    /duplicate board/i,
+  )
+  assert.throws(
+    () => engine.assertPublishedPairingStructure(tournament, [valid[0], { ...valid[1], whiteProfileId: 'p1' }], registrations),
+    /more than once/i,
+  )
+  assert.throws(
+    () => engine.assertPublishedPairingStructure(tournament, [{ ...valid[0], round: 0 }, valid[1]], registrations),
+    /positive whole numbers/i,
+  )
+})
+
+test('round-robin publication requires the complete opponent matrix', () => {
+  const players = ['p1', 'p2', 'p3', 'p4']
+  const registrations = players.map((profileId) => ({ profileId }))
+  const schedule = engine.buildRoundRobinSchedule(players, false, { initialColor: 'white' })
+    .map((game) => ({ ...game, status: 'scheduled', result: '*' }))
+
+  assert.doesNotThrow(() => engine.assertPublishedPairingStructure(
+    { format: 'Round Robin' },
+    schedule,
+    registrations,
+  ))
+  assert.throws(
+    () => engine.assertPublishedPairingStructure({ format: 'Round Robin' }, schedule.slice(0, -1), registrations),
+    /complete expected round and game matrix|exactly once/i,
+  )
+
+  const double = engine.buildRoundRobinSchedule(players, true, { initialColor: 'white' })
+    .map((game) => ({ ...game, status: 'scheduled', result: '*' }))
+  double[double.length / 2] = {
+    ...double[double.length / 2],
+    whiteProfileId: double[0].whiteProfileId,
+    blackProfileId: double[0].blackProfileId,
+  }
+  assert.throws(
+    () => engine.assertPublishedPairingStructure({ format: 'Double Round Robin' }, double, registrations),
+    /more than once|rematches must reverse|opponent pair/i,
+  )
+})
+
+test('knockout publication is bound to the canonical bracket entrant order', () => {
+  const entrants = ['p1', 'p2', 'p3', 'p4']
+  const registrations = entrants.map((profileId) => ({ profileId }))
+  const structure = engine.buildKnockoutStructure(entrants.length, false)
+  const games = engine.openingKnockoutPairs(entrants.length).map((pair, index) => ({
+    round: 1,
+    board: index + 1,
+    whiteProfileId: entrants[pair.a.e],
+    blackProfileId: entrants[pair.b.e],
+    status: 'scheduled',
+    result: '*',
+  }))
+  const names = new Map(entrants.map((id) => [id, id]))
+  const bracketSnapshot = engine.buildKnockoutSnapshot(
+    structure,
+    entrants,
+    games,
+    names,
+    { format: 'Single Elimination' },
+  )
+
+  assert.doesNotThrow(() => engine.assertPublishedPairingStructure(
+    { format: 'Single Elimination', bracketSnapshot },
+    games,
+    registrations,
+  ))
+  assert.throws(
+    () => engine.assertPublishedPairingStructure(
+      { format: 'Single Elimination', bracketSnapshot },
+      [{ ...games[0], blackProfileId: 'p3' }, games[1]],
+      registrations,
+    ),
+    /more than once|do not match/i,
+  )
+})
+
+test('atomic pairing replacement rolls back instead of reporting a partial publish', async () => {
+  const transactionUpdates = []
+  const tablesDB = {
+    createTransaction: async () => ({ $id: 'tx1' }),
+    deleteRows: async () => ({ rows: [] }),
+    createRow: async ({ rowId, data, permissions }) => ({ $id: rowId, ...data, $permissions: permissions }),
+    updateRow: async () => { throw Object.assign(new Error('metadata write failed'), { code: 500 }) },
+    updateTransaction: async (input) => { transactionUpdates.push(input); return input },
+  }
+
+  await assert.rejects(
+    () => engine.replaceTournamentPairingsAtomically(
+      tablesDB,
+      'juchess',
+      { $id: 't1', format: 'Swiss', timeControl: '5+0', playMode: 'inPerson', physicalBoards: 3 },
+      [{ round: 1, board: 1, whiteProfileId: 'p1', blackProfileId: 'p2' }],
+      null,
+    ),
+    /metadata write failed/,
+  )
+  assert.deepEqual(transactionUpdates, [{ transactionId: 'tx1', rollback: true }])
+})
+
+test('atomic pairing replacement stages game rows and tournament metadata before commit', async () => {
+  const calls = []
+  const tablesDB = {
+    createTransaction: async (input) => { calls.push(['createTransaction', input]); return { $id: 'tx1' } },
+    deleteRows: async (input) => { calls.push(['deleteRows', input]); return { rows: [] } },
+    createRow: async (input) => { calls.push(['createRow', input]); return { $id: input.rowId, ...input.data } },
+    updateRow: async (input) => { calls.push(['updateRow', input]); return { $id: input.rowId, ...input.data } },
+    updateTransaction: async (input) => { calls.push(['updateTransaction', input]); return input },
+  }
+
+  const result = await engine.replaceTournamentPairingsAtomically(
+    tablesDB,
+    'juchess',
+    { $id: 't1', format: 'Swiss', timeControl: '5+0', playMode: 'inPerson', physicalBoards: 3 },
+    [{ round: 1, board: 1, whiteProfileId: 'p1', blackProfileId: 'p2' }],
+    null,
+  )
+
+  assert.equal(result.rows.length, 1)
+  assert.equal(result.roundsTotal, 1)
+  const createCall = calls.find(([name]) => name === 'createRow')[1]
+  assert.equal(createCall.transactionId, 'tx1')
+  assert.equal(createCall.data.tournamentId, 't1')
+  assert.deepEqual(createCall.permissions, ['read("any")'])
+  const metadataCall = calls.find(([name]) => name === 'updateRow')[1]
+  assert.equal(metadataCall.transactionId, 'tx1')
+  assert.equal(metadataCall.data.currentRound, 1)
+  assert.deepEqual(calls.at(-1), ['updateTransaction', { transactionId: 'tx1', commit: true }])
+})
+
+test('atomic pairing replacement rejects schedules above the verified transaction ceiling', async () => {
+  const games = Array.from({ length: 97 }, (_, index) => ({
+    round: index + 1,
+    board: 1,
+    whiteProfileId: `white-${index}`,
+    blackProfileId: `black-${index}`,
+  }))
+  let transactionStarted = false
+
+  await assert.rejects(
+    () => engine.replaceTournamentPairingsAtomically(
+      { createTransaction: async () => { transactionStarted = true; return { $id: 'tx1' } } },
+      'juchess',
+      { $id: 't1', format: 'Swiss', timeControl: '5+0', playMode: 'inPerson', physicalBoards: 1 },
+      games,
+      null,
+    ),
+    /at most 96/i,
+  )
+  assert.equal(transactionStarted, false)
+})
+
+test('admin authorization requires a confirmed membership in the role team', () => {
+  const membership = {
+    userId: 'account-1',
+    teamId: 'admin_super_admins',
+    confirm: true,
+    joined: '2026-07-18T10:00:00.000Z',
+  }
+  assert.equal(engine.isConfirmedAdminMembership(membership, 'account-1', 'admin_super_admins'), true)
+  assert.equal(engine.isConfirmedAdminMembership({ ...membership, confirm: false }, 'account-1', 'admin_super_admins'), false)
+  assert.equal(engine.isConfirmedAdminMembership(membership, 'other-account', 'admin_super_admins'), false)
+  assert.equal(engine.isConfirmedAdminMembership(membership, 'account-1', 'admin_staff'), false)
+})
+
+test('competition-defining fields are detected independently from descriptive edits', () => {
+  const current = {
+    format: 'Swiss',
+    timeControl: '5+0 Blitz',
+    playMode: 'online',
+    onlinePlatform: 'juchess',
+    roundsTotal: 5,
+  }
+  assert.deepEqual(engine.changedCompetitionFields(current, { name: 'New title' }), [])
+  assert.deepEqual(engine.changedCompetitionFields(current, { format: 'Round Robin' }), ['format'])
+  assert.deepEqual(engine.changedCompetitionFields(current, { roundsTotal: 7 }), ['roundsTotal'])
 })
 
 test('round counts', () => {

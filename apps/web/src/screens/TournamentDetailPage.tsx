@@ -6,22 +6,17 @@ import {
   ChevronRight,
   Download,
   Image as ImageIcon,
-  LayoutGrid,
-  List,
   LoaderCircle,
   Play,
-  Search,
   ShieldCheck,
   Trophy,
   X,
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
-import { TournamentMiniBoard } from '../components/TournamentMiniBoard'
 import { useAuth } from '../context/useAuth'
 import {
-  loadTournaments,
-  parseStoredMoves,
+  loadTournamentDetail,
   subscribeToTournamentChanges,
   type Member,
   type PublishedBracketMatch,
@@ -43,8 +38,7 @@ import {
 } from '../lib/registrations'
 import './TournamentDetailPage.css'
 
-type DetailTab = 'registration' | 'players' | 'rounds' | 'games' | 'table' | 'media'
-type GameView = 'grid' | 'list'
+type DetailTab = 'registration' | 'players' | 'rounds' | 'table' | 'media'
 type BracketView = 'winners' | 'losers' | 'final'
 type StageRoundTab = 'stage-one' | 'stage-two'
 
@@ -103,122 +97,25 @@ type BracketConfig =
       brackets: Record<BracketView, BracketDefinition>
     }
 
-const bracketByeName = 'Bye'
-
-const bracketConfigs: Record<string, BracketConfig> = {
-  'single-elimination': {
-    type: 'single',
-    title: 'Single elimination bracket',
-    bracket: {
-      rounds: ['Round of 16', 'Quarterfinal', 'Semifinal', 'Final'],
-      matches: [
-        [
-          { a: 'Ibrahim Ahmad', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
-          { a: 'Hasan Qasem', b: 'Sara Nasser', sa: 0, sb: 1, w: 'b' },
-          { a: 'Leen Haddad', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
-          { a: 'Khaled Mansour', b: 'Yazan Khaled', sa: 0, sb: 1, w: 'b' },
-          { a: 'Omar Saleh', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
-          { a: 'Rania Odeh', b: 'Mohammad Al-Khatib', sa: 0, sb: 1, w: 'b' },
-          { a: 'Amr Zaidan', b: 'Lina Shami', sa: 1, sb: 0, w: 'a' },
-          { a: 'Fadi Rimawi', b: 'Dana Aqel', sa: 0, sb: 1, w: 'b' },
-        ],
-        [
-          { a: 'Ibrahim Ahmad', b: 'Sara Nasser', sa: 1, sb: 0, w: 'a' },
-          { a: 'Leen Haddad', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a' },
-          { a: 'Omar Saleh', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' },
-          { a: 'Amr Zaidan', b: 'Dana Aqel', sa: 0, sb: 1, w: 'b' },
-        ],
-        [
-          { a: 'Ibrahim Ahmad', b: 'Leen Haddad', live: true },
-          { a: 'Omar Saleh', b: 'Dana Aqel', live: true },
-        ],
-        [{ a: 'TBD', b: 'TBD' }],
-      ],
-    },
-  },
-  'double-elimination': {
-    type: 'double',
-    title: 'Double elimination bracket',
-    brackets: {
-      winners: {
-        rounds: ['W-Round of 16', 'W-Quarterfinal', 'W-Semifinal', 'W-Final'],
-        matches: [
-          [
-            { a: 'Ibrahim Ahmad', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
-            { a: 'Sara Nasser', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a' },
-            { a: 'Leen Haddad', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
-            { a: 'Yazan Khaled', b: 'Khaled Mansour', sa: 1, sb: 0, w: 'a' },
-            { a: 'Omar Saleh', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
-            { a: 'Mohammad Al-Khatib', b: 'Rania Odeh', sa: 1, sb: 0, w: 'a' },
-            { a: 'Amr Zaidan', b: 'Lina Shami', sa: 1, sb: 0, w: 'a' },
-            { a: 'Dana Aqel', b: 'Fadi Rimawi', sa: 1, sb: 0, w: 'a' },
-          ],
-          [
-            { a: 'Ibrahim Ahmad', b: 'Sara Nasser', sa: 1, sb: 0, w: 'a' },
-            { a: 'Leen Haddad', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a' },
-            { a: 'Omar Saleh', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' },
-            { a: 'Dana Aqel', b: 'Amr Zaidan', sa: 1, sb: 0, w: 'a' },
-          ],
-          [
-            { a: 'Ibrahim Ahmad', b: 'Leen Haddad', sa: 1, sb: 0, w: 'a' },
-            { a: 'Omar Saleh', b: 'Dana Aqel', sa: 1, sb: 0, w: 'a' },
-          ],
-          [{ a: 'Ibrahim Ahmad', b: 'Omar Saleh', sa: 1, sb: 0, w: 'a' }],
-        ],
-      },
-      losers: {
-        rounds: ['Lower Round 1', 'Lower Round 2', 'Lower Round 3', 'Lower Round 4', 'Lower Round 5', 'Lower Final'],
-        matches: [
-          [
-            { a: 'Zaid Hamdan', b: 'Hasan Qasem', sa: 1, sb: 0, w: 'a', next: 0 },
-            { a: 'Noor Barakat', b: 'Khaled Mansour', sa: 1, sb: 0, w: 'a', next: 1 },
-            { a: 'Tala Suleiman', b: 'Rania Odeh', sa: 1, sb: 0, w: 'a', next: 2 },
-            { a: 'Lina Shami', b: 'Fadi Rimawi', sa: 1, sb: 0, w: 'a', next: 3 },
-          ],
-          [
-            { a: 'Sara Nasser', b: 'Zaid Hamdan', sa: 1, sb: 0, w: 'a' },
-            { a: 'Yazan Khaled', b: 'Noor Barakat', sa: 1, sb: 0, w: 'a' },
-            { a: 'Mohammad Al-Khatib', b: 'Tala Suleiman', sa: 1, sb: 0, w: 'a' },
-            { a: 'Amr Zaidan', b: 'Lina Shami', sa: 1, sb: 0, w: 'a' },
-          ],
-          [
-            { a: 'Sara Nasser', b: 'Yazan Khaled', sa: 1, sb: 0, w: 'a', next: 0 },
-            { a: 'Mohammad Al-Khatib', b: 'Amr Zaidan', sa: 1, sb: 0, w: 'a', next: 1 },
-          ],
-          [
-            { a: 'Leen Haddad', b: 'Sara Nasser', sa: 0, sb: 1, w: 'b' },
-            { a: 'Dana Aqel', b: 'Mohammad Al-Khatib', sa: 0, sb: 1, w: 'b' },
-          ],
-          [{ a: 'Sara Nasser', b: 'Mohammad Al-Khatib', sa: 1, sb: 0, w: 'a' }],
-          [{ a: 'Omar Saleh', b: 'Sara Nasser', live: true }],
-        ],
-      },
-      final: {
-        rounds: ['Grand Final', 'Reset if needed'],
-        matches: [
-          [{ a: 'Ibrahim Ahmad', b: 'Winner Losers Final' }],
-          [{ a: 'Winner Grand Final', b: 'Reset only if needed' }],
-        ],
-      },
-    },
-  },
-}
+const bracketTournamentRouteIds = new Set(['single-elimination', 'double-elimination'])
 
 function TournamentDetailPage() {
   const { id } = useParams()
   const [tab, setTab] = useState<DetailTab>('registration')
-  const [gameView, setGameView] = useState<GameView>('grid')
   const [bracketView, setBracketView] = useState<BracketView>('winners')
-  const [tournaments, setTournaments] = useState<Tournament[]>([])
+  const [tournament, setTournament] = useState<Tournament | null>(null)
   const [loading, setLoading] = useState(true)
   const [cloudError, setCloudError] = useState(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let alive = true
+    setTournament(null)
+    setLoading(true)
+    setCloudError(false)
 
-    loadTournaments().then((result) => {
+    loadTournamentDetail({ slug: id ?? '' }).then((result) => {
       if (!alive) return
-      setTournaments(result.tournaments)
+      setTournament(result.tournament)
       setCloudError(Boolean(result.error))
       setLoading(false)
     })
@@ -226,23 +123,20 @@ function TournamentDetailPage() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [id])
 
   useEffect(() => {
     setBracketView('winners')
   }, [id])
 
-  const tournament = useMemo(
-    () => tournaments.find((item) => item.id === id) || null,
-    [id, tournaments],
-  )
-
   useEffect(() => {
-    if (!tournament?.rowId) return
+    const tournamentId = tournament?.rowId
+    if (!tournamentId) return
     let alive = true
     let unsubscribe: (() => void) | undefined
     let refreshing = false
     let queued = false
+    let realtimeBurstTimer: number | undefined
     const refreshTournament = async () => {
       if (refreshing) {
         queued = true
@@ -251,9 +145,9 @@ function TournamentDetailPage() {
       refreshing = true
       do {
         queued = false
-        const result = await loadTournaments()
+        const result = await loadTournamentDetail({ rowId: tournamentId })
         if (!alive) break
-        if (!result.error) setTournaments(result.tournaments)
+        if (!result.error) setTournament(result.tournament)
         setCloudError(Boolean(result.error))
       } while (alive && queued)
       refreshing = false
@@ -261,13 +155,22 @@ function TournamentDetailPage() {
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') void refreshTournament()
     }
-    const timer = window.setInterval(
-      () => void refreshTournament(),
-      tournament.status === 'Active' ? 2_000 : 5_000,
-    )
+    const refreshAfterRealtimeBurst = () => {
+      if (!alive || document.visibilityState !== 'visible') return
+      if (realtimeBurstTimer !== undefined) window.clearTimeout(realtimeBurstTimer)
+      realtimeBurstTimer = window.setTimeout(() => {
+        realtimeBurstTimer = undefined
+        if (alive && document.visibilityState === 'visible') void refreshTournament()
+      }, 250)
+    }
+    const timer = tournament.status === 'Completed'
+      ? undefined
+      : window.setInterval(() => {
+        if (document.visibilityState === 'visible') void refreshTournament()
+      }, 15_000)
     window.addEventListener('focus', refreshWhenVisible)
     document.addEventListener('visibilitychange', refreshWhenVisible)
-    void subscribeToTournamentChanges(tournament.rowId, () => void refreshTournament())
+    void subscribeToTournamentChanges(tournamentId, refreshAfterRealtimeBurst)
       .then((stop) => {
         if (alive) unsubscribe = stop
         else stop()
@@ -277,7 +180,8 @@ function TournamentDetailPage() {
       })
     return () => {
       alive = false
-      window.clearInterval(timer)
+      if (timer !== undefined) window.clearInterval(timer)
+      if (realtimeBurstTimer !== undefined) window.clearTimeout(realtimeBurstTimer)
       window.removeEventListener('focus', refreshWhenVisible)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
       unsubscribe?.()
@@ -321,14 +225,12 @@ function TournamentDetailPage() {
     ? [
         { key: 'registration', label: 'Registration' },
         { key: 'players', label: 'Players' },
-        { key: 'games', label: 'Games' },
         { key: 'table', label: 'Bracket' },
       ]
     : [
         { key: 'registration', label: 'Registration' },
         { key: 'players', label: 'Players' },
         { key: 'rounds', label: 'Rounds' },
-        { key: 'games', label: 'Games' },
         { key: 'table', label: 'Standings' },
       ]
   if (tournament.status === 'Completed') tabs.push({ key: 'media', label: 'Photos' })
@@ -382,15 +284,11 @@ function TournamentDetailPage() {
         ) : null}
 
         {activeTab === 'players' ? (
-          <PlayersTab standings={detail.standings} />
+          <PlayersTab players={tournament.registeredPlayers ?? []} />
         ) : null}
 
         {activeTab === 'rounds' ? (
           <RoundsTab rounds={detail.rounds} tournament={tournament} />
-        ) : null}
-
-        {activeTab === 'games' ? (
-          <GamesTab games={detail.games} tournament={tournament} view={gameView} setView={setGameView} />
         ) : null}
 
         {activeTab === 'table' ? (
@@ -403,14 +301,14 @@ function TournamentDetailPage() {
         ) : null}
 
         {activeTab === 'media' ? (
-          <TournamentMediaTab items={tournament.media ?? []} />
+          <TournamentMediaTab items={tournament.media ?? []} unavailable={Boolean(tournament.mediaUnavailable)} />
         ) : null}
       </main>
     </div>
   )
 }
 
-function TournamentMediaTab({ items }: { items: TournamentMedia[] }) {
+function TournamentMediaTab({ items, unavailable }: { items: TournamentMedia[]; unavailable: boolean }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const touchStartX = useRef<number | null>(null)
   const activeItem = activeIndex === null ? null : items[activeIndex]
@@ -446,7 +344,13 @@ function TournamentMediaTab({ items }: { items: TournamentMedia[] }) {
         </div>
         <span>{items.length} {items.length === 1 ? 'file' : 'files'}</span>
       </div>
-      {items.length ? (
+      {unavailable ? (
+        <div className="public-media-empty">
+          <ImageIcon size={30} aria-hidden="true" />
+          <strong>Photos unavailable</strong>
+          <span>Tournament photos could not be loaded. Try again shortly.</span>
+        </div>
+      ) : items.length ? (
         <div className="public-media-grid">
           {items.map((item, index) => (
             <article className="public-media-card" key={item.id}>
@@ -576,13 +480,17 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   const [registration, setRegistration] = useState<MyRegistration | null>(null)
   const [attendance, setAttendance] = useState<MyAttendanceConfirmation | null>(null)
   const [registrationLoading, setRegistrationLoading] = useState(false)
+  const [registrationUnavailable, setRegistrationUnavailable] = useState(false)
+  const [resolvedRegistrationKey, setResolvedRegistrationKey] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [attendanceBusy, setAttendanceBusy] = useState<AttendanceStatus | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const registrationLockRef = useRef(false)
+  const registrationLoadGenerationRef = useRef(0)
 
   const tournamentRowId = tournament.rowId
   const profileId = profile?.$id
+  const registrationKey = tournamentRowId && profileId ? `${tournamentRowId}:${profileId}` : null
   const registrationOpen = tournament.status === 'Upcoming'
   const closedTitle = tournament.status === 'Active' ? 'Tournament is live' : 'Registration closed'
   const closedMessage = tournament.status === 'Active'
@@ -590,9 +498,12 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
     : 'This tournament is completed. Registration is no longer available.'
 
   const refreshRegistration = useCallback(async () => {
+    const generation = ++registrationLoadGenerationRef.current
     if (!tournamentRowId || !profileId) {
       setRegistration(null)
       setAttendance(null)
+      setResolvedRegistrationKey(null)
+      setRegistrationUnavailable(false)
       return
     }
 
@@ -602,20 +513,33 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
         loadMyRegistration(tournamentRowId, profileId),
         loadMyAttendance(tournamentRowId, profileId),
       ])
+      if (generation !== registrationLoadGenerationRef.current) return
       setRegistration(nextRegistration)
       setAttendance(nextAttendance)
+      setResolvedRegistrationKey(`${tournamentRowId}:${profileId}`)
+      setRegistrationUnavailable(false)
     } catch {
-      setRegistration(null)
-      setAttendance(null)
+      if (generation !== registrationLoadGenerationRef.current) return
+      setRegistrationUnavailable(true)
     } finally {
-      setRegistrationLoading(false)
+      if (generation === registrationLoadGenerationRef.current) setRegistrationLoading(false)
     }
   }, [profileId, tournamentRowId])
 
   useEffect(() => {
     void refreshRegistration()
-    const timer = window.setInterval(() => void refreshRegistration(), 60_000)
-    return () => window.clearInterval(timer)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshRegistration()
+    }
+    const timer = window.setInterval(refreshWhenVisible, 60_000)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      registrationLoadGenerationRef.current += 1
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
   }, [refreshRegistration])
 
   if (authLoading) {
@@ -680,7 +604,14 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   }
 
   async function handleRegister() {
-    if (!tournamentRowId || !user || !registrationOpen || registrationLockRef.current) return
+    if (
+      !tournamentRowId
+      || !user
+      || !registrationOpen
+      || registrationLockRef.current
+      || registrationUnavailable
+      || resolvedRegistrationKey !== registrationKey
+    ) return
     registrationLockRef.current = true
     setBusy(true)
     setMessage(null)
@@ -700,7 +631,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   }
 
   async function handleCancel() {
-    if (!registration) return
+    if (!registration || registrationUnavailable) return
     setBusy(true)
     setMessage(null)
     try {
@@ -715,7 +646,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   }
 
   async function handleAttendance(status: Exclude<AttendanceStatus, 'pending'>) {
-    if (!registration || attendanceBusy) return
+    if (!registration || attendanceBusy || registrationUnavailable) return
     setAttendanceBusy(status)
     setMessage(null)
     try {
@@ -732,6 +663,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
 
   const status = registration?.status
   const isRegistered = Boolean(registration) && status !== 'cancelled'
+  const registrationChecking = registrationLoading || resolvedRegistrationKey !== registrationKey
 
   const registrationSucceeded = message?.startsWith('Registration received') ?? false
 
@@ -741,7 +673,12 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
         {registrationSucceeded ? <Check size={24} aria-hidden="true" /> : <ShieldCheck size={24} aria-hidden="true" />}
       </div>
       <div className="register-body">
-        {registrationLoading ? (
+        {registrationUnavailable ? (
+          <>
+            <h2>Registration status unavailable</h2>
+            <p>JuChess could not safely confirm your current registration. Actions are paused until the canonical status reloads.</p>
+          </>
+        ) : registrationChecking ? (
           <p>Loading your registration...</p>
         ) : !registrationOpen && !isRegistered ? (
           <>
@@ -778,16 +715,20 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
         {message ? <p className="register-message" role="status">{message}</p> : null}
       </div>
       <div className="register-actions">
-        {!registrationOpen ? null : !isRegistered ? (
+        {registrationUnavailable ? (
+          <button type="button" className="secondary-action" disabled={registrationLoading} onClick={() => void refreshRegistration()}>
+            {registrationLoading ? 'Checking...' : 'Retry'}
+          </button>
+        ) : !registrationOpen ? null : !isRegistered ? (
           <button
             type="button"
             className="primary-action registration-submit"
-            disabled={busy || registrationLoading}
+            disabled={busy || registrationChecking}
             aria-busy={busy}
             onClick={handleRegister}
           >
-            {busy || registrationLoading ? <LoaderCircle className="registration-spinner" size={16} aria-hidden="true" /> : null}
-            {registrationLoading ? 'Checking...' : busy ? 'Registering...' : 'Register'}
+            {busy || registrationChecking ? <LoaderCircle className="registration-spinner" size={16} aria-hidden="true" /> : null}
+            {registrationChecking ? 'Checking...' : busy ? 'Registering...' : 'Register'}
           </button>
         ) : (
           <button type="button" className="secondary-action" disabled={busy} onClick={handleCancel}>
@@ -865,45 +806,41 @@ function AttendancePrompt({
   )
 }
 
-function PlayersTab({ standings }: { standings: StandingRow[] }) {
+function PlayersTab({ players }: { players: Member[] }) {
   return (
     <section className="detail-tab-panel">
       <div className="players-panel">
         <div className="panel-heading">
           <h2>Players</h2>
-          <span>{standings.length} registered</span>
+          <span>{players.length} registered</span>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Player</th>
-              <th>Rating</th>
-              <th>Pts</th>
-              <th>W / D / L</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {standings.map((row) => (
-              <tr key={row.member.id}>
-                <td>{row.rank}</td>
-                <td>
-                  <strong>{row.member.name}</strong>
-                  <small>{row.member.university || 'University not listed'}</small>
-                </td>
-                <td>{row.member.rating}</td>
-                <td>{row.points}</td>
-                <td>
-                  {row.wins} / {row.draws} / {row.losses}
-                </td>
-                <td>
-                  <span className={`table-status ${row.status.toLowerCase()}`}>{row.status}</span>
-                </td>
+        {players.length ? (
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Player</th>
+                <th>Rating</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {players.map((player, index) => (
+                <tr key={player.id}>
+                  <td>{index + 1}</td>
+                  <td>
+                    <strong>{player.name}</strong>
+                    <small>{player.university || 'University not listed'}</small>
+                  </td>
+                  <td>{player.rating}</td>
+                  <td><span className="table-status registered">Registered</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <UnpublishedPanel title="No confirmed players" body="Confirmed registrations will appear here." />
+        )}
       </div>
     </section>
   )
@@ -1011,205 +948,6 @@ function roundAdminStatus(round: RoundGroup, tournament: Tournament) {
   return 'Recorded round'
 }
 
-function GamesTab({
-  games,
-  tournament,
-  view,
-  setView,
-}: {
-  games: TournamentGame[]
-  tournament: Tournament
-  view: GameView
-  setView: (view: GameView) => void
-}) {
-  const [query, setQuery] = useState('')
-  const [roundFilter, setRoundFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'live' | 'finished' | 'scheduled'>('all')
-  const [, setClockTick] = useState(0)
-  const rounds = useMemo(
-    () => [...new Set(games.map((game) => game.round))].sort((left, right) => right - left),
-    [games],
-  )
-  const groupedGames = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    const visible = games.filter((game) => {
-      const matchesQuery = !normalizedQuery || [
-        game.white.name,
-        game.black.name,
-        String(game.board),
-        String(game.round),
-      ].some((value) => value.toLowerCase().includes(normalizedQuery))
-      const matchesRound = roundFilter === 'all' || game.round === Number(roundFilter)
-      const matchesStatus = statusFilter === 'all'
-        || (statusFilter === 'live' && game.status === 'live')
-        || (statusFilter === 'finished' && (game.status === 'completed' || game.status === 'forfeit'))
-        || (statusFilter === 'scheduled' && game.status === 'scheduled')
-      return matchesQuery && matchesRound && matchesStatus
-    })
-    const groups = new Map<number, TournamentGame[]>()
-    visible.forEach((game) => {
-      const roundGames = groups.get(game.round) ?? []
-      roundGames.push(game)
-      groups.set(game.round, roundGames)
-    })
-    return [...groups.entries()]
-      .sort(([left], [right]) => right - left)
-      .map(([round, roundGames]) => ({
-        round,
-        games: roundGames.sort((left, right) => left.board - right.board),
-      }))
-  }, [games, query, roundFilter, statusFilter])
-
-  useEffect(() => {
-    if (!games.some((game) => game.status === 'live')) return
-    const timer = window.setInterval(() => setClockTick((value) => value + 1), 1_000)
-    return () => window.clearInterval(timer)
-  }, [games])
-
-  return (
-    <section className="detail-tab-panel">
-      <div className="games-toolbar">
-        <div>
-          <h2>Games</h2>
-          <p>Watch every board live, then scroll through completed rounds and results.</p>
-        </div>
-        <div className="view-toggle" aria-label="Game view">
-          <button type="button" className={view === 'grid' ? 'active' : undefined} onClick={() => setView('grid')}>
-            <LayoutGrid size={14} aria-hidden="true" />
-            Grid
-          </button>
-          <button type="button" className={view === 'list' ? 'active' : undefined} onClick={() => setView('list')}>
-            <List size={14} aria-hidden="true" />
-            List
-          </button>
-        </div>
-      </div>
-
-      <div className="games-filter-bar">
-        <label className="games-search">
-          <Search size={16} aria-hidden="true" />
-          <span className="sr-only">Search games</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search player, board or round"
-          />
-        </label>
-        <select value={roundFilter} onChange={(event) => setRoundFilter(event.target.value)} aria-label="Filter by round">
-          <option value="all">All rounds</option>
-          {rounds.map((round) => <option value={round} key={round}>Round {round}</option>)}
-        </select>
-        <div className="game-status-filter" aria-label="Filter games by status">
-          {(['all', 'live', 'finished', 'scheduled'] as const).map((status) => (
-            <button
-              type="button"
-              className={statusFilter === status ? 'active' : undefined}
-              onClick={() => setStatusFilter(status)}
-              key={status}
-            >
-              {status === 'all' ? 'All' : status[0].toUpperCase() + status.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {groupedGames.length ? (
-        <div className="tournament-game-rounds">
-          {groupedGames.map((group) => (
-            <section className="tournament-game-round" key={group.round}>
-              <header>
-                <div>
-                  <h3>Round {group.round}</h3>
-                  <span>
-                    {group.round === tournament.currentRound && tournament.status === 'Active'
-                      ? 'Current round · updates live'
-                      : group.games.every((game) => game.status === 'completed' || game.status === 'forfeit')
-                        ? 'Completed'
-                        : 'Published pairings'}
-                  </span>
-                </div>
-                <strong>{group.games.length} {group.games.length === 1 ? 'game' : 'games'}</strong>
-              </header>
-              <div className={`game-card-wrap live-boards ${view}`}>
-                {group.games.map((game) => (
-                  <Link to={`/games?game=${game.id}`} className="game-card live-game-card" key={game.id}>
-                    <span className={`game-state-overlay ${game.status}`}>
-                      {gameStatusLabel(game)}
-                    </span>
-                    <TournamentMiniBoard game={game} />
-                    <div className="game-card-body">
-                      <div>
-                        <span>Board {game.board}</span>
-                        <strong>{game.status === 'live' ? 'Watch live' : `Round ${game.round}`}</strong>
-                      </div>
-                      <div className="game-color-players">
-                        <p>
-                          <span className="tournament-color-chip white">W</span>
-                          <span>{game.white.name}<small>{game.white.rating}</small></span>
-                          <time>{spectatorClockLabel(game, 'white', tournament.timeControl)}</time>
-                        </p>
-                        <p>
-                          <span className="tournament-color-chip black">B</span>
-                          <span>{game.black.name}<small>{game.black.rating}</small></span>
-                          <time>{spectatorClockLabel(game, 'black', tournament.timeControl)}</time>
-                        </p>
-                      </div>
-                      <small>{gameOutcomeLabel(game)}</small>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-      ) : (
-        <UnpublishedPanel
-          title={games.length ? 'No games match these filters' : 'Games not published'}
-          body={games.length ? 'Change the search or filters to see more boards.' : 'Games will appear after the organizer publishes pairings.'}
-        />
-      )}
-    </section>
-  )
-}
-
-function gameStatusLabel(game: TournamentGame) {
-  if (game.status === 'live') return 'Live'
-  if (game.status === 'scheduled') return 'Scheduled'
-  if (game.status === 'forfeit') return 'Forfeit'
-  return game.result
-}
-
-function gameOutcomeLabel(game: TournamentGame) {
-  if (game.status === 'live') return 'Open the board to watch every move'
-  if (game.status === 'scheduled') return game.scheduledStartAt
-    ? `Starts ${new Date(game.scheduledStartAt).toLocaleString()}`
-    : 'Waiting for the round to begin'
-  const reason = game.terminationReason
-    ? game.terminationReason === 'noShow' ? 'no-show'
-      : game.terminationReason.replace(/([A-Z])/g, ' $1').toLowerCase()
-    : ''
-  return `Result ${game.result}${reason ? ` · ${reason}` : ''}`
-}
-
-function spectatorClockLabel(game: TournamentGame, side: 'white' | 'black', timeControl: string) {
-  const stored = side === 'white' ? game.whiteTimeMs : game.blackTimeMs
-  const initialMinutes = Number(timeControl.match(/(\d+(?:\.\d+)?)/)?.[1])
-  const fallback = Number.isFinite(initialMinutes) && initialMinutes > 0
-    ? Math.round(initialMinutes * 60_000)
-    : undefined
-  const base = game.status === 'scheduled' && (!stored || stored <= 0) ? fallback : stored
-  if (base === undefined) return ''
-  const turn = parseStoredMoves(game.pgn).length % 2 === 0 ? 'white' : 'black'
-  const runningSince = game.status === 'live' && turn === side && game.turnStartedAt
-    ? Date.parse(game.turnStartedAt)
-    : Number.NaN
-  const remaining = Number.isFinite(runningSince)
-    ? Math.max(0, base - (Date.now() - runningSince))
-    : base
-  const totalSeconds = Math.ceil(remaining / 1_000)
-  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`
-}
-
 function TableTab({
   bracketView,
   setBracketView,
@@ -1221,21 +959,9 @@ function TableTab({
   standings: StandingRow[]
   tournament: Tournament
 }) {
-  const publishedGames = tournament.publishedGames ?? []
-  const gameBracketConfig = publishedGames.length
-    ? buildTournamentBracketConfig(
-      tournament,
-      standings.map((row) => row.member),
-      publishedGames,
-    )
-    : null
-  const savedBracketConfig = tournament.bracketSnapshot
+  const bracketConfig = tournament.bracketSnapshot
     ? bracketConfigFromPublishedSnapshot(tournament.bracketSnapshot)
     : null
-  // The published snapshot is the source of truth — the server regenerates it
-  // from real results on every advancement. The game-derived config is only a
-  // fallback for brackets published before snapshots existed.
-  const bracketConfig = savedBracketConfig ?? gameBracketConfig
 
   if (isBracketTournament(tournament)) {
     if (bracketConfig) {
@@ -1253,6 +979,14 @@ function TableTab({
     return (
       <section className="detail-tab-panel">
         <UnpublishedPanel title="Bracket not published" body="The bracket will appear after the organizer publishes it in the admin panel." />
+      </section>
+    )
+  }
+
+  if (!standings.length) {
+    return (
+      <section className="detail-tab-panel">
+        <UnpublishedPanel title="Standings not published" body="Standings will appear after the organizer publishes canonical results." />
       </section>
     )
   }
@@ -1294,30 +1028,6 @@ function TableTab({
       </div>
     </section>
   )
-}
-
-function buildTournamentBracketConfig(tournament: Tournament, players: Member[], publishedGames: TournamentGame[]): BracketConfig | null {
-  const bracketPlayers = players.slice(0, effectiveBracketPlayerCount(tournament, players.length))
-  const firstRoundGames = publishedGames.filter((game) => game.round === 1).sort((a, b) => a.board - b.board)
-  if (firstRoundGames.length < 1 || bracketPlayers.length < 2) return null
-
-  if (/double elimination/i.test(tournament.format)) {
-    return {
-      type: 'double',
-      title: 'Double elimination bracket',
-      brackets: buildDoubleEliminationBrackets(tournament, bracketPlayers, firstRoundGames),
-    }
-  }
-
-  if (isBracketTournament(tournament)) {
-    return {
-      type: 'single',
-      title: `${tournament.format} bracket`,
-      bracket: buildSingleEliminationBracket(tournament, bracketPlayers, firstRoundGames),
-    }
-  }
-
-  return null
 }
 
 function bracketConfigFromPublishedSnapshot(snapshot: PublishedBracketSnapshot): BracketConfig | null {
@@ -1382,324 +1092,6 @@ function bracketScoreValue(value?: string) {
   if (value === undefined || value === '') return undefined
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : undefined
-}
-
-function buildSingleEliminationBracket(
-  tournament: Tournament,
-  players: Member[],
-  publishedGames: TournamentGame[] = [],
-  options: { forceActiveRound?: number; matchNumbers?: number[][]; prefix?: string } = {},
-): BracketDefinition {
-  const publishedNames = publishedGames.flatMap((game) => [game.white.name, game.black.name])
-  const names = players.length ? players.map((player) => player.name) : publishedNames
-  const counts = bracketRoundCounts(names.length)
-  const labels = counts.map((count) => prefixedRoundName(count, options.prefix))
-  const activeRound = options.forceActiveRound ?? activeBracketRoundIndex(labels, tournament)
-  const bracketSize = nextPowerOfTwo(names.length)
-  let current = openingBracketNames(names, bracketSize)
-  const gamesByRound = groupTournamentGamesByRound(publishedGames)
-
-  const matches = labels.map((label, roundIndex) => {
-    const sourceCode = bracketRoundCode(label)
-    const complete = tournament.status === 'Completed' || (tournament.status === 'Active' && roundIndex < activeRound)
-    const live = tournament.status === 'Active' && roundIndex === activeRound
-    const roundGames = gamesByRound.get(roundIndex + 1) ?? []
-    const roundMatches = pairNames(current).map(([a, b], matchIndex) => {
-      const publishedGame = roundGames[matchIndex]
-      const whiteName = publishedGame?.white.name ?? a
-      const blackName = publishedGame?.black.name ?? b
-      return makeBracketMatch(whiteName, blackName, {
-        complete,
-        gameId: publishedGame?.id,
-        live,
-        matchNumber: options.matchNumbers?.[roundIndex]?.[matchIndex],
-        matchIndex,
-        result: publishedGame?.result,
-        status: publishedGame?.status,
-        next: roundIndex < labels.length - 1 ? Math.floor(matchIndex / 2) : undefined,
-      })
-    })
-    const winners = roundMatches.map((match, matchIndex) => (
-      match.w || complete ? bracketWinner(match) : winnerNameFromMatch(match, sourceCode, matchIndex + 1)
-    ))
-
-    current = winners
-
-    return roundMatches
-  })
-
-  return { rounds: labels, matches }
-}
-
-function groupTournamentGamesByRound(games: TournamentGame[]) {
-  const rows = new Map<number, TournamentGame[]>()
-  games.forEach((game) => {
-    const list = rows.get(game.round) ?? []
-    list.push(game)
-    rows.set(game.round, list)
-  })
-
-  rows.forEach((roundGames) => roundGames.sort((a, b) => a.board - b.board))
-  return rows
-}
-
-function buildDoubleEliminationBrackets(
-  tournament: Tournament,
-  players: Member[],
-  publishedGames: TournamentGame[],
-): Record<BracketView, BracketDefinition> {
-  const publishedNames = publishedGames.flatMap((game) => [game.white.name, game.black.name])
-  const playerCount = Math.max(2, players.length || publishedNames.length)
-  const matchNumbers = buildDoubleEliminationMatchNumbering(
-    bracketRoundCounts(playerCount).map((count) => Math.max(1, count / 2)),
-  )
-  const winnersTournament = {
-    ...tournament,
-    round: /winner|w-/i.test(tournament.round) ? tournament.round : 'W-Final',
-  }
-  const winners = buildSingleEliminationBracket(winnersTournament, players, publishedGames, {
-    ...(/winner|w-/i.test(tournament.round) ? {} : { forceActiveRound: Number.POSITIVE_INFINITY }),
-    matchNumbers: matchNumbers.winners,
-    prefix: 'W-',
-  })
-  const winnerMatches = winners.matches
-  const winnerLabels = winners.rounds
-  const firstLoserPool = losersFromBracketRound(winnerMatches[0] || [], winnerLabels[0] || 'W-Round')
-  const incomingLosers = winnerMatches
-    .slice(1, -1)
-    .map((round, index) => {
-      const losers = losersFromBracketRound(round, winnerLabels[index + 1] || `W-Round ${index + 2}`)
-      return losers.length > 2 ? [...losers].reverse() : losers
-    })
-  const winnersFinalLoser = loserName(
-    winnerMatches[winnerMatches.length - 1]?.[0],
-    winnerLabels[winnerLabels.length - 1] || 'W-Final',
-    1,
-  )
-  const loserRounds = buildLoserBracketRounds(
-    firstLoserPool,
-    incomingLosers,
-    tournament,
-    buildLowerBracketRoundLabelsFromWinnerRounds(winnerLabels),
-    matchNumbers.losers,
-  )
-  const loserChampion = loserRounds.length
-    ? winnerNameFromMatch(
-      loserRounds[loserRounds.length - 1].matches[0],
-      loserRounds[loserRounds.length - 1].round,
-      1,
-    )
-    : firstLoserPool[0] ?? 'Lower bracket survivor'
-  const losersFinalLive = tournament.status === 'Active' && !/grand|reset/i.test(tournament.round)
-  const losersFinal = makeBracketMatch(winnersFinalLoser, loserChampion, {
-    complete: tournament.status === 'Completed',
-    live: losersFinalLive,
-    matchNumber: matchNumbers.lowerFinal,
-    matchIndex: 0,
-  })
-  const grandFinal = makeBracketMatch(
-    winnerNameFromMatch(winnerMatches[winnerMatches.length - 1]?.[0], 'W-Final', 1),
-    winnerNameFromMatch(losersFinal, 'Lower Final', 1),
-    {
-      complete: tournament.status === 'Completed',
-      live: tournament.status === 'Active' && /grand/i.test(tournament.round),
-      matchNumber: matchNumbers.grandFinal,
-      matchIndex: 0,
-    },
-  )
-
-  return {
-    winners,
-    losers: {
-      rounds: [...loserRounds.map((round) => round.round), 'Lower Final'],
-      matches: [...loserRounds.map((round) => round.matches), [losersFinal]],
-    },
-    final: {
-      rounds: ['Grand Final', 'Reset if needed'],
-      matches: [
-        [grandFinal],
-        [{ a: `Winner of ${matchNumbers.grandFinal}`, b: 'Reset only if needed', matchNumber: matchNumbers.resetFinal }],
-      ],
-    },
-  }
-}
-
-function buildDoubleEliminationMatchNumbering(winnerMatchCounts: number[]) {
-  const winners: number[][] = winnerMatchCounts.map(() => [])
-  const losers: number[][] = []
-  let next = 1
-
-  const allocate = (count: number, direction: 'asc' | 'desc' = 'asc') => {
-    const numbers = Array.from({ length: count }, (_value, index) => next + index)
-    next += count
-    return direction === 'desc' ? numbers.reverse() : numbers
-  }
-
-  if (winnerMatchCounts.length) {
-    winners[0] = allocate(winnerMatchCounts[0])
-  }
-
-  let poolCount = winnerMatchCounts[0] ?? 0
-  let poolDirection: 'asc' | 'desc' = 'asc'
-
-  for (let winnerRoundIndex = 1; winnerRoundIndex < winnerMatchCounts.length - 1; winnerRoundIndex += 1) {
-    if (poolCount >= 2) {
-      const matchCount = Math.floor(poolCount / 2)
-      const direction: 'asc' | 'desc' = poolDirection === 'desc' ? 'desc' : 'asc'
-      losers.push(allocate(matchCount, direction))
-      poolCount = matchCount + (poolCount % 2)
-      poolDirection = direction
-    }
-
-    winners[winnerRoundIndex] = allocate(winnerMatchCounts[winnerRoundIndex])
-
-    const incomingCount = winnerMatchCounts[winnerRoundIndex]
-    if (incomingCount > 0) {
-      const pairCount = Math.min(poolCount, incomingCount)
-      if (pairCount > 0) {
-        const direction = incomingCount > 2 ? 'desc' : 'asc'
-        losers.push(allocate(pairCount, direction))
-        poolDirection = direction
-      }
-      poolCount = poolCount + incomingCount - pairCount
-    }
-  }
-
-  while (poolCount > 1) {
-    const matchCount = Math.floor(poolCount / 2)
-    const direction: 'asc' | 'desc' = poolDirection === 'desc' ? 'desc' : 'asc'
-    losers.push(allocate(matchCount, direction))
-    poolCount = matchCount + (poolCount % 2)
-    poolDirection = direction
-  }
-
-  const finalWinnerRoundIndex = winnerMatchCounts.length - 1
-  if (finalWinnerRoundIndex > 0) {
-    winners[finalWinnerRoundIndex] = allocate(winnerMatchCounts[finalWinnerRoundIndex])
-  }
-
-  return {
-    grandFinal: next + 1,
-    losers,
-    lowerFinal: next,
-    resetFinal: next + 2,
-    winners,
-  }
-}
-
-function buildLoserBracketRounds(
-  firstPool: string[],
-  incomingPools: string[][],
-  tournament: Tournament,
-  lowerRoundLabels: string[],
-  matchNumbers: number[][],
-) {
-  const rawRounds: Array<{ round: string; matches: BracketMatch[] }> = []
-  let pool = firstPool
-  const complete = tournament.status === 'Completed' || tournament.status === 'Active'
-
-  const buildLoserMatch = (a: string, b: string, matchIndex: number, next: number, matchNumber?: number) => (
-    makeBracketMatch(a, b, {
-      complete,
-      live: false,
-      matchNumber,
-      matchIndex,
-      next,
-    })
-  )
-
-  const pushReduction = (feedsDropIn = false) => {
-    if (pool.length < 2) return
-    const pairable = pool.length % 2 === 0 ? pool : pool.slice(0, -1)
-    const carry = pool.length % 2 === 0 ? [] : [pool[pool.length - 1]]
-    const roundNumber = rawRounds.length + 1
-    const roundMatchNumbers = matchNumbers[rawRounds.length] ?? []
-    const matches = pairNames(pairable).map(([a, b], matchIndex) => (
-      buildLoserMatch(a, b, matchIndex, feedsDropIn ? matchIndex : Math.floor(matchIndex / 2), roundMatchNumbers[matchIndex])
-    ))
-    const winners = matches.map((match, index) => (
-      complete ? bracketWinner(match) : winnerNameFromMatch(match, `L${roundNumber}`, index + 1)
-    ))
-    rawRounds.push({ round: `L-Round ${roundNumber}`, matches })
-    pool = [...winners, ...carry]
-  }
-
-  const pairDropIns = (incoming: string[]) => {
-    if (!incoming.length) return
-    if (!pool.length) {
-      pool = [...incoming]
-      return
-    }
-
-    const pairCount = Math.min(pool.length, incoming.length)
-    const roundNumber = rawRounds.length + 1
-    const roundMatchNumbers = matchNumbers[rawRounds.length] ?? []
-    const matches = Array.from({ length: pairCount }, (_, index) => (
-      buildLoserMatch(pool[index], incoming[index], index, Math.floor(index / 2), roundMatchNumbers[index])
-    ))
-    const winners = matches.map((match, index) => (
-      complete ? bracketWinner(match) : winnerNameFromMatch(match, `L${roundNumber}`, index + 1)
-    ))
-    rawRounds.push({ round: `L-Round ${roundNumber}`, matches })
-    pool = [
-      ...winners,
-      ...pool.slice(pairCount),
-      ...incoming.slice(pairCount),
-    ]
-  }
-
-  incomingPools.forEach((incoming) => {
-    pushReduction(incoming.length > 0)
-    pairDropIns(incoming)
-  })
-
-  while (pool.length > 1) {
-    pushReduction(false)
-  }
-
-  return normalizeLowerBracketRounds(rawRounds, lowerRoundLabels)
-}
-
-function normalizeLowerBracketRounds(
-  rounds: Array<{ round: string; matches: BracketMatch[] }>,
-  preferredLabels: string[] = [],
-) {
-  const fallbackLabels = buildLowerBracketRoundLabels(
-    rounds.map((round) => round.matches.length),
-    isLowerBracketFinalRound(rounds[rounds.length - 1]?.round),
-  )
-  const includesFinalRound = isLowerBracketFinalRound(rounds[rounds.length - 1]?.round)
-  const labels = rounds.map((round, index) => {
-    if (includesFinalRound && index === rounds.length - 1) return 'Lower Final'
-    return preferredLabels[index] ?? fallbackLabels[index] ?? round.round
-  })
-  const rawToLabel = new Map(labels.map((label, index) => [`L${index + 1}`, label]))
-  const codeToIndex = buildLowerBracketCodeIndex(labels)
-  const lastRoundIndex = rounds.length - 1
-
-  return rounds.map((round, index) => ({
-    ...round,
-    matches: round.matches.map((match) => ({
-      ...rewriteLowerBracketPlaceholders(match, rawToLabel, undefined, index, labels, codeToIndex),
-      ...(index === lastRoundIndex ? { next: 0 } : {}),
-    })),
-    round: labels[index] ?? round.round,
-  }))
-}
-
-function rewriteLowerBracketPlaceholders(
-  match: BracketMatch,
-  rawToLabel: Map<string, string>,
-  firstWinnerRoundCode?: string,
-  roundIndex?: number,
-  labels?: string[],
-  codeToIndex?: Map<string, number>,
-): BracketMatch {
-  return {
-    ...match,
-    a: rewriteLowerBracketPlaceholder(match.a, rawToLabel, firstWinnerRoundCode, roundIndex, labels, codeToIndex),
-    b: rewriteLowerBracketPlaceholder(match.b, rawToLabel, firstWinnerRoundCode, roundIndex, labels, codeToIndex),
-  }
 }
 
 function rewriteLowerBracketPlaceholder(
@@ -1841,154 +1233,6 @@ function isLowerBracketFinalRound(name?: string) {
   return Boolean(name && /^(?:(?:l|lower)[-\s]*)?final$/i.test(name.trim()))
 }
 
-function bracketRoundCounts(playerCount: number) {
-  const counts: number[] = [nextPowerOfTwo(playerCount)]
-  let next = counts[counts.length - 1] / 2
-  while (next >= 2) {
-    counts.push(next)
-    next /= 2
-  }
-  return counts
-}
-
-function effectiveBracketPlayerCount(tournament: Tournament, availablePlayers: number) {
-  const declared = tournament.participants > 0
-    ? tournament.participants
-    : tournament.capacity && tournament.capacity > 0
-      ? tournament.capacity
-      : availablePlayers
-
-  return Math.max(2, Math.min(availablePlayers, declared))
-}
-
-function nextPowerOfTwo(value: number) {
-  let result = 1
-  while (result < value) result *= 2
-  return Math.max(2, result)
-}
-
-function pairNames(names: string[]) {
-  const pairs: Array<[string, string]> = []
-  for (let index = 0; index < names.length - 1; index += 2) {
-    pairs.push([names[index], names[index + 1]])
-  }
-  return pairs
-}
-
-function openingBracketNames(names: string[], bracketSize: number) {
-  const slots: string[] = []
-  const firstRoundMatches = Math.max(1, bracketSize / 2)
-  const byeCount = Math.max(0, bracketSize - names.length)
-  let playerIndex = 0
-
-  for (let matchIndex = 0; matchIndex < firstRoundMatches; matchIndex += 1) {
-    const a = names[playerIndex++] ?? bracketByeName
-    const b = matchIndex >= firstRoundMatches - byeCount
-      ? bracketByeName
-      : names[playerIndex++] ?? bracketByeName
-    slots.push(a, b)
-  }
-
-  return slots
-}
-
-function makeBracketMatch(
-  a: string,
-  b: string,
-  {
-    complete,
-    gameId,
-    live,
-    matchNumber,
-    matchIndex,
-    next,
-    result,
-    status,
-  }: {
-    complete: boolean
-    gameId?: string
-    live: boolean
-    matchNumber?: number
-    matchIndex: number
-    next?: number
-    result?: TournamentGame['result']
-    status?: TournamentGame['status']
-  },
-): BracketMatch {
-  const base = { a, b, gameId, matchNumber, next }
-  const byeWinner = bracketByeWinner(a, b)
-  if (byeWinner) return { ...base, w: byeWinner }
-  if (status === 'live' || live) return { ...base, live: true }
-  if (result && result !== '*') {
-    if (result === '1/2-1/2') return { ...base, sa: 0.5, sb: 0.5 }
-    const winner = result === '0-1' ? 'b' : 'a'
-    return {
-      ...base,
-      sa: winner === 'a' ? 1 : 0,
-      sb: winner === 'b' ? 1 : 0,
-      w: winner,
-    }
-  }
-  if (!complete) return base
-
-  const winner = matchIndex % 2 === 0 ? 'a' : 'b'
-  return {
-    ...base,
-    sa: winner === 'a' ? 1 : 0,
-    sb: winner === 'b' ? 1 : 0,
-    w: winner,
-  }
-}
-
-function bracketByeWinner(a: string, b: string): 'a' | 'b' | null {
-  const aBye = isByeName(a)
-  const bBye = isByeName(b)
-  if (aBye && !bBye) return 'b'
-  if (bBye && !aBye) return 'a'
-  return null
-}
-
-function bracketWinner(match: BracketMatch) {
-  if (match.w === 'b') return match.b
-  return match.a
-}
-
-function bracketLoser(match: BracketMatch) {
-  if (match.w === 'b') return match.a
-  return match.b
-}
-
-function winnerNameFromMatch(match: BracketMatch | undefined, roundLabel: string, matchNumber: number) {
-  if (!match) return `Winner ${bracketRoundCode(roundLabel)}-${matchNumber}`
-  if (match.w) return bracketWinner(match)
-  if (match.matchNumber) return `Winner of ${match.matchNumber}`
-  return `Winner ${bracketRoundCode(roundLabel)}-${matchNumber}`
-}
-
-function loserName(match: BracketMatch | undefined, roundLabel: string, matchNumber: number) {
-  if (!match) return `Loser ${bracketRoundCode(roundLabel)}-${matchNumber}`
-  if (match.w) return bracketLoser(match)
-  if (match.matchNumber) return `Loser of ${match.matchNumber}`
-  return `Loser ${bracketRoundCode(roundLabel)}-${matchNumber}`
-}
-
-function losersFromBracketRound(matches: BracketMatch[], roundLabel: string) {
-  return matches
-    .map((match, index) => loserName(match, roundLabel, index + 1))
-    .filter((name) => !isByeName(name))
-}
-
-function prefixedRoundName(playersInRound: number, prefix = '') {
-  return `${prefix}${bracketRoundName(playersInRound)}`
-}
-
-function bracketRoundName(playersInRound: number) {
-  if (playersInRound === 2) return 'Final'
-  if (playersInRound === 4) return 'Semifinal'
-  if (playersInRound === 8) return 'Quarterfinal'
-  return `Round of ${playersInRound}`
-}
-
 function bracketRoundCode(label: string) {
   const survivor = /surviv(?:or|al)/i.test(label)
   const qualifier = /qualifier/i.test(label)
@@ -2001,28 +1245,6 @@ function bracketRoundCode(label: string) {
   if (count) return `${prefix}R${count}${suffix}`
   const lowerRound = /lower round\s*(\d+)/i.exec(label)?.[1]
   return lowerRound ? `LR${lowerRound}` : label.replace(/[^A-Za-z0-9]+/g, '').slice(0, 6) || 'R'
-}
-
-function activeBracketRoundIndex(labels: string[], tournament: Tournament) {
-  if (tournament.status === 'Completed') return labels.length
-  if (tournament.status !== 'Active') return 0
-
-  if (tournament.currentRound && tournament.currentRound > 0) {
-    return Math.max(0, Math.min(labels.length - 1, tournament.currentRound - 1))
-  }
-
-  const round = tournament.round.toLowerCase()
-  const parsed = labels.findIndex((label) => {
-    const lower = label.toLowerCase()
-    if (round.includes('final') && lower.includes('final') && !lower.includes('semi')) return true
-    if (round.includes('semi') && lower.includes('semi')) return true
-    if (round.includes('quarter') && lower.includes('quarter')) return true
-    const count = /round of\s*(\d+)/i.exec(lower)?.[1]
-    return Boolean(count && round.includes(count))
-  })
-
-  if (parsed >= 0) return parsed
-  return Math.max(0, Math.min(labels.length - 1, labels.length - 2))
 }
 
 function BracketPanel({
@@ -2359,10 +1581,6 @@ function isPendingMatch(match: BracketMatch) {
   )
 }
 
-function isByeName(name: string) {
-  return name === bracketByeName
-}
-
 function UnpublishedPanel({ body, title }: { body: string; title: string }) {
   return (
     <div className="unpublished-panel">
@@ -2398,68 +1616,24 @@ function StatusBadge({ status }: { status: Tournament['status'] }) {
 function buildDetail(tournament: Tournament) {
   const selectedMembers = tournament.registeredPlayers ?? []
   const publishedGames = tournament.publishedGames ?? []
-  const savedStandings = new Map((tournament.standings ?? []).map((row) => [row.profileId, row]))
-  const stats = new Map<string, { points: number; wins: number; draws: number; losses: number; playing: boolean }>()
-
-  selectedMembers.forEach((member) => {
-    stats.set(member.id, { points: 0, wins: 0, draws: 0, losses: 0, playing: false })
-  })
-
-  publishedGames.forEach((game) => {
-    const white = stats.get(game.white.id) ?? { points: 0, wins: 0, draws: 0, losses: 0, playing: false }
-    const black = stats.get(game.black.id) ?? { points: 0, wins: 0, draws: 0, losses: 0, playing: false }
-
-    if (game.status === 'live') {
-      white.playing = true
-      black.playing = true
-    } else if (game.status === 'completed') {
-      if (game.result === '1-0') {
-        white.points += 1
-        white.wins += 1
-        black.losses += 1
-      } else if (game.result === '0-1') {
-        black.points += 1
-        black.wins += 1
-        white.losses += 1
-      } else if (game.result === '1/2-1/2') {
-        white.points += 0.5
-        black.points += 0.5
-        white.draws += 1
-        black.draws += 1
-      }
-    }
-
-    stats.set(game.white.id, white)
-    stats.set(game.black.id, black)
-  })
-
-  const standings = selectedMembers.map((member, index) => {
-    const row = stats.get(member.id) ?? { points: 0, wins: 0, draws: 0, losses: 0, playing: false }
-    const saved = savedStandings.get(member.id)
-
-    return {
+  const membersById = new Map(selectedMembers.map((member) => [member.id, member]))
+  const standings = (tournament.standings ?? []).flatMap((saved): StandingRow[] => {
+    const member = membersById.get(saved.profileId)
+    if (!member) return []
+    return [{
       member,
-      rank: saved?.rank ?? index + 1,
-      points: saved?.points ?? row.points,
-      wins: saved?.wins ?? row.wins,
-      draws: saved?.draws ?? row.draws,
-      losses: saved?.losses ?? row.losses,
-      tieBreak: saved?.tieBreak ?? 0,
-      status: row.playing ? 'Playing' : (saved?.played ?? row.wins + row.draws + row.losses) > 0 ? 'Finished' : 'Registered',
-      authoritative: Boolean(saved),
-      seedOrder: index,
-    } satisfies StandingRow & { authoritative: boolean; seedOrder: number }
-  }).sort((a, b) => (
-    a.authoritative && b.authoritative
-      ? a.rank - b.rank
-      : b.points - a.points || b.tieBreak - a.tieBreak || b.wins - a.wins || a.seedOrder - b.seedOrder
-  )).map(({ authoritative: _authoritative, seedOrder: _seedOrder, ...row }, index) => ({ ...row, rank: index + 1 }))
-
-  const games = publishedGames
+      rank: saved.rank,
+      points: saved.points,
+      wins: saved.wins,
+      draws: saved.draws,
+      losses: saved.losses,
+      tieBreak: saved.tieBreak,
+      status: saved.played > 0 ? 'Finished' : 'Registered',
+    }]
+  })
 
   return {
     standings,
-    games,
     rounds: buildRoundGroups(tournament, publishedGames),
   }
 }
@@ -2525,7 +1699,7 @@ function isMultiStageTournament(tournament: Tournament) {
 }
 
 function isBracketTournament(tournament: Tournament) {
-  return Boolean(bracketConfigs[tournament.id]) || /knockout|elimination/i.test(tournament.format)
+  return bracketTournamentRouteIds.has(tournament.id) || /knockout|elimination/i.test(tournament.format)
 }
 
 export default TournamentDetailPage

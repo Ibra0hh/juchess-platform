@@ -1,14 +1,13 @@
 import { Link } from 'react-router-dom'
+import { compactCrestUrl } from '../lib/brand'
 import './SiteFooter.css'
-
-const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 
 function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="site-footer-inner">
         <Link to="/home" className="site-footer-brand" aria-label="JuChess home">
-          <img src={crestUrl} alt="" />
+          <img src={compactCrestUrl} alt="" />
           <span>
             <strong>JuChess</strong>
             <small>University of Jordan Chess Club</small>

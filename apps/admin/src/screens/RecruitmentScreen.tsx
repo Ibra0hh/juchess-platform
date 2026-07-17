@@ -9,6 +9,7 @@ import {
   type RecruitmentReviewInput,
   type RecruitmentStatus,
 } from '../lib/adminData'
+import { csvCell } from '../lib/csv'
 import './RecruitmentScreen.css'
 
 const statusOptions: Array<{ value: RecruitmentStatus; label: string }> = [
@@ -268,7 +269,6 @@ function exportApplicationsCsv(applications: RecruitmentApplication[]) {
   URL.revokeObjectURL(url)
 }
 
-function csvCell(value: string) { return `"${value.replace(/"/g, '""')}"` }
 function getInitials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'JU' }
 function formatAdminDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) }
 function toDatetimeLocal(value?: string) { if (!value) return ''; const date = new Date(value); if (Number.isNaN(date.getTime())) return ''; const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000); return local.toISOString().slice(0, 16) }

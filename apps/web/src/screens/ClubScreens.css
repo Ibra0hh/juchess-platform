@@ -1862,6 +1862,34 @@
   font-weight: 900;
 }
 
+.review-engine-cta {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid rgba(17, 17, 17, 0.15);
+  border-radius: 7px;
+  background: #fbf6e8;
+}
+
+.review-engine-cta span {
+  color: #7d2434;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.review-engine-cta strong {
+  font-family: "Droid Serif", Georgia, serif;
+  font-size: 16px;
+}
+
+.review-engine-cta small {
+  color: rgba(17, 17, 17, 0.62);
+  font-size: 11px;
+}
+
 .class-count-head {
   display: grid;
   grid-template-columns: minmax(90px, 1fr) 34px 28px 34px;

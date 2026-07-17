@@ -7,6 +7,7 @@ import { TournamentPlayGuard } from './components/TournamentPlayGuard'
 import { ProfileCompletionGuard } from './components/ProfileCompletionGuard'
 import RouteSkeleton from './components/RouteSkeleton'
 import RouteMetadata from './components/RouteMetadata'
+import RouteErrorBoundary from './components/RouteErrorBoundary'
 import { compactCrestUrl } from './lib/brand'
 import { useOnlineTournamentPlayLock } from './lib/onlineTournamentPlayLock'
 
@@ -60,8 +61,9 @@ function App() {
         <TournamentPlayProvider>
           <TournamentPlayGuard>
             <RouteMetadata />
-            <Suspense fallback={<RouteSkeleton />}>
-              <Routes>
+            <RouteErrorBoundary>
+              <Suspense fallback={<RouteSkeleton />}>
+                <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/tournaments" element={<TournamentsPage />} />
@@ -81,8 +83,9 @@ function App() {
               <Route path="/privacy" element={<LegalPage kind="privacy" />} />
               <Route path="/terms" element={<LegalPage kind="terms" />} />
               <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
+                </Routes>
+              </Suspense>
+            </RouteErrorBoundary>
           </TournamentPlayGuard>
         </TournamentPlayProvider>
       </ProfileCompletionGuard>

@@ -48,7 +48,10 @@ export function GameChat({
     setDraft('')
     setLoading(true)
     void refresh()
-    const timer = window.setInterval(() => void refresh(), 10_000)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    const timer = window.setInterval(refreshWhenVisible, 10_000)
     let unsubscribe: (() => void) | undefined
     let alive = true
     void subscribeToHostedGameMessages(gameId, () => void refresh())

@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { compactCrestUrl } from '../lib/brand'
-import { demoTournaments, members, sampleGamesBySource } from '../lib/juchess'
 import './ClubScreens.css'
 
 const toolCards = [
@@ -30,12 +29,12 @@ const toolCards = [
     action: 'Browse events',
   },
   {
-    to: '/tournament/swiss',
+    to: '/tournaments',
     icon: '\u2656',
     tag: 'Live',
     title: 'Live boards',
-    body: 'Jump into the Swiss detail page with standings, pairings, games, and round data.',
-    action: 'Open live event',
+    body: 'Open a published event to follow its canonical pairings, games, results, and standings.',
+    action: 'Find a live event',
   },
   {
     to: '/leaderboard',
@@ -56,8 +55,6 @@ const toolCards = [
 ] as const
 
 function ToolsPage() {
-  const totalGames = Object.values(sampleGamesBySource).reduce((sum, games) => sum + games.length, 0)
-
   return (
     <div className="club-screen tools-screen" data-screen-label="Tools">
       <SiteHeader active="games" />
@@ -69,11 +66,6 @@ function ToolsPage() {
               A focused launch pad for review, analysis, live tournament boards, rankings, and player records across
               JuChess.
             </p>
-            <div className="tools-summary" aria-label="Club tool summary">
-              <SummaryBox label="Review games" value={totalGames} />
-              <SummaryBox label="Tournament pages" value={demoTournaments.length} />
-              <SummaryBox label="Rated players" value={members.length} />
-            </div>
           </div>
           <img src={compactCrestUrl} alt="Chess Club JU logo" />
         </section>
@@ -102,15 +94,6 @@ function ToolsPage() {
           </div>
         </section>
       </main>
-    </div>
-  )
-}
-
-function SummaryBox({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <strong>{value}</strong>
-      <span>{label}</span>
     </div>
   )
 }

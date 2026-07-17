@@ -6,6 +6,7 @@ export { parseStoredMoves } from './storedMoves'
 
 const tournamentAssetsBucketId = 'tournament-assets'
 const tournamentMediaPrefix = 'ju-media'
+const systemByeProfileId = 'system_bye'
 
 export type TournamentStatus = 'Active' | 'Upcoming' | 'Completed'
 export type OnlineTournamentPlatform = 'chessCom' | 'lichess' | 'juchess'
@@ -37,6 +38,7 @@ export type Tournament = {
   standings?: TournamentStanding[]
   bracketSnapshot?: PublishedBracketSnapshot
   media?: TournamentMedia[]
+  mediaUnavailable?: boolean
 }
 
 export type TournamentStanding = {
@@ -284,29 +286,6 @@ export const tableIds = {
   ipBlocks: 'ip_blocks',
 } as const
 
-export const members: Member[] = [
-  { id: 'ibrahim', name: 'Ibrahim Ahmad', rating: 1810, university: 'University of Jordan' },
-  { id: 'omar', name: 'Omar Saleh', rating: 1740, university: 'University of Jordan' },
-  { id: 'leen', name: 'Leen Haddad', rating: 1685, university: 'University of Jordan' },
-  { id: 'yazan', name: 'Yazan Khaled', rating: 1602, university: 'University of Jordan' },
-  { id: 'sara', name: 'Sara Nasser', rating: 1550, university: 'University of Jordan' },
-  { id: 'mohammad', name: 'Mohammad Al-Khatib', rating: 1490, university: 'University of Jordan' },
-  { id: 'rania', name: 'Rania Odeh', rating: 1465, university: 'University of Jordan' },
-  { id: 'khaled', name: 'Khaled Mansour', rating: 1430, university: 'University of Jordan' },
-  { id: 'tala', name: 'Tala Suleiman', rating: 1395, university: 'University of Jordan' },
-  { id: 'hasan', name: 'Hasan Qasem', rating: 1370, university: 'University of Jordan' },
-  { id: 'noor', name: 'Noor Barakat', rating: 1340, university: 'University of Jordan' },
-  { id: 'zaid', name: 'Zaid Hamdan', rating: 1310, university: 'University of Jordan' },
-  { id: 'amr', name: 'Amr Zaidan', rating: 1295, university: 'University of Jordan' },
-  { id: 'lina', name: 'Lina Shami', rating: 1270, university: 'University of Jordan' },
-  { id: 'fadi', name: 'Fadi Rimawi', rating: 1245, university: 'University of Jordan' },
-  { id: 'dana', name: 'Dana Aqel', rating: 1220, university: 'University of Jordan' },
-  { id: 'nour', name: 'Nour Alami', rating: 1198, university: 'University of Jordan' },
-  { id: 'tamer', name: 'Tamer Qasem', rating: 1184, university: 'University of Jordan' },
-  { id: 'salma', name: 'Salma Nouri', rating: 1166, university: 'University of Jordan' },
-  { id: 'adam', name: 'Adam Kareem', rating: 1148, university: 'University of Jordan' },
-]
-
 const tournamentFormatOrder = [
   'Swiss',
   'Round robin',
@@ -318,126 +297,6 @@ const tournamentFormatOrder = [
   'Arena',
 ] as const
 
-export const demoTournaments: Tournament[] = [
-  {
-    id: 'swiss',
-    name: 'Swiss',
-    status: 'Upcoming',
-    date: 'Jul 20, 2026',
-    playMode: 'inPerson',
-    location: 'Student Union Hall B',
-    format: 'Swiss',
-    timeControl: '15+10 Rapid',
-    participants: 6,
-    capacity: 6,
-    round: 'Registration open',
-    desc: 'Swiss test tournament.',
-  },
-  {
-    id: 'round-robin',
-    name: 'Round robin',
-    status: 'Upcoming',
-    date: 'Jul 22, 2026',
-    playMode: 'inPerson',
-    location: 'Engineering Lounge',
-    format: 'Round robin',
-    timeControl: '10+5 Rapid',
-    participants: 16,
-    capacity: 16,
-    round: 'Registration open',
-    desc: 'Round robin test tournament.',
-  },
-  {
-    id: 'double-round-robin',
-    name: 'Double round robin',
-    status: 'Upcoming',
-    date: 'Jul 24, 2026',
-    playMode: 'inPerson',
-    location: 'Library Seminar Room 2',
-    format: 'Double round robin',
-    timeControl: '25+10 Classical',
-    participants: 18,
-    capacity: 18,
-    round: 'Registration open',
-    desc: 'Double round robin test tournament.',
-  },
-  {
-    id: 'single-elimination',
-    name: 'Single elimination',
-    status: 'Upcoming',
-    date: 'Jul 26, 2026',
-    playMode: 'inPerson',
-    location: 'Hall A',
-    format: 'Single elimination',
-    timeControl: '10+0 Blitz',
-    participants: 16,
-    capacity: 16,
-    round: 'Registration open',
-    desc: 'Single elimination test tournament.',
-  },
-  {
-    id: 'double-elimination',
-    name: 'Double elimination',
-    status: 'Upcoming',
-    date: 'Jul 28, 2026',
-    playMode: 'inPerson',
-    location: 'Hall A',
-    format: 'Double elimination',
-    timeControl: '5+3 Blitz',
-    participants: 20,
-    capacity: 20,
-    round: 'Registration open',
-    desc: 'Double elimination test tournament.',
-  },
-  {
-    id: 'multi-stage',
-    name: 'Multi-stage',
-    status: 'Upcoming',
-    date: 'Jul 30, 2026',
-    playMode: 'inPerson',
-    location: 'Library Seminar Room 2',
-    format: 'Multi-stage',
-    timeControl: '10+5 Rapid',
-    participants: 18,
-    capacity: 18,
-    round: 'Registration open',
-    desc: 'Multi-stage test tournament.',
-  },
-  {
-    id: 'team',
-    name: 'Team',
-    status: 'Upcoming',
-    date: 'Aug 1, 2026',
-    playMode: 'inPerson',
-    location: 'Hall A',
-    format: 'Team',
-    timeControl: '10+0 Rapid',
-    participants: 16,
-    capacity: 16,
-    round: 'Registration open',
-    desc: 'Team test tournament.',
-  },
-  {
-    id: 'arena',
-    name: 'Arena',
-    status: 'Upcoming',
-    date: 'Aug 3, 2026',
-    playMode: 'inPerson',
-    location: 'Club Room',
-    format: 'Arena',
-    timeControl: '5+0 Blitz',
-    participants: 20,
-    capacity: 20,
-    round: 'Registration open',
-    desc: 'Arena test tournament.',
-  },
-]
-
-export const liveGames = [
-  { id: 'g1', board: 1, white: 'Ibrahim Ahmad', black: 'Omar Saleh', result: 'live' },
-  { id: 'g2', board: 2, white: 'Leen Haddad', black: 'Yazan Khaled', result: 'live' },
-]
-
 const pieceGlyphs: Record<string, string> = {
   p: '\u265f',
   n: '\u265e',
@@ -446,33 +305,6 @@ const pieceGlyphs: Record<string, string> = {
   q: '\u265b',
   k: '\u265a',
 }
-
-const sampleMoves = [
-  'e4',
-  'e5',
-  'Nf3',
-  'Nc6',
-  'Bb5',
-  'a6',
-  'Ba4',
-  'Nf6',
-  'O-O',
-  'Be7',
-  'Re1',
-  'b5',
-  'Bb3',
-  'd6',
-  'c3',
-  'O-O',
-  'h3',
-  'Nb8',
-  'd4',
-  'Nbd7',
-  'c4',
-  'c6',
-  'Nc3',
-  'Bb7',
-]
 
 export function fenBoard(fen: string): BoardCell[] {
   const boardFen = fen.split(' ')[0] || '8/8/8/8/8/8/8/8'
@@ -511,76 +343,8 @@ export function fenBoard(fen: string): BoardCell[] {
   return cells.slice(0, 64)
 }
 
-function memberName(index: number) {
-  return members[index]?.name || members[0].name
-}
-
-function memberRating(index: number) {
-  return members[index]?.rating || members[0].rating
-}
-
-function makeSampleGame(
-  source: GameSource,
-  id: number,
-  whiteIndex: number,
-  blackIndex: number,
-  result: string,
-  date: string,
-  opening: string,
-  round = '',
-): SampleGame {
-  return {
-    key: `${source}-${id}`,
-    id: String(id),
-    source,
-    white: memberName(whiteIndex),
-    black: memberName(blackIndex),
-    wRating: memberRating(whiteIndex),
-    bRating: memberRating(blackIndex),
-    result,
-    date,
-    opening,
-    round,
-    fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-    moves: sampleMoves,
-  }
-}
-
-export const sampleGamesBySource: Record<GameSource, SampleGame[]> = {
-  'chess.com': [
-    makeSampleGame('chess.com', 1, 0, 3, '1-0', 'Jun 30, 2026', 'Italian Game: Classical'),
-    makeSampleGame('chess.com', 2, 1, 0, '0-1', 'Jun 28, 2026', 'Sicilian Defense: Najdorf'),
-    makeSampleGame('chess.com', 3, 0, 5, '1/2-1/2', 'Jun 26, 2026', "Queen's Gambit Declined"),
-    makeSampleGame('chess.com', 4, 2, 0, '0-1', 'Jun 22, 2026', 'Ruy Lopez: Berlin'),
-    makeSampleGame('chess.com', 5, 0, 4, '1-0', 'Jun 19, 2026', 'Caro-Kann: Advance'),
-    makeSampleGame('chess.com', 6, 0, 1, '1-0', 'Jun 15, 2026', 'English Opening'),
-    makeSampleGame('chess.com', 7, 3, 0, '1/2-1/2', 'Jun 12, 2026', 'French Defense: Tarrasch'),
-    makeSampleGame('chess.com', 8, 0, 2, '1-0', 'Jun 8, 2026', 'Scotch Game'),
-  ],
-  lichess: [
-    makeSampleGame('lichess', 2, 4, 1, '0-1', 'Jul 1, 2026', "King's Indian Defense"),
-    makeSampleGame('lichess', 5, 1, 2, '1-0', 'Jun 29, 2026', 'Vienna Game'),
-    makeSampleGame('lichess', 7, 3, 1, '1/2-1/2', 'Jun 25, 2026', 'Slav Defense'),
-    makeSampleGame('lichess', 1, 1, 5, '1-0', 'Jun 21, 2026', 'Italian Game: Evans Gambit'),
-    makeSampleGame('lichess', 4, 2, 3, '1-0', 'Jun 18, 2026', 'Nimzo-Indian Defense'),
-    makeSampleGame('lichess', 3, 5, 1, '0-1', 'Jun 14, 2026', 'Pirc Defense'),
-  ],
-  tournament: [
-    makeSampleGame('tournament', 1, 0, 1, '1-0', 'Jul 2, 2026', 'Ruy Lopez: Closed', 'Swiss - R4'),
-    makeSampleGame('tournament', 6, 2, 3, '1/2-1/2', 'Jul 2, 2026', 'Catalan Opening', 'Swiss - R4'),
-    makeSampleGame('tournament', 3, 4, 5, '1-0', 'Jul 2, 2026', 'Sicilian: Alapin', 'Swiss - R4'),
-    makeSampleGame('tournament', 8, 1, 4, '1-0', 'Jun 27, 2026', "Queen's Gambit Accepted", 'Single elimination - QF'),
-    makeSampleGame('tournament', 2, 3, 2, '0-1', 'Jun 27, 2026', 'London System', 'Single elimination - QF'),
-    makeSampleGame('tournament', 5, 0, 5, '1-0', 'Jun 20, 2026', 'Italian Game: Giuoco Piano', 'Double round robin - R3'),
-  ],
-}
-
-export function findSampleGame(value: string | null | undefined): SampleGame | null {
-  if (!value) return null
-
-  return Object.values(sampleGamesBySource)
-    .flat()
-    .find((game) => game.key === value || game.id === value) || null
+export function findSampleGame(_value: string | null | undefined): SampleGame | null {
+  return null
 }
 
 export async function loadTournamentGame(gameId: string | null | undefined): Promise<SampleGame | null> {
@@ -622,23 +386,13 @@ export async function loadTournamentGameArchive(): Promise<SampleGame[]> {
   if (!appwriteReady) return []
 
   try {
-    const [games, profiles, tournaments] = await Promise.all([
-      listVisibleGameRows(),
-      tablesDB.listRows<AppwriteProfileRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.profiles,
-        queries: [Query.limit(1000)],
-        total: false,
-      }),
-      tablesDB.listRows<AppwriteTournamentRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.tournaments,
-        queries: [Query.limit(1000)],
-        total: false,
-      }),
+    const games = await listVisibleGameRows()
+    const [profiles, tournaments] = await Promise.all([
+      listCloudRowsByIds<AppwriteProfileRow>(tableIds.profiles, games.flatMap((row) => [row.whiteProfileId, row.blackProfileId])),
+      listCloudRowsByIds<AppwriteTournamentRow>(tableIds.tournaments, games.map((row) => row.tournamentId)),
     ])
-    const profileMap = mapProfiles(profiles.rows)
-    const tournamentNames = mapTournamentNames(tournaments.rows)
+    const profileMap = mapProfiles(profiles)
+    const tournamentNames = mapTournamentNames(tournaments)
     const mapped = games
       .filter((row) => (
         row.blackProfileId !== 'system_bye'
@@ -651,7 +405,7 @@ export async function loadTournamentGameArchive(): Promise<SampleGame[]> {
     return mapped
   } catch (error) {
     console.warn('JuChess cloud game archive read failed.', error)
-    return []
+    throw new Error('Tournament game archive is unavailable right now.')
   }
 }
 
@@ -659,23 +413,13 @@ export async function loadProfileGameHistory(profileId: string | null | undefine
   if (!appwriteReady || !profileId) return []
 
   try {
-    const [games, profiles, tournaments] = await Promise.all([
-      listVisibleGameRows(profileId),
-      tablesDB.listRows<AppwriteProfileRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.profiles,
-        queries: [Query.limit(1000)],
-        total: false,
-      }),
-      tablesDB.listRows<AppwriteTournamentRow>({
-        databaseId: appwriteConfig.databaseId,
-        tableId: tableIds.tournaments,
-        queries: [Query.limit(1000)],
-        total: false,
-      }),
+    const games = await listVisibleGameRows(profileId)
+    const [profiles, tournaments] = await Promise.all([
+      listCloudRowsByIds<AppwriteProfileRow>(tableIds.profiles, games.flatMap((row) => [row.whiteProfileId, row.blackProfileId])),
+      listCloudRowsByIds<AppwriteTournamentRow>(tableIds.tournaments, games.map((row) => row.tournamentId)),
     ])
-    const profileMap = mapProfiles(profiles.rows)
-    const tournamentNames = mapTournamentNames(tournaments.rows)
+    const profileMap = mapProfiles(profiles)
+    const tournamentNames = mapTournamentNames(tournaments)
 
     return games
       .filter((row) => (
@@ -700,27 +444,15 @@ async function listVisibleGameRows(profileId?: string) {
         Query.equal('blackProfileId', profileId),
       ])
     : null
-  const queries = [profileQuery, statusQuery, Query.limit(1000)].filter(
+  const queries = [profileQuery, statusQuery].filter(
     (query): query is string => Boolean(query),
   )
 
   try {
-    const response = await tablesDB.listRows<AppwriteGameRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.games,
-      queries,
-      total: false,
-    })
-    return response.rows
+    return await listAllCloudRows<AppwriteGameRow>(tableIds.games, queries)
   } catch (error) {
     console.warn('Indexed game query is unavailable; using the compatibility scan.', error)
-    const response = await tablesDB.listRows<AppwriteGameRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.games,
-      queries: [Query.limit(1000)],
-      total: false,
-    })
-    return response.rows
+    return await listAllCloudRows<AppwriteGameRow>(tableIds.games)
   }
 }
 
@@ -840,6 +572,19 @@ export type TournamentLoadResult = {
   error?: unknown
 }
 
+export type TournamentDetailLoadResult = {
+  tournament: Tournament | null
+  source: 'cloud' | 'unavailable'
+  error?: unknown
+}
+
+type TournamentDetailLookup =
+  | { rowId: string }
+  | { slug: string }
+
+const tournamentDetailRequests = new Map<string, Promise<TournamentDetailLoadResult>>()
+const tournamentDetailPageSize = 100
+
 export async function subscribeToTournamentGameChanges(tournamentId: string, onChange: () => void) {
   const subscription = await realtime.subscribe(
     Channel.tablesdb(appwriteConfig.databaseId).table(tableIds.games).row(),
@@ -918,6 +663,239 @@ export async function loadTournaments(): Promise<TournamentLoadResult> {
   return loadTournamentRows(true)
 }
 
+export async function subscribeToVisibleGameChanges(onChange: () => void) {
+  const subscription = await realtime.subscribe(
+    Channel.tablesdb(appwriteConfig.databaseId).table(tableIds.games).row(),
+    onChange,
+    [Query.equal('status', ['live', 'completed', 'forfeit'])],
+  )
+  return () => {
+    void subscription.unsubscribe()
+  }
+}
+
+/**
+ * Loads one public tournament and only its related rows. Canonical slices are
+ * deliberately all-or-nothing: a failed games, registrations, or standings
+ * read must not be presented as an authoritative empty tournament.
+ */
+export function loadTournamentDetail(lookup: TournamentDetailLookup): Promise<TournamentDetailLoadResult> {
+  const value = 'rowId' in lookup ? lookup.rowId.trim() : lookup.slug.trim()
+  const key = `${'rowId' in lookup ? 'row' : 'slug'}:${value}`
+  const existing = tournamentDetailRequests.get(key)
+  if (existing) return existing
+
+  const request = loadTournamentDetailUncached(lookup).finally(() => {
+    if (tournamentDetailRequests.get(key) === request) tournamentDetailRequests.delete(key)
+  })
+  tournamentDetailRequests.set(key, request)
+  return request
+}
+
+async function loadTournamentDetailUncached(lookup: TournamentDetailLookup): Promise<TournamentDetailLoadResult> {
+  const value = 'rowId' in lookup ? lookup.rowId.trim() : lookup.slug.trim()
+  if (!appwriteReady || !value) {
+    return {
+      tournament: null,
+      source: 'unavailable',
+      error: new Error(appwriteReady
+        ? 'A tournament identifier is required.'
+        : 'Cloud connection is not configured for this app.'),
+    }
+  }
+
+  try {
+    const tournamentRow = await findTournamentDetailRow(lookup)
+    if (!tournamentRow || isPublicTestRow(tournamentRow)) {
+      return { tournament: null, source: 'cloud' }
+    }
+
+    const tournamentId = tournamentRow.$id
+    const [registrations, games, standings] = await Promise.all([
+      listAllTournamentRows<AppwriteRegistrationRow>(tableIds.registrations, tournamentId),
+      listAllTournamentRows<AppwriteGameRow>(tableIds.games, tournamentId),
+      listAllTournamentRows<AppwriteStandingRow>(tableIds.standings, tournamentId),
+    ])
+    const profiles = mapProfiles(await listTournamentProfiles(registrations, games, standings))
+    let media: Models.File[] = []
+    let mediaUnavailable = false
+    if (tournamentRow.status === 'completed') {
+      try {
+        media = await listTournamentMediaFiles(tournamentId)
+      } catch (error) {
+        mediaUnavailable = true
+        console.warn('Tournament media read failed.', error)
+      }
+    }
+    const playersByTournament = groupRegisteredPlayers(registrations, profiles)
+    const gamesByTournament = groupPublishedGames(games, profiles)
+    const standingsByTournament = groupTournamentStandings(standings)
+    const participantCounts = groupRegistrationCounts(registrations)
+    const mediaByTournament = groupTournamentMedia(media)
+
+    const tournament = mapAppwriteTournament(
+      tournamentRow,
+      participantCounts,
+      playersByTournament,
+      gamesByTournament,
+      standingsByTournament,
+      mediaByTournament,
+    )
+    if (tournament) tournament.mediaUnavailable = mediaUnavailable
+
+    return {
+      tournament,
+      source: 'cloud',
+    }
+  } catch (error) {
+    console.warn('JuChess cloud tournament detail read failed.', error)
+    return { tournament: null, source: 'unavailable', error }
+  }
+}
+
+async function findTournamentDetailRow(lookup: TournamentDetailLookup) {
+  if ('rowId' in lookup) {
+    return tablesDB.getRow<AppwriteTournamentRow>({
+      databaseId: appwriteConfig.databaseId,
+      tableId: tableIds.tournaments,
+      rowId: lookup.rowId.trim(),
+    })
+  }
+
+  const response = await tablesDB.listRows<AppwriteTournamentRow>({
+    databaseId: appwriteConfig.databaseId,
+    tableId: tableIds.tournaments,
+    queries: [Query.equal('slug', lookup.slug.trim()), Query.limit(1)],
+    total: false,
+    ttl: 0,
+  })
+  return response.rows[0] ?? null
+}
+
+async function listAllTournamentRows<T extends Models.Row>(tableId: string, tournamentId: string) {
+  return await listAllCloudRows<T>(tableId, [Query.equal('tournamentId', tournamentId)])
+}
+
+async function listAllCloudRows<T extends Models.Row>(
+  tableId: string,
+  queries: string[] = [],
+  ttl = 0,
+) {
+  const rows: T[] = []
+  let cursor: string | undefined
+
+  do {
+    const response = await tablesDB.listRows<T>({
+      databaseId: appwriteConfig.databaseId,
+      tableId,
+      queries: [
+        ...queries,
+        Query.limit(tournamentDetailPageSize),
+        ...(cursor ? [Query.cursorAfter(cursor)] : []),
+      ],
+      total: false,
+      ttl,
+    })
+    rows.push(...response.rows)
+    if (response.rows.length < tournamentDetailPageSize) break
+
+    const nextCursor = response.rows.at(-1)?.$id
+    if (!nextCursor || nextCursor === cursor) {
+      throw new Error(`Could not continue paginating ${tableId}.`)
+    }
+    cursor = nextCursor
+  } while (cursor)
+
+  return rows
+}
+
+async function listCloudRowsByIds<T extends Models.Row>(
+  tableId: string,
+  values: Array<string | null | undefined>,
+) {
+  const ids = [...new Set(values.filter((value): value is string => Boolean(value)))]
+  if (!ids.length) return []
+  const chunks = Array.from(
+    { length: Math.ceil(ids.length / tournamentDetailPageSize) },
+    (_value, index) => ids.slice(index * tournamentDetailPageSize, (index + 1) * tournamentDetailPageSize),
+  )
+  const responses = await Promise.all(chunks.map((chunk) => tablesDB.listRows<T>({
+    databaseId: appwriteConfig.databaseId,
+    tableId,
+    queries: [Query.equal('$id', chunk), Query.limit(tournamentDetailPageSize)],
+    total: false,
+    ttl: 0,
+  })))
+  return responses.flatMap((response) => response.rows)
+}
+
+async function listTournamentProfiles(
+  registrations: AppwriteRegistrationRow[],
+  games: AppwriteGameRow[],
+  standings: AppwriteStandingRow[],
+) {
+  const profileIds = new Set<string>()
+  registrations.forEach((row) => {
+    if (row.status === 'confirmed' && row.profileId) profileIds.add(row.profileId)
+  })
+  games.forEach((row) => {
+    if (row.whiteProfileId && row.whiteProfileId !== systemByeProfileId) profileIds.add(row.whiteProfileId)
+    if (row.blackProfileId && row.blackProfileId !== systemByeProfileId) profileIds.add(row.blackProfileId)
+  })
+  standings.forEach((row) => {
+    if (row.profileId) profileIds.add(row.profileId)
+  })
+
+  const ids = [...profileIds]
+  if (!ids.length) return []
+
+  const chunks = Array.from(
+    { length: Math.ceil(ids.length / tournamentDetailPageSize) },
+    (_value, index) => ids.slice(index * tournamentDetailPageSize, (index + 1) * tournamentDetailPageSize),
+  )
+  const responses = await Promise.all(chunks.map((chunk) => tablesDB.listRows<AppwriteProfileRow>({
+    databaseId: appwriteConfig.databaseId,
+    tableId: tableIds.profiles,
+    queries: [Query.equal('$id', chunk), Query.limit(tournamentDetailPageSize)],
+    total: false,
+    ttl: 0,
+  })))
+  const rows = responses.flatMap((response) => response.rows)
+  const returnedIds = new Set(rows.map((row) => row.$id))
+  const missingIds = ids.filter((id) => !returnedIds.has(id))
+  if (missingIds.length) {
+    throw new Error(`Tournament references unavailable player profiles: ${missingIds.join(', ')}`)
+  }
+  return rows
+}
+
+async function listTournamentMediaFiles(tournamentId: string) {
+  const files: Models.File[] = []
+  let cursor: string | undefined
+
+  do {
+    const response = await storage.listFiles({
+      bucketId: tournamentAssetsBucketId,
+      queries: [
+        Query.startsWith('name', `${tournamentMediaPrefix}--${tournamentId}--`),
+        Query.limit(tournamentDetailPageSize),
+        ...(cursor ? [Query.cursorAfter(cursor)] : []),
+      ],
+      total: false,
+    })
+    files.push(...response.files)
+    if (response.files.length < tournamentDetailPageSize) break
+
+    const nextCursor = response.files.at(-1)?.$id
+    if (!nextCursor || nextCursor === cursor) {
+      throw new Error('Could not continue paginating tournament media.')
+    }
+    cursor = nextCursor
+  } while (cursor)
+
+  return files
+}
+
 async function loadTournamentRows(includeDetails: boolean): Promise<TournamentLoadResult> {
   if (!appwriteReady) {
     return {
@@ -928,32 +906,22 @@ async function loadTournamentRows(includeDetails: boolean): Promise<TournamentLo
   }
 
   try {
-    const tournamentRows = tablesDB.listRows<AppwriteTournamentRow>({
-      databaseId: appwriteConfig.databaseId,
-      tableId: tableIds.tournaments,
-      queries: [Query.limit(100)],
-      total: false,
-      ttl: 0,
-    })
-    const registrationRows = safeListRows<AppwriteRegistrationRow>(
-      tableIds.registrations,
-      [Query.limit(1000)],
-      'registrations',
-    )
+    const tournamentRows = listAllCloudRows<AppwriteTournamentRow>(tableIds.tournaments)
+    const registrationRows = listAllCloudRows<AppwriteRegistrationRow>(tableIds.registrations)
     const profileRows = includeDetails
-      ? safeListRows<AppwriteProfileRow>(tableIds.profiles, [Query.limit(1000)], 'profiles')
+      ? listAllCloudRows<AppwriteProfileRow>(tableIds.profiles)
       : Promise.resolve<AppwriteProfileRow[]>([])
     const gameRows = includeDetails
-      ? safeListRows<AppwriteGameRow>(tableIds.games, [Query.limit(1000)], 'games')
+      ? listAllCloudRows<AppwriteGameRow>(tableIds.games)
       : Promise.resolve<AppwriteGameRow[]>([])
     const standingRows = includeDetails
-      ? safeListRows<AppwriteStandingRow>(tableIds.standings, [Query.limit(1000)], 'standings')
+      ? listAllCloudRows<AppwriteStandingRow>(tableIds.standings)
       : Promise.resolve<AppwriteStandingRow[]>([])
     const mediaFiles = includeDetails
       ? safeListTournamentMedia()
       : Promise.resolve<Models.File[]>([])
 
-    const [response, registrations, profilesResponse, gamesResponse, standingsResponse, mediaResponse] = await Promise.all([
+    const [tournamentRowsResponse, registrations, profilesResponse, gamesResponse, standingsResponse, mediaResponse] = await Promise.all([
       tournamentRows,
       registrationRows,
       profileRows,
@@ -969,7 +937,7 @@ async function loadTournamentRows(includeDetails: boolean): Promise<TournamentLo
     const participantCounts = groupRegistrationCounts(registrations)
     const mediaByTournament = groupTournamentMedia(mediaResponse)
 
-    const rows = uniqueTournamentsByFormat(response.rows
+    const rows = uniqueTournamentsByFormat(tournamentRowsResponse
       .filter((row) => !isPublicTestRow(row))
       .map((row) => mapAppwriteTournament(
         row,
@@ -994,12 +962,24 @@ async function loadTournamentRows(includeDetails: boolean): Promise<TournamentLo
 
 async function safeListTournamentMedia() {
   try {
-    const response = await storage.listFiles({
-      bucketId: tournamentAssetsBucketId,
-      queries: [Query.limit(500)],
-      total: false,
-    })
-    return response.files
+    const files: Models.File[] = []
+    let cursor: string | undefined
+    do {
+      const response = await storage.listFiles({
+        bucketId: tournamentAssetsBucketId,
+        queries: [
+          Query.limit(tournamentDetailPageSize),
+          ...(cursor ? [Query.cursorAfter(cursor)] : []),
+        ],
+        total: false,
+      })
+      files.push(...response.files)
+      if (response.files.length < tournamentDetailPageSize) break
+      const nextCursor = response.files.at(-1)?.$id
+      if (!nextCursor || nextCursor === cursor) throw new Error('Tournament media pagination did not advance.')
+      cursor = nextCursor
+    } while (cursor)
+    return files
   } catch (error) {
     console.warn('Tournament media read failed.', error)
     return []
@@ -1078,23 +1058,6 @@ export async function loadAnnouncements(): Promise<AnnouncementLoadResult> {
   }
 }
 
-async function safeListRows<T extends Models.Row>(tableId: string, queries: string[], label: string) {
-  try {
-    const response = await tablesDB.listRows<T>({
-      databaseId: appwriteConfig.databaseId,
-      tableId,
-      queries,
-      total: false,
-      ttl: 0,
-    })
-
-    return response.rows
-  } catch (error) {
-    console.warn(`JuChess cloud ${label} read failed.`, error)
-    return []
-  }
-}
-
 function mapAnnouncement(row: AppwriteAnnouncementRow): Announcement | null {
   if (!row.title || !row.body) return null
 
@@ -1168,11 +1131,17 @@ function groupRegisteredPlayers(rows: AppwriteRegistrationRow[], profiles: Map<s
 
 function groupPublishedGames(rows: AppwriteGameRow[], profiles: Map<string, Member>) {
   const groups = new Map<string, TournamentGame[]>()
+  const byeMember: Member = {
+    id: systemByeProfileId,
+    name: 'Bye',
+    rating: 0,
+    university: '',
+  }
 
   rows.forEach((row) => {
     if (!row.tournamentId || !row.whiteProfileId || !row.blackProfileId) return
-    const white = profiles.get(row.whiteProfileId)
-    const black = profiles.get(row.blackProfileId)
+    const white = row.whiteProfileId === systemByeProfileId ? byeMember : profiles.get(row.whiteProfileId)
+    const black = row.blackProfileId === systemByeProfileId ? byeMember : profiles.get(row.blackProfileId)
     if (!white || !black) return
     const list = groups.get(row.tournamentId) ?? []
     list.push({

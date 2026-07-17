@@ -16,6 +16,8 @@ import {
   findSampleGame,
   loadTournamentGame,
   loadTournamentGameArchive,
+  subscribeToTournamentGameRow,
+  subscribeToVisibleGameChanges,
   type GameSource,
   type SampleGame,
 } from '../lib/juchess'
@@ -137,6 +139,7 @@ function GamesPage() {
   } = useBoardPreferences()
   const [reviewSession, setReviewSession] = useState<ScopedGameReview | null>(null)
   const [reviewStarted, setReviewStarted] = useState(false)
+  const [reviewRequestVersion, setReviewRequestVersion] = useState(0)
   const [reviewError, setReviewError] = useState('')
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewProgress, setReviewProgress] = useState({ completed: 0, total: 0 })
@@ -152,6 +155,7 @@ function GamesPage() {
     ? reviewSession.result
     : null
   const reviewRunRef = useRef(0)
+  const reviewStartedIdentityRef = useRef<string | null>(null)
   const reviewAbortRef = useRef<AbortController | null>(null)
   const reviewEngineRef = useRef<StockfishReviewEngine | null>(null)
   const workspaceAnalysisRunRef = useRef(0)
@@ -173,8 +177,10 @@ function GamesPage() {
     reviewAbortRef.current = null
     reviewEngineRef.current?.dispose()
     reviewEngineRef.current = null
+    reviewStartedIdentityRef.current = null
     setReviewSession(null)
     setReviewStarted(false)
+    setReviewRequestVersion(0)
     setReviewError('')
     setReviewLoading(false)
     setReviewProgress({ completed: 0, total: 0 })
@@ -185,7 +191,9 @@ function GamesPage() {
   }, [engineStrength])
 
   useEffect(() => {
+    reviewStartedIdentityRef.current = null
     setReviewStarted(false)
+    setReviewRequestVersion(0)
   }, [game?.key])
 
   useEffect(() => {
@@ -239,18 +247,40 @@ function GamesPage() {
       refreshing = true
       try {
         const games = await loadTournamentGameArchive()
-        if (active) setTournamentArchive(games)
+        if (active) {
+          setTournamentArchive(games)
+          setSearchError('')
+        }
+      } catch (caught) {
+        if (active) setSearchError(caught instanceof Error ? caught.message : 'Tournament game archive is unavailable right now.')
       } finally {
         refreshing = false
       }
     }
 
     void refreshArchive()
-    const timer = window.setInterval(() => void refreshArchive(), 5000)
+    let unsubscribe: (() => void) | undefined
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshArchive()
+    }
+    const timer = window.setInterval(refreshWhenVisible, 30_000)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    void subscribeToVisibleGameChanges(() => void refreshArchive())
+      .then((stop) => {
+        if (active) unsubscribe = stop
+        else stop()
+      })
+      .catch(() => {
+        // The visible-only watchdog still refreshes if Realtime is unavailable.
+      })
 
     return () => {
       active = false
       window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      unsubscribe?.()
     }
   }, [source])
 
@@ -277,10 +307,27 @@ function GamesPage() {
       }
     }
 
-    const timer = window.setInterval(() => void refreshLiveGame(), 3000)
+    let unsubscribe: (() => void) | undefined
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshLiveGame()
+    }
+    const timer = window.setInterval(refreshWhenVisible, 15_000)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    void subscribeToTournamentGameRow(liveCloudGameId, () => void refreshLiveGame())
+      .then((stop) => {
+        if (active) unsubscribe = stop
+        else stop()
+      })
+      .catch(() => {
+        // The visible-only watchdog still refreshes if Realtime is unavailable.
+      })
     return () => {
       active = false
       window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      unsubscribe?.()
     }
   }, [liveCloudGameId, step])
 
@@ -288,12 +335,18 @@ function GamesPage() {
     const run = ++reviewRunRef.current
     const targetIdentity = activeGameIdentity
     setReviewSession(null)
-    setReviewStarted(false)
     setReviewError('')
     setReviewLoading(false)
     setReviewProgress({ completed: 0, total: 0 })
 
-    if (step !== 'review' || !game || !targetIdentity) return
+    if (
+      step !== 'review'
+      || !game
+      || !targetIdentity
+      || !reviewStarted
+      || reviewRequestVersion < 1
+      || reviewStartedIdentityRef.current !== targetIdentity
+    ) return
     if (game.live) {
       setReviewError('The live board is still changing. Full engine review becomes available when the game finishes.')
       return
@@ -351,7 +404,7 @@ function GamesPage() {
       if (reviewAbortRef.current === controller) reviewAbortRef.current = null
       if (reviewEngineRef.current === engine) reviewEngineRef.current = null
     }
-  }, [activeGameIdentity, enginePreset.depth, enginePreset.hashMb, game, step])
+  }, [activeGameIdentity, enginePreset.depth, enginePreset.hashMb, game, reviewRequestVersion, reviewStarted, step])
 
   useEffect(() => {
     const run = ++workspaceAnalysisRunRef.current
@@ -880,6 +933,7 @@ function GamesPage() {
               opening={currentOpening}
               onSelectMove={(index) => {
                 setMoveIdx(index)
+                reviewStartedIdentityRef.current = activeGameIdentity
                 setReviewStarted(true)
               }}
               progress={reviewProgress}
@@ -895,7 +949,9 @@ function GamesPage() {
               }}
               onStart={() => {
                 setMoveIdx(0)
+                reviewStartedIdentityRef.current = activeGameIdentity
                 setReviewStarted(true)
+                setReviewRequestVersion((version) => version + 1)
               }}
             />
           ) : null}
@@ -1327,6 +1383,16 @@ function ReviewPanel({
           </div>
         ) : null}
         {error ? <p className="review-error" role="alert">{error}</p> : null}
+        {!review && !loading ? (
+          <div className="review-engine-cta">
+            <span>Engine review</span>
+            <strong>Analyze this completed game when you are ready.</strong>
+            <small>Stockfish loads only after you start.</small>
+            <button type="button" className="review-start-button" onClick={onStart}>
+              {error ? 'Try engine review again' : 'Start engine review'}
+            </button>
+          </div>
+        ) : null}
         {review ? (
           <>
             <ReviewGraph

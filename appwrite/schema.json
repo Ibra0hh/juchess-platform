@@ -76,6 +76,9 @@
       }
     },
     "tournaments": {
+      "indexes": {
+        "status_key": "key:status"
+      },
       "fields": {
         "slug": "string|required|unique",
         "name": "string|required",
@@ -105,6 +108,11 @@
       "note": "World-readable (public players list and participant counts). Rows are created ONLY by the player-actions function; clients have no create permission. Never store a secret here.",
       "permissions": ["read(\"any\")", "update(\"team:admins\")", "delete(\"team:admins\")", "update(\"team:organizers\")"],
       "rowSecurity": true,
+      "indexes": {
+        "tournamentId_key": "key:tournamentId",
+        "profileId_key": "key:profileId",
+        "tournament_profile_unique": "unique:tournamentId,profileId"
+      },
       "fields": {
         "tournamentId": "string|required",
         "profileId": "string|required",
@@ -256,6 +264,9 @@
       }
     },
     "standings": {
+      "indexes": {
+        "tournamentId_key": "key:tournamentId"
+      },
       "fields": {
         "tournamentId": "string|required",
         "profileId": "string|required",

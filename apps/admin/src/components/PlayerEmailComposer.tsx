@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Mail, Send, X } from 'lucide-react'
+import { compactCrestUrl } from '../lib/brand'
 import {
   formatAdminError,
   loadPlayerEmailStatus,
@@ -175,7 +176,7 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
             <div className="player-email-preview-card">
               <div className="player-email-preview-accent" />
               <div className="player-email-preview-brand">
-                <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="JuChess" />
+                <img src={compactCrestUrl} alt="JuChess" />
                 <strong>JuChess</strong>
                 <small>University of Jordan Chess Club</small>
               </div>

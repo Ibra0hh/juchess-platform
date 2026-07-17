@@ -1,11 +1,63 @@
 # JuChess Complete New-Chat Handoff
 
-Last updated: July 17, 2026
+Last updated: July 18, 2026
 
 This file is both a complete project handoff and a copy-paste prompt for a new
 AI chat. It describes the intended product, the actual implementation, the
 backend contract, deployment state, known limitations, and the working rules
 that must not be lost between chats.
+
+## July 18 architecture, correctness, and performance hardening
+
+- Added `docs/SYSTEM_ARCHITECTURE.md` as the executable architecture reference,
+  including account/OAuth trees, trust boundaries, data ownership, tournament
+  lifecycle, hosted-play sequence, refresh behavior, deployment flow, and an
+  explicit list of current constraints.
+- The public web app now route-splits large screens. The core entry is about
+  43.45 kB raw/13.31 kB gzip; tournament detail, review, tools, and other large
+  screens load only when navigated to. Stockfish also starts only after explicit
+  review intent and exposes load/retry failure instead of silently hanging.
+- Web tournament/game reads are ID-scoped and cursor-paginated. Visible-only
+  watchdogs complement filtered Appwrite Realtime, bursts are coalesced, stale
+  async responses cannot replace a newer auth/session snapshot, and transient
+  failures preserve the last canonical data while disabling unsafe actions.
+  Fake review fixtures, fake player data/actions, and the redundant tournament
+  Games tab were removed.
+- The admin control center now has a generation-safe JWT cache, single-flight
+  canonical refresh, Realtime invalidation, visible-only slow watchdogs, explicit
+  unavailable/stale states, targeted private email resolution, CSV formula
+  injection protection, and no simulated success controls. A failed player or
+  tournament load keeps the last good snapshot and makes management read-only.
+- Mobile now uses generation-safe session JWTs, cursor pagination, canonical
+  tournament/game snapshots, exact-game Realtime with a visible fallback, and
+  explicit media-unavailable state. Demo tournament fixtures were removed.
+- `admin-actions` now verifies the current Appwrite admin-team membership in
+  addition to `admin_profiles`; private identity fallbacks propagate outages;
+  tournament creation is forced to Draft; and published/active competition
+  fields are locked. Pairing publication validates boards, rounds, participants,
+  byes, round-robin matrices, and knockout entrants, then canonicalizes knockout
+  brackets and commits games plus metadata in one transaction. Already-published
+  schedules must be unpublished first. Atomic publication is capped at 96 games
+  to stay below the smallest Appwrite transaction-operation limit.
+- Fair-play heartbeats now upsert one stable row per game/player/session rather
+  than growing every heartbeat; archives and summaries use scoped/paginated
+  reads. The live `games` query indexes required by status, player/status, and
+  tournament/status reads are available and declared in `appwrite/schema.json`.
+- The `admin-actions` public URL variable now points to `https://juchess.page`.
+  Deployment `6a5abbd5b964134863c1` is ready, active, and returned HTTP 200 from
+  execution `6a5abc0b1ccaadc6aa25` in 0.02 seconds.
+- Validation passed: web lint/build plus 70 tests; admin lint/build plus 15
+  control-center tests and the complete admin Function engine suite; all five
+  Function syntax checks and the repository-wide Function suite; all three
+  email templates; Flutter analysis and 38 mobile tests. No Android device was
+  connected, so this release was not installed on physical hardware. No real
+  email was sent, so inbox delivery/rendering was not re-verified.
+- Remaining explicit debt: tournament media mutations still use direct Storage;
+  opening-pairing proposals originate in the admin browser before strict server
+  validation; audit writes are best-effort; some public/mobile aggregation reads
+  are still broad; and the admin, mobile, and `admin-actions` monoliths need
+  incremental domain decomposition. Team and full Arena engines remain
+  incomplete.
 
 ## July 17 deep authentication hardening
 

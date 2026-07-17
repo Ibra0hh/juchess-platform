@@ -1,4 +1,4 @@
-import { Account, Client, Functions, Storage, TablesDB } from 'appwrite'
+import { Account, Client, Functions, Realtime, Storage, TablesDB } from 'appwrite'
 
 // These client identifiers are public. Defaults keep the static admin build
 // connected when local environment files are intentionally excluded from Git.
@@ -26,5 +26,6 @@ if (appwriteConfig.endpoint && appwriteConfig.projectId) {
 
 export const account = new Account(client)
 export const tablesDB = new TablesDB(client)
+export const realtime = new Realtime(client)
 export const storage = new Storage(client)
 export const functions = new Functions(client)
