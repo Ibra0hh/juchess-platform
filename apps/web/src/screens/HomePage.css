@@ -472,9 +472,11 @@
   z-index: 5;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 28px;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   padding: 13px 26px;
   color: rgba(248, 243, 231, 0.9);
   background: #111111;
@@ -483,17 +485,36 @@
   font-family: "Cormorant Garamond", Georgia, serif;
   font-size: 18px;
   white-space: nowrap;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.home-marquee::-webkit-scrollbar {
+  display: none;
 }
 
 .home-marquee span {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 10px;
+  padding: 0 24px;
+  border-right: 1px solid rgba(201, 174, 107, 0.32);
+}
+
+.home-marquee span:last-child {
+  border-right: 0;
 }
 
 .home-marquee b {
   color: #c9ae6b;
   font-weight: 700;
+}
+
+@media (min-width: 981px) {
+  .home-marquee {
+    justify-content: center;
+  }
 }
 
 .home-news,
@@ -652,7 +673,7 @@
   overflow: hidden;
   color: #f5efe3;
   background: #5a1922;
-  padding: 96px 26px;
+  padding: 64px 26px;
 }
 
 .home-vision .home-section-heading,
@@ -668,7 +689,9 @@
 }
 
 .home-section-heading.light h2 {
+  max-width: 680px;
   color: #f5efe3;
+  font-size: clamp(34px, 4.3vw, 44px);
 }
 
 .home-section-heading.light h2 em {
@@ -677,6 +700,8 @@
 }
 
 .home-section-heading.light p {
+  max-width: 520px;
+  margin-top: 10px;
   color: rgba(245, 239, 227, 0.78);
 }
 
@@ -707,34 +732,34 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
-  margin-top: 48px;
+  margin-top: 30px;
 }
 
 .vision-card {
   background: rgba(248, 243, 231, 0.045);
   border: 1px solid rgba(201, 174, 107, 0.28);
   border-radius: 16px;
-  padding: 28px 24px;
+  padding: 20px;
 }
 
 .vision-card strong {
   color: #c9ae6b;
   font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 30px;
+  font-size: 25px;
 }
 
 .vision-card h3 {
-  margin: 12px 0 0;
+  margin: 7px 0 0;
   font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 24px;
+  font-size: 21px;
   line-height: 1.1;
 }
 
 .vision-card p {
-  margin: 10px 0 0;
+  margin: 7px 0 0;
   color: rgba(245, 239, 227, 0.72);
-  font-size: 13.5px;
-  line-height: 1.65;
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 .team-grid {
@@ -1419,9 +1444,14 @@
   }
 
   .home-marquee {
-    gap: 10px 22px;
-    padding: 11px 16px;
-    font-size: 16px;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 11px 0;
+    font-size: 15px;
+  }
+
+  .home-marquee span {
+    padding: 0 18px;
   }
 
   .home-news,
@@ -1478,17 +1508,57 @@
   }
 
   .home-vision {
-    padding: 64px 16px;
+    padding: 42px 16px;
+  }
+
+  .home-vision .home-section-heading,
+  .home-vision .vision-card-grid {
+    width: 100%;
+    max-width: 343px;
+    margin-right: auto;
+    margin-left: auto;
+    box-sizing: border-box;
+  }
+
+  .home-vision .home-section-heading h2 {
+    width: 100%;
+    max-width: 340px;
+    font-size: 30px;
+    overflow-wrap: anywhere;
+  }
+
+  .home-vision .home-section-heading p {
+    max-width: 340px;
+    margin-top: 10px;
+    font-size: 12.5px;
+    line-height: 1.48;
   }
 
   .vision-card-grid {
-    gap: 10px;
-    margin-top: 32px;
+    gap: 8px;
+    margin-top: 22px;
   }
 
   .vision-card {
-    padding: 22px 20px;
-    border-radius: 12px;
+    min-width: 0;
+    padding: 14px 16px;
+    border-radius: 10px;
+    box-sizing: border-box;
+  }
+
+  .vision-card strong {
+    font-size: 21px;
+  }
+
+  .vision-card h3 {
+    margin-top: 4px;
+    font-size: 18px;
+  }
+
+  .vision-card p {
+    margin-top: 5px;
+    font-size: 12px;
+    line-height: 1.4;
   }
 
   .team-grid {
