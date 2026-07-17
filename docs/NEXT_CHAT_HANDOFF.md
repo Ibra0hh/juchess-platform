@@ -1345,8 +1345,14 @@ Successful link or code verification updates Appwrite's canonical
 seconds, and a live invalid-code request returned the expected generic 400.
 Function syntax, all 29 Function tests, all three email-template checks, web
 lint/build, and all 52 web tests passed. Rendered desktop QA confirmed the sent,
-invalid-link, and invalid-code recovery states. A new real inbox message has not
-yet been sent; obtain fresh recipient confirmation immediately before doing so.
+invalid-link, and invalid-code recovery states. After fresh recipient approval,
+a real verification email was sent to `7ibrahem0h@gmail.com` through execution
+`6a5a41c8be8515b8b1bf`. Message
+`verify_6a5a41c8003a2dac40ae` reached Appwrite `sent` status with one delivery at
+July 17, 2026 17:52:57 Asia/Amman. The challenge expires exactly two hours after
+creation, and the account's original verified state was restored. Gmail inbox
+rendering and actual link/code interaction still require the recipient's
+confirmation.
 
 At commit `c20c8c3`, the tournament/board checks below had passed:
 
@@ -1401,8 +1407,10 @@ These are real limitations, not optional wording issues:
     delivery, but Gmail inbox rendering and reply-to remain unconfirmed.
     Email/SMS/Push announcement broadcast delivery also remains incomplete.
 13. The two-hour link-and-code verification Function and recovery provider are
-    configured, but the new verification email and the password-recovery email
-    still need complete real-inbox link/code tests with an approved recipient.
+    configured. Appwrite recorded one verification-email delivery, but Gmail
+    rendering and actual link/code interaction remain unconfirmed. The
+    password-recovery email still needs a complete real-inbox link test with an
+    approved recipient.
 14. Email verification is currently implemented on the web client. Audit the
     Flutter sign-up/sign-in flow before assuming mobile enforces the identical
     verification gate and branded callback experience.
