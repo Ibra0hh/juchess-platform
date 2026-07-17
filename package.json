@@ -28,6 +28,7 @@
     "migrate:board-preferences": "powershell -ExecutionPolicy Bypass -File scripts/migrate-board-preferences.ps1",
     "migrate:registration-deadline": "powershell -ExecutionPolicy Bypass -File scripts/migrate-tournament-registration-deadline.ps1",
     "migrate:recruitment": "powershell -ExecutionPolicy Bypass -File scripts/migrate-recruitment.ps1",
+    "migrate:email-verification": "powershell -ExecutionPolicy Bypass -File scripts/migrate-email-verification.ps1",
     "configure:auth-sessions": "powershell -ExecutionPolicy Bypass -File scripts/configure-auth-session-policy.ps1",
     "generate:opening-book": "node scripts/generate-opening-book.mjs",
     "lint:web": "npm --workspace apps/web run lint",
@@ -37,8 +38,8 @@
     "test:web-review": "node --experimental-strip-types --test apps/web/src/lib/gameReview.test.ts apps/web/src/lib/externalGames.test.ts apps/web/src/lib/onlineTournamentOptimism.test.ts apps/web/src/lib/storedMoves.test.ts apps/web/src/lib/boardAppearance.test.ts apps/web/src/lib/openingBook.test.ts apps/web/src/lib/tablebase.test.ts apps/web/src/lib/jordanUniversities.test.ts apps/web/src/lib/functionAuth.test.ts apps/web/src/lib/profileImageCrop.test.ts apps/web/src/lib/profileCompletion.test.ts apps/web/src/lib/emailVerification.test.ts apps/web/src/lib/publicContent.test.ts apps/web/src/lib/authSession.test.ts apps/web/src/components/RouteMetadata.test.ts",
     "test:admin-wizard": "node --experimental-strip-types --test apps/admin/test/tournamentWizard.test.mjs",
     "test:engine": "cd appwrite/functions/admin-actions && node --test test/*.test.mjs",
-    "test:functions": "node --test appwrite/functions/player-actions/test/*.test.mjs appwrite/functions/attendance-actions/test/*.test.mjs appwrite/functions/access-guards/test/*.test.mjs",
-    "check:functions": "node --check appwrite/functions/admin-actions/src/main.js && node --check appwrite/functions/player-actions/src/main.js && node --check appwrite/functions/attendance-actions/src/main.js && node --check appwrite/functions/access-guards/src/main.js",
+    "test:functions": "node --test appwrite/functions/player-actions/test/*.test.mjs appwrite/functions/attendance-actions/test/*.test.mjs appwrite/functions/access-guards/test/*.test.mjs appwrite/functions/verification-actions/test/*.test.mjs",
+    "check:functions": "node --check appwrite/functions/admin-actions/src/main.js && node --check appwrite/functions/player-actions/src/main.js && node --check appwrite/functions/attendance-actions/src/main.js && node --check appwrite/functions/access-guards/src/main.js && node --check appwrite/functions/verification-actions/src/main.js",
     "check:web": "npm run lint:web && npm run build:web && npm run test:web-review",
     "check:admin": "npm run lint:admin && npm run build:admin && npm run test:admin-wizard && npm run test:engine",
     "check:all": "npm run check:functions && npm run test:functions && npm run check:web && npm run check:admin && npm run mobile:analyze && npm run mobile:test"

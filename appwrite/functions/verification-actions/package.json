@@ -1,0 +1,9 @@
+{
+  "name": "juchess-verification-actions",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "node-appwrite": "^26.2.0"
+  }
+}

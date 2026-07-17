@@ -1,4 +1,5 @@
-.verification-resend-form {
+.verification-resend-form,
+.verification-code-form {
   width: 100%;
   display: grid;
   gap: 12px;
@@ -8,7 +9,16 @@
   text-align: left;
 }
 
-.verification-resend-form label {
+.verification-code-form {
+  margin-top: 6px;
+  padding: 16px;
+  border: 1px solid rgba(169, 138, 63, 0.34);
+  border-radius: 10px;
+  background: rgba(246, 240, 227, 0.72);
+}
+
+.verification-resend-form label,
+.verification-code-form label {
   display: grid;
   gap: 6px;
   color: rgba(17, 17, 17, 0.78);
@@ -16,7 +26,8 @@
   font-weight: 600;
 }
 
-.verification-resend-form input {
+.verification-resend-form input,
+.verification-code-form input {
   box-sizing: border-box;
   width: 100%;
   height: 44px;
@@ -30,9 +41,79 @@
   outline: none;
 }
 
-.verification-resend-form input:focus {
+.verification-resend-form input:focus,
+.verification-code-form input:focus {
   border-color: #7a2431;
   box-shadow: 0 0 0 3px rgba(122, 36, 49, 0.12);
+}
+
+.verification-form-heading {
+  display: grid;
+  gap: 3px;
+  color: #111111;
+  text-align: left;
+}
+
+.verification-form-heading strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.verification-form-heading span {
+  color: rgba(17, 17, 17, 0.64);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.verification-code-form .verification-code-input {
+  height: 52px;
+  padding-left: 20px;
+  font-family: 'Courier New', monospace;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  text-align: center;
+}
+
+.verification-method-divider {
+  position: relative;
+  width: 100%;
+  margin: 8px 0 0;
+  color: rgba(17, 17, 17, 0.54);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.verification-method-divider::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: rgba(17, 17, 17, 0.13);
+  content: '';
+}
+
+.verification-method-divider span {
+  position: relative;
+  padding: 0 10px;
+  background: #fffdf8;
+}
+
+@media (max-width: 480px) {
+  .verification-code-form {
+    padding: 14px 12px;
+  }
+
+  .verification-code-form .verification-code-input {
+    padding-left: 16px;
+    font-size: 21px;
+    letter-spacing: 6px;
+  }
 }
 
 .verification-resend-button {

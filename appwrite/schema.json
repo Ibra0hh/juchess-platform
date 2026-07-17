@@ -55,6 +55,26 @@
         "phone": "string"
       }
     },
+    "email_verification_challenges": {
+      "note": "Server-only two-hour email verification proofs. Email addresses, six-digit codes, and link tokens are stored only as keyed hashes. Clients have no direct permissions.",
+      "permissions": [],
+      "rowSecurity": true,
+      "indexes": {
+        "verification_user": "key:userId",
+        "verification_email": "key:emailHash"
+      },
+      "fields": {
+        "userId": "string|required",
+        "emailHash": "string|required",
+        "codeHash": "string|required",
+        "linkHash": "string|required",
+        "expiresAt": "datetime|required",
+        "attempts": "integer|default:0|min:0|max:5",
+        "consumedAt": "datetime",
+        "emailMessageId": "string|required",
+        "createdAt": "datetime|required"
+      }
+    },
     "tournaments": {
       "fields": {
         "slug": "string|required|unique",
@@ -333,5 +353,5 @@
     }
   },
   "buckets": ["avatars", "tournament-assets"],
-  "functions": ["admin-actions", "player-actions", "attendance-actions", "access-guards"]
+  "functions": ["admin-actions", "player-actions", "attendance-actions", "access-guards", "verification-actions"]
 }

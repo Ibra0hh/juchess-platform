@@ -1332,6 +1332,22 @@ horizontal overflow, and no browser console warnings/errors. A real resend was
 not triggered during UI QA because that requires the affected player's actual
 credentials and sends an external email.
 
+On July 17, 2026, website email verification was moved from Appwrite's fixed
+seven-day link to the deployed `verification-actions` Function. Every new
+verification email now contains both a secure link and a six-digit code. The
+Function enforces an exact two-hour expiry, a 30-second resend cooldown, five
+code attempts, and invalidates all older proofs after resend. Only keyed hashes
+of the email, code, and link token are stored in the private
+`email_verification_challenges` table; the table has no client permissions.
+Successful link or code verification updates Appwrite's canonical
+`emailVerification` user flag. Function deployment
+`6a5a3b8b123eb48ab6d6` reached ready, its live health response reported 7,200
+seconds, and a live invalid-code request returned the expected generic 400.
+Function syntax, all 29 Function tests, all three email-template checks, web
+lint/build, and all 52 web tests passed. Rendered desktop QA confirmed the sent,
+invalid-link, and invalid-code recovery states. A new real inbox message has not
+yet been sent; obtain fresh recipient confirmation immediately before doing so.
+
 At commit `c20c8c3`, the tournament/board checks below had passed:
 
 - Function JavaScript syntax checks
@@ -1384,8 +1400,9 @@ These are real limitations, not optional wording issues:
     user-confirmed production test reached Appwrite `sent` status with one
     delivery, but Gmail inbox rendering and reply-to remain unconfirmed.
     Email/SMS/Push announcement broadcast delivery also remains incomplete.
-13. The verification/recovery provider is configured, but a real inbox flow has
-    not yet been completed. This is the highest-priority auth verification gap.
+13. The two-hour link-and-code verification Function and recovery provider are
+    configured, but the new verification email and the password-recovery email
+    still need complete real-inbox link/code tests with an approved recipient.
 14. Email verification is currently implemented on the web client. Audit the
     Flutter sign-up/sign-in flow before assuming mobile enforces the identical
     verification gate and branded callback experience.

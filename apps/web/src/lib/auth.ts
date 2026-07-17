@@ -3,6 +3,7 @@ import { account, appwriteConfig, appwriteReady, createPlayerFunctionHeaders, fu
 import { tableIds } from './juchess'
 import type { BoardPreferences } from './boardAppearance'
 import { isExistingSessionError, normalizeAccountEmail } from './authSession'
+import { sendEmailVerificationChallenge } from './emailVerification'
 
 export type ProfileRole = 'member' | 'organizer' | 'admin'
 export type ProfileStatus = 'active' | 'suspended'
@@ -154,8 +155,8 @@ export async function signInWithEmail(input: SignInInput): Promise<AuthSession> 
 
     throw new EmailVerificationRequiredError(
       verificationSent
-        ? 'Verify your email before signing in. We sent you a new verification link.'
-        : 'Verify your email before signing in. Open the most recent verification email we sent you.',
+        ? 'Verify your email before signing in. We sent a new two-hour link and six-digit code.'
+        : 'Verify your email before signing in. Open the most recent JuChess verification email.',
     )
   }
 
@@ -231,15 +232,6 @@ export async function completePasswordRecovery(userId: string, secret: string, p
     userId,
     secret,
     password,
-  })
-}
-
-export async function completeEmailVerification(userId: string, secret: string) {
-  requireAppwriteReady()
-
-  await account.updateEmailVerification({
-    userId,
-    secret,
   })
 }
 
@@ -434,9 +426,7 @@ function requireAppwriteReady() {
 }
 
 async function sendCurrentUserEmailVerification() {
-  await account.createEmailVerification({
-    url: appUrl('/verify-email'),
-  })
+  await sendEmailVerificationChallenge()
 }
 
 async function deleteCurrentSession() {

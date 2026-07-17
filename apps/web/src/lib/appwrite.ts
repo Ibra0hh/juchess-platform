@@ -20,6 +20,7 @@ export const appwriteConfig = {
   adminFunctionId: import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions',
   playerFunctionId: import.meta.env.VITE_APPWRITE_PLAYER_FUNCTION_ID ?? 'player-actions',
   attendanceFunctionId: import.meta.env.VITE_APPWRITE_ATTENDANCE_FUNCTION_ID ?? 'attendance-actions',
+  verificationFunctionId: import.meta.env.VITE_APPWRITE_VERIFICATION_FUNCTION_ID ?? 'verification-actions',
 }
 
 export const appwriteReady = Boolean(
@@ -41,4 +42,12 @@ export const realtime = new Realtime(client)
 export async function createPlayerFunctionHeaders() {
   const token = await account.createJWT({ duration: 900 })
   return playerFunctionHeaders(token.jwt)
+}
+
+export async function createAccountFunctionHeaders() {
+  const token = await account.createJWT({ duration: 900 })
+  return {
+    'content-type': 'application/json',
+    'juchess-account-jwt': token.jwt,
+  }
 }

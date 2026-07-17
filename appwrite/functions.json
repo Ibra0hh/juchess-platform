@@ -144,5 +144,42 @@
         "value": "juchess"
       }
     ]
+  },
+  {
+    "$id": "verification-actions",
+    "name": "JuChess Email Verification",
+    "runtime": "node-22",
+    "path": "functions/verification-actions",
+    "entrypoint": "src/main.js",
+    "commands": "npm install",
+    "execute": [
+      "any"
+    ],
+    "events": [],
+    "schedule": "",
+    "timeout": 15,
+    "enabled": true,
+    "logging": true,
+    "ignore": [
+      "node_modules",
+      ".git"
+    ],
+    "scopes": [
+      "rows.read",
+      "rows.write",
+      "users.read",
+      "users.write",
+      "messages.write"
+    ],
+    "vars": [
+      {
+        "key": "JUCHESS_DATABASE_ID",
+        "value": "juchess"
+      },
+      {
+        "key": "JUCHESS_PUBLIC_WEB_URL",
+        "value": "https://juchess.page"
+      }
+    ]
   }
 ]

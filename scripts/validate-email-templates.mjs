@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { buildVerificationEmailHtml } from '../appwrite/functions/verification-actions/src/main.js'
 
 const templateDir = 'appwrite/email-templates'
 const templates = readdirSync(templateDir).filter((name) => name.endsWith('.html'))
@@ -44,4 +45,26 @@ for (const name of templates) {
   console.log(`OK ${name} (${size} bytes)`)
 }
 
-console.log(`Validated ${templates.length} JuChess email templates.`)
+const challengeHtml = buildVerificationEmailHtml({
+  displayName: 'JuChess Player',
+  code: '123456',
+  verificationUrl: 'https://juchess.page/verify-email?challenge=template-check&token=template-check-token',
+})
+for (const marker of [
+  logoUrl,
+  '@media only screen and (max-width:480px)',
+  'Verify email address',
+  '>123456<',
+  'Expires in two hours',
+]) {
+  if (!challengeHtml.includes(marker)) throw new Error(`verification-actions: missing challenge email markup ${marker}.`)
+}
+for (const pattern of forbiddenPatterns) {
+  if (pattern.test(challengeHtml)) throw new Error(`verification-actions: contains unsafe email markup (${pattern}).`)
+}
+if (Buffer.byteLength(challengeHtml, 'utf8') > 100_000) {
+  throw new Error('verification-actions: exceeds the 100 KB email HTML budget.')
+}
+console.log(`OK verification-actions challenge email (${Buffer.byteLength(challengeHtml, 'utf8')} bytes)`)
+
+console.log(`Validated ${templates.length + 1} JuChess email templates.`)
