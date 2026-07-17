@@ -224,10 +224,35 @@ async function requireAccount(req, authMessage = 'Sign in to manage your JuChess
     .setJWT(jwt);
 
   try {
-    return await new Account(userClient).get();
-  } catch {
+    const user = await new Account(userClient).get();
+    if (!user.emailVerification) {
+      throw new HttpError(403, 'Verify your email before using private JuChess features.');
+    }
+    return user;
+  } catch (cause) {
+    if (cause instanceof HttpError) throw cause;
     throw new HttpError(401, authMessage);
   }
+}
+
+export async function activateCompleteOwnerProfile(tablesDB, databaseId, user, profile, identity) {
+  if (!profile || profile.status === 'suspended' || !isCompletePlayerProfile(profile, identity)) {
+    return profile;
+  }
+
+  const permissions = profilePermissions('active', user.$id);
+  const currentPermissions = Array.isArray(profile.$permissions) ? profile.$permissions : [];
+  const alreadyActiveAndPublic = profile.status === 'active'
+    && permissions.every((permission) => currentPermissions.includes(permission));
+  if (alreadyActiveAndPublic) return profile;
+
+  return await tablesDB.updateRow({
+    databaseId,
+    tableId: tableIds.profiles,
+    rowId: profile.$id,
+    data: { status: 'active' },
+    permissions,
+  });
 }
 
 async function loadProfileContext(tablesDB, databaseId, accountId) {
@@ -325,10 +350,16 @@ async function requirePlayer(req, tablesDB, databaseId) {
 }
 
 export async function saveOwnerProfile(tablesDB, databaseId, user, body, users = null) {
+  if (user.emailVerification === false) {
+    throw new HttpError(403, 'Verify your email before creating a JuChess profile.');
+  }
   const { publicData, privateData } = normalizeProfileUpdate(body);
   const context = await loadProfileContext(tablesDB, databaseId, user.$id);
+  if (context.profile?.status === 'suspended') {
+    throw new HttpError(403, 'This account is blocked by club administration.');
+  }
   const profileId = context.profile?.$id ?? context.identity?.$id ?? ID.unique();
-  const status = context.profile?.status ?? 'pending';
+  const status = 'active';
   const identityData = buildPrivateProfileData(profileId, user, context.identity, privateData);
   assertCompletePlayerProfile({ ...context.profile, ...publicData }, identityData);
   const reclaimablePhoneIdentity = Object.prototype.hasOwnProperty.call(privateData, 'phone')
@@ -358,7 +389,7 @@ export async function saveOwnerProfile(tablesDB, databaseId, user, body, users =
           databaseId,
           tableId: tableIds.profiles,
           rowId: profileId,
-          data: publicData,
+          data: { ...publicData, status },
           permissions: profilePermissions(status, user.$id),
           transactionId: transaction.$id,
         })
@@ -370,9 +401,9 @@ export async function saveOwnerProfile(tablesDB, databaseId, user, body, users =
             ...publicData,
             rating: 1200,
             role: 'member',
-            status: 'pending',
+            status,
           },
-          permissions: profilePermissions('pending', user.$id),
+          permissions: profilePermissions(status, user.$id),
           transactionId: transaction.$id,
         });
 
@@ -576,7 +607,14 @@ export default async ({ req, res, log, error }) => {
       if (method === 'GET') {
         const { profile, identity } = await loadProfileContext(tablesDB, databaseId, user.$id);
         if (!profile) return res.json({ ok: false, error: 'No club profile exists for this account.' }, 404);
-        return res.json({ ok: true, row: mergeOwnerProfile(profile, identity, user) });
+        const activeProfile = await activateCompleteOwnerProfile(
+          tablesDB,
+          databaseId,
+          user,
+          profile,
+          identity,
+        );
+        return res.json({ ok: true, row: mergeOwnerProfile(activeProfile, identity, user) });
       }
 
       const row = await saveOwnerProfile(tablesDB, databaseId, user, body, users);

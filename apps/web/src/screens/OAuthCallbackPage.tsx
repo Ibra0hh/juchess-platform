@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import { formatAppwriteError } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
-import { profileNeedsCompletion } from '../lib/profileCompletion'
+import { postAuthenticationDestination } from '../lib/profileCompletion'
 import './AuthPage.css'
 
 export default function OAuthCallbackPage() {
@@ -29,7 +29,7 @@ export default function OAuthCallbackPage() {
 
     void completeOAuth(userId, secret)
       .then((session) => {
-        navigate(profileNeedsCompletion(session.profile) ? '/complete-profile' : '/profile', { replace: true })
+        navigate(postAuthenticationDestination(session.profile), { replace: true })
       })
       .catch((caught) => setError(formatAppwriteError(caught)))
   }, [completeOAuth, navigate, searchParams])
@@ -41,7 +41,7 @@ export default function OAuthCallbackPage() {
         <section className="auth-panel prototype-auth-panel signin auth-callback-panel" aria-live="polite">
           <img src={compactCrestUrl} alt="" />
           <h1>{error ? 'Sign-in needs attention' : 'Finishing your sign-in'}</h1>
-          <p>{error || 'Creating your secure sign-in session...'}</p>
+          <p>{error || 'Checking whether your JuChess player profile is ready...'}</p>
           {!error ? <span className="auth-spinner" aria-hidden="true" /> : null}
           {error ? <Link className="auth-secondary-button" to="/sign-in">Return to sign in</Link> : null}
         </section>

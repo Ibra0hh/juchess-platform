@@ -5,7 +5,7 @@ import type { BoardPreferences } from './boardAppearance'
 import { isExistingSessionError, normalizeAccountEmail } from './authSession'
 
 export type ProfileRole = 'member' | 'organizer' | 'admin'
-export type ProfileStatus = 'pending' | 'active' | 'suspended'
+export type ProfileStatus = 'active' | 'suspended'
 
 export type AuthProfile = Models.Row & {
   accountId: string

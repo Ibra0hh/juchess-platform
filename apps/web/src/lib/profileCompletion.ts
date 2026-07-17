@@ -8,6 +8,7 @@ export type ProfileCompletionFields = {
 const PROFILE_COMPLETION_PATHS = new Set(['/auth/callback', '/complete-profile', '/verify-email'])
 
 export type ProfileCompletionAuthMethod = 'google' | 'email' | 'account'
+export type PostAuthenticationDestination = '/complete-profile' | '/profile'
 
 export function profileCompletionAuthMethod(sessionProvider: string | null | undefined): ProfileCompletionAuthMethod {
   const provider = sessionProvider?.trim().toLowerCase()
@@ -21,6 +22,12 @@ export function profileNeedsCompletion(profile: ProfileCompletionFields | null |
     || !profile.university?.trim()
     || !profile.universityId?.trim()
     || !profile.phone?.trim()
+}
+
+export function postAuthenticationDestination(
+  profile: ProfileCompletionFields | null | undefined,
+): PostAuthenticationDestination {
+  return profileNeedsCompletion(profile) ? '/complete-profile' : '/profile'
 }
 
 export function shouldRedirectToProfileCompletion({

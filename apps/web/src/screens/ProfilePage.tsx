@@ -254,7 +254,7 @@ function ProfilePage() {
             <div className="member-profile-name">
               <div>
                 <h1>{displayName}</h1>
-                <span>{profile?.status === 'pending' ? 'Pending member' : 'Club member'}</span>
+                <span>Club member</span>
               </div>
               <p>{username} · Member since {formatMemberSince(user?.$createdAt || profile?.$createdAt)}</p>
             </div>

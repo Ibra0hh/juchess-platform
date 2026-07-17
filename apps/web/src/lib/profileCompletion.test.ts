@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   profileCompletionAuthMethod,
   profileNeedsCompletion,
+  postAuthenticationDestination,
   shouldRedirectToProfileCompletion,
 } from './profileCompletion.ts'
 
@@ -20,6 +21,15 @@ test('a profile does not count as complete until every required field exists', (
   for (const field of Object.keys(completeProfile) as Array<keyof typeof completeProfile>) {
     assert.equal(profileNeedsCompletion({ ...completeProfile, [field]: '  ' }), true, field)
   }
+})
+
+test('the post-authentication tree distinguishes a JuChess member from a new Google identity', () => {
+  assert.equal(postAuthenticationDestination(null), '/complete-profile')
+  assert.equal(postAuthenticationDestination({
+    ...completeProfile,
+    phone: '',
+  }), '/complete-profile')
+  assert.equal(postAuthenticationDestination(completeProfile), '/profile')
 })
 
 test('signed-in identities without a complete profile are restricted to completion routes', () => {

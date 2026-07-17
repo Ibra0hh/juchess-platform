@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   assertCompletePlayerProfile,
+  activateCompleteOwnerProfile,
   attendanceRowId,
   attendanceWindowState,
   buildPrivateProfileData,
@@ -74,6 +75,36 @@ test('an incomplete first profile submission starts no database transaction', as
     (error) => error.statusCode === 400 && /required before a JuChess profile can be created/.test(error.message),
   );
   assert.equal(transactionCalls, 0);
+});
+
+test('an unverified email account cannot create a JuChess profile', async () => {
+  let databaseCalls = 0;
+  const tablesDB = {
+    async listRows() {
+      databaseCalls += 1;
+      return { rows: [] };
+    },
+  };
+
+  await assert.rejects(
+    saveOwnerProfile(
+      tablesDB,
+      'juchess',
+      {
+        $id: 'unverified-account',
+        email: 'student@example.com',
+        emailVerification: false,
+      },
+      {
+        displayName: 'Student Knight',
+        university: 'University of Jordan',
+        universityId: '0201234',
+        phone: '0791234567',
+      },
+    ),
+    (error) => error.statusCode === 403 && /verify your email/i.test(error.message),
+  );
+  assert.equal(databaseCalls, 0);
 });
 
 test('profile updates separate editable public and private fields', () => {
@@ -215,7 +246,7 @@ test('profile completion clears an orphaned phone reservation in the same transa
           $id: 'current-profile',
           displayName: 'Student Knight',
           university: 'University of Jordan',
-          status: 'pending',
+          status: options.data.status,
         };
       }
       return { $id: options.rowId, ...options.data };
@@ -255,9 +286,110 @@ test('profile completion clears an orphaned phone reservation in the same transa
     transactionId: 'transaction-1',
   });
   assert.equal(updates[1].tableId, 'profiles');
+  assert.equal(updates[1].data.status, 'active');
+  assert.deepEqual(updates[1].permissions, [
+    'read("any")',
+    'read("user:current-account")',
+  ]);
   assert.equal(updates[1].transactionId, 'transaction-1');
   assert.deepEqual(transactionUpdates, [{ transactionId: 'transaction-1', commit: true }]);
   assert.equal(result.phone, '+962791234567');
+  assert.equal(result.status, 'active');
+});
+
+test('a complete first profile submission creates an active club member', async () => {
+  const writes = [];
+  const tablesDB = {
+    async listRows() {
+      return { rows: [] };
+    },
+    async createTransaction() {
+      return { $id: 'transaction-1' };
+    },
+    async createRow(options) {
+      writes.push(options);
+      return { $id: options.rowId, ...options.data };
+    },
+    async upsertRow(options) {
+      return { $id: options.rowId, ...options.data };
+    },
+    async updateTransaction() {
+      return {};
+    },
+  };
+
+  const result = await saveOwnerProfile(
+    tablesDB,
+    'juchess',
+    { $id: 'google-account', email: 'student@example.com', name: 'Google Student' },
+    {
+      displayName: 'Google Student',
+      university: 'University of Jordan',
+      universityId: '0201234',
+      phone: '0791234567',
+      chessComUsername: 'GoogleKnight',
+    },
+  );
+
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].tableId, 'profiles');
+  assert.equal(writes[0].data.status, 'active');
+  assert.deepEqual(writes[0].permissions, [
+    'read("any")',
+    'read("user:google-account")',
+  ]);
+  assert.equal(result.status, 'active');
+  assert.equal(result.universityId, '0201234');
+});
+
+test('a verified complete legacy profile becomes active and public when it is loaded', async () => {
+  const updates = [];
+  const tablesDB = {
+    async updateRow(options) {
+      updates.push(options);
+      return { $id: options.rowId, ...options.data, $permissions: options.permissions };
+    },
+  };
+
+  const row = await activateCompleteOwnerProfile(
+    tablesDB,
+    'juchess',
+    { $id: 'verified-account', emailVerification: true },
+    {
+      $id: 'legacy-profile',
+      displayName: 'Legacy Knight',
+      university: 'University of Jordan',
+      status: 'pending',
+      $permissions: ['read("user:verified-account")'],
+    },
+    {
+      universityId: '0201234',
+      phone: '+962791234567',
+    },
+  );
+
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].data.status, 'active');
+  assert.deepEqual(updates[0].permissions, [
+    'read("any")',
+    'read("user:verified-account")',
+  ]);
+  assert.equal(row.status, 'active');
+});
+
+test('an incomplete profile is kept private until its required details are saved', async () => {
+  let updates = 0;
+  const profile = { $id: 'incomplete-profile', displayName: 'New Knight', status: 'active' };
+  const row = await activateCompleteOwnerProfile(
+    { async updateRow() { updates += 1; } },
+    'juchess',
+    { $id: 'verified-account', emailVerification: true },
+    profile,
+    { universityId: null, phone: null },
+  );
+
+  assert.equal(row, profile);
+  assert.equal(updates, 0);
 });
 
 test('profile updates reject every server-owned identity and moderation field', () => {

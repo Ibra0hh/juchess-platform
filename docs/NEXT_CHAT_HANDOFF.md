@@ -1,11 +1,39 @@
 # JuChess Complete New-Chat Handoff
 
-Last updated: July 16, 2026
+Last updated: July 17, 2026
 
 This file is both a complete project handoff and a copy-paste prompt for a new
 AI chat. It describes the intended product, the actual implementation, the
 backend contract, deployment state, known limitations, and the working rules
 that must not be lost between chats.
+
+## July 17 Google onboarding and membership state
+
+- Google OAuth now follows one explicit, tested post-authentication tree:
+  a missing or incomplete JuChess profile routes to `/complete-profile`; a
+  complete profile routes to `/profile`. The completion form requires full
+  name, university, University ID, and phone, while Chess.com and Lichess
+  usernames remain optional.
+- Email/password users remain signed out until email verification. The
+  `player-actions` Function also rejects unverified accounts directly, so an
+  unverified client cannot bypass the website and create a profile.
+- There is no player approval or pending-member state. A complete profile save
+  creates an active member. Suspended profiles cannot save around moderation.
+- The live `profiles.status` enum is `active,suspended` with default `active`.
+  All 10 legacy pending values were migrated. Four verified, complete legacy
+  members are public; six incomplete, unverified, or orphaned legacy records
+  remain owner/admin-only so canonical chat and fair-play references are not
+  destroyed. The unauthenticated API exposes 10 active profiles and zero
+  pending profiles.
+- `player-actions` deployment `6a5a2d6bcf3c577351e2` is ready and active.
+- `npm run check:web`, `npm run check:functions`, `npm run test:functions`, and
+  `npm run check:email-templates` passed. The Function suite has 25 passing
+  tests and the web suite has 50 passing tests.
+- Appwrite accepted one real verification request and one real password-
+  recovery request for the approved address `7ibrahem0h@gmail.com`. The
+  account's verified flag was restored immediately and the temporary test
+  session was deleted. Gmail delivery/rendering and the one-time links still
+  require confirmation from the recipient; do not claim inbox delivery yet.
 
 ## Copy-Paste Prompt For The New Chat
 

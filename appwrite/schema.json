@@ -25,7 +25,7 @@
         "university": "string",
         "rating": "integer|default:1200",
         "role": "enum:member,organizer,admin",
-        "status": "enum:pending,active,suspended",
+        "status": "enum:active,suspended|default:active",
         "avatarFileId": "string",
         "coverFileId": "string",
         "chessComUsername": "string|unique",
