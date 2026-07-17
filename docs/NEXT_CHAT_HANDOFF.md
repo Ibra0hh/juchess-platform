@@ -7,6 +7,34 @@ AI chat. It describes the intended product, the actual implementation, the
 backend contract, deployment state, known limitations, and the working rules
 that must not be lost between chats.
 
+## July 17 signup timeout incident
+
+- Two real signup preflight executions of `access-guards` timed out at the
+  Appwrite synchronous-execution hard limit of 30 seconds: executions
+  `6a5a51b562991263e02b` and `6a5a51e0dd75d58d97cb`. Both had empty Function
+  logs, so the executor never reached the JuChess handler. Signup therefore
+  stopped before `account.create`; no account, session, verification challenge,
+  or email was created by either attempt.
+- The same active deployment recovered without a data or schema change. A live
+  health execution then completed, and five `/check` probes returned 200 in
+  0.12-0.46 seconds of Function time. Both block tables were empty, ruling out
+  row volume and block-list scanning as the cause. Appwrite's public status page
+  showed all services operational, so this is treated as a transient executor
+  startup/queue stall rather than a deterministic JuChess logic failure.
+- Web access checks now use an 8-second hedged request. Normal checks still make
+  one Function execution; only a stalled check starts one backup execution. The
+  first valid decision wins, genuine block decisions still fail closed, and two
+  failures show an explicit temporary-security-check message. Signup failures
+  state that no account was created.
+- The access guard now selects only required block fields and records safe
+  start/data-loaded/completion timings without logging submitted identities.
+- `access-guards` deployment `6a5a5cca9dd6b0e4bb3b` is ready and active. Its
+  first cold production probe returned 200, followed by nine consecutive 200
+  checks; all ten contain the new timing logs.
+- `npm run check:web`, `npm run check:functions`, and `npm run test:functions`
+  passed. The web suite now has 56 tests, including four hedged-request tests;
+  the Function suite has 29 passing tests.
+
 ## July 17 Google onboarding and membership state
 
 - Google OAuth now follows one explicit, tested post-authentication tree:

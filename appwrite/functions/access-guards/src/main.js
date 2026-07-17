@@ -133,11 +133,11 @@ function ipMatchesRange(ip, range) {
   return (ipInt & mask) === (networkInt & mask);
 }
 
-async function listRows(tablesDB, databaseId, tableId) {
+async function listRows(tablesDB, databaseId, tableId, fields) {
   const response = await tablesDB.listRows({
     databaseId,
     tableId,
-    queries: [Query.limit(500)],
+    queries: [Query.select(fields), Query.limit(500)],
     total: false,
   });
 
@@ -165,13 +165,17 @@ export default async ({ req, res, log, error }) => {
   }
 
   try {
+    const startedAt = Date.now();
+    log('Access guard check started.');
     const requestIp = getRequestIp(req);
     const accountId = String(req.headers?.['x-appwrite-user-id'] ?? '').trim();
     const [identityBlocks, ipBlocks, storedCandidates] = await Promise.all([
-      listRows(tablesDB, databaseId, tableIds.identityBlocks),
-      listRows(tablesDB, databaseId, tableIds.ipBlocks),
+      listRows(tablesDB, databaseId, tableIds.identityBlocks, ['type', 'value', 'reason', 'status']),
+      listRows(tablesDB, databaseId, tableIds.ipBlocks, ['ipRange', 'reason', 'status']),
       loadStoredCandidates(tablesDB, databaseId, accountId),
     ]);
+
+    log(`Access guard data loaded in ${Date.now() - startedAt}ms.`);
 
     // Before sign-up there is no authenticated account, so submitted values
     // are the only candidates. Authenticated checks also include the canonical
@@ -204,6 +208,7 @@ export default async ({ req, res, log, error }) => {
       });
     }
 
+    log(`Access guard check completed in ${Date.now() - startedAt}ms.`);
     return res.json({ ok: true, allowed: true });
   } catch (cause) {
     error('Access guard verification failed.');

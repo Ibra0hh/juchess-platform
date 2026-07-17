@@ -4,6 +4,7 @@ import { tableIds } from './juchess'
 import type { BoardPreferences } from './boardAppearance'
 import { isExistingSessionError, normalizeAccountEmail } from './authSession'
 import { sendEmailVerificationChallenge } from './emailVerification'
+import { runHedgedRequest } from './hedgedRequest'
 
 export type ProfileRole = 'member' | 'organizer' | 'admin'
 export type ProfileStatus = 'active' | 'suspended'
@@ -83,6 +84,8 @@ type AccessGuardInput = {
 class AccessBlockedError extends Error {}
 
 class EmailVerificationRequiredError extends Error {}
+
+const accessGuardHedgeDelayMs = 8_000
 
 export async function getCurrentSession(): Promise<AuthSession | null> {
   if (!appwriteReady) return null
@@ -170,7 +173,7 @@ export async function signInWithEmail(input: SignInInput): Promise<AuthSession> 
 
 export async function signUpWithEmail(input: SignUpInput): Promise<void> {
   requireAppwriteReady()
-  await assertAccessAllowed({ email: input.email })
+  await assertAccessAllowed({ email: input.email }, 'account-creation')
   await assertNoActiveSessionForAccountCreation(input.email)
 
   await account.create({
@@ -469,9 +472,36 @@ async function assertNoActiveSessionForAccountCreation(email: string) {
   }
 }
 
-async function assertAccessAllowed(input: AccessGuardInput) {
+type AccessGuardOperation = 'session' | 'account-creation'
+
+async function assertAccessAllowed(
+  input: AccessGuardInput,
+  operation: AccessGuardOperation = 'session',
+) {
   if (!appwriteConfig.accessGuardFunctionId) return
 
+  let payload: { ok?: boolean; allowed?: boolean; reason?: string; error?: string }
+  try {
+    payload = await runHedgedRequest(
+      () => requestAccessGuardDecision(input),
+      accessGuardHedgeDelayMs,
+    )
+  } catch {
+    throw new Error(operation === 'account-creation'
+      ? 'JuChess could not complete the security check right now. No account was created. Please try again.'
+      : 'JuChess could not complete the security check right now. Please try again.')
+  }
+
+  if (payload.allowed === false) {
+    throw new AccessBlockedError(payload.reason || 'This account is blocked by club administration.')
+  }
+
+  if (payload.allowed !== true) {
+    throw new Error('JuChess received an incomplete security decision. Please try again.')
+  }
+}
+
+async function requestAccessGuardDecision(input: AccessGuardInput) {
   const execution = await functions.createExecution({
     functionId: appwriteConfig.accessGuardFunctionId,
     body: JSON.stringify({
@@ -487,14 +517,16 @@ async function assertAccessAllowed(input: AccessGuardInput) {
     },
   })
 
-  const payload = parseGuardBody(execution.responseBody)
-  if (payload.allowed === false) {
-    throw new AccessBlockedError(payload.reason || 'This account is blocked by club administration.')
+  if (execution.status === 'failed') {
+    throw new Error(execution.errors || 'The access guard execution failed.')
   }
 
+  const payload = parseGuardBody(execution.responseBody)
   if (execution.responseStatusCode >= 400 || payload.ok === false) {
-    throw new Error(payload.reason || payload.error || 'This account is blocked by club administration.')
+    throw new Error(payload.reason || payload.error || 'The access guard service is unavailable.')
   }
+
+  return payload
 }
 
 function parseGuardBody(body: string): { ok?: boolean; allowed?: boolean; reason?: string; error?: string } {
