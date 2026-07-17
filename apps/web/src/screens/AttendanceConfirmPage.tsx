@@ -8,6 +8,7 @@ import {
   type AttendanceInvitation,
 } from '../lib/attendance'
 import type { AttendanceStatus } from '../lib/registrations'
+import { compactCrestUrl } from '../lib/brand'
 import './AttendanceConfirmPage.css'
 
 export default function AttendanceConfirmPage() {
@@ -60,7 +61,7 @@ export default function AttendanceConfirmPage() {
       <SiteHeader active="tournaments" />
       <main className="attendance-page">
         <section className="attendance-card" aria-live="polite">
-          <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="JuChess" />
+          <img src={compactCrestUrl} alt="JuChess" />
           {loading ? (
             <>
               <LoaderCircle className="attendance-loader" size={34} aria-hidden="true" />

@@ -130,10 +130,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    await signOutCurrentUser()
-    setUser(null)
-    setProfile(null)
-    setSessionProvider(null)
+    try {
+      await signOutCurrentUser()
+    } finally {
+      setUser(null)
+      setProfile(null)
+      setSessionProvider(null)
+      setError(null)
+    }
   }, [previewSession])
 
   const linkExternalGameUsername = useCallback(async (

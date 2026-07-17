@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
+import { compactCrestUrl } from '../lib/brand'
 import { demoTournaments, members, sampleGamesBySource } from '../lib/juchess'
 import './ClubScreens.css'
 
@@ -74,7 +75,7 @@ function ToolsPage() {
               <SummaryBox label="Rated players" value={members.length} />
             </div>
           </div>
-          <img src={`${import.meta.env.BASE_URL}prototype/assets/crest.png`} alt="Chess Club JU logo" />
+          <img src={compactCrestUrl} alt="Chess Club JU logo" />
         </section>
 
         <section aria-labelledby="quick-tools-title">

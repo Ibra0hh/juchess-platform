@@ -5,6 +5,7 @@ import { useAuth } from '../context/useAuth'
 import GoogleMark from '../components/GoogleMark'
 import UniversityField from '../components/UniversityField'
 import { formatAppwriteError } from '../lib/auth'
+import { compactCrestUrl } from '../lib/brand'
 import { profileCompletionAuthMethod, profileNeedsCompletion } from '../lib/profileCompletion'
 import './AuthPage.css'
 
@@ -72,7 +73,7 @@ export default function CompleteProfilePage() {
     <div className="auth-screen">
       <header className="auth-site-header">
         <Link to="/home">
-          <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="Chess Club JU crest" />
+          <img src={compactCrestUrl} alt="Chess Club JU crest" />
           <span>JuChess</span>
         </Link>
       </header>

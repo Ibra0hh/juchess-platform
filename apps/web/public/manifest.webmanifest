@@ -1,0 +1,25 @@
+{
+  "name": "JuChess - University of Jordan Chess Club",
+  "short_name": "JuChess",
+  "description": "Tournaments, live games, and chess tools from the University of Jordan Chess Club.",
+  "start_url": "/home/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f0e2",
+  "theme_color": "#7d2434",
+  "icons": [
+    {
+      "src": "/web/email/juchess-email-logo.png",
+      "sizes": "100x100",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/web/prototype/assets/crest.png",
+      "sizes": "1280x1280",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

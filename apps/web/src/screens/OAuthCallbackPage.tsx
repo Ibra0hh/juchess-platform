@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import { formatAppwriteError } from '../lib/auth'
+import { compactCrestUrl } from '../lib/brand'
 import { profileNeedsCompletion } from '../lib/profileCompletion'
 import './AuthPage.css'
 
@@ -38,7 +39,7 @@ export default function OAuthCallbackPage() {
       <AuthHeader />
       <main className="auth-main prototype-auth-main signin">
         <section className="auth-panel prototype-auth-panel signin auth-callback-panel" aria-live="polite">
-          <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="" />
+          <img src={compactCrestUrl} alt="" />
           <h1>{error ? 'Sign-in needs attention' : 'Finishing your sign-in'}</h1>
           <p>{error || 'Creating your secure sign-in session...'}</p>
           {!error ? <span className="auth-spinner" aria-hidden="true" /> : null}
@@ -53,7 +54,7 @@ function AuthHeader() {
   return (
     <header className="auth-site-header">
       <Link to="/home">
-        <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="Chess Club JU crest" />
+        <img src={compactCrestUrl} alt="Chess Club JU crest" />
         <span>JuChess</span>
       </Link>
     </header>

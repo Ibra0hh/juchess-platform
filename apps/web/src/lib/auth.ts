@@ -85,13 +85,20 @@ class EmailVerificationRequiredError extends Error {}
 export async function getCurrentSession(): Promise<AuthSession | null> {
   if (!appwriteReady) return null
 
+  let user: Models.User
   try {
-    const user = await account.get()
-    if (!user.emailVerification) {
-      await deleteCurrentSession()
-      return null
-    }
+    user = await account.get()
+  } catch (error) {
+    if (isMissingAccountSession(error)) return null
+    throw error
+  }
 
+  if (!user.emailVerification) {
+    await deleteCurrentSession()
+    return null
+  }
+
+  try {
     const [profile, sessionProvider] = await Promise.all([
       loadOwnerProfile(),
       loadCurrentSessionProvider(),
@@ -115,8 +122,15 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
       throw error
     }
 
-    return null
+    throw error
   }
+}
+
+function isMissingAccountSession(error: unknown) {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && Number((error as { code?: unknown }).code) === 401
 }
 
 export async function signInWithEmail(input: SignInInput): Promise<AuthSession> {

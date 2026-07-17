@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import { profileMediaUrl } from '../lib/auth'
+import { compactCrestUrl } from '../lib/brand'
 import { useOnlineTournamentPlayLock } from '../lib/onlineTournamentPlayLock'
 import './SiteHeader.css'
 
 type SiteHeaderProps = {
-  active: 'home' | 'tournaments' | 'tools' | 'games' | 'leaderboard' | 'profile'
+  active?: 'home' | 'tournaments' | 'tools' | 'games' | 'leaderboard' | 'profile'
   profilePreview?: {
     displayName: string
     initials: string
@@ -13,8 +14,6 @@ type SiteHeaderProps = {
   }
   toolsDisabled?: boolean
 }
-
-const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 
 function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeaderProps) {
   const { loading, profile, signOut, user } = useAuth()
@@ -36,7 +35,7 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
     <header className="site-header">
       <div className="site-header-inner">
         <Link to="/home" className="brand-link">
-          <img src={crestUrl} alt="Chess Club JU crest" />
+          <img src={compactCrestUrl} alt="Chess Club JU crest" />
           <span>
             <strong>JuChess</strong>
             <small>University of Jordan Chess Club</small>

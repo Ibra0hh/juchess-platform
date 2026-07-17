@@ -212,6 +212,19 @@
   margin: 22px 0 18px;
 }
 
+.auth-legal-copy {
+  margin: 14px 6px 0;
+  color: #746b62;
+  font: 400 0.76rem/1.55 "IBM Plex Sans", sans-serif;
+  text-align: center;
+}
+
+.auth-legal-copy a {
+  color: #7d2434;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
 .auth-divider > span {
   flex: 1;
   height: 1px;

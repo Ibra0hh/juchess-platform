@@ -4,11 +4,11 @@ import { Link } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
+import { compactCrestUrl } from '../lib/brand'
 import { loadAnnouncements, loadTournamentSummaries, type Announcement, type Tournament } from '../lib/juchess'
 import { isPublicAnnouncement, isPublicTournament } from '../lib/publicContent'
 import './HomePage.css'
 
-const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
 const gmailGlyphUrl = `${import.meta.env.BASE_URL}prototype/assets/gmail-glyph-gradient.svg`
 const instagramGlyphUrl = `${import.meta.env.BASE_URL}prototype/assets/instagram-glyph-gradient.svg`
 
@@ -177,7 +177,7 @@ function HomePage() {
                 <strong>Est. University of Jordan / Amman</strong>
               </div>
               <div className="hero-title-row">
-                <img src={crestUrl} alt="Chess Club JU crest" />
+                <img src={compactCrestUrl} alt="Chess Club JU crest" />
                 <h1 id="home-title">
                   <span>Ju</span>
                   <span>Chess</span>
@@ -457,7 +457,7 @@ function TeamSection() {
             </div>
             <div className="team-card-copy">
               <strong>{member.role}</strong>
-              <h4>{member.name}</h4>
+              <h3>{member.name}</h3>
               {'responsibility' in member && member.responsibility ? <p>{member.responsibility}</p> : null}
             </div>
           </article>
@@ -477,7 +477,7 @@ function AppSection() {
         <div className="app-panel-grid" aria-hidden="true" />
         <div className="app-copy">
           <div className="contact-heading">
-            <img className="contact-logo" src={crestUrl} alt="JuChess crest" />
+            <img className="contact-logo" src={compactCrestUrl} alt="JuChess crest" />
             <div className="contact-heading-copy">
               <span>Contact the club</span>
               <h2 id="contact-title">Get in touch with us.</h2>

@@ -9,6 +9,7 @@ import {
   startOAuthSession,
   type SocialAuthProvider,
 } from '../lib/auth'
+import { compactCrestUrl } from '../lib/brand'
 import './AuthPage.css'
 
 type AuthPageProps = {
@@ -104,7 +105,7 @@ function AuthPage({ mode }: AuthPageProps) {
       <main className={`auth-main prototype-auth-main ${isSignup ? 'signup' : 'signin'}`}>
         <section className={`auth-panel prototype-auth-panel ${isSignup ? 'signup' : 'signin'}`} aria-labelledby="auth-title">
           <div className="auth-intro">
-            {!isSignup ? <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="" /> : null}
+            {!isSignup ? <img src={compactCrestUrl} alt="" /> : null}
             <h1 id="auth-title">{isSignup ? 'Create Player Club Account' : 'Welcome back'}</h1>
             <p>{isSignup ? 'Join the University of Jordan Chess Club roster' : 'Sign in to your player club account'}</p>
           </div>
@@ -121,6 +122,12 @@ function AuthPage({ mode }: AuthPageProps) {
             ready={ready}
             onSelect={handleOAuth}
           />
+
+          {isSignup ? (
+            <p className="auth-legal-copy">
+              By creating an account, you agree to the <Link to="/terms">terms of use</Link> and acknowledge the <Link to="/privacy">privacy policy</Link>.
+            </p>
+          ) : null}
 
           <div className="auth-divider" aria-hidden="true">
             <span />
@@ -232,7 +239,7 @@ function AuthSiteHeader() {
   return (
     <header className="auth-site-header">
       <Link to="/home">
-        <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="Chess Club JU crest" />
+        <img src={compactCrestUrl} alt="Chess Club JU crest" />
         <span>JuChess</span>
       </Link>
     </header>
@@ -283,7 +290,7 @@ function PasswordField({ autoComplete, label, onChange, onToggle, showPassword, 
           required
           minLength={8}
           autoComplete={autoComplete}
-          placeholder="••••••••"
+          placeholder="Enter your password"
         />
         <button type="button" className="auth-password-toggle" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={onToggle}>
           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

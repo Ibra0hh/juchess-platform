@@ -33,3 +33,89 @@
   color: #7d2434;
   font-weight: 700;
 }
+.session-recovery {
+  display: grid;
+  min-height: 100dvh;
+  padding: 32px 20px;
+  place-items: center;
+  background: #f5efe3;
+}
+
+.session-recovery section {
+  width: min(100%, 520px);
+  padding: clamp(28px, 5vw, 48px);
+  border: 1px solid rgba(122, 36, 49, .18);
+  border-radius: 22px;
+  background: rgba(255, 252, 245, .96);
+  box-shadow: 0 24px 70px rgba(55, 34, 25, .12);
+  text-align: center;
+}
+
+.session-recovery-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 18px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #7a2431;
+  font: 700 24px/1 system-ui, sans-serif;
+}
+
+.session-recovery-kicker {
+  margin: 0 0 8px;
+  color: #8b2638 !important;
+  font: 700 12px/1.2 system-ui, sans-serif;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.session-recovery h1 {
+  margin: 0;
+  color: #191512;
+  font-size: clamp(28px, 5vw, 42px);
+  line-height: 1.05;
+}
+
+.session-recovery section > p:not(.session-recovery-kicker) {
+  margin: 18px auto 0;
+  color: #6d625b;
+  line-height: 1.65;
+}
+
+.session-recovery section > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 26px;
+}
+
+.session-recovery button,
+.session-recovery a {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font: 700 14px/44px system-ui, sans-serif;
+  text-decoration: none;
+}
+
+.session-recovery button {
+  border: 1px solid #7a2431;
+  color: #fff;
+  background: #7a2431;
+  cursor: pointer;
+}
+
+.session-recovery a {
+  border: 1px solid rgba(25, 21, 18, .22);
+  color: #191512;
+  background: transparent;
+}
+
+.session-recovery button.secondary {
+  border-color: rgba(25, 21, 18, .22);
+  color: #191512;
+  background: transparent;
+}

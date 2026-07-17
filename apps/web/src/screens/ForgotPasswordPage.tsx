@@ -7,6 +7,7 @@ import {
   requestPasswordRecovery,
 } from '../lib/auth'
 import { appwriteReady } from '../lib/appwrite'
+import { compactCrestUrl } from '../lib/brand'
 import './AuthPage.css'
 
 function ForgotPasswordPage() {
@@ -66,7 +67,7 @@ function ForgotPasswordPage() {
       <main className="auth-main">
         <section className="auth-panel compact" aria-labelledby="forgot-title">
           <div className="auth-brand">
-            <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="Chess Club JU logo" />
+            <img src={compactCrestUrl} alt="Chess Club JU logo" />
             <span>Account recovery</span>
           </div>
 

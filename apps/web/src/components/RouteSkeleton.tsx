@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom'
 
-const crestUrl = `${import.meta.env.BASE_URL}prototype/assets/crest.png`
+import { compactCrestUrl } from '../lib/brand'
 const navItems = Array.from({ length: 4 }, (_, index) => index)
 
 type SkeletonKind = 'auth' | 'board' | 'content'
@@ -95,7 +95,7 @@ export default function RouteSkeleton() {
       <header className="route-skeleton-header">
         <div className="route-skeleton-header-inner">
           <div className="route-skeleton-brand" aria-hidden="true">
-            <img src={crestUrl} alt="" />
+              <img src={compactCrestUrl} alt="" />
             <span>
               <strong>JuChess</strong>
               <small>University of Jordan Chess Club</small>

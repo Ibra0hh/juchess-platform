@@ -896,6 +896,20 @@ export type AnnouncementLoadResult = {
   error?: unknown
 }
 
+const hiddenProductionRowIds = new Set(['tt'])
+
+function isPublicTestRow(row: Models.Row & { name?: string; slug?: string }) {
+  const name = row.name?.trim().toLocaleLowerCase()
+  const slug = row.slug?.trim().toLocaleLowerCase()
+  return Boolean(import.meta.env?.PROD)
+    && (
+      row.$id.startsWith('seed_')
+      || hiddenProductionRowIds.has(row.$id)
+      || hiddenProductionRowIds.has(name ?? '')
+      || hiddenProductionRowIds.has(slug ?? '')
+    )
+}
+
 export async function loadTournamentSummaries(): Promise<TournamentLoadResult> {
   return loadTournamentRows(false)
 }
@@ -956,6 +970,7 @@ async function loadTournamentRows(includeDetails: boolean): Promise<TournamentLo
     const mediaByTournament = groupTournamentMedia(mediaResponse)
 
     const rows = uniqueTournamentsByFormat(response.rows
+      .filter((row) => !isPublicTestRow(row))
       .map((row) => mapAppwriteTournament(
         row,
         participantCounts,
@@ -1052,6 +1067,7 @@ export async function loadAnnouncements(): Promise<AnnouncementLoadResult> {
 
     return {
       announcements: response.rows
+        .filter((row) => !isPublicTestRow(row))
         .map(mapAnnouncement)
         .filter((item): item is Announcement => Boolean(item)),
       source: 'cloud',

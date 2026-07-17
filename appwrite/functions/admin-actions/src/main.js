@@ -3488,6 +3488,47 @@ async function requireAdminActor(req, tablesDB, databaseId) {
   return profile;
 }
 
+const adminPanelSessionPreferenceKey = 'juchessAdminPanelSession';
+
+function readAdminPanelSessionToken(req) {
+  return String(req.headers['juchess-admin-panel-session'] ?? '').trim().slice(0, 128);
+}
+
+async function claimAdminPanelSession(users, accountId, token) {
+  if (!token) throw new HttpError(400, 'An admin panel session token is required.');
+  const preferences = await users.getPrefs({ userId: accountId });
+  await users.updatePrefs({
+    userId: accountId,
+    prefs: {
+      ...preferences,
+      [adminPanelSessionPreferenceKey]: {
+        token,
+        claimedAt: new Date().toISOString(),
+      },
+    },
+  });
+}
+
+async function assertAdminPanelSession(users, accountId, token) {
+  const preferences = await users.getPrefs({ userId: accountId });
+  const activeSession = preferences?.[adminPanelSessionPreferenceKey];
+
+  // During the staged rollout, the previous admin frontend does not send a
+  // panel token. Allow it only until the first updated frontend claims a
+  // lease; after that claim, every older or missing token is rejected.
+  if (!activeSession && !token) return;
+
+  if (!token || !activeSession || activeSession.token !== token) {
+    throw new HttpError(409, 'This admin panel session was replaced by another device or browser.');
+  }
+}
+
+export {
+  assertAdminPanelSession,
+  claimAdminPanelSession,
+  readAdminPanelSessionToken,
+};
+
 function requireSuperAdmin(actor) {
   if (actor.role !== 'superAdmin') {
     throw new HttpError(403, 'Only a super admin can manage admin access.');
@@ -3566,6 +3607,8 @@ export default async ({ req, res, log, error }) => {
         'POST /profiles/lookup',
         'DELETE /players',
         'GET /admin/session',
+        'POST /admin/session/claim',
+        'GET /admin/session/active',
         'GET /admin/admins',
         'POST /admin/admins',
         'POST /admin/admins/:id/status',
@@ -3660,6 +3703,21 @@ export default async ({ req, res, log, error }) => {
     }
 
     const actor = await requireAdminActor(req, tablesDB, databaseId);
+
+    if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'session' && segments.length === 2) {
+      return res.json({ ok: true, allowed: true, profile: actor });
+    }
+
+    if (method === 'POST' && segments[0] === 'admin' && segments[1] === 'session' && segments[2] === 'claim') {
+      await claimAdminPanelSession(users, actor.accountId, readAdminPanelSessionToken(req));
+      return res.json({ ok: true, action: 'claimAdminPanelSession' });
+    }
+
+    await assertAdminPanelSession(users, actor.accountId, readAdminPanelSessionToken(req));
+
+    if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'session' && segments[2] === 'active') {
+      return res.json({ ok: true, active: true });
+    }
 
     if (method === 'GET' && segments[0] === 'recruitment' && segments[1] === 'applications' && segments.length === 2) {
       const applications = await loadCrewApplications(tablesDB, databaseId);
@@ -3851,10 +3909,6 @@ export default async ({ req, res, log, error }) => {
       });
 
       return res.json({ ok: true, action: 'deletePlayers', deleted, deletedRows });
-    }
-
-    if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'session') {
-      return res.json({ ok: true, allowed: true, profile: actor });
     }
 
     if (method === 'GET' && segments[0] === 'players' && segments.length === 1) {

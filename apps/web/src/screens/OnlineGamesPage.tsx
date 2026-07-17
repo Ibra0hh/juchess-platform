@@ -63,7 +63,7 @@ function OnlineGamesPage() {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(requestedGameId)
   const [boardMoves, setBoardMoves] = useState<string[]>([])
   const [viewedPly, setViewedPly] = useState<number | null>(null)
-  const [boardResult, setBoardResult] = useState('Live')
+  const [boardResult, setBoardResult] = useState('Ready')
   const [flipped, setFlipped] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const {
@@ -306,6 +306,7 @@ function OnlineGamesPage() {
     <div className="club-screen online-games-screen" data-screen-label="Games">
       <SiteHeader active="games" toolsDisabled={playingOnlineTournament} />
       <main className="online-games-main">
+        <h1 className="visually-hidden">Online tournament games</h1>
         {playingOnlineTournament ? (
           <div className="forced-game-banner" role="status">
             <ShieldAlert size={19} aria-hidden="true" />
@@ -426,7 +427,9 @@ function OnlineGamesPage() {
                       ? selectedGame?.status === 'scheduled' && assignedColor === 'black'
                         ? 'Waiting for White to begin'
                         : canMove ? 'Your turn' : 'Opponent to move'
-                      : `${boardMoves.length} moves · ${boardResult}`}
+                      : selectedGame
+                        ? `${boardMoves.length} moves · ${boardResult}`
+                        : 'Select a tournament game to watch'}
                 </span>
                 {opening ? <small>{opening.eco} · {opening.name}</small> : null}
               </div>

@@ -29,6 +29,7 @@ import {
   deleteTournament,
   formatAdminError,
   getAdminSession,
+  isAdminPanelSessionReplacedError,
   loadAdminProfiles,
   countPendingRegistrations,
   configureTournamentProcedure,
@@ -53,6 +54,7 @@ import {
   updateTournamentGamePgn,
   unpublishTournamentPairings,
   uploadTournamentMedia,
+  verifyAdminPanelSession,
   type AdminRegistration,
   type AdminRegistrationStatus,
   type AdminGame,
@@ -656,6 +658,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [dataSource, setDataSource] = useState<TournamentDataSource>('unavailable')
   const [message, setMessage] = useState<string | null>(null)
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null)
 
   async function refreshTournaments() {
     const result = await loadAdminTournaments()
@@ -688,6 +691,7 @@ function App() {
     setBlocks({ identityBlocks: [], ipBlocks: [] })
     setAdminProfiles({ admins: [] })
     setScreen('dashboard')
+    setSessionNotice(null)
   }
 
   useEffect(() => {
@@ -726,6 +730,41 @@ function App() {
       alive = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!session?.allowed) return
+    let alive = true
+    let checking = false
+
+    const verifyLease = async () => {
+      if (checking) return
+      checking = true
+      try {
+        await verifyAdminPanelSession()
+      } catch (error) {
+        if (!alive || !isAdminPanelSessionReplacedError(error)) return
+        setSession(null)
+        setBlocks({ identityBlocks: [], ipBlocks: [] })
+        setAdminProfiles({ admins: [] })
+        setSessionNotice('This admin panel was closed because the same account opened the control center on another device or browser.')
+      } finally {
+        checking = false
+      }
+    }
+    const verifyWhenVisible = () => {
+      if (document.visibilityState === 'visible') void verifyLease()
+    }
+    const timer = window.setInterval(() => void verifyLease(), 15_000)
+    window.addEventListener('focus', verifyWhenVisible)
+    document.addEventListener('visibilitychange', verifyWhenVisible)
+
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', verifyWhenVisible)
+      document.removeEventListener('visibilitychange', verifyWhenVisible)
+    }
+  }, [session?.allowed])
 
   useEffect(() => {
     if (!session?.allowed || screen !== 'tournaments') return
@@ -777,7 +816,9 @@ function App() {
   if (!session) {
     return (
       <LoginScreen
+        notice={sessionNotice}
         onLogin={(nextSession) => {
+          setSessionNotice(null)
           setSession(nextSession)
           void refreshTournaments()
           void refreshBlocks(nextSession)
@@ -828,7 +869,7 @@ function App() {
   )
 }
 
-function LoginScreen({ onLogin }: { onLogin: (session: AdminSession) => void }) {
+function LoginScreen({ notice, onLogin }: { notice?: string | null; onLogin: (session: AdminSession) => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -859,6 +900,7 @@ function LoginScreen({ onLogin }: { onLogin: (session: AdminSession) => void }) 
         </div>
         <h1 id="admin-login-title">Sign in</h1>
         <p>Admin control console.</p>
+        {notice ? <div className="auth-notice" role="status">{notice}</div> : null}
         <form onSubmit={handleSubmit}>
           <label>
             Email

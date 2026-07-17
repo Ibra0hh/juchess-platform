@@ -6,6 +6,8 @@ import { TournamentPlayProvider } from './context/TournamentPlayContext'
 import { TournamentPlayGuard } from './components/TournamentPlayGuard'
 import { ProfileCompletionGuard } from './components/ProfileCompletionGuard'
 import RouteSkeleton from './components/RouteSkeleton'
+import RouteMetadata from './components/RouteMetadata'
+import { compactCrestUrl } from './lib/brand'
 import { useOnlineTournamentPlayLock } from './lib/onlineTournamentPlayLock'
 
 const AuthPage = lazy(() => import('./screens/AuthPage'))
@@ -14,6 +16,7 @@ const ForgotPasswordPage = lazy(() => import('./screens/ForgotPasswordPage'))
 const GamesPage = lazy(() => import('./screens/GamesPage'))
 const HomePage = lazy(() => import('./screens/HomePage'))
 const LeaderboardPage = lazy(() => import('./screens/LeaderboardPage'))
+const LegalPage = lazy(() => import('./screens/LegalPage'))
 const OnlineGamesPage = lazy(() => import('./screens/OnlineGamesPage'))
 const OAuthCallbackPage = lazy(() => import('./screens/OAuthCallbackPage'))
 const CompleteProfilePage = lazy(() => import('./screens/CompleteProfilePage'))
@@ -26,8 +29,8 @@ const VerifyEmailPage = lazy(() => import('./screens/VerifyEmailPage'))
 function NotFound() {
   return (
     <main className="prototype-missing">
-      <img src={`${import.meta.env.BASE_URL}juchess-logo.png`} alt="JuChess logo" />
-      <h1>Screen not found</h1>
+      <img src={compactCrestUrl} alt="JuChess logo" />
+      <h1>Page not found</h1>
       <Link to="/home">Open JuChess Home</Link>
     </main>
   )
@@ -56,6 +59,7 @@ function App() {
       <ProfileCompletionGuard>
         <TournamentPlayProvider>
           <TournamentPlayGuard>
+            <RouteMetadata />
             <Suspense fallback={<RouteSkeleton />}>
               <Routes>
               <Route path="/" element={<HomePage />} />
@@ -74,6 +78,8 @@ function App() {
               <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/join-the-team" element={<RecruitmentPage />} />
+              <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+              <Route path="/terms" element={<LegalPage kind="terms" />} />
               <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

@@ -187,6 +187,7 @@ button {
 }
 
 .auth-error,
+.auth-notice,
 .prototype-note {
   padding: 11px 13px;
   border: 1px solid rgba(178, 58, 58, 0.24);

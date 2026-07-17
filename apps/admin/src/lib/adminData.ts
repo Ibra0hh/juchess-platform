@@ -355,6 +355,7 @@ export type AdminProfileLoadResult = {
 }
 
 const adminFunctionId = import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions'
+const adminPanelSessionStorageKey = 'juchess:admin-panel-session'
 
 export async function signInAdmin(email: string, password: string) {
   requireAppwriteReady()
@@ -390,6 +391,14 @@ export async function getAdminSession(): Promise<AdminSession | null> {
         body: {},
       })
 
+      if (response.allowed) {
+        await runAdminAction({
+          method: ExecutionMethod.POST,
+          path: '/admin/session/claim',
+          body: {},
+        })
+      }
+
       return {
         user,
         profile: response.profile,
@@ -407,6 +416,18 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   } catch {
     return null
   }
+}
+
+export async function verifyAdminPanelSession() {
+  await runAdminAction({
+    method: ExecutionMethod.GET,
+    path: '/admin/session/active',
+    body: {},
+  })
+}
+
+export function isAdminPanelSessionReplacedError(error: unknown) {
+  return formatAdminError(error).includes('another device or browser')
 }
 
 export async function loadAdminTournaments(): Promise<AdminTournamentLoadResult> {
@@ -1401,6 +1422,7 @@ async function runAdminAction<T>({
     headers: {
       'content-type': 'application/json',
       'juchess-admin-jwt': adminJwt.jwt,
+      'juchess-admin-panel-session': getAdminPanelSessionToken(),
     },
   })
 
@@ -1410,6 +1432,17 @@ async function runAdminAction<T>({
   }
 
   return payload
+}
+
+function getAdminPanelSessionToken() {
+  const existing = window.sessionStorage.getItem(adminPanelSessionStorageKey)?.trim()
+  if (existing) return existing
+
+  const token = typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `panel-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  window.sessionStorage.setItem(adminPanelSessionStorageKey, token)
+  return token
 }
 
 function parseExecutionBody<T>(body: string): T {

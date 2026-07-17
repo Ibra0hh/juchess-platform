@@ -260,7 +260,7 @@ function RecruitmentPage() {
 function RecruitmentShell({ children, profilePreview }: { children: React.ReactNode; profilePreview?: { avatarUrl?: string; displayName: string; initials: string } }) {
   return (
     <div className="club-screen recruitment-screen" data-screen-label="Join the team">
-      <SiteHeader active="profile" profilePreview={profilePreview} />
+      <SiteHeader profilePreview={profilePreview} />
       <main className="recruitment-main">{children}</main>
     </div>
   )

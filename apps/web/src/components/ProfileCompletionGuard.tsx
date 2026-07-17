@@ -1,14 +1,37 @@
 import type { ReactNode } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import { shouldRedirectToProfileCompletion } from '../lib/profileCompletion'
 import RouteSkeleton from './RouteSkeleton'
 
 export function ProfileCompletionGuard({ children }: { children: ReactNode }) {
-  const { loading, profile, user } = useAuth()
+  const { error, loading, profile, refresh, signOut, user } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
+
+  async function restartSignIn() {
+    await signOut().catch(() => undefined)
+    navigate('/sign-in', { replace: true })
+  }
 
   if (loading) return <RouteSkeleton />
+
+  if (error) {
+    return (
+      <main className="session-recovery" role="alert">
+        <section>
+          <span className="session-recovery-mark" aria-hidden="true">!</span>
+          <p className="session-recovery-kicker">Account connection</p>
+          <h1>We couldn't finish loading your account.</h1>
+          <p>{error}</p>
+          <div>
+            <button type="button" onClick={() => void refresh()}>Try again</button>
+            <button className="secondary" type="button" onClick={() => void restartSignIn()}>Sign in again</button>
+          </div>
+        </section>
+      </main>
+    )
+  }
 
   if (shouldRedirectToProfileCompletion({
     loading,

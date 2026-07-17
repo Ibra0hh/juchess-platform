@@ -150,6 +150,19 @@ npm run migrate:profile-privacy -- -FinalizePublicFields
 The migration uses the current Appwrite CLI login, or `APPWRITE_API_KEY` when
 running non-interactively. It never stores the key in the repository.
 
+JuChess accounts, including accounts with admin access, are designed to stay
+signed in on up to five devices. Configure the Appwrite project with:
+
+```powershell
+appwrite login
+npm run configure:auth-sessions
+```
+
+Appwrite removes the oldest account session only after that limit is reached.
+The admin app separately permits only one active admin-panel lease per account.
+Opening the control center elsewhere replaces the older panel without deleting
+that account's website or mobile sessions.
+
 Attendance confirmation uses the scheduled `admin-actions` execution once per
 minute. Accepted players receive the in-app Yes/No prompt during the final hour
 before `startsAt`. Secure email links additionally require a secret
