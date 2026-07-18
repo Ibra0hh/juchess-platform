@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="The official JuChess website color palette: burgundy, cream, ink, and restrained antique gold."
+    />
+    <meta name="theme-color" content="#f5efe3" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://juchess.page/palette/" />
+    <link rel="icon" type="image/svg+xml" href="../web/favicon.svg" />
+    <meta property="og:title" content="JuChess Website Palette" />
+    <meta
+      property="og:description"
+      content="The official color system for the University of Jordan Chess Club website."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://juchess.page/palette/" />
+    <title>JuChess Website Palette</title>
+    <style>
+      :root {
+        --ju-ink: #111111;
+        --ju-burgundy: #7a2431;
+        --ju-burgundy-dark: #5f1b26;
+        --ju-gold: #a98a3f;
+        --ju-gold-soft: #c9ae6b;
+        --ju-cream: #f5efe3;
+        --ju-surface: #fffcf4;
+        --ju-muted: #6d625b;
+        --ju-line: rgba(17, 17, 17, 0.16);
+        --ju-shadow: 0 22px 60px rgba(35, 22, 17, 0.09);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        color: var(--ju-ink);
+        background: var(--ju-cream);
+        font-family: Arial, Helvetica, sans-serif;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      a {
+        font: inherit;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid rgba(122, 36, 49, 0.38);
+        outline-offset: 4px;
+      }
+
+      .site-header {
+        border-bottom: 1px solid var(--ju-line);
+        background: rgba(245, 239, 227, 0.94);
+      }
+
+      .header-inner,
+      main,
+      .footer-inner {
+        width: min(100% - 48px, 1160px);
+        margin: 0 auto;
+      }
+
+      .header-inner {
+        min-height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .brand img {
+        width: 44px;
+        height: 44px;
+        display: block;
+        object-fit: contain;
+      }
+
+      .brand span {
+        display: grid;
+        gap: 2px;
+      }
+
+      .brand strong {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 22px;
+        line-height: 1;
+      }
+
+      .brand small {
+        color: var(--ju-burgundy);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .home-link {
+        min-height: 42px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 16px;
+        border: 1px solid rgba(17, 17, 17, 0.22);
+        border-radius: 7px;
+        color: var(--ju-ink);
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        transition: border-color 160ms ease, color 160ms ease;
+      }
+
+      .home-link:hover {
+        color: var(--ju-burgundy);
+        border-color: var(--ju-burgundy);
+      }
+
+      main {
+        padding: 92px 0 104px;
+      }
+
+      .hero {
+        max-width: 840px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin-top: 0;
+      }
+
+      h1,
+      h2 {
+        font-family: Georgia, "Times New Roman", serif;
+      }
+
+      h1 {
+        max-width: 780px;
+        margin-bottom: 24px;
+        font-size: clamp(52px, 8.2vw, 102px);
+        font-weight: 700;
+        letter-spacing: -0.045em;
+        line-height: 0.92;
+      }
+
+      .hero p {
+        max-width: 690px;
+        margin-bottom: 0;
+        color: var(--ju-muted);
+        font-size: clamp(17px, 2vw, 21px);
+        line-height: 1.6;
+      }
+
+      .hero-rule {
+        width: 82px;
+        height: 3px;
+        margin: 42px 0 0;
+        background: var(--ju-gold);
+      }
+
+      section {
+        margin-top: 96px;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 28px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--ju-line);
+      }
+
+      .section-heading h2 {
+        margin-bottom: 0;
+        font-size: clamp(32px, 4vw, 50px);
+        line-height: 1;
+      }
+
+      .section-heading p {
+        max-width: 410px;
+        margin-bottom: 1px;
+        color: var(--ju-muted);
+        font-size: 14px;
+        line-height: 1.55;
+        text-align: right;
+      }
+
+      .palette-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 30px 16px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .swatch-button {
+        width: 100%;
+        display: block;
+        padding: 0;
+        border: 0;
+        color: var(--ju-ink);
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .color-block {
+        min-height: 178px;
+        display: flex;
+        align-items: flex-end;
+        padding: 18px;
+        border: 1px solid var(--ju-line);
+        border-radius: 10px;
+        box-shadow: var(--ju-shadow);
+        transition: transform 160ms ease, box-shadow 160ms ease;
+      }
+
+      .swatch-button:hover .color-block {
+        transform: translateY(-3px);
+        box-shadow: 0 26px 62px rgba(35, 22, 17, 0.14);
+      }
+
+      .hex {
+        padding: 6px 8px;
+        border-radius: 5px;
+        color: var(--ju-ink);
+        background: rgba(255, 252, 244, 0.91);
+        font-family: "Courier New", Courier, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+
+      .swatch-name,
+      .swatch-role {
+        display: block;
+      }
+
+      .swatch-name {
+        margin-top: 14px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .swatch-role {
+        margin-top: 5px;
+        color: var(--ju-muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .color-ink { background: var(--ju-ink); }
+      .color-burgundy { background: var(--ju-burgundy); }
+      .color-burgundy-dark { background: var(--ju-burgundy-dark); }
+      .color-gold { background: var(--ju-gold); }
+      .color-gold-soft { background: var(--ju-gold-soft); }
+      .color-cream { background: var(--ju-cream); }
+      .color-surface { background: var(--ju-surface); }
+      .color-muted { background: var(--ju-muted); }
+
+      .pairings {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .pairing {
+        min-height: 176px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 24px;
+        border: 1px solid var(--ju-line);
+        border-radius: 10px;
+      }
+
+      .pairing strong {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 25px;
+        line-height: 1.08;
+      }
+
+      .pairing span {
+        font-family: "Courier New", Courier, monospace;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .pairing-burgundy {
+        color: var(--ju-cream);
+        background: var(--ju-burgundy);
+      }
+
+      .pairing-cream {
+        color: var(--ju-ink);
+        background: var(--ju-cream);
+      }
+
+      .pairing-gold {
+        color: var(--ju-ink);
+        background: var(--ju-gold-soft);
+      }
+
+      .usage-bar {
+        min-height: 88px;
+        display: flex;
+        overflow: hidden;
+        border: 1px solid var(--ju-line);
+        border-radius: 10px;
+        box-shadow: var(--ju-shadow);
+      }
+
+      .usage-bar span {
+        display: grid;
+        place-items: center;
+        padding: 12px;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .usage-cream { width: 60%; color: var(--ju-ink); background: var(--ju-cream); }
+      .usage-ink { width: 25%; color: var(--ju-cream); background: var(--ju-ink); }
+      .usage-burgundy { width: 10%; color: var(--ju-cream); background: var(--ju-burgundy); }
+      .usage-gold { width: 5%; min-width: 56px; color: var(--ju-ink); background: var(--ju-gold-soft); }
+
+      .usage-notes {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 20px;
+        margin-top: 24px;
+      }
+
+      .usage-notes strong,
+      .usage-notes span {
+        display: block;
+      }
+
+      .usage-notes strong {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 18px;
+      }
+
+      .usage-notes span {
+        margin-top: 6px;
+        color: var(--ju-muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .token-panel {
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        color: var(--ju-cream);
+        background: var(--ju-ink);
+        box-shadow: var(--ju-shadow);
+      }
+
+      .token-toolbar {
+        min-height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 10px 18px;
+        border-bottom: 1px solid rgba(245, 239, 227, 0.14);
+      }
+
+      .token-toolbar strong {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 18px;
+      }
+
+      .copy-all {
+        min-height: 38px;
+        padding: 0 14px;
+        border: 1px solid rgba(245, 239, 227, 0.36);
+        border-radius: 6px;
+        color: var(--ju-cream);
+        background: transparent;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .copy-all:hover {
+        color: var(--ju-ink);
+        background: var(--ju-gold-soft);
+        border-color: var(--ju-gold-soft);
+      }
+
+      pre {
+        margin: 0;
+        padding: 24px;
+        overflow-x: auto;
+        color: #f5efe3;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 14px;
+        line-height: 1.8;
+      }
+
+      .token-name { color: var(--ju-gold-soft); }
+      .token-value { color: #f0c7cf; }
+
+      .design-note {
+        display: grid;
+        grid-template-columns: 5px minmax(0, 1fr);
+        gap: 20px;
+        margin-top: 30px;
+        padding: 22px 0;
+        border-top: 1px solid var(--ju-line);
+        border-bottom: 1px solid var(--ju-line);
+      }
+
+      .design-note::before {
+        content: "";
+        background: var(--ju-gold);
+      }
+
+      .design-note p {
+        margin: 0;
+        color: var(--ju-muted);
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      footer {
+        color: rgba(245, 239, 227, 0.82);
+        background: var(--ju-ink);
+      }
+
+      .footer-inner {
+        min-height: 112px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .footer-inner strong {
+        color: var(--ju-cream);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 22px;
+      }
+
+      .footer-inner span {
+        font-size: 12px;
+      }
+
+      .copy-status {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        z-index: 10;
+        max-width: calc(100% - 40px);
+        padding: 12px 16px;
+        border: 1px solid rgba(245, 239, 227, 0.18);
+        border-radius: 7px;
+        color: var(--ju-cream);
+        background: var(--ju-ink);
+        box-shadow: 0 14px 40px rgba(17, 17, 17, 0.22);
+        font-size: 13px;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(10px);
+        transition: opacity 160ms ease, transform 160ms ease;
+      }
+
+      .copy-status.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 840px) {
+        main {
+          padding-top: 72px;
+        }
+
+        .palette-grid,
+        .usage-notes {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .pairings {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .header-inner,
+        main,
+        .footer-inner {
+          width: min(100% - 32px, 1160px);
+        }
+
+        .header-inner {
+          min-height: 64px;
+        }
+
+        .brand img {
+          width: 38px;
+          height: 38px;
+        }
+
+        .brand strong {
+          font-size: 20px;
+        }
+
+        .brand small,
+        .home-link {
+          font-size: 9px;
+        }
+
+        .home-link {
+          min-height: 38px;
+          padding: 0 11px;
+        }
+
+        main {
+          padding: 58px 0 72px;
+        }
+
+        h1 {
+          margin-bottom: 20px;
+          font-size: clamp(48px, 17vw, 68px);
+        }
+
+        .hero p {
+          font-size: 16px;
+        }
+
+        section {
+          margin-top: 72px;
+        }
+
+        .section-heading {
+          display: block;
+        }
+
+        .section-heading p {
+          margin-top: 12px;
+          text-align: left;
+        }
+
+        .palette-grid {
+          gap: 26px 12px;
+        }
+
+        .color-block {
+          min-height: 122px;
+          padding: 12px;
+        }
+
+        .swatch-name {
+          font-size: 17px;
+        }
+
+        .usage-bar {
+          min-height: 0;
+          display: grid;
+          grid-template-columns: 1fr;
+        }
+
+        .usage-bar span {
+          width: 100%;
+          min-height: 52px;
+        }
+
+        .usage-notes {
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+
+        .token-toolbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .copy-all {
+          width: 100%;
+        }
+
+        pre {
+          padding: 18px;
+          font-size: 12px;
+        }
+
+        .footer-inner {
+          min-height: 0;
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 8px;
+          padding: 28px 0;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="../" aria-label="JuChess home">
+          <img src="../email/juchess-email-logo.png" alt="JuChess crest" width="44" height="44" />
+          <span>
+            <strong>JuChess</strong>
+            <small>Design palette</small>
+          </span>
+        </a>
+        <a class="home-link" href="../">Back to JuChess</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <h1 id="page-title">The colors of JuChess.</h1>
+        <p>
+          A warm, collegiate system built from club burgundy, cream, near-black ink, and restrained antique gold.
+          Designed to feel serious at the board, welcoming on campus, and unmistakably JuChess.
+        </p>
+        <div class="hero-rule" aria-hidden="true"></div>
+      </section>
+
+      <section aria-labelledby="core-colors-title">
+        <div class="section-heading">
+          <h2 id="core-colors-title">Core palette</h2>
+          <p>Choose any swatch to copy its exact production hex value.</p>
+        </div>
+
+        <ul class="palette-grid">
+          <li>
+            <button class="swatch-button" type="button" data-copy="#111111" aria-label="Copy Ink color #111111">
+              <span class="color-block color-ink"><span class="hex">#111111</span></span>
+              <span class="swatch-name">Ink</span>
+              <span class="swatch-role">Text, footer, and premium dark sections</span>
+            </button>
+          </li>
+          <li>
+            <button class="swatch-button" type="button" data-copy="#7A2431" aria-label="Copy Club burgundy color #7A2431">
+              <span class="color-block color-burgundy"><span class="hex">#7A2431</span></span>
+              <span class="swatch-name">Club burgundy</span>
+              <span class="swatch-role">Primary actions and active states</span>
+            </button>
+          </li>
+          <li>
+            <button class="swatch-button" type="button" data-copy="#5F1B26" aria-label="Copy Deep burgundy color #5F1B26">
+              <span class="color-block color-burgundy-dark"><span class="hex">#5F1B26</span></span>
+              <span class="swatch-name">Deep burgundy</span>
+              <span class="swatch-role">Hover, pressed, and high-depth accents</span>
+            </button>
+          </li>
+          <li>
+            <button class="swatch-button" type="button" data-copy="#A98A3F" aria-label="Copy Antique gold color #A98A3F">
+              <span class="color-block color-gold"><span class="hex">#A98A3F</span></span>
+              <span class="swatch-name">Antique gold</span>
+              <span class="swatch-role">Rules, borders, and restrained accents</span>
+            </button>
+          </li>
+          <li>
+            <button class="swatch-button" type="button" data-copy="#C9AE6B" aria-label="Copy Soft gold color #C9AE6B">
+              <span class="color-block color-gold-soft"><span class="hex">#C9AE6B</span></span>
+              <span class="swatch-name">Soft gold</span>
+              <span class="swatch-role">Medals and dark-surface highlights</span>
+            </button>
+          </li>
+          <li>
+            <button class="swatch-button" type="button" data-copy="#F5EFE3" aria-label="Copy Club cream color #F5EFE3">
+              <span class="color-block color-cream"><span class="hex">#F5EFE3</span></span>
+              <span class="swatch-name">Club cream</span>
+              <span class="swatch-role">Primary website background</span>
+            </button>
+          </li>
+          <li>
+            <button class="swatch-button" type="button" data-copy="#FFFCF4" aria-label="Copy Ivory surface color #FFFCF4">
+              <span class="color-block color-surface"><span class="hex">#FFFCF4</span></span>
+              <span class="swatch-name">Ivory surface</span>
+              <span class="swatch-role">Forms, cards, and elevated content</span>
+            </button>
+          </li>
+          <li>
+            <button class="swatch-button" type="button" data-copy="#6D625B" aria-label="Copy Warm muted color #6D625B">
+              <span class="color-block color-muted"><span class="hex">#6D625B</span></span>
+              <span class="swatch-name">Warm muted</span>
+              <span class="swatch-role">Secondary copy and metadata</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="pairings-title">
+        <div class="section-heading">
+          <h2 id="pairings-title">Accessible pairings</h2>
+          <p>These combinations comfortably exceed WCAG AA contrast requirements.</p>
+        </div>
+        <div class="pairings">
+          <div class="pairing pairing-burgundy">
+            <strong>Cream on burgundy</strong>
+            <span>8.63:1 · primary buttons</span>
+          </div>
+          <div class="pairing pairing-cream">
+            <strong>Ink on cream</strong>
+            <span>16.49:1 · page content</span>
+          </div>
+          <div class="pairing pairing-gold">
+            <strong>Ink on soft gold</strong>
+            <span>8.77:1 · compact highlights</span>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="balance-title">
+        <div class="section-heading">
+          <h2 id="balance-title">Recommended balance</h2>
+          <p>The identity stays premium when burgundy and gold remain purposeful.</p>
+        </div>
+        <div class="usage-bar" aria-label="Recommended color proportions: 60 percent cream, 25 percent ink and ivory, 10 percent burgundy, 5 percent gold">
+          <span class="usage-cream">60% cream</span>
+          <span class="usage-ink">25% ink</span>
+          <span class="usage-burgundy">10%</span>
+          <span class="usage-gold">5%</span>
+        </div>
+        <div class="usage-notes">
+          <div><strong>Foundation</strong><span>Let cream carry most page backgrounds and breathing room.</span></div>
+          <div><strong>Structure</strong><span>Use ink for typography, navigation, and strong dark sections.</span></div>
+          <div><strong>Action</strong><span>Reserve burgundy for calls to action, focus, and selection.</span></div>
+          <div><strong>Prestige</strong><span>Use gold sparingly for winners, rules, and fine highlights.</span></div>
+        </div>
+      </section>
+
+      <section aria-labelledby="tokens-title">
+        <div class="section-heading">
+          <h2 id="tokens-title">CSS tokens</h2>
+          <p>Ready to drop into a website, presentation, or design-system file.</p>
+        </div>
+        <div class="token-panel">
+          <div class="token-toolbar">
+            <strong>JuChess color variables</strong>
+            <button class="copy-all" type="button" id="copy-tokens">Copy all tokens</button>
+          </div>
+          <pre aria-label="JuChess CSS color variables"><code id="token-code">:root {
+  <span class="token-name">--ju-ink</span>: <span class="token-value">#111111</span>;
+  <span class="token-name">--ju-burgundy</span>: <span class="token-value">#7a2431</span>;
+  <span class="token-name">--ju-burgundy-dark</span>: <span class="token-value">#5f1b26</span>;
+  <span class="token-name">--ju-gold</span>: <span class="token-value">#a98a3f</span>;
+  <span class="token-name">--ju-gold-soft</span>: <span class="token-value">#c9ae6b</span>;
+  <span class="token-name">--ju-cream</span>: <span class="token-value">#f5efe3</span>;
+  <span class="token-name">--ju-surface</span>: <span class="token-value">#fffcf4</span>;
+  <span class="token-name">--ju-muted</span>: <span class="token-value">#6d625b</span>;
+}</code></pre>
+        </div>
+        <div class="design-note">
+          <p>
+            Antique gold is an accent, not body text. On cream it does not provide enough contrast for normal copy;
+            use ink or burgundy for readable text and keep gold for borders, medals, and small visual details.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-inner">
+        <strong>JuChess</strong>
+        <span>University of Jordan Chess Club · Official website palette</span>
+      </div>
+    </footer>
+
+    <div class="copy-status" id="copy-status" role="status" aria-live="polite"></div>
+
+    <script>
+      const status = document.getElementById('copy-status')
+      let statusTimer
+
+      function showStatus(message) {
+        status.textContent = message
+        status.classList.add('visible')
+        window.clearTimeout(statusTimer)
+        statusTimer = window.setTimeout(() => status.classList.remove('visible'), 1800)
+      }
+
+      async function copyText(value, message) {
+        try {
+          await navigator.clipboard.writeText(value)
+          showStatus(message)
+        } catch {
+          const field = document.createElement('textarea')
+          field.value = value
+          field.setAttribute('readonly', '')
+          field.style.position = 'fixed'
+          field.style.opacity = '0'
+          document.body.appendChild(field)
+          field.select()
+          document.execCommand('copy')
+          field.remove()
+          showStatus(message)
+        }
+      }
+
+      document.querySelectorAll('[data-copy]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const value = button.getAttribute('data-copy')
+          copyText(value, `${value} copied`)
+        })
+      })
+
+      document.getElementById('copy-tokens').addEventListener('click', () => {
+        copyText(document.getElementById('token-code').textContent, 'CSS tokens copied')
+      })
+    </script>
+  </body>
+</html>

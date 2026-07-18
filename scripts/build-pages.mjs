@@ -106,6 +106,7 @@ try {
   for (const fileName of publicRootFiles) {
     copyFileSync(join('apps/web/public', fileName), join('docs', fileName))
   }
+  cpSync('apps/web/public/palette', 'docs/palette', { force: true, recursive: true })
   writeStaticRoutes()
   mkdirSync('docs/email', { recursive: true })
   copyFileSync('apps/web/public/email/juchess-email-logo.png', 'docs/email/juchess-email-logo.png')
