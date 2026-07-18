@@ -11,6 +11,20 @@
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://juchess.page/palette/" />
     <link rel="icon" type="image/svg+xml" href="../web/favicon.svg" />
+    <link
+      rel="preload"
+      href="/web/assets/droidserif-regular-z42WDJCf.woff"
+      as="font"
+      type="font/woff"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/web/assets/droidserif-bold-CnvgVUwH.woff"
+      as="font"
+      type="font/woff"
+      crossorigin
+    />
     <meta property="og:title" content="JuChess Website Palette" />
     <meta
       property="og:description"
@@ -20,6 +34,22 @@
     <meta property="og:url" content="https://juchess.page/palette/" />
     <title>JuChess Website Palette</title>
     <style>
+      @font-face {
+        font-family: "Droid Serif";
+        font-style: normal;
+        font-display: swap;
+        font-weight: 400;
+        src: url("/web/assets/droidserif-regular-z42WDJCf.woff") format("woff");
+      }
+
+      @font-face {
+        font-family: "Droid Serif";
+        font-style: normal;
+        font-display: swap;
+        font-weight: 700;
+        src: url("/web/assets/droidserif-bold-CnvgVUwH.woff") format("woff");
+      }
+
       :root {
         --ju-ink: #111111;
         --ju-burgundy: #7a2431;
@@ -31,6 +61,7 @@
         --ju-muted: #6d625b;
         --ju-line: rgba(17, 17, 17, 0.16);
         --ju-shadow: 0 22px 60px rgba(35, 22, 17, 0.09);
+        --ju-font: "FF Providence Sans", "Droid Serif", Georgia, serif;
       }
 
       * {
@@ -46,7 +77,7 @@
         margin: 0;
         color: var(--ju-ink);
         background: var(--ju-cream);
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: var(--ju-font);
         text-rendering: optimizeLegibility;
         -webkit-font-smoothing: antialiased;
       }
@@ -104,7 +135,7 @@
       }
 
       .brand strong {
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: var(--ju-font);
         font-size: 22px;
         line-height: 1;
       }
@@ -152,7 +183,7 @@
 
       h1,
       h2 {
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: var(--ju-font);
       }
 
       h1 {
@@ -262,7 +293,7 @@
 
       .swatch-name {
         margin-top: 14px;
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: var(--ju-font);
         font-size: 20px;
         font-weight: 700;
       }
@@ -300,7 +331,7 @@
       }
 
       .pairing strong {
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: var(--ju-font);
         font-size: 25px;
         line-height: 1.08;
       }
@@ -363,7 +394,7 @@
       }
 
       .usage-notes strong {
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: var(--ju-font);
         font-size: 18px;
       }
 
@@ -394,7 +425,7 @@
       }
 
       .token-toolbar strong {
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: var(--ju-font);
         font-size: 18px;
       }
 
@@ -466,7 +497,7 @@
 
       .footer-inner strong {
         color: var(--ju-cream);
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: var(--ju-font);
         font-size: 22px;
       }
 
