@@ -21,6 +21,7 @@ export type Tournament = {
   playMode: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location: string
+  locationUrl?: string
   format: string
   timeControl: string
   participants: number
@@ -76,6 +77,7 @@ type AppwriteTournamentRow = Models.Row & {
   playMode?: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location?: string
+  locationUrl?: string
   capacity?: number
   description?: string
   bracketSnapshot?: string
@@ -1232,6 +1234,7 @@ function mapAppwriteTournament(
     location: row.playMode === 'online'
       ? onlinePlatformLabel(normalizeOnlinePlatform(row.onlinePlatform))
       : row.location || 'University of Jordan',
+    locationUrl: row.playMode === 'online' ? undefined : row.locationUrl?.trim() || undefined,
     format,
     timeControl: row.timeControl,
     participants: participantCounts.get(row.$id) ?? 0,

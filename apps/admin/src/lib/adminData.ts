@@ -60,6 +60,7 @@ type AppwriteTournamentRow = Models.Row & {
   playMode?: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location?: string
+  locationUrl?: string
   capacity?: number
   description?: string
   bracketSnapshot?: string
@@ -191,6 +192,7 @@ export type AdminTournament = {
   playMode: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location?: string
+  locationUrl?: string
   description?: string
   publishedGames: number
   publishedGameRows: AdminGame[]
@@ -274,6 +276,7 @@ export type TournamentInput = {
   playMode?: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location?: string
+  locationUrl?: string | null
   capacity?: number
   description?: string
   physicalBoards?: number
@@ -1309,6 +1312,7 @@ function mapTournament(
     playMode: row.playMode === 'online' ? 'online' : 'inPerson',
     onlinePlatform: normalizeOnlinePlatform(row.onlinePlatform),
     location: row.location,
+    locationUrl: row.locationUrl,
     description: row.description,
     publishedGames: games.length,
     publishedGameRows: games,
@@ -1484,7 +1488,9 @@ function parseExecutionBody<T>(body: string): T {
 
 function cleanTournamentInput(input: Partial<TournamentInput>): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(input).filter(([, value]) => value !== undefined && value !== ''),
+    Object.entries(input)
+      .filter(([key, value]) => value !== undefined && (value !== '' || key === 'locationUrl'))
+      .map(([key, value]) => [key, key === 'locationUrl' && value === '' ? null : value]),
   )
 }
 

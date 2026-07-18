@@ -85,6 +85,7 @@ import {
   nextTournamentWizardStep,
   tournamentWizardSubmitIntent,
 } from './lib/tournamentWizard'
+import { normalizeTournamentLocationUrl } from './lib/tournamentLocation'
 import {
   clockHandAngle,
   clockLabelAngle,
@@ -680,6 +681,7 @@ function createInitialTournamentForm(): TournamentInput {
     playMode: 'inPerson',
     onlinePlatform: undefined,
     location: '',
+    locationUrl: '',
   }
 }
 
@@ -1668,6 +1670,16 @@ function TournamentsScreen({
       return
     }
 
+    let locationUrl = ''
+    try {
+      locationUrl = form.playMode === 'inPerson'
+        ? normalizeTournamentLocationUrl(form.locationUrl)
+        : ''
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Enter a valid location link.')
+      return
+    }
+
     setSubmitting(true)
     setMessage(null)
 
@@ -1680,6 +1692,7 @@ function TournamentsScreen({
           || buildUniqueTournamentSlugBase(name, tournaments, editingTournament?.rowId),
         status: isEditing ? form.status : 'draft',
         timeControl: `${timeMinutes || '0'}+${timeIncrement || '0'} ${timeCategory}`,
+        locationUrl,
       }
 
       if (editingTournament?.rowId) {
@@ -2178,14 +2191,26 @@ function TournamentsScreen({
                       </div>
                     </div>
                   ) : (
-                    <label>
-                      Venue
-                      <input
-                        value={form.location ?? ''}
-                        onChange={(event) => update('location', event.target.value)}
-                        placeholder="Type venue..."
-                      />
-                    </label>
+                    <>
+                      <label>
+                        Location name
+                        <input
+                          value={form.location ?? ''}
+                          onChange={(event) => update('location', event.target.value)}
+                          placeholder="e.g. Student Union Hall B"
+                        />
+                      </label>
+                      <label>
+                        Location link (optional)
+                        <input
+                          type="url"
+                          inputMode="url"
+                          value={form.locationUrl ?? ''}
+                          onChange={(event) => update('locationUrl', event.target.value)}
+                          placeholder="https://maps.google.com/..."
+                        />
+                      </label>
+                    </>
                   )}
                   <TournamentDateTimeControl
                     label="Tournament start"
@@ -6712,6 +6737,7 @@ function tournamentToEditForm(item: AdminTournament): TournamentInput {
     playMode: item.playMode,
     onlinePlatform: item.onlinePlatform,
     location: item.location ?? '',
+    locationUrl: item.locationUrl ?? '',
     description: item.description ?? '',
     startsAt: item.startsAt,
     registrationDeadline: item.registrationDeadline,

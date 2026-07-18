@@ -189,6 +189,35 @@
   color: #a9852e;
 }
 
+.overview-location {
+  align-items: flex-start;
+}
+
+.overview-location-link {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 0 11px;
+  border: 1px solid rgba(122, 36, 49, 0.28);
+  border-radius: 7px;
+  color: #7a2431;
+  background: rgba(122, 36, 49, 0.045);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.overview-location-link:hover {
+  border-color: #7a2431;
+  color: #fffcf4;
+  background: #7a2431;
+}
+
 .detail-description {
   font-size: 14px;
   line-height: 1.6;

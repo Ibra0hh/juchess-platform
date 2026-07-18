@@ -5,8 +5,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  ExternalLink,
   Image as ImageIcon,
   LoaderCircle,
+  MapPin,
   Play,
   ShieldCheck,
   Trophy,
@@ -464,7 +466,7 @@ function RegistrationTab({
         <OverviewItem label="Format" value={tournament.format} />
         <OverviewItem label="Time control" value={tournament.timeControl} />
         <OverviewItem label="Stage" value={tournament.round} tone="accent" />
-        <OverviewItem label="Venue" value={tournament.location} />
+        <OverviewItem label="Location" value={tournament.location} href={tournament.locationUrl} />
         <OverviewItem label="Leading" value={leader ? `${leader.member.name} · ${leader.points} pts` : 'Not started'} tone="gold" />
       </div>
 
@@ -1591,11 +1593,34 @@ function UnpublishedPanel({ body, title }: { body: string; title: string }) {
   )
 }
 
-function OverviewItem({ label, value, tone }: { label: string; value: string; tone?: 'accent' | 'gold' }) {
+function OverviewItem({
+  href,
+  label,
+  tone,
+  value,
+}: {
+  href?: string
+  label: string
+  value: string
+  tone?: 'accent' | 'gold'
+}) {
   return (
-    <div className="overview-item">
+    <div className={href ? 'overview-item overview-location' : 'overview-item'}>
       <span>{label}</span>
       <strong className={tone}>{value}</strong>
+      {href ? (
+        <a
+          className="overview-location-link"
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Open ${value} location in a new tab`}
+        >
+          <MapPin size={14} aria-hidden="true" />
+          Open location
+          <ExternalLink size={13} aria-hidden="true" />
+        </a>
+      ) : null}
     </div>
   )
 }

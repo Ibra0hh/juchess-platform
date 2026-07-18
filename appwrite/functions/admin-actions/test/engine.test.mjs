@@ -1090,6 +1090,14 @@ test('competition-defining fields are detected independently from descriptive ed
   assert.deepEqual(engine.changedCompetitionFields(current, { roundsTotal: 7 }), ['roundsTotal'])
 })
 
+test('tournament location links allow only HTTP and HTTPS URLs', () => {
+  assert.equal(engine.normalizeTournamentLocationUrl(undefined), undefined)
+  assert.equal(engine.normalizeTournamentLocationUrl(''), null)
+  assert.equal(engine.normalizeTournamentLocationUrl(' https://maps.app.goo.gl/example '), 'https://maps.app.goo.gl/example')
+  assert.throws(() => engine.normalizeTournamentLocationUrl('maps.google.com/place'), /starting with https:\/\//)
+  assert.throws(() => engine.normalizeTournamentLocationUrl('javascript:alert(1)'), /starting with https:\/\//)
+})
+
 test('round counts', () => {
   assert.equal(engine.swissRoundsTotal({ roundsTotal: 0 }, 20), 6)
   assert.equal(engine.swissRoundsTotal({ roundsTotal: 9 }, 20), 9, 'an explicit count wins')

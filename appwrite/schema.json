@@ -115,6 +115,7 @@
         "playMode": "enum:inPerson,online|default:inPerson",
         "onlinePlatform": "enum:chessCom,lichess,juchess",
         "location": "string",
+        "locationUrl": "url",
         "capacity": "integer",
         "description": "string",
         "bracketSnapshot": "longtext",

@@ -87,7 +87,7 @@ function TournamentsPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search tournaments, formats, venues..."
+            placeholder="Search tournaments, formats, locations..."
             aria-label="Search tournaments"
           />
         </div>
@@ -263,7 +263,7 @@ function EmptyState({
           ? 'No live tournament right now'
           : 'No completed tournaments yet'
   const body = searching
-    ? 'Try another tournament name, format, or venue.'
+    ? 'Try another tournament name, format, or location.'
     : !hasAnyTournaments
       ? 'New JuChess events will appear here as soon as they are announced.'
       : filter === 'Upcoming'

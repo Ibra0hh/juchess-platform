@@ -1821,6 +1821,25 @@ function validateTournamentOnlinePlatform(playMode, onlinePlatform) {
   return onlinePlatform;
 }
 
+export function normalizeTournamentLocationUrl(value) {
+  if (value === undefined) return undefined;
+  const candidate = String(value ?? '').trim();
+  if (!candidate) return null;
+
+  let url;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new HttpError(400, 'Enter a valid location link starting with https:// or http://.');
+  }
+
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new HttpError(400, 'Enter a valid location link starting with https:// or http://.');
+  }
+
+  return url.toString();
+}
+
 function isJuChessHostedTournament(tournament) {
   return tournament.playMode === 'online' && tournament.onlinePlatform === 'juchess';
 }
@@ -4615,6 +4634,7 @@ export default async ({ req, res, log, error }) => {
           playMode,
           onlinePlatform,
           location: body.location,
+          locationUrl: normalizeTournamentLocationUrl(body.locationUrl),
           capacity: body.capacity,
           description: body.description,
           physicalBoards: normalizePhysicalBoards(body.physicalBoards),
@@ -4674,6 +4694,7 @@ export default async ({ req, res, log, error }) => {
           playMode,
           onlinePlatform,
           location: body.location,
+          locationUrl: normalizeTournamentLocationUrl(body.locationUrl),
           capacity: body.capacity,
           description: body.description,
           physicalBoards: body.physicalBoards === undefined ? undefined : normalizePhysicalBoards(body.physicalBoards),

@@ -27,6 +27,7 @@
     "migrate:profile-university": "powershell -ExecutionPolicy Bypass -File scripts/migrate-profile-university.ps1",
     "migrate:board-preferences": "powershell -ExecutionPolicy Bypass -File scripts/migrate-board-preferences.ps1",
     "migrate:registration-deadline": "powershell -ExecutionPolicy Bypass -File scripts/migrate-tournament-registration-deadline.ps1",
+    "migrate:location-url": "powershell -ExecutionPolicy Bypass -File scripts/migrate-tournament-location-url.ps1",
     "migrate:recruitment": "powershell -ExecutionPolicy Bypass -File scripts/migrate-recruitment.ps1",
     "migrate:email-verification": "powershell -ExecutionPolicy Bypass -File scripts/migrate-email-verification.ps1",
     "migrate:password-recovery": "powershell -ExecutionPolicy Bypass -File scripts/migrate-password-recovery.ps1",
