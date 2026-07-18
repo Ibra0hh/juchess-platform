@@ -13,6 +13,13 @@ import {
   TablesDB,
   Users,
 } from 'node-appwrite';
+import {
+  PASSWORD_RECOVERY_TTL_MS,
+  RecoveryHttpError,
+  confirmPasswordRecoveryCode,
+  confirmPasswordRecoveryLink,
+  requestPasswordRecovery,
+} from './passwordRecovery.js';
 
 const tableId = 'email_verification_challenges';
 export const VERIFICATION_TTL_MS = 2 * 60 * 60 * 1000;
@@ -176,6 +183,12 @@ export function buildVerificationEmailHtml({ displayName, code, verificationUrl 
 function requireSecret() {
   const secret = String(process.env.JUCHESS_VERIFICATION_SECRET ?? '');
   if (secret.length < 32) throw new HttpError(503, 'Email verification is not configured yet.');
+  return secret;
+}
+
+function requireRecoverySecret() {
+  const secret = String(process.env.JUCHESS_RECOVERY_SECRET ?? '');
+  if (secret.length < 32) throw new RecoveryHttpError(503, 'Password recovery is not configured yet.');
   return secret;
 }
 
@@ -417,13 +430,50 @@ export default async ({ req, res, log, error }) => {
   if (method === 'GET' && segments.length === 0) {
     return res.json({
       ok: true,
-      service: 'juchess-verification-actions',
+      service: 'juchess-account-security',
       expiresInSeconds: VERIFICATION_TTL_MS / 1000,
-      routes: ['POST /send', 'POST /confirm-link', 'POST /confirm-code'],
+      passwordRecoveryExpiresInSeconds: PASSWORD_RECOVERY_TTL_MS / 1000,
+      routes: [
+        'POST /send',
+        'POST /confirm-link',
+        'POST /confirm-code',
+        'POST /recovery/send',
+        'POST /recovery/confirm-link',
+        'POST /recovery/confirm-code',
+      ],
     });
   }
 
   try {
+    if (method === 'POST' && segments[0] === 'recovery') {
+      const secret = requireRecoverySecret();
+      if (segments[1] === 'send') {
+        const result = await requestPasswordRecovery({
+          tablesDB,
+          users,
+          messaging,
+          databaseId,
+          body,
+          secret,
+          publicWebUrl,
+          clientIp: req.headers['x-appwrite-client-ip'] ?? '',
+        });
+        log('Accepted one password recovery request.');
+        return res.json({ ok: true, ...result });
+      }
+      if (segments[1] === 'confirm-link') {
+        const result = await confirmPasswordRecoveryLink({ tablesDB, users, databaseId, body, secret });
+        log('Completed one password recovery by link.');
+        return res.json({ ok: true, ...result });
+      }
+      if (segments[1] === 'confirm-code') {
+        const result = await confirmPasswordRecoveryCode({ tablesDB, users, databaseId, body, secret });
+        log('Completed one password recovery by code.');
+        return res.json({ ok: true, ...result });
+      }
+      return res.json({ ok: false, error: `No password recovery action for ${method} ${path}` }, 404);
+    }
+
     const secret = requireSecret();
     if (method === 'POST' && segments[0] === 'send') {
       const user = await requireAccount(req);
@@ -450,12 +500,25 @@ export default async ({ req, res, log, error }) => {
     }
     return res.json({ ok: false, error: `No verification action for ${method} ${path}` }, 404);
   } catch (caught) {
-    if (!(caught instanceof HttpError)) error(caught?.message ?? String(caught));
+    const knownError = caught instanceof HttpError || caught instanceof RecoveryHttpError;
+    if (!knownError) {
+      error(segments[0] === 'recovery'
+        ? 'A password recovery backend operation failed.'
+        : caught?.message ?? String(caught));
+    }
+    // Requesting recovery never reveals whether an account, target, rate
+    // limit, or temporary provider failure exists. The web queues this route
+    // asynchronously, and direct synchronous callers receive the same answer.
+    if (segments[0] === 'recovery' && segments[1] === 'send' && !(caught instanceof RecoveryHttpError && caught.statusCode === 400)) {
+      return res.json({ ok: true, accepted: true });
+    }
     return res.json({
       ok: false,
-      error: caught instanceof HttpError
+      error: knownError
         ? caught.message
-        : 'Email verification could not be completed right now.',
-    }, caught instanceof HttpError ? caught.statusCode : 500);
+        : segments[0] === 'recovery'
+          ? 'Password recovery could not be completed right now.'
+          : 'Email verification could not be completed right now.',
+    }, knownError ? caught.statusCode : 500);
   }
 };

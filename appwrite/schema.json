@@ -75,6 +75,28 @@
         "createdAt": "datetime|required"
       }
     },
+    "password_recovery_challenges": {
+      "note": "Server-only one-hour password recovery proofs. Email addresses, client IPs, six-digit codes, and link tokens are stored only as keyed hashes. Clients have no direct permissions.",
+      "permissions": [],
+      "rowSecurity": true,
+      "indexes": {
+        "recovery_user": "key:userId",
+        "recovery_email": "key:emailHash",
+        "recovery_ip": "key:ipHash"
+      },
+      "fields": {
+        "userId": "string|required",
+        "emailHash": "string|required",
+        "ipHash": "string|required",
+        "codeHash": "string|required",
+        "linkHash": "string|required",
+        "expiresAt": "datetime|required",
+        "attempts": "integer|default:0|min:0|max:5",
+        "consumedAt": "datetime",
+        "emailMessageId": "string|required",
+        "createdAt": "datetime|required"
+      }
+    },
     "tournaments": {
       "indexes": {
         "status_key": "key:status"

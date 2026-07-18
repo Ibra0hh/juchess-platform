@@ -989,11 +989,64 @@ class AppwriteService {
   }
 
   Future<void> sendPasswordRecovery(String email) async {
-    try {
-      await account.createRecovery(email: email, url: AppConfig.recoveryUrl);
-    } catch (error) {
-      if (isUnknownAccountRecoveryError(error)) return;
-      rethrow;
+    final execution = await functions.createExecution(
+      functionId: AppConfig.verificationFunctionId,
+      body: jsonEncode({'email': email.trim().toLowerCase()}),
+      xasync: true,
+      path: '/recovery/send',
+      method: enums.ExecutionMethod.pOST,
+      headers: {'content-type': 'application/json'},
+    );
+    if (execution.status == enums.ExecutionStatus.failed) {
+      throw AppwriteException(
+        'JuChess could not queue the recovery email. Please try again.',
+        execution.responseStatusCode,
+        'recovery_execution_failed',
+      );
+    }
+  }
+
+  Future<void> resetPasswordWithRecoveryCode({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    final execution = await functions.createExecution(
+      functionId: AppConfig.verificationFunctionId,
+      body: jsonEncode({
+        'email': email.trim().toLowerCase(),
+        'code': code.replaceAll(RegExp(r'\D'), ''),
+        'password': password,
+      }),
+      xasync: false,
+      path: '/recovery/confirm-code',
+      method: enums.ExecutionMethod.pOST,
+      headers: {'content-type': 'application/json'},
+    );
+    if (execution.status == enums.ExecutionStatus.failed) {
+      throw AppwriteException(
+        execution.errors.isEmpty
+            ? 'The password recovery service execution failed.'
+            : execution.errors,
+        execution.responseStatusCode,
+        'recovery_execution_failed',
+      );
+    }
+    final payload = _decodeFunctionPayload(
+      execution.responseBody,
+      fallback:
+          'The password recovery service returned an unreadable response.',
+    );
+    if (execution.responseStatusCode >= 400 ||
+        payload['ok'] == false ||
+        payload['reset'] != true) {
+      throw AppwriteException(
+        payload['error']?.toString() ??
+            'Password recovery could not be completed right now.',
+        execution.responseStatusCode,
+        'recovery_reset_failed',
+        execution.responseBody,
+      );
     }
   }
 
@@ -2300,6 +2353,37 @@ class AppState extends ChangeNotifier {
 
     try {
       await service.sendPasswordRecovery(email);
+      return true;
+    } catch (caught) {
+      error = appwriteMessage(caught);
+      return false;
+    } finally {
+      authLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> resetPasswordWithRecoveryCode({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    if (!service.ready) {
+      error = 'Account service is not ready yet.';
+      notifyListeners();
+      return false;
+    }
+
+    authLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      await service.resetPasswordWithRecoveryCode(
+        email: email,
+        code: code,
+        password: password,
+      );
       return true;
     } catch (caught) {
       error = appwriteMessage(caught);
@@ -14001,11 +14085,17 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _recoveryController = TextEditingController();
+  final _recoveryCodeController = TextEditingController();
+  final _recoveryPasswordController = TextEditingController();
+  final _recoveryConfirmPasswordController = TextEditingController();
 
   late AuthMode _mode = widget.initialMode;
   bool _showSignInPassword = false;
   bool _showSignUpPassword = false;
   bool _showConfirmPassword = false;
+  bool _showRecoveryPassword = false;
+  bool _showRecoveryConfirmPassword = false;
+  bool _recoveryCodeMode = false;
   String _authNotice = '';
   String _recoveryNotice = '';
 
@@ -14016,14 +14106,26 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _recoveryController.dispose();
+    _recoveryCodeController.dispose();
+    _recoveryPasswordController.dispose();
+    _recoveryConfirmPasswordController.dispose();
     super.dispose();
   }
 
   void _setMode(AuthMode mode) {
     context.read<AppState>().clearError();
     setState(() {
+      if (mode == AuthMode.forgot && _recoveryController.text.isEmpty) {
+        _recoveryController.text = _emailController.text.trim();
+      }
       _mode = mode;
       _recoveryNotice = '';
+      if (mode != AuthMode.forgot) {
+        _recoveryCodeMode = false;
+        _recoveryCodeController.clear();
+        _recoveryPasswordController.clear();
+        _recoveryConfirmPasswordController.clear();
+      }
     });
   }
 
@@ -14243,7 +14345,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Enter the email address tied to your JuChess account. We will send a secure password-reset link.',
+          'Enter the email address tied to your JuChess account. We will send a secure reset button and a six-digit code.',
           style: TextStyle(
             color: Color(0xa6111111),
             fontSize: 13.5,
@@ -14259,6 +14361,75 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
           textInputAction: TextInputAction.done,
           validator: emailValue,
         ),
+        if (_recoveryCodeMode) ...[
+          const SizedBox(height: 14),
+          AuthField(
+            controller: _recoveryCodeController,
+            label: 'Six-digit recovery code',
+            hintText: '000000',
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.next,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
+            validator: (value) => RegExp(r'^\d{6}$').hasMatch(value ?? '')
+                ? null
+                : 'Enter the six-digit code from your email',
+          ),
+          const SizedBox(height: 14),
+          AuthField(
+            controller: _recoveryPasswordController,
+            label: 'New password',
+            hintText: 'At least 8 characters',
+            obscureText: !_showRecoveryPassword,
+            textInputAction: TextInputAction.next,
+            validator: (value) {
+              final password = value ?? '';
+              if (password.length < 8) return 'Use at least 8 characters';
+              if (!RegExp(r'[A-Z]').hasMatch(password) ||
+                  !RegExp(r'\d').hasMatch(password)) {
+                return 'Use one uppercase letter and one number';
+              }
+              return null;
+            },
+            suffix: PasswordToggle(
+              visible: _showRecoveryPassword,
+              onPressed: () => setState(
+                () => _showRecoveryPassword = !_showRecoveryPassword,
+              ),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 8, left: 4),
+            child: Text(
+              'Use 8+ characters with at least one uppercase letter and one number.',
+              style: TextStyle(
+                color: Color(0xa6111111),
+                fontSize: 12,
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          AuthField(
+            controller: _recoveryConfirmPasswordController,
+            label: 'Confirm new password',
+            hintText: 'Re-enter password',
+            obscureText: !_showRecoveryConfirmPassword,
+            textInputAction: TextInputAction.done,
+            validator: (value) => value == _recoveryPasswordController.text
+                ? null
+                : 'Passwords do not match',
+            suffix: PasswordToggle(
+              visible: _showRecoveryConfirmPassword,
+              onPressed: () => setState(
+                () => _showRecoveryConfirmPassword =
+                    !_showRecoveryConfirmPassword,
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 22),
         AuthErrorText(error: state.error),
         if (_recoveryNotice.isNotEmpty) ...[
@@ -14275,10 +14446,42 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
           const SizedBox(height: 12),
         ],
         PrototypeAuthButton(
-          label: state.authLoading ? 'Working...' : 'Continue',
+          label: state.authLoading
+              ? 'Working...'
+              : _recoveryCodeMode
+              ? 'Update password'
+              : 'Send reset email',
           onTap: state.authLoading || !state.appwriteReady
               ? null
+              : _recoveryCodeMode
+              ? _submitRecoveryCode
               : _submitForgot,
+        ),
+        TextButton(
+          onPressed: state.authLoading
+              ? null
+              : _recoveryCodeMode
+              ? _sendAnotherRecoveryEmail
+              : () {
+                  context.read<AppState>().clearError();
+                  setState(() {
+                    _recoveryCodeMode = true;
+                    _recoveryNotice = '';
+                  });
+                },
+          style: TextButton.styleFrom(
+            foregroundColor: PrototypeColors.burgundy,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            textStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          child: Text(
+            _recoveryCodeMode
+                ? 'Send a new recovery email'
+                : 'I already have a recovery code',
+          ),
         ),
         const SizedBox(height: 14),
         const Text(
@@ -14339,8 +14542,51 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     final success = await context.read<AppState>().sendPasswordRecovery(value);
     if (success && mounted) {
       setState(() {
+        _recoveryCodeMode = true;
         _recoveryNotice =
-            'If an account matches, check that inbox for a recovery link.';
+            'If a JuChess password account matches, a reset button and six-digit code are being sent. Use only the newest email.';
+      });
+    }
+  }
+
+  Future<void> _sendAnotherRecoveryEmail() async {
+    final value = _recoveryController.text.trim();
+    final emailProblem = emailValue(value);
+    if (emailProblem != null) {
+      context.read<AppState>().setError(emailProblem);
+      return;
+    }
+    final success = await context.read<AppState>().sendPasswordRecovery(value);
+    if (success && mounted) {
+      setState(() {
+        _recoveryCodeController.clear();
+        _recoveryNotice =
+            'If a JuChess password account matches, a fresh email is being sent. The previous link and code are disabled.';
+      });
+    }
+  }
+
+  Future<void> _submitRecoveryCode() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final success = await context
+        .read<AppState>()
+        .resetPasswordWithRecoveryCode(
+          email: _recoveryController.text.trim(),
+          code: _recoveryCodeController.text,
+          password: _recoveryPasswordController.text,
+        );
+    if (success && mounted) {
+      setState(() {
+        _mode = AuthMode.signIn;
+        _emailController.text = _recoveryController.text.trim();
+        _passwordController.clear();
+        _recoveryCodeMode = false;
+        _recoveryCodeController.clear();
+        _recoveryPasswordController.clear();
+        _recoveryConfirmPasswordController.clear();
+        _recoveryNotice = '';
+        _authNotice =
+            'Password updated. Existing sessions were closed; sign in again.';
       });
     }
   }
@@ -14471,6 +14717,7 @@ class AuthField extends StatelessWidget {
     this.obscureText = false,
     this.validator,
     this.onChanged,
+    this.inputFormatters,
     this.suffix,
     super.key,
   });
@@ -14485,6 +14732,7 @@ class AuthField extends StatelessWidget {
   final bool obscureText;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
+  final List<TextInputFormatter>? inputFormatters;
   final Widget? suffix;
 
   @override
@@ -14520,6 +14768,7 @@ class AuthField extends StatelessWidget {
           obscureText: obscureText,
           validator: validator,
           onChanged: onChanged,
+          inputFormatters: inputFormatters,
           style: const TextStyle(
             color: PrototypeColors.black,
             fontSize: 15,

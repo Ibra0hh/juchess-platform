@@ -272,7 +272,7 @@ void main() {
     expect(find.text('0-0-0'), findsNothing);
   });
 
-  testWidgets('mobile auth advertises only working recovery methods', (
+  testWidgets('mobile auth offers the real link and six-digit recovery methods', (
     WidgetTester tester,
   ) async {
     final state = AppState(AppwriteService(enabled: false));
@@ -287,7 +287,26 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('Enter the email address tied'), findsOneWidget);
-    expect(find.textContaining('one-time code'), findsNothing);
+    expect(find.textContaining('six-digit code'), findsOneWidget);
+    expect(find.text('I already have a recovery code'), findsOneWidget);
+    await tester.ensureVisible(find.text('I already have a recovery code'));
+    await tester.tap(find.text('I already have a recovery code'));
+    await tester.pump();
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is AuthField && widget.label == 'Six-digit recovery code',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is AuthField && widget.label == 'New password',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Update password'), findsOneWidget);
     expect(find.text('SMS'), findsNothing);
   });
 

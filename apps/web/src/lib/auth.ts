@@ -3,7 +3,7 @@ import { account, appwriteConfig, appwriteReady, clearFunctionJwtCache, createPl
 import { publicTableIds } from './tableIds'
 import type { BoardPreferences } from './boardAppearance'
 import { isExistingSessionError } from './authSession'
-import { formatAuthError, isUnknownAccountRecoveryError } from './authErrors'
+import { formatAuthError } from './authErrors'
 import {
   normalizeAuthEmail,
   validateAccountEmail,
@@ -14,6 +14,7 @@ import {
 import { sendEmailVerificationChallenge } from './emailVerification'
 import { runHedgedRequest } from './hedgedRequest'
 import { normalizeJordanMobile, validateRequiredPlayerProfile } from './profileValidation'
+import { queuePasswordRecoveryEmail } from './passwordRecovery'
 
 export type ProfileRole = 'member' | 'organizer' | 'admin'
 export type ProfileStatus = 'active' | 'suspended'
@@ -278,16 +279,7 @@ export async function requestPasswordRecovery(email: string) {
   const emailProblem = validateAccountEmail(normalizedEmail)
   if (emailProblem) throw new Error(emailProblem)
 
-  try {
-    await account.createRecovery({
-      email: normalizedEmail,
-      url: appUrl('/forgot-password'),
-    })
-  } catch (error) {
-    // Never reveal whether an email address has a JuChess account.
-    if (isUnknownAccountRecoveryError(error)) return
-    throw error
-  }
+  await queuePasswordRecoveryEmail(normalizedEmail)
 }
 
 export async function completePasswordRecovery(userId: string, secret: string, password: string) {

@@ -5,7 +5,7 @@ export type ProfileCompletionFields = {
   phone?: string | null
 }
 
-const PROFILE_COMPLETION_PATHS = new Set(['/auth/callback', '/complete-profile', '/verify-email'])
+const PROFILE_COMPLETION_PATHS = new Set(['/auth/callback', '/complete-profile', '/forgot-password', '/verify-email'])
 const AUTHENTICATED_ROUTES = new Set(['/complete-profile', '/join-the-team', '/profile'])
 
 export type ProfileCompletionAuthMethod = 'google' | 'email' | 'account'

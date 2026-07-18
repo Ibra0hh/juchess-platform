@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { compactCrestUrl } from '../lib/brand'
+import { routeBoundaryKey } from '../lib/routePath'
 
 type BoundaryState = { failed: boolean }
 
@@ -32,5 +33,5 @@ class RouteErrorBoundaryInner extends Component<{ children: ReactNode }, Boundar
 
 export default function RouteErrorBoundary({ children }: { children: ReactNode }) {
   const location = useLocation()
-  return <RouteErrorBoundaryInner key={location.pathname}>{children}</RouteErrorBoundaryInner>
+  return <RouteErrorBoundaryInner key={routeBoundaryKey(location.pathname)}>{children}</RouteErrorBoundaryInner>
 }

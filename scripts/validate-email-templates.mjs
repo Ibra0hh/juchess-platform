@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { buildVerificationEmailHtml } from '../appwrite/functions/verification-actions/src/main.js'
+import { buildPasswordRecoveryEmailHtml } from '../appwrite/functions/verification-actions/src/passwordRecovery.js'
 
 const templateDir = 'appwrite/email-templates'
 const templates = readdirSync(templateDir).filter((name) => name.endsWith('.html'))
@@ -67,4 +68,26 @@ if (Buffer.byteLength(challengeHtml, 'utf8') > 100_000) {
 }
 console.log(`OK verification-actions challenge email (${Buffer.byteLength(challengeHtml, 'utf8')} bytes)`)
 
-console.log(`Validated ${templates.length + 1} JuChess email templates.`)
+const recoveryHtml = buildPasswordRecoveryEmailHtml({
+  displayName: 'JuChess Player',
+  code: '123456',
+  recoveryUrl: 'https://juchess.page/forgot-password?challenge=template-check&token=template-check-token',
+})
+for (const marker of [
+  logoUrl,
+  '@media only screen and (max-width:480px)',
+  'Reset JuChess password',
+  '>123456<',
+  'Expires in one hour',
+]) {
+  if (!recoveryHtml.includes(marker)) throw new Error(`verification-actions: missing recovery email markup ${marker}.`)
+}
+for (const pattern of forbiddenPatterns) {
+  if (pattern.test(recoveryHtml)) throw new Error(`verification-actions: contains unsafe recovery email markup (${pattern}).`)
+}
+if (Buffer.byteLength(recoveryHtml, 'utf8') > 100_000) {
+  throw new Error('verification-actions: recovery email exceeds the 100 KB HTML budget.')
+}
+console.log(`OK verification-actions recovery email (${Buffer.byteLength(recoveryHtml, 'utf8')} bytes)`)
+
+console.log(`Validated ${templates.length + 2} JuChess email templates.`)

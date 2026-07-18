@@ -147,7 +147,7 @@
   },
   {
     "$id": "verification-actions",
-    "name": "JuChess Email Verification",
+    "name": "JuChess Account Security",
     "runtime": "node-22",
     "path": "functions/verification-actions",
     "entrypoint": "src/main.js",

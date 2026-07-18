@@ -1507,6 +1507,49 @@ Earlier live production tests also verified:
 Re-run the relevant flow after any related code change. Old evidence is not a
 substitute for new verification.
 
+### July 18 password recovery link-and-code release
+
+Password recovery was moved from Appwrite's native link-only recovery request
+to the deployed `verification-actions` Function. The web and Flutter clients
+now request a branded recovery message containing both a one-hour secure link
+and a six-digit code. The web route preserves link credentials in history state
+when stripping query secrets, supports legacy Appwrite links, and offers a
+resend/code fallback for invalid, expired, or already-used links. Code recovery
+is limited to five attempts, with a 60-second resend cooldown and hashed
+email/IP/code/link values in the private `password_recovery_challenges` table.
+Successful recovery deletes active sessions before updating the password and
+never signs the player in automatically. Google-only accounts are not silently
+converted into local-password accounts.
+
+Production setup completed:
+
+- `password_recovery_challenges` was created with row security, no client
+  permissions, the required fields, and user/email/IP indexes.
+- The dedicated secret `JUCHESS_RECOVERY_SECRET` was created as a protected
+  Function variable; its value is never stored in the repository or logs.
+- Function deployment `6a5bbb0e03df8b77878a` is ready, active, and live with
+  the expected `users.read`, `users.write`, `rows.read`, `rows.write`, and
+  `messages.write` scopes. Health returned HTTP 200 with one-hour recovery and
+  two-hour verification TTLs.
+- A live unknown-address smoke request returned the generic accepted response,
+  created no recovery row, and sent no message.
+
+Verification completed locally:
+
+- Web lint/build and 74 web tests passed.
+- Function syntax checks and 135 Function tests passed.
+- Email-template validation passed for verification, password recovery, and
+  both static Appwrite templates.
+- Flutter analyze and all 38 Flutter tests passed.
+- Browser QA confirmed desktop and 390x844 request/code/link/invalid states,
+  query-secret stripping with refresh persistence, no horizontal overflow, and
+  no console warnings/errors.
+
+The new Pages bundles and route indexes are staged for the release. No real
+password-recovery email or password mutation was performed during this turn:
+an approved recipient is still required before an inbox test, and no Android
+or iOS device was connected for a physical mobile install.
+
 ## 26. Known Gaps And Risks
 
 These are real limitations, not optional wording issues:

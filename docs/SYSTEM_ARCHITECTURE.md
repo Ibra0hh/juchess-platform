@@ -52,7 +52,7 @@ The web and admin applications are built together into GitHub Pages. `/admin/` i
 | Mobile | `apps/mobile/lib/main.dart` | `AppwriteService` and feature state in the Flutter app | Android/iOS build |
 | Admin and hosted play | `appwrite/functions/admin-actions/src/main.js` | Server SDK, admin teams, audit rows | Appwrite Function `admin-actions` |
 | Player profile and registration | `appwrite/functions/player-actions/src/main.js` | Verified account + private identity | Appwrite Function `player-actions` |
-| Email verification | `appwrite/functions/verification-actions/src/main.js` | Two-hour hashed challenge | Appwrite Function `verification-actions` |
+| Email verification and password recovery | `appwrite/functions/verification-actions/src/main.js` | Private, hashed, one-time challenges | Appwrite Function `verification-actions` |
 | Sign-up/sign-in access checks | `appwrite/functions/access-guards/src/main.js` | Identity/IP block lists | Appwrite Function `access-guards` |
 | Attendance links | `appwrite/functions/attendance-actions/src/main.js` | Hashed attendance token | Appwrite Function `attendance-actions` |
 | Pages build | `scripts/build-pages.mjs` | Builds both Vite clients | `docs/` on `main` |
@@ -98,7 +98,35 @@ Important behavior:
 - Codes are rate/attempt limited by the verification Function. Raw codes, link secrets, and email addresses are not stored in the challenge table; keyed hashes are stored.
 - There is no durable “temporary member” session. An unverified Appwrite account may exist so it can receive verification, but it has no active public player profile and no private JuChess access.
 - A verified account with missing required details is routed to profile completion. Required fields are full name, university, University ID, and phone; Chess.com and Lichess usernames are optional.
-- Password recovery uses Appwrite’s recovery flow and returns a generic response so the UI does not disclose whether an email is registered.
+- Password recovery sends one JuChess-branded message with both a secure link and a six-digit code. It returns the same response for existing, unknown, unsupported, and rate-limited accounts so the UI does not disclose whether an email is registered.
+
+### Password recovery
+
+```mermaid
+flowchart TD
+    R["Enter account email"] --> Q["Queue recovery Function asynchronously"]
+    Q --> G["Always show the same public response"]
+    Q --> U{"Enabled local-password account<br/>and within rate limits?"}
+    U -->|"No"| STOP["Do not send; disclose nothing"]
+    U -->|"Yes"| H["Store only HMAC hashes of email, IP, code, and link token"]
+    H --> M["Send one-hour link + six-digit code through Appwrite Messaging"]
+    M --> L["Open link on any device"]
+    M --> C["Enter code on another device"]
+    L --> P["Validate one-time proof + current canonical email"]
+    C --> A["Atomically count attempt, then validate proof + current canonical email"]
+    A --> P
+    P --> X["Atomically claim proof and invalidate older proofs"]
+    X --> S["Delete existing sessions"]
+    S --> W["Appwrite Users updates password"]
+    W --> SI["Sign in again; no automatic session"]
+```
+
+Recovery proofs expire after one hour. Only five code attempts are allowed,
+and requests are limited by keyed email and Appwrite client-IP hashes. Link and
+code confirmations never set `emailVerification`; verification remains its own
+account lifecycle. Google-only accounts continue with Google and do not silently
+gain an email/password credential through this flow. Old native Appwrite recovery
+links remain accepted for their original one-hour lifetime during the migration.
 
 ### Google OAuth
 
@@ -148,6 +176,7 @@ erDiagram
 | `fair_play_events` | `admin-actions` | Server-written and admin-only; telemetry is a review signal, not proof of cheating |
 | `attendance_confirmations` | attendance/admin Functions | Private response and delivery state |
 | `email_verification_challenges` | `verification-actions` | Server-only hashed two-hour proofs |
+| `password_recovery_challenges` | `verification-actions` | Server-only hashed one-hour proofs and attempt state |
 | `admin_profiles`, block lists, audit rows | admin server code | Never use public profile role as authorization |
 
 Every list that can grow beyond one Appwrite page must use cursor pagination. Queries used in live paths need indexes; in particular `games` is indexed by status, `(whiteProfileId,status)`, `(blackProfileId,status)`, and `(tournamentId,status)`.

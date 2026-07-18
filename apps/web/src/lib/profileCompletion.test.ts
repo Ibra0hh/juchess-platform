@@ -60,6 +60,12 @@ test('signed-in identities without a complete profile are restricted to completi
   }), false)
   assert.equal(shouldRedirectToProfileCompletion({
     loading: false,
+    pathname: '/forgot-password/',
+    profile: null,
+    signedIn: true,
+  }), false)
+  assert.equal(shouldRedirectToProfileCompletion({
+    loading: false,
     pathname: '/tournaments',
     profile: completeProfile,
     signedIn: true,

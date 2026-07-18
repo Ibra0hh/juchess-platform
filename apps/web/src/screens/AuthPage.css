@@ -70,6 +70,7 @@
 }
 
 .auth-panel {
+  box-sizing: border-box;
   width: min(100%, 440px);
   background: #fffcf4;
   border: 1px solid rgba(17, 17, 17, 0.16);
@@ -632,6 +633,32 @@ button.auth-secondary-button:disabled {
   margin-top: 8px;
 }
 
+.auth-recovery-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-recovery-actions.secondary {
+  margin-top: 10px;
+}
+
+.auth-recovery-actions .auth-submit-link {
+  margin-top: 20px;
+}
+
+.auth-recovery-code-input {
+  text-align: center;
+  font-family: "IBM Plex Mono", "Courier New", monospace !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.35em;
+}
+
+.auth-screen[data-screen-label="Forgot Password"] {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .auth-callback-actions {
   width: 100%;
   display: grid;
@@ -805,6 +832,16 @@ button.auth-secondary-button:disabled {
     min-height: auto;
     align-items: flex-start;
     padding: 10px 14px 36px;
+  }
+
+  .auth-recovery-main {
+    min-height: auto;
+    place-items: start center;
+    padding: 12px 14px 36px;
+  }
+
+  .auth-recovery-panel {
+    padding: 24px 20px;
   }
 
   .prototype-auth-panel,
