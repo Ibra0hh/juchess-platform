@@ -24,10 +24,12 @@ const routeMetadata: Record<string, PageMetadata> = {
   '/games': {
     title: 'Online Tournament Games | JuChess',
     description: 'Play assigned JuChess tournament games and watch live boards from active online events.',
+    index: false,
   },
   '/leaderboard': {
     title: 'Club Leaderboard | JuChess',
     description: 'View active University of Jordan Chess Club player ratings and standings.',
+    index: false,
   },
   '/join-the-team': {
     title: 'Join the JuChess Team',

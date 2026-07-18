@@ -1545,17 +1545,48 @@ Verification completed locally:
   query-secret stripping with refresh persistence, no horizontal overflow, and
   no console warnings/errors.
 
-The new Pages bundles and route indexes are staged for the release. No real
+The new Pages bundles and route indexes were published in commit `95e0faa`;
+GitHub Pages run `29654763743` completed successfully. No real
 password-recovery email or password mutation was performed during this turn:
 an approved recipient is still required before an inbox test, and no Android
 or iOS device was connected for a physical mobile install.
+
+### July 18 launch-readiness audit
+
+The public website and admin panel passed a production launch audit. Web lint,
+build, and all 74 web tests passed; admin lint/build, 15 control-center tests,
+and 82 tournament-engine tests passed; the complete 135-test Function suite,
+all four email-template checks, Flutter analysis, and all 38 Flutter tests also
+passed. `npm audit --omit=dev` reported zero known production dependency
+vulnerabilities. All five Appwrite Functions were enabled, live, ready, and
+returned HTTP 200 from new health executions. Anonymous production reads
+exposed only the intended public profile fields; private profile, verification,
+and password-recovery rows returned zero visible rows, while admin and block
+tables rejected anonymous access.
+
+Rendered production QA covered the home page at desktop and 390x844 mobile
+sizes, the Home-to-Vision interaction, tournaments, tools, sign-in, sign-up,
+password recovery, privacy, terms, and the admin sign-in page. Every route had
+meaningful content, correct titles, no horizontal overflow in the tested
+viewports, and no browser console warnings/errors. The release also removes
+the intentionally hidden Games and Leaderboard routes from the sitemap, marks
+their generated and runtime metadata `noindex`, and marks the private admin
+client `noindex`.
+
+The site is technically suitable for a public beta/club launch, but it is not a
+claim that every roadmap feature is complete. Production currently has no
+published tournament, so the public tournament carousel/list is intentionally
+empty. Team and full Arena engines remain incomplete, a real recovery inbox and
+password-mutation test still requires an approved account, and GitHub Pages
+does not provide configurable CSP/security response headers. HTTPS is enforced
+and the current certificate is approved.
 
 ## 26. Known Gaps And Risks
 
 These are real limitations, not optional wording issues:
 
-1. Web tournament tabs still include a redundant Games tab, unlike mobile and
-   the latest compact tournament-tab intent.
+1. Production currently has no published tournament, so the home tournament
+   carousel and public tournament list correctly render empty states.
 2. Team format does not yet have a full team/roster/board/match-point engine.
 3. Arena is rolling Swiss-like, not a complete continuous Arena implementation.
 4. Chess.com/Lichess import is limited to 20 recent games; full history needs
@@ -1583,9 +1614,8 @@ These are real limitations, not optional wording issues:
     rendering and actual link/code interaction remain unconfirmed. The
     password-recovery email still needs a complete real-inbox link test with an
     approved recipient.
-14. Email verification is currently implemented on the web client. Audit the
-    Flutter sign-up/sign-in flow before assuming mobile enforces the identical
-    verification gate and branded callback experience.
+14. Flutter auth now has verification/recovery parity tests, but the latest
+    flow still needs installation and visual verification on a physical device.
 
 ## 27. Recommended Next Work
 

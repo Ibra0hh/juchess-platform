@@ -8,8 +8,10 @@ test('public routes expose specific indexable metadata', () => {
   assert.equal(metadataForPath('/privacy/').title, 'Privacy Policy | JuChess')
 })
 
-test('account routes and unknown routes are not indexed', () => {
+test('account, hidden product, and unknown routes are not indexed', () => {
   assert.equal(metadataForPath('/sign-in').index, false)
+  assert.equal(metadataForPath('/games').index, false)
+  assert.equal(metadataForPath('/leaderboard').index, false)
   assert.equal(metadataForPath('/missing-page').index, false)
 })
 
