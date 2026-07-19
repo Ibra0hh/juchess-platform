@@ -3975,6 +3975,31 @@ function requireSuperAdmin(actor) {
   }
 }
 
+const adminAreasByRole = Object.freeze({
+  organizer: Object.freeze(['tournaments', 'players']),
+  admin: Object.freeze(['dashboard', 'tournaments', 'players', 'recruitment', 'news', 'announcements']),
+  superAdmin: Object.freeze(['dashboard', 'tournaments', 'players', 'recruitment', 'news', 'announcements', 'adminAccess']),
+});
+
+export function adminRoleCanAccess(role, area) {
+  return Boolean(adminAreasByRole[role]?.includes(area));
+}
+
+export function adminAreaForRoute(segments) {
+  const root = segments[0];
+  if (root === 'admin' && segments[1] === 'admins') return 'adminAccess';
+  if (['recruitment', 'news', 'announcements'].includes(root)) return root;
+  if (['tournaments', 'registrations', 'games', 'fair-play'].includes(root)) return 'tournaments';
+  if (['players', 'profiles', 'blocks'].includes(root)) return 'players';
+  return null;
+}
+
+export function requireAdminArea(actor, area) {
+  if (area && !adminRoleCanAccess(actor.role, area)) {
+    throw new HttpError(403, 'This admin role cannot access this area.');
+  }
+}
+
 function adminTeamForRole(role) {
   return role === 'superAdmin' ? adminTeamIds.superAdmins : adminTeamIds.staff;
 }
@@ -4158,6 +4183,8 @@ export default async ({ req, res, log, error }) => {
     if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'session' && segments[2] === 'active') {
       return res.json({ ok: true, active: true });
     }
+
+    requireAdminArea(actor, adminAreaForRoute(segments));
 
     if (method === 'GET' && segments[0] === 'recruitment' && segments[1] === 'applications' && segments.length === 2) {
       const applications = await loadCrewApplications(tablesDB, databaseId);

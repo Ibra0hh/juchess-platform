@@ -1077,6 +1077,38 @@ test('admin authorization requires a confirmed membership in the role team', () 
   assert.equal(engine.isConfirmedAdminMembership(membership, 'account-1', 'admin_staff'), false)
 })
 
+test('admin role areas keep organizer access limited to tournaments and players', () => {
+  assert.equal(engine.adminRoleCanAccess('organizer', 'tournaments'), true)
+  assert.equal(engine.adminRoleCanAccess('organizer', 'players'), true)
+  assert.equal(engine.adminRoleCanAccess('organizer', 'dashboard'), false)
+  assert.equal(engine.adminRoleCanAccess('organizer', 'recruitment'), false)
+  assert.equal(engine.adminRoleCanAccess('organizer', 'news'), false)
+  assert.equal(engine.adminRoleCanAccess('organizer', 'announcements'), false)
+  assert.equal(engine.adminRoleCanAccess('organizer', 'adminAccess'), false)
+  assert.equal(engine.adminRoleCanAccess('admin', 'adminAccess'), false)
+  assert.equal(engine.adminRoleCanAccess('superAdmin', 'adminAccess'), true)
+  assert.doesNotThrow(() => engine.requireAdminArea({ role: 'organizer' }, 'tournaments'))
+  assert.throws(
+    () => engine.requireAdminArea({ role: 'organizer' }, 'recruitment'),
+    (error) => error.statusCode === 403 && /cannot access this area/i.test(error.message),
+  )
+})
+
+test('admin routes map to the role area that owns them', () => {
+  assert.equal(engine.adminAreaForRoute(['tournaments', 'tournament-1']), 'tournaments')
+  assert.equal(engine.adminAreaForRoute(['registrations', 'registration-1', 'status']), 'tournaments')
+  assert.equal(engine.adminAreaForRoute(['games', 'game-1', 'result']), 'tournaments')
+  assert.equal(engine.adminAreaForRoute(['fair-play', 'report']), 'tournaments')
+  assert.equal(engine.adminAreaForRoute(['players']), 'players')
+  assert.equal(engine.adminAreaForRoute(['profiles', 'profile-1', 'status']), 'players')
+  assert.equal(engine.adminAreaForRoute(['blocks']), 'players')
+  assert.equal(engine.adminAreaForRoute(['recruitment', 'applications']), 'recruitment')
+  assert.equal(engine.adminAreaForRoute(['news']), 'news')
+  assert.equal(engine.adminAreaForRoute(['announcements']), 'announcements')
+  assert.equal(engine.adminAreaForRoute(['admin', 'admins']), 'adminAccess')
+  assert.equal(engine.adminAreaForRoute(['admin', 'session']), null)
+})
+
 test('competition-defining fields are detected independently from descriptive edits', () => {
   const current = {
     format: 'Swiss',

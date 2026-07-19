@@ -92,8 +92,13 @@ import {
   clockValueFromPoint,
   type ClockPickerPhase,
 } from './lib/clockTimePicker'
+import {
+  canAccessAdminScreen,
+  resolveAdminScreen,
+  type AdminScreen,
+} from './lib/adminPermissions'
 
-type Screen = 'dashboard' | 'tournaments' | 'players' | 'recruitment' | 'news' | 'announcements' | 'adminAccess'
+type Screen = AdminScreen
 type TournamentTab = TournamentStatus
 type TournamentDataSource = 'cloud' | 'unavailable'
 type Player = {
@@ -708,6 +713,9 @@ function App() {
   const [message, setMessage] = useState<string | null>(null)
   const [sessionNotice, setSessionNotice] = useState<string | null>(null)
   const [loadTournamentsSingleFlight] = useState(() => createSingleFlightTask(loadAdminTournaments))
+  const activeScreen = session?.profile
+    ? resolveAdminScreen(session.profile.role, screen)
+    : screen
 
   const applyTournamentResult = useCallback((result: Awaited<ReturnType<typeof loadAdminTournaments>>) => {
     setTournaments((previous) => resolveTournamentSnapshot(previous, result).tournaments)
@@ -825,7 +833,7 @@ function App() {
   }, [session?.allowed])
 
   useEffect(() => {
-    if (!session?.allowed || screen !== 'tournaments') return
+    if (!session?.allowed || activeScreen !== 'tournaments') return
     let alive = true
     let burstTimer: number | null = null
     let subscription: Awaited<ReturnType<typeof subscribeToAdminTournamentChanges>> = null
@@ -885,10 +893,10 @@ function App() {
       document.removeEventListener('visibilitychange', refreshAndEnsureRealtimeWhenVisible)
       if (subscription) void subscription.unsubscribe()
     }
-  }, [refreshTournaments, screen, session?.allowed])
+  }, [activeScreen, refreshTournaments, session?.allowed])
 
   useEffect(() => {
-    if (!session?.allowed || screen !== 'dashboard') return
+    if (!session?.allowed || activeScreen !== 'dashboard') return
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') void refreshTournaments()
     }
@@ -900,7 +908,7 @@ function App() {
       window.removeEventListener('focus', refreshWhenVisible)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
-  }, [refreshTournaments, screen, session?.allowed])
+  }, [activeScreen, refreshTournaments, session?.allowed])
 
   if (loading) return <PrototypeLoading />
 
@@ -937,9 +945,9 @@ function App() {
   }
 
   return (
-    <AdminAppShell screen={screen} setScreen={setScreen} session={session} onSignOut={handleSignOut}>
+    <AdminAppShell screen={activeScreen} setScreen={setScreen} session={session} onSignOut={handleSignOut}>
       {message ? <div className="prototype-note" role="status">{message}</div> : null}
-      {screen === 'dashboard' ? (
+      {activeScreen === 'dashboard' ? (
         <DashboardScreen
           tournaments={tournaments}
           blocks={blocks}
@@ -947,7 +955,7 @@ function App() {
           goPlayers={() => setScreen('players')}
         />
       ) : null}
-      {screen === 'tournaments' ? (
+      {activeScreen === 'tournaments' ? (
         <TournamentsScreen
           dataSource={dataSource}
           tournaments={tournaments}
@@ -955,13 +963,13 @@ function App() {
           onChanged={refreshTournaments}
         />
       ) : null}
-      {screen === 'players' ? (
+      {activeScreen === 'players' ? (
         <PlayersScreen blocks={blocks} session={session} onBlocksChanged={refreshBlocks} />
       ) : null}
-      {screen === 'recruitment' ? <RecruitmentScreen /> : null}
-      {screen === 'news' ? <NewsScreen /> : null}
-      {screen === 'announcements' ? <AnnouncementsScreen /> : null}
-      {screen === 'adminAccess' ? (
+      {activeScreen === 'recruitment' ? <RecruitmentScreen /> : null}
+      {activeScreen === 'news' ? <NewsScreen /> : null}
+      {activeScreen === 'announcements' ? <AnnouncementsScreen /> : null}
+      {activeScreen === 'adminAccess' ? (
         <AdminAccessScreen
           adminProfiles={adminProfiles}
           session={session}
@@ -1091,6 +1099,10 @@ function AdminAppShell({
     .join('')
     .slice(0, 2)
     .toUpperCase() || 'AO'
+  const role = session?.profile?.role
+  const visibleNavItems = role
+    ? navItems.filter((item) => canAccessAdminScreen(role, item.key))
+    : navItems
 
   return (
     <div className="prototype-admin">
@@ -1103,7 +1115,7 @@ function AdminAppShell({
           </span>
         </div>
         <nav className="sidebar-nav" aria-label="Admin navigation">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               key={item.key}
               type="button"
@@ -1120,7 +1132,7 @@ function AdminAppShell({
             <span className="avatar">{initials}</span>
             <span>
               <strong>{displayName}</strong>
-              <small>{session?.profile?.role === 'superAdmin' ? 'Super Admin' : 'Head Organizer'}</small>
+              <small>{role ? adminRoleLabel(role) : 'Admin'}</small>
             </span>
           </div>
           {session ? (
