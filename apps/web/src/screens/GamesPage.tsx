@@ -161,7 +161,7 @@ function GamesPage() {
     ? reviewSession.result
     : null
   const reviewRunRef = useRef(0)
-  const reviewStartedIdentityRef = useRef<string | null>(null)
+  const reviewRequestIdentityRef = useRef<string | null>(null)
   const reviewAbortRef = useRef<AbortController | null>(null)
   const reviewEngineRef = useRef<StockfishReviewEngine | null>(null)
   const workspaceAnalysisRunRef = useRef(0)
@@ -183,7 +183,7 @@ function GamesPage() {
     reviewAbortRef.current = null
     reviewEngineRef.current?.dispose()
     reviewEngineRef.current = null
-    reviewStartedIdentityRef.current = null
+    reviewRequestIdentityRef.current = null
     setReviewSession(null)
     setReviewStarted(false)
     setReviewRequestVersion(0)
@@ -198,7 +198,7 @@ function GamesPage() {
   }, [engineStrength])
 
   useEffect(() => {
-    reviewStartedIdentityRef.current = null
+    reviewRequestIdentityRef.current = null
     setReviewStarted(false)
     setReviewRequestVersion(0)
   }, [game?.key])
@@ -350,9 +350,8 @@ function GamesPage() {
       step !== 'review'
       || !game
       || !targetIdentity
-      || !reviewStarted
       || reviewRequestVersion < 1
-      || reviewStartedIdentityRef.current !== targetIdentity
+      || reviewRequestIdentityRef.current !== targetIdentity
     ) return
     if (game.live) {
       setReviewError('The live board is still changing. Full engine review becomes available when the game finishes.')
@@ -411,7 +410,7 @@ function GamesPage() {
       if (reviewAbortRef.current === controller) reviewAbortRef.current = null
       if (reviewEngineRef.current === engine) reviewEngineRef.current = null
     }
-  }, [activeGameIdentity, enginePreset.depth, enginePreset.hashMb, game, reviewRequestVersion, reviewStarted, step])
+  }, [activeGameIdentity, enginePreset.depth, enginePreset.hashMb, game, reviewRequestVersion, step])
 
   useEffect(() => {
     const run = ++workspaceAnalysisRunRef.current
@@ -972,9 +971,14 @@ function GamesPage() {
               loading={reviewLoading}
               moveRows={reviewRows}
               opening={currentOpening}
+              onAnalyze={() => {
+                setMoveIdx(0)
+                reviewRequestIdentityRef.current = activeGameIdentity
+                setReviewStarted(false)
+                setReviewRequestVersion((version) => version + 1)
+              }}
               onSelectMove={(index) => {
                 setMoveIdx(index)
-                reviewStartedIdentityRef.current = activeGameIdentity
                 setReviewStarted(true)
               }}
               progress={reviewProgress}
@@ -988,11 +992,9 @@ function GamesPage() {
                 setSelectedKey(null)
                 setSource(null)
               }}
-              onStart={() => {
+              onStartWalkthrough={() => {
                 setMoveIdx(0)
-                reviewStartedIdentityRef.current = activeGameIdentity
                 setReviewStarted(true)
-                setReviewRequestVersion((version) => version + 1)
               }}
             />
           ) : null}
@@ -1379,9 +1381,10 @@ function ReviewPanel({
   loading,
   moveRows,
   opening,
+  onAnalyze,
   onExit,
   onSelectMove,
-  onStart,
+  onStartWalkthrough,
   progress,
   review,
   selectedMove,
@@ -1395,9 +1398,10 @@ function ReviewPanel({
   loading: boolean
   moveRows: ReturnType<typeof buildMoveRows>
   opening: OpeningIdentity | null
+  onAnalyze: () => void
   onExit: () => void
   onSelectMove: (index: number) => void
-  onStart: () => void
+  onStartWalkthrough: () => void
   progress: { completed: number; total: number }
   review: GameReviewResult | null
   selectedMove?: ReviewedMove
@@ -1447,7 +1451,7 @@ function ReviewPanel({
             <span>Engine review</span>
             <strong>Analyze this completed game when you are ready.</strong>
             <small>Stockfish loads only after you start.</small>
-            <button type="button" className="review-start-button" onClick={onStart}>
+            <button type="button" className="review-start-button" onClick={onAnalyze}>
               {error ? 'Try engine review again' : 'Start engine review'}
             </button>
           </div>
@@ -1527,7 +1531,7 @@ function ReviewPanel({
                     </div>
                   ))}
                 </div>
-                <button type="button" className="review-start-button" onClick={onStart}>
+                <button type="button" className="review-start-button" onClick={onStartWalkthrough}>
                   Start Review
                 </button>
               </>
