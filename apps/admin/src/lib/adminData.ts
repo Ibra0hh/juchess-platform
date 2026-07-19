@@ -2,6 +2,7 @@ import { ExecutionMethod, ID, Query, type Models } from 'appwrite'
 import { account, appwriteConfig, appwriteReady, functions, storage, tablesDB } from './appwrite'
 import { createAdminJwtCache } from './adminJwt'
 import { tableIds, type TournamentStatus } from './juchess'
+import type { PlayerEmailLink } from './playerEmail'
 
 export type AdminRole = 'superAdmin' | 'admin' | 'organizer'
 export type AdminStatus = 'active' | 'suspended'
@@ -863,7 +864,12 @@ export async function loadPlayerEmailStatus(): Promise<PlayerEmailStatus> {
   })
 }
 
-export async function sendPlayerEmail(input: { profileIds: string[]; subject: string; message: string }) {
+export async function sendPlayerEmail(input: {
+  profileIds: string[]
+  subject: string
+  message: string
+  link?: PlayerEmailLink
+}) {
   return await runAdminAction<PlayerEmailSendResult>({
     method: ExecutionMethod.POST,
     path: '/players/email',

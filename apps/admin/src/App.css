@@ -4326,6 +4326,90 @@ button {
   box-shadow: 0 0 0 3px rgba(125, 36, 52, 0.09);
 }
 
+.player-email-add-link {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 7px;
+  border: 1px solid #d8c8bb;
+  border-radius: 9px;
+  background: #fff;
+  color: #7d2434;
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.player-email-link-fields {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #dfd2c4;
+  border-radius: 11px;
+  background: #faf6ef;
+  padding: 13px;
+}
+
+.player-email-link-fields > header,
+.player-email-link-fields > header > div,
+.player-email-link-fields > header > div > span {
+  display: flex;
+  align-items: center;
+}
+
+.player-email-link-fields > header {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.player-email-link-fields > header > div {
+  min-width: 0;
+  gap: 8px;
+  color: #7d2434;
+}
+
+.player-email-link-fields > header > div > span {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.player-email-link-fields > header strong {
+  color: #171310;
+  font-size: 12px;
+}
+
+.player-email-link-fields > header small {
+  color: #8a7e70;
+  font-size: 10px;
+}
+
+.player-email-link-fields > header button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: #7d2434;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.player-email-link-fields > div {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+
+.player-email-link-fields > p {
+  margin: -2px 0 0;
+  color: #a0323f;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
 .player-email-provider {
   border-radius: 8px;
   background: #fbf1e2;
@@ -4442,6 +4526,30 @@ button {
   font-size: 12px;
   line-height: 1.65;
   white-space: pre-wrap;
+}
+
+.player-email-preview-copy > a,
+.player-email-preview-link-placeholder {
+  max-width: 100%;
+  display: inline-block;
+  box-sizing: border-box;
+  margin-top: 17px;
+  border: 1px solid #7d2434;
+  border-radius: 8px;
+  background: #7d2434;
+  color: #fff;
+  padding: 10px 15px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.3;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.player-email-preview-link-placeholder {
+  border-style: dashed;
+  background: #fbf3f4;
+  color: #8c5962;
 }
 
 .player-email-preview-copy > div {
@@ -4920,6 +5028,10 @@ button {
   }
 
   .player-email-delivery-row {
+    grid-template-columns: 1fr;
+  }
+
+  .player-email-link-fields > div {
     grid-template-columns: 1fr;
   }
 

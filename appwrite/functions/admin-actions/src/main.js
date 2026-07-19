@@ -590,6 +590,36 @@ function isCompletePlayerProfile(profile, identity) {
 const PLAYER_EMAIL_RECIPIENT_LIMIT = 50;
 const PLAYER_EMAIL_SUBJECT_LIMIT = 120;
 const PLAYER_EMAIL_BODY_LIMIT = 5000;
+const PLAYER_EMAIL_LINK_TEXT_LIMIT = 80;
+const PLAYER_EMAIL_LINK_URL_LIMIT = 2048;
+
+function normalizePlayerEmailLink(input) {
+  if (input == null) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    throw new HttpError(400, 'Email link details are invalid.');
+  }
+
+  const text = String(input.text ?? '').trim().replace(/\s+/g, ' ');
+  const url = String(input.url ?? '').trim();
+  if (!text || !url) throw new HttpError(400, 'Write both the link text and link URL.');
+  if (text.length > PLAYER_EMAIL_LINK_TEXT_LIMIT) {
+    throw new HttpError(400, `Email link text is limited to ${PLAYER_EMAIL_LINK_TEXT_LIMIT} characters.`);
+  }
+  if (url.length > PLAYER_EMAIL_LINK_URL_LIMIT) {
+    throw new HttpError(400, `Email link URLs are limited to ${PLAYER_EMAIL_LINK_URL_LIMIT} characters.`);
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new HttpError(400, 'Use a complete http:// or https:// email link.');
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname || parsed.username || parsed.password) {
+    throw new HttpError(400, 'Use a complete http:// or https:// email link without a username or password.');
+  }
+  return { text, url };
+}
 
 export function normalizePlayerEmailInput(input = {}) {
   const profileIds = Array.isArray(input.profileIds)
@@ -597,6 +627,7 @@ export function normalizePlayerEmailInput(input = {}) {
     : [];
   const subject = String(input.subject ?? '').trim().replace(/\s+/g, ' ');
   const message = String(input.message ?? '').replace(/\r\n?/g, '\n').trim();
+  const link = normalizePlayerEmailLink(input.link);
 
   if (!profileIds.length) throw new HttpError(400, 'Select at least one player to email.');
   if (profileIds.length > PLAYER_EMAIL_RECIPIENT_LIMIT) {
@@ -611,12 +642,16 @@ export function normalizePlayerEmailInput(input = {}) {
     throw new HttpError(400, `Email messages are limited to ${PLAYER_EMAIL_BODY_LIMIT} characters.`);
   }
 
-  return { profileIds, subject, message };
+  return { profileIds, subject, message, link };
 }
 
-export function buildPlayerEmailHtml({ subject, message }) {
+export function buildPlayerEmailHtml({ subject, message, link: linkInput }) {
   const safeSubject = escapeHtml(subject);
   const safeMessage = escapeHtml(message).replaceAll('\n', '<br>');
+  const link = normalizePlayerEmailLink(linkInput);
+  const safeLink = link
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:24px;"><tr><td align="center" style="border-radius:9px;background:#7d2434;"><a href="${escapeHtml(link.url)}" target="_blank" style="display:inline-block;max-width:100%;box-sizing:border-box;padding:13px 20px;border:1px solid #7d2434;border-radius:9px;background:#7d2434;color:#ffffff;font-size:14px;font-weight:700;line-height:1.3;text-decoration:none;word-break:break-word;">${escapeHtml(link.text)}</a></td></tr></table>`
+    : '';
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -645,6 +680,7 @@ export function buildPlayerEmailHtml({ subject, message }) {
                 <div style="height:1px;background:#ede6da;margin-bottom:24px;"></div>
                 <h1 style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;color:#171310;">${safeSubject}</h1>
                 <div style="font-size:15px;line-height:1.75;color:#4f463d;">${safeMessage}</div>
+                ${safeLink}
                 <div style="margin-top:28px;padding:17px 18px;border-left:4px solid #a98a3f;border-radius:0 9px 9px 0;background:#f8f2e8;font-size:13px;line-height:1.55;color:#655b4f;">
                   This message was sent by the JuChess administration team. Reply to this email to contact the club.
                 </div>
@@ -4427,6 +4463,7 @@ export default async ({ req, res, log, error }) => {
           subject: input.subject,
           profileIds: recipients.map((recipient) => recipient.profileId),
           skipped,
+          hasLink: Boolean(input.link),
         },
       });
 

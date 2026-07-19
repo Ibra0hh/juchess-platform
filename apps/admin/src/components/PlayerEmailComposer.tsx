@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Mail, Send, X } from 'lucide-react'
+import { Link2, Mail, Send, Trash2, X } from 'lucide-react'
 import { compactCrestUrl } from '../lib/brand'
+import {
+  PLAYER_EMAIL_LINK_TEXT_LIMIT,
+  PLAYER_EMAIL_LINK_URL_LIMIT,
+  playerEmailLinkPreview,
+} from '../lib/playerEmail'
 import {
   formatAdminError,
   loadPlayerEmailStatus,
@@ -24,6 +29,9 @@ type Props = {
 export default function PlayerEmailComposer({ recipients, onClose, onSent }: Props) {
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
+  const [linkEnabled, setLinkEnabled] = useState(false)
+  const [linkText, setLinkText] = useState('')
+  const [linkUrl, setLinkUrl] = useState('')
   const [provider, setProvider] = useState<PlayerEmailStatus | null>(null)
   const [providerError, setProviderError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -34,6 +42,7 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
   const recipientLabel = useMemo(() => (
     recipients.length === 1 ? recipients[0].name : `${recipients.length} selected players`
   ), [recipients])
+  const previewLink = useMemo(() => playerEmailLinkPreview(linkText, linkUrl), [linkText, linkUrl])
 
   useEffect(() => {
     sendingRef.current = sending
@@ -79,6 +88,7 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
         profileIds: recipients.map((recipient) => recipient.id),
         subject,
         message,
+        link: linkEnabled && previewLink ? previewLink : undefined,
       })
       onSent(result)
     } catch (error) {
@@ -87,7 +97,13 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
     }
   }
 
-  const readyToSend = Boolean(provider?.ready && subject.trim() && message.trim() && !sending)
+  const readyToSend = Boolean(
+    provider?.ready
+    && subject.trim()
+    && message.trim()
+    && (!linkEnabled || previewLink)
+    && !sending,
+  )
 
   return (
     <div className="modal-backdrop player-email-backdrop" onClick={() => { if (!sending) onClose() }}>
@@ -151,6 +167,68 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
               <small>{message.length}/5000</small>
             </label>
 
+            {linkEnabled ? (
+              <section className="player-email-link-fields" aria-label="Email link">
+                <header>
+                  <div>
+                    <Link2 size={16} aria-hidden="true" />
+                    <span><strong>Link button</strong><small>Add one clear action below the message.</small></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLinkEnabled(false)
+                      setLinkText('')
+                      setLinkUrl('')
+                    }}
+                    disabled={sending}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                    Remove
+                  </button>
+                </header>
+                <div>
+                  <label>
+                    Text on the link
+                    <input
+                      value={linkText}
+                      onChange={(event) => setLinkText(event.target.value)}
+                      placeholder="View tournament details"
+                      maxLength={PLAYER_EMAIL_LINK_TEXT_LIMIT}
+                      required
+                    />
+                    <small>{linkText.length}/{PLAYER_EMAIL_LINK_TEXT_LIMIT}</small>
+                  </label>
+                  <label>
+                    Link URL
+                    <input
+                      type="url"
+                      inputMode="url"
+                      value={linkUrl}
+                      onChange={(event) => setLinkUrl(event.target.value)}
+                      placeholder="https://juchess.page/tournaments"
+                      maxLength={PLAYER_EMAIL_LINK_URL_LIMIT}
+                      required
+                    />
+                  </label>
+                </div>
+                {linkUrl.trim() && !previewLink ? (
+                  <p role="alert">Enter link text and a complete http:// or https:// address without a username or password.</p>
+                ) : null}
+              </section>
+            ) : (
+              <button
+                type="button"
+                className="player-email-add-link"
+                onClick={() => setLinkEnabled(true)}
+                aria-expanded="false"
+                disabled={sending}
+              >
+                <Link2 size={16} aria-hidden="true" />
+                Add a link
+              </button>
+            )}
+
             <div className={provider?.ready ? 'player-email-provider ready' : 'player-email-provider'} role="status">
               {provider?.ready
                 ? `Email delivery ready${provider.provider ? ` · ${provider.provider}` : ''}`
@@ -183,6 +261,13 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
               <div className="player-email-preview-copy">
                 <h3>{subject.trim() || 'Your email subject'}</h3>
                 <p>{message.trim() || 'Your message will appear here in the JuChess club email theme.'}</p>
+                {linkEnabled ? (
+                  previewLink ? (
+                    <a href={previewLink.url} target="_blank" rel="noreferrer">{previewLink.text}</a>
+                  ) : (
+                    <span className="player-email-preview-link-placeholder">Your link button will appear here</span>
+                  )
+                ) : null}
                 <div>This message was sent by the JuChess administration team. Reply to this email to contact the club.</div>
               </div>
               <footer>JuChess · University of Jordan Chess Club</footer>

@@ -33,6 +33,22 @@ that must not be lost between chats.
   tests, 142 Function tests, Flutter analysis, and 39 mobile tests. No Android
   device was connected, so the mobile change was not installed on hardware.
 
+## July 19 player-email link buttons
+
+- Player Management's existing branded email composer now has an optional
+  `Add a link` action. It collects the visible link text and a complete URL,
+  shows the result as a burgundy button in the live preview, and removes both
+  values together when the admin removes the link.
+- `admin-actions` validates the same optional link server-side. Both text and
+  URL are required when enabled; text is capped at 80 characters, URLs at 2048,
+  and only complete HTTP/HTTPS URLs without embedded credentials are accepted.
+  The HTML template escapes the label and URL and uses an email-compatible
+  table button. Existing messages without links remain unchanged.
+- Admin audit metadata records only `hasLink`, not the destination URL or
+  message body. Deployment `6a5c25521b59064b3d27` is ready and active. Admin
+  checks passed with 25 UI/helper tests and 91 engine tests; the complete
+  Function suite passed with 144 tests. No email was sent during implementation.
+
 ## July 18 architecture, correctness, and performance hardening
 
 - Added `docs/SYSTEM_ARCHITECTURE.md` as the executable architecture reference,

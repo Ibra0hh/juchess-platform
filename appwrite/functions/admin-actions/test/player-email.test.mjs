@@ -17,12 +17,31 @@ test('player email input deduplicates recipients and enforces content limits', (
     profileIds: ['player-1', 'player-2'],
     subject: 'Tournament update',
     message: 'Round one starts at 5:00 PM.\nPlease arrive early.',
+    link: null,
   });
   assert.throws(() => normalizePlayerEmailInput({ profileIds: [], subject: 'Hello', message: 'Body' }), /select at least one/i);
   assert.throws(() => normalizePlayerEmailInput({ profileIds: ['p1'], subject: '', message: 'Body' }), /subject/i);
   assert.throws(() => normalizePlayerEmailInput({ profileIds: ['p1'], subject: 'Hello', message: '' }), /message/i);
   assert.throws(() => normalizePlayerEmailInput({ profileIds: ['p1'], subject: 'x'.repeat(121), message: 'Body' }), /120 characters/i);
   assert.throws(() => normalizePlayerEmailInput({ profileIds: ['p1'], subject: 'Hello', message: 'x'.repeat(5001) }), /5000 characters/i);
+});
+
+test('player email input validates and normalizes an optional link button', () => {
+  const input = normalizePlayerEmailInput({
+    profileIds: ['player-1'],
+    subject: 'Round update',
+    message: 'Pairings are ready.',
+    link: { text: '  View   pairings  ', url: ' https://juchess.page/tournaments/summer?round=2&board=4 ' },
+  });
+
+  assert.deepEqual(input.link, {
+    text: 'View pairings',
+    url: 'https://juchess.page/tournaments/summer?round=2&board=4',
+  });
+  assert.throws(() => normalizePlayerEmailInput({ profileIds: ['p1'], subject: 'Hello', message: 'Body', link: { text: 'Open' } }), /both the link text and link URL/i);
+  assert.throws(() => normalizePlayerEmailInput({ profileIds: ['p1'], subject: 'Hello', message: 'Body', link: { text: 'Open', url: '/relative' } }), /complete http/i);
+  assert.throws(() => normalizePlayerEmailInput({ profileIds: ['p1'], subject: 'Hello', message: 'Body', link: { text: 'Open', url: 'javascript:alert(1)' } }), /complete http/i);
+  assert.throws(() => normalizePlayerEmailInput({ profileIds: ['p1'], subject: 'Hello', message: 'Body', link: { text: 'Open', url: 'https://user:secret@example.com' } }), /without a username or password/i);
 });
 
 test('player email template keeps the JuChess theme and escapes admin content', () => {
@@ -37,6 +56,22 @@ test('player email template keeps the JuChess theme and escapes admin content', 
   assert.match(html, /Pairings &lt;Final&gt;/);
   assert.match(html, /Hello &amp; welcome<br>&lt;script&gt;alert\(&quot;no&quot;\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>alert/);
+});
+
+test('player email template renders an escaped branded link button', () => {
+  const html = buildPlayerEmailHtml({
+    subject: 'Pairings',
+    message: 'Round two is ready.',
+    link: {
+      text: 'Open <pairings>',
+      url: 'https://juchess.page/tournaments/summer?round=2&board=4',
+    },
+  });
+
+  assert.match(html, /background:#7d2434/);
+  assert.match(html, />Open &lt;pairings&gt;<\/a>/);
+  assert.match(html, /href="https:\/\/juchess\.page\/tournaments\/summer\?round=2&amp;board=4"/);
+  assert.throws(() => buildPlayerEmailHtml({ subject: 'Unsafe', message: 'No', link: { text: 'Open', url: 'data:text\/html,bad' } }), /complete http/i);
 });
 
 test('player email recipients are resolved only from private account identities', async () => {
