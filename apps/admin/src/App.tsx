@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Clock3, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Clock3, Copy, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
 import RecruitmentScreen from './screens/RecruitmentScreen'
 import PlayerEmailComposer from './components/PlayerEmailComposer'
@@ -97,6 +97,8 @@ import {
   resolveAdminScreen,
   type AdminScreen,
 } from './lib/adminPermissions'
+import { externalRatingSourceLabel, hasExternalRating } from './lib/externalRating'
+import { playerDetailFields, playerDetailsText } from './lib/playerDetails'
 
 type Screen = AdminScreen
 type TournamentTab = TournamentStatus
@@ -110,6 +112,12 @@ type Player = {
   email: string
   phone: string
   rating: number
+  ratingSource?: string
+  ratingUpdatedAt?: string
+  chessComUsername?: string
+  lichessUsername?: string
+  role?: string
+  status?: string
   record: string
   avatarColor: string
   avatarUrl?: string
@@ -522,9 +530,11 @@ type Pairing = {
   white: string
   whiteProfileId?: string
   whiteRating: number | string
+  whiteRatingSource?: string
   black: string
   blackProfileId?: string
   blackRating: number | string
+  blackRatingSource?: string
   next?: number
   targetSlot?: AdminBracketSide
 }
@@ -693,7 +703,7 @@ function createInitialTournamentForm(): TournamentInput {
 const pageText: Record<Screen, { title: string; sub: string }> = {
   dashboard: { title: 'Dashboard', sub: 'Live overview of your club operations' },
   tournaments: { title: 'Tournament Control Center', sub: 'Create, publish and run every event' },
-  players: { title: 'Player Management', sub: 'Roster, ratings and player records' },
+  players: { title: 'Player Management', sub: 'Roster and player records' },
   recruitment: { title: 'Recruitment', sub: 'Review member applications and manage the candidate pipeline' },
   news: { title: 'News', sub: 'Public posts shown on the app & website' },
   announcements: { title: 'Announcements', sub: 'Broadcast to players and members' },
@@ -2926,8 +2936,8 @@ function TournamentManageView({
   const currentRoundPairings = useMemo(() => currentRoundPairingsForTournament(tournament, pairings), [pairings, tournament])
   const pairingRounds = useMemo(() => groupPairingsByRound(pairings), [pairings])
   const publishedPairingRounds = useMemo(
-    () => groupAdminGamesByRound(tournament.publishedGameRows),
-    [tournament.publishedGameRows],
+    () => groupAdminGamesByRound(tournament.publishedGameRows, tournamentPlayers),
+    [tournament.publishedGameRows, tournamentPlayers],
   )
   const displayedPairingRounds = publishedPairingRounds.length ? publishedPairingRounds : pairingRounds
   const savedBracketConfig = useMemo(() => (
@@ -3221,7 +3231,9 @@ function TournamentManageView({
             ) : tournamentPlayers.length ? tournamentPlayers.map((player, index) => (
               <div key={player.id} className="manage-row">
                 <strong>{index + 1}. {player.name}</strong>
-                <span>{player.rating}</span>
+                {hasExternalRating(player.rating, player.ratingSource) ? (
+                  <span title={externalRatingSourceLabel(player.ratingSource)}>{player.rating}</span>
+                ) : null}
               </div>
             )) : (
               <EmptyState title="No registered players" body="Players must register before pairings can be published." />
@@ -3267,7 +3279,9 @@ function TournamentManageView({
                       >
                         <span className="participant-avatar">{playerInitials(player.name)}</span>
                         <strong>{player.name}<small>{player.universityId} · {player.email || 'No email'}</small></strong>
-                        <b>{player.rating}</b>
+                        {hasExternalRating(player.rating, player.ratingSource) ? (
+                          <b title={externalRatingSourceLabel(player.ratingSource)}>{player.rating}</b>
+                        ) : null}
                       </button>
                     )) : (
                       <div className="empty-row">No eligible players match this search.</div>
@@ -3300,12 +3314,12 @@ function TournamentManageView({
                     <span>#{pairing.board}</span>
                     <strong className="pairing-player white-side">
                       <span className="chess-color-chip white">W</span>
-                      <span>{pairing.white}<small>{pairing.whiteRating}</small></span>
+                      <span>{pairing.white}{pairing.whiteRatingSource ? <small title={externalRatingSourceLabel(pairing.whiteRatingSource)}>{pairing.whiteRating}</small> : null}</span>
                     </strong>
                     <em>vs</em>
                     <strong className="pairing-player black-side">
                       <span className="chess-color-chip black">B</span>
-                      <span>{pairing.black}<small>{pairing.blackRating}</small></span>
+                      <span>{pairing.black}{pairing.blackRatingSource ? <small title={externalRatingSourceLabel(pairing.blackRatingSource)}>{pairing.blackRating}</small> : null}</span>
                     </strong>
                   </div>
                 ))}
@@ -3421,7 +3435,7 @@ function TournamentManageView({
                 {standingRows.map((row) => (
                   <div className="standings-table-row" data-rank={row.rank} key={row.id} role="row">
                     <span>{row.rank}</span>
-                    <strong>{row.name}<small>{row.rating}</small></strong>
+                    <strong>{row.name}{row.ratingSource ? <small title={externalRatingSourceLabel(row.ratingSource)}>{row.rating}</small> : null}</strong>
                     <span>{row.played}</span>
                     <span>{row.wins}</span>
                     <span>{row.draws}</span>
@@ -4544,6 +4558,7 @@ function RegistrationQueue({
   selectedTournamentKey: string
   tournaments: AdminTournament[]
 }) {
+  const showExternalRatings = registrations.some((item) => hasExternalRating(item.rating, item.ratingSource))
   return (
     <section className="panel-card table-card registration-panel">
       <div className="panel-head">
@@ -4582,7 +4597,7 @@ function RegistrationQueue({
               <tr>
                 <th>Player</th>
                 <th>University ID</th>
-                <th>Rating</th>
+                {showExternalRatings ? <th>External rating</th> : null}
                 <th>Approval</th>
                 <th>Seed</th>
                 <th>Attendance</th>
@@ -4599,7 +4614,13 @@ function RegistrationQueue({
                       <small>{item.email || item.profileId}</small>
                     </td>
                     <td>{item.universityId || 'Not set'}</td>
-                    <td className="mono center">{item.rating ?? '-'}</td>
+                    {showExternalRatings ? (
+                      <td className="mono center">
+                        {hasExternalRating(item.rating, item.ratingSource) ? (
+                          <span title={externalRatingSourceLabel(item.ratingSource)}>{item.rating}</span>
+                        ) : null}
+                      </td>
+                    ) : null}
                     <td><StatusPill status={item.status === 'confirmed' ? 'accepted' : item.status} /></td>
                     <td className="mono center">{item.seed ?? '-'}</td>
                     <td>
@@ -4754,6 +4775,12 @@ function PlayersScreen({
         email: player.email,
         phone: player.phone || 'Not set',
         rating: player.rating,
+        ratingSource: player.ratingSource,
+        ratingUpdatedAt: player.ratingUpdatedAt,
+        chessComUsername: player.chessComUsername,
+        lichessUsername: player.lichessUsername,
+        role: player.role,
+        status: player.status,
         // Per-player win/loss records are not computed yet; show nothing
         // rather than a fabricated record.
         record: 'Not calculated',
@@ -4774,6 +4801,7 @@ function PlayersScreen({
     return !needle || player.name.toLowerCase().includes(needle) || player.universityId.toLowerCase().includes(needle)
   })
   const selectedCount = Object.values(selected).filter(Boolean).length
+  const showExternalRatings = visiblePlayers.some((player) => hasExternalRating(player.rating, player.ratingSource))
 
   function togglePlayer(playerId: string) {
     setSelected((current) => ({ ...current, [playerId]: !current[playerId] }))
@@ -4863,7 +4891,7 @@ function PlayersScreen({
                 <th />
                 <th>Name</th>
                 <th>University ID</th>
-                <th>Rating</th>
+                {showExternalRatings ? <th>External rating</th> : null}
                 <th className="right">Actions</th>
               </tr>
             </thead>
@@ -4888,7 +4916,13 @@ function PlayersScreen({
                     </div>
                   </td>
                   <td className="mono">{player.universityId}</td>
-                  <td className="mono"><strong>{player.rating}</strong></td>
+                  {showExternalRatings ? (
+                    <td className="mono">
+                      {hasExternalRating(player.rating, player.ratingSource) ? (
+                        <strong title={externalRatingSourceLabel(player.ratingSource)}>{player.rating}</strong>
+                      ) : null}
+                    </td>
+                  ) : null}
                   <td className="right">
                     <div className="tournament-action-row">
                       <button type="button" className="mini-button ghost" disabled={Boolean(playersError) || !player.email} onClick={() => requestPlayerEmail([player])}>Message</button>
@@ -4977,14 +5011,24 @@ function PlayerModal({
   player: Player
 }) {
   const [coverFailed, setCoverFailed] = useState(false)
+  const [copiedField, setCopiedField] = useState('')
   const showCover = Boolean(player.coverUrl && !coverFailed)
-  const fields = [
-    ['Name', player.name],
-    ['University ID', player.universityId],
-    ['Email', player.email],
-    ['Phone number', player.phone],
-    ['Rating', String(player.rating)],
-  ]
+  const fields = playerDetailFields(player)
+  const ratingLabel = hasExternalRating(player.rating, player.ratingSource)
+    ? `${player.rating} · ${externalRatingSourceLabel(player.ratingSource)}`
+    : ''
+
+  async function copyField(label: string, value: string) {
+    await writeClipboardText(value)
+    setCopiedField(label)
+    window.setTimeout(() => setCopiedField((current) => current === label ? '' : current), 1800)
+  }
+
+  async function copyAllFields() {
+    await writeClipboardText(playerDetailsText(player))
+    setCopiedField('all')
+    window.setTimeout(() => setCopiedField((current) => current === 'all' ? '' : current), 1800)
+  }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -5010,19 +5054,31 @@ function PlayerModal({
           <div>
             <span>Player profile</span>
             <h2 id="player-profile-title">{player.name}</h2>
-            <p>{player.universityId} · Rating {player.rating}</p>
+            <p>{player.universityId}{ratingLabel ? ` · ${ratingLabel}` : ''}</p>
           </div>
           {player.blocked ? <em>BLOCKED</em> : null}
         </div>
         <div className="field-grid">
-          {fields.map(([label, value]) => (
-            <div key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </div>
+          {fields.map(({ label, value }) => (
+            <article key={label}>
+              <div>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+              <button type="button" onClick={() => void copyField(label, value)} aria-label={`Copy ${label.toLowerCase()}`} title={`Copy ${label.toLowerCase()}`}>
+                {copiedField === label ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+              </button>
+            </article>
           ))}
         </div>
+        <p className="player-copy-status" aria-live="polite">
+          {copiedField === 'all' ? 'All player details copied.' : copiedField ? `${copiedField} copied.` : ''}
+        </p>
         <div className="modal-actions">
+          <button type="button" className="secondary-action" onClick={() => void copyAllFields()}>
+            {copiedField === 'all' ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+            {copiedField === 'all' ? 'Copied all details' : 'Copy all details'}
+          </button>
           <button type="button" onClick={onMessage} disabled={!player.email}>✉ Message</button>
         </div>
       </section>
@@ -5169,6 +5225,29 @@ function NewsScreen() {
       </section>
     </div>
   )
+}
+
+async function writeClipboardText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value)
+      return
+    } catch {
+      // Some browsers expose the Clipboard API but deny it for the current
+      // permission state. Fall through to the user-gesture copy fallback.
+    }
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const copied = document.execCommand('copy')
+  textarea.remove()
+  if (!copied) throw new Error('Clipboard access is unavailable in this browser.')
 }
 
 function AnnouncementsScreen() {
@@ -5402,6 +5481,7 @@ function buildTournamentPlayers(seed: number, registrations: AdminRegistration[]
       email: registration.email || '',
       phone: '',
       rating: registration.rating ?? 1200,
+      ratingSource: registration.ratingSource,
       record: '0-0-0',
       avatarColor: playerAvatarColors[index % playerAvatarColors.length] ?? '#111111',
       tournaments: 1,
@@ -5475,9 +5555,11 @@ function buildRoundRobinPairings(
           white: white.name,
           whiteProfileId: white.profileId ?? white.id,
           whiteRating: white.rating,
+          whiteRatingSource: white.ratingSource,
           black: black.name,
           blackProfileId: black.profileId ?? black.id,
           blackRating: black.rating,
+          blackRatingSource: black.ratingSource,
         })
         board += 1
       }
@@ -5496,9 +5578,11 @@ function buildRoundRobinPairings(
       white: pairing.black,
       whiteProfileId: pairing.blackProfileId,
       whiteRating: pairing.blackRating,
+      whiteRatingSource: pairing.blackRatingSource,
       black: pairing.white,
       blackProfileId: pairing.whiteProfileId,
       blackRating: pairing.whiteRating,
+      blackRatingSource: pairing.whiteRatingSource,
     })),
   ]
 }
@@ -5518,6 +5602,7 @@ function buildColorAwarePairing(
       white: first.name,
       whiteProfileId: first.profileId ?? first.id,
       whiteRating: first.rating,
+      whiteRatingSource: first.ratingSource,
       black: 'Bye',
       blackProfileId: SYSTEM_BYE_PROFILE_ID,
       blackRating: '-',
@@ -5545,9 +5630,11 @@ function buildColorAwarePairing(
     white: white.name,
     whiteProfileId: white.profileId ?? white.id,
     whiteRating: white.rating,
+    whiteRatingSource: white.ratingSource,
     black: black.name,
     blackProfileId: black.profileId ?? black.id,
     blackRating: black.rating,
+    blackRatingSource: black.ratingSource,
   }
 }
 
@@ -5595,16 +5682,19 @@ function groupPairingsByRound(pairings: Pairing[]) {
     }))
 }
 
-function groupAdminGamesByRound(games: AdminGame[]) {
+function groupAdminGamesByRound(games: AdminGame[], players: Player[]) {
+  const playersById = new Map(players.map((player) => [player.profileId ?? player.id, player]))
   return groupPairingsByRound(games.map((game) => ({
     round: game.round,
     board: game.board,
     white: game.whiteName,
     whiteProfileId: game.whiteProfileId,
     whiteRating: game.whiteRating,
+    whiteRatingSource: playersById.get(game.whiteProfileId)?.ratingSource,
     black: game.blackName,
     blackProfileId: game.blackProfileId,
     blackRating: game.blackRating,
+    blackRatingSource: playersById.get(game.blackProfileId)?.ratingSource,
   })))
 }
 
@@ -5625,6 +5715,7 @@ function buildAdminStandingRows(standings: AdminStanding[], players: Player[], g
         ...standing,
         name: player?.name ?? gamePlayer?.name ?? standing.profileId,
         rating: player?.rating ?? gamePlayer?.rating ?? 1200,
+        ratingSource: player?.ratingSource,
       }
     })
 }

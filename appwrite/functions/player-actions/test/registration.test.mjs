@@ -646,7 +646,7 @@ test('an incomplete profile is kept private until its required details are saved
 });
 
 test('profile updates reject every server-owned identity and moderation field', () => {
-  for (const field of ['accountId', 'email', 'rating', 'role', 'status', 'profileId', '$id']) {
+  for (const field of ['accountId', 'email', 'rating', 'ratingSource', 'ratingUpdatedAt', 'role', 'status', 'profileId', '$id']) {
     assert.throws(
       () => normalizeProfileUpdate({ [field]: 'attacker-controlled' }),
       (error) => error.statusCode === 400 && /managed by JuChess/.test(error.message),

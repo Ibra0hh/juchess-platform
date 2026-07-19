@@ -23,6 +23,154 @@ const tableIds = {
   ipBlocks: 'ip_blocks',
 };
 
+const EXTERNAL_RATING_REFRESH_MS = 12 * 60 * 60 * 1000;
+const EXTERNAL_RATING_REQUEST_TIMEOUT_MS = 4_000;
+const EXTERNAL_RATING_PRIORITY = [
+  'chess.com:rapid',
+  'lichess:rapid',
+  'chess.com:blitz',
+  'lichess:blitz',
+  'chess.com:bullet',
+  'lichess:bullet',
+  'chess.com:daily',
+  'lichess:classical',
+  'lichess:correspondence',
+];
+
+function normalizeExternalRating(value) {
+  const rating = Number(value);
+  return Number.isInteger(rating) && rating > 0 ? rating : null;
+}
+
+export function parseChessComRatings(payload = {}) {
+  return ['rapid', 'blitz', 'bullet', 'daily'].flatMap((pool) => {
+    const rating = normalizeExternalRating(payload?.[`chess_${pool}`]?.last?.rating);
+    return rating ? [{ rating, source: `chess.com:${pool}` }] : [];
+  });
+}
+
+export function parseLichessRatings(payload = {}) {
+  return ['rapid', 'blitz', 'bullet', 'classical', 'correspondence'].flatMap((pool) => {
+    const performance = payload?.perfs?.[pool];
+    const rating = normalizeExternalRating(performance?.rating);
+    const games = Number(performance?.games);
+    return rating && Number.isFinite(games) && games > 0
+      ? [{ rating, source: `lichess:${pool}` }]
+      : [];
+  });
+}
+
+export function selectExternalRating(candidates = []) {
+  const bySource = new Map(candidates.map((candidate) => [candidate.source, candidate]));
+  for (const source of EXTERNAL_RATING_PRIORITY) {
+    const candidate = bySource.get(source);
+    if (candidate) return candidate;
+  }
+  return null;
+}
+
+async function fetchExternalRatingJson(url, fetchImpl, timeoutMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl(url, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'JuChess/1.0 (https://juchess.page/)',
+      },
+      signal: controller.signal,
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`Rating provider returned HTTP ${response.status}.`);
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function loadExternalPlayerRating(
+  profile,
+  { fetchImpl = fetch, timeoutMs = EXTERNAL_RATING_REQUEST_TIMEOUT_MS } = {},
+) {
+  const requests = [];
+  const chessComUsername = String(profile?.chessComUsername ?? '').trim();
+  const lichessUsername = String(profile?.lichessUsername ?? '').trim();
+
+  if (chessComUsername) {
+    requests.push(
+      fetchExternalRatingJson(
+        `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername)}/stats`,
+        fetchImpl,
+        timeoutMs,
+      ).then((payload) => payload ? parseChessComRatings(payload) : []),
+    );
+  }
+  if (lichessUsername) {
+    requests.push(
+      fetchExternalRatingJson(
+        `https://lichess.org/api/user/${encodeURIComponent(lichessUsername)}`,
+        fetchImpl,
+        timeoutMs,
+      ).then((payload) => payload ? parseLichessRatings(payload) : []),
+    );
+  }
+
+  if (!requests.length) return { rating: null, source: null, providerFailures: 0 };
+  const results = await Promise.allSettled(requests);
+  const candidates = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
+  const selected = selectExternalRating(candidates);
+  return {
+    rating: selected?.rating ?? null,
+    source: selected?.source ?? null,
+    providerFailures: results.filter((result) => result.status === 'rejected').length,
+  };
+}
+
+export async function refreshNextExternalPlayerRating(
+  tablesDB,
+  databaseId,
+  { fetchImpl = fetch, now = new Date() } = {},
+) {
+  const profiles = await listAllRows(tablesDB, databaseId, tableIds.profiles);
+  const nowMs = now.getTime();
+  const due = profiles
+    .filter((profile) => String(profile.chessComUsername ?? '').trim() || String(profile.lichessUsername ?? '').trim())
+    .filter((profile) => {
+      const checkedAt = Date.parse(String(profile.ratingUpdatedAt ?? ''));
+      return !Number.isFinite(checkedAt) || nowMs - checkedAt >= EXTERNAL_RATING_REFRESH_MS;
+    })
+    .toSorted((left, right) => (
+      String(left.ratingUpdatedAt ?? '').localeCompare(String(right.ratingUpdatedAt ?? ''))
+      || String(left.$createdAt ?? '').localeCompare(String(right.$createdAt ?? ''))
+    ));
+
+  const profile = due[0];
+  if (!profile) return { checked: 0, remaining: 0 };
+
+  const result = await loadExternalPlayerRating(profile, { fetchImpl });
+  const checkedAt = now.toISOString();
+  const data = {
+    ratingSource: result.source,
+    ratingUpdatedAt: checkedAt,
+    ...(result.rating ? { rating: result.rating } : {}),
+  };
+  await tablesDB.updateRow({
+    databaseId,
+    tableId: tableIds.profiles,
+    rowId: profile.$id,
+    data,
+  });
+
+  return {
+    checked: 1,
+    profileId: profile.$id,
+    rating: result.rating,
+    source: result.source,
+    providerFailures: result.providerFailures,
+    remaining: Math.max(0, due.length - 1),
+  };
+}
+
 export const CREW_APPLICATION_STATUSES = [
   'submitted',
   'reviewing',
@@ -74,9 +222,13 @@ export async function loadCrewApplications(tablesDB, databaseId) {
           displayName: profile.displayName || profile.email || 'Club member',
           email: profile.email || '',
           phone: profile.phone || '',
-          universityId: profile.universityId || '',
-          rating: profile.rating ?? 1200,
-          status: profile.status || 'active',
+           universityId: profile.universityId || '',
+           rating: profile.rating ?? 1200,
+           ratingSource: profile.ratingSource || '',
+           ratingUpdatedAt: profile.ratingUpdatedAt || '',
+           chessComUsername: profile.chessComUsername || '',
+           lichessUsername: profile.lichessUsername || '',
+           status: profile.status || 'active',
           avatarFileId: profile.avatarFileId || '',
           coverFileId: profile.coverFileId || '',
         } : null,
@@ -4024,12 +4176,14 @@ export default async ({ req, res, log, error }) => {
   log(`JuChess admin action ${method} ${path}`);
 
   if (segments.length === 0 && req.headers['x-appwrite-trigger'] === 'schedule') {
-    const [clockResult, attendanceResult] = await Promise.allSettled([
+    const [clockResult, attendanceResult, ratingResult] = await Promise.allSettled([
       sweepHostedGameDeadlines(tablesDB, databaseId),
       dispatchAttendanceReminders(tablesDB, messaging, databaseId),
+      refreshNextExternalPlayerRating(tablesDB, databaseId),
     ]);
     if (clockResult.status === 'rejected') error(clockResult.reason?.message ?? String(clockResult.reason));
     if (attendanceResult.status === 'rejected') error(attendanceResult.reason?.message ?? String(attendanceResult.reason));
+    if (ratingResult.status === 'rejected') error(ratingResult.reason?.message ?? String(ratingResult.reason));
     if (clockResult.status === 'rejected' && attendanceResult.status === 'rejected') {
       return res.json({ ok: false, error: 'Scheduled tournament maintenance failed.' }, 500);
     }
@@ -4040,6 +4194,9 @@ export default async ({ req, res, log, error }) => {
       attendance: attendanceResult.status === 'fulfilled'
         ? attendanceResult.value
         : { error: 'Attendance reminder dispatch failed.' },
+      ratings: ratingResult.status === 'fulfilled'
+        ? ratingResult.value
+        : { error: 'External rating refresh failed.' },
     });
   }
 

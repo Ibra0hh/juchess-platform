@@ -145,6 +145,26 @@ class EmailSignUpResult {
       'Account created. Check $email for the JuChess verification link or six-digit code. Both expire in two hours.';
 }
 
+const _externalRatingSourceLabels = <String, String>{
+  'chess.com:rapid': 'Chess.com Rapid',
+  'chess.com:blitz': 'Chess.com Blitz',
+  'chess.com:bullet': 'Chess.com Bullet',
+  'chess.com:daily': 'Chess.com Daily',
+  'lichess:rapid': 'Lichess Rapid',
+  'lichess:blitz': 'Lichess Blitz',
+  'lichess:bullet': 'Lichess Bullet',
+  'lichess:classical': 'Lichess Classical',
+  'lichess:correspondence': 'Lichess Correspondence',
+};
+
+String externalRatingSourceLabel(String? source) =>
+    _externalRatingSourceLabels[source] ?? '';
+
+bool hasExternalRating(int? rating, String? source) =>
+    rating != null &&
+    rating > 0 &&
+    _externalRatingSourceLabels.containsKey(source);
+
 class EmailVerificationRequiredException implements Exception {
   const EmailVerificationRequiredException({required this.challengeSent});
 
@@ -177,6 +197,8 @@ class PlayerProfileIdentity {
     this.status,
     this.chessComUsername,
     this.lichessUsername,
+    this.rating,
+    this.ratingSource,
   });
 
   factory PlayerProfileIdentity.fromRow(Map<String, dynamic> row) {
@@ -195,6 +217,8 @@ class PlayerProfileIdentity {
       status: row['status']?.toString(),
       chessComUsername: row['chessComUsername']?.toString(),
       lichessUsername: row['lichessUsername']?.toString(),
+      rating: int.tryParse(row['rating']?.toString() ?? ''),
+      ratingSource: row['ratingSource']?.toString(),
     );
   }
 
@@ -206,6 +230,8 @@ class PlayerProfileIdentity {
   final String? status;
   final String? chessComUsername;
   final String? lichessUsername;
+  final int? rating;
+  final String? ratingSource;
 }
 
 sealed class ProfileIdentityLookup {
@@ -1809,6 +1835,7 @@ Map<String, PlayerSeed> _mapProfileRows(List<models.Row> rows) {
       data['displayName']?.toString() ?? row.$id,
       _asInt(data['rating']) ?? 1200,
       data['university']?.toString() ?? 'University of Jordan',
+      data['ratingSource']?.toString(),
     );
   }
   return profiles;
@@ -1839,7 +1866,15 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
     final seed = _asInt(data['seed']) ?? 9999;
     groups
         .putIfAbsent(tournamentId, () => [])
-        .add(PlayerSeed(seed, profile.name, profile.rating, profile.subtitle));
+        .add(
+          PlayerSeed(
+            seed,
+            profile.name,
+            profile.rating,
+            profile.subtitle,
+            profile.ratingSource,
+          ),
+        );
   }
 
   return groups.map((tournamentId, players) {
@@ -1855,6 +1890,7 @@ Map<String, List<PlayerSeed>> _groupRegisteredPlayers(
           players[i].name,
           players[i].rating,
           players[i].subtitle,
+          players[i].ratingSource,
         ),
     ]);
   });
@@ -1910,6 +1946,7 @@ Map<String, List<TournamentStandingSeed>> _groupTournamentStandings(
             rank: rank,
             name: profile.name,
             rating: profile.rating,
+            ratingSource: profile.ratingSource,
             points: points,
             tieBreak: _asDouble(data['tieBreak']) ?? 0,
             played: math.max(0, _asInt(data['played']) ?? 0),
@@ -2120,6 +2157,8 @@ class AppState extends ChangeNotifier {
   String? profileId;
   String? chessComUsername;
   String? lichessUsername;
+  int? externalRating;
+  String? externalRatingSource;
   String? error;
   String? profileLoadError;
   ProfileGateState profileGateState = ProfileGateState.ready;
@@ -2551,12 +2590,16 @@ class AppState extends ChangeNotifier {
         profileId = null;
         chessComUsername = null;
         lichessUsername = null;
+        externalRating = null;
+        externalRatingSource = null;
         profileGateState = ProfileGateState.completionRequired;
         profileLoadError = null;
       case ProfileIdentityFailure(:final cause):
         profileId = null;
         chessComUsername = null;
         lichessUsername = null;
+        externalRating = null;
+        externalRatingSource = null;
         profileGateState = ProfileGateState.loadFailure;
         profileLoadError = appwriteMessage(cause);
     }
@@ -2573,6 +2616,8 @@ class AppState extends ChangeNotifier {
     if (displayName != null && displayName.isNotEmpty) userName = displayName;
     chessComUsername = profile.chessComUsername?.trim();
     lichessUsername = profile.lichessUsername?.trim();
+    externalRating = profile.rating;
+    externalRatingSource = profile.ratingSource?.trim();
   }
 
   void _clearAccountIdentity() {
@@ -2581,6 +2626,8 @@ class AppState extends ChangeNotifier {
     profileId = null;
     chessComUsername = null;
     lichessUsername = null;
+    externalRating = null;
+    externalRatingSource = null;
     profileGateState = ProfileGateState.ready;
     profileLoadError = null;
     myRegistrations = {};
@@ -5922,6 +5969,7 @@ class _TournamentMainTab extends StatelessWidget {
               rank: standing.rank,
               name: standing.name,
               rating: standing.rating,
+              ratingSource: standing.ratingSource,
               points: _formatTournamentPoints(standing.points),
               record: '${standing.wins}-${standing.draws}-${standing.losses}',
             );
@@ -6636,6 +6684,7 @@ class StandingRow extends StatelessWidget {
     required this.rank,
     required this.name,
     required this.rating,
+    this.ratingSource,
     required this.points,
     required this.record,
     super.key,
@@ -6644,6 +6693,7 @@ class StandingRow extends StatelessWidget {
   final int rank;
   final String name;
   final int rating;
+  final String? ratingSource;
   final String points;
   final String record;
 
@@ -6671,7 +6721,9 @@ class StandingRow extends StatelessWidget {
                 Text(name, style: const TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 2),
                 Text(
-                  '$rating · $record',
+                  hasExternalRating(rating, ratingSource)
+                      ? '$rating · $record'
+                      : record,
                   style: const TextStyle(
                     color: Color(0x8c111111),
                     fontSize: 11.5,
@@ -6917,6 +6969,7 @@ class TournamentPairingPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final player = _playerForName(event, name);
     return Column(
       crossAxisAlignment: alignEnd
           ? CrossAxisAlignment.end
@@ -6941,16 +6994,20 @@ class TournamentPairingPlayer extends StatelessWidget {
               : MainAxisAlignment.start,
           children: [
             ChessColorBadge(color: color, compact: true),
-            const SizedBox(width: 6),
-            Text(
-              '${_ratingForPlayerName(event, name)}',
-              style: const TextStyle(
-                color: Color(0xff8b8577),
-                fontFamily: 'monospace',
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+            if (hasExternalRating(player?.rating, player?.ratingSource)) ...[
+              const SizedBox(width: 6),
+              Text(
+                '${player?.rating}',
+                semanticsLabel:
+                    '${player?.rating}, ${externalRatingSourceLabel(player?.ratingSource)}',
+                style: const TextStyle(
+                  color: Color(0xff8b8577),
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ],
@@ -7028,6 +7085,7 @@ class _TournamentPlayersTab extends StatelessWidget {
                   name: player.name,
                   subtitle: player.subtitle,
                   rating: player.rating,
+                  ratingSource: player.ratingSource,
                 ),
               )
               .toList(),
@@ -7167,14 +7225,14 @@ String _roundPanelStatus(TournamentSeed event, RoundSeed round) {
   return 'Recorded round';
 }
 
-int _ratingForPlayerName(TournamentSeed event, String name) {
+PlayerSeed? _playerForName(TournamentSeed event, String name) {
   for (final player in event.registeredPlayers) {
-    if (player.name == name) return player.rating;
+    if (player.name == name) return player;
   }
   for (final player in clubPlayers) {
-    if (player.name == name) return player.rating;
+    if (player.name == name) return player;
   }
-  return 1200;
+  return null;
 }
 
 bool _hasBracketTab(TournamentSeed event) {
@@ -7609,10 +7667,20 @@ class ProfileScreen extends StatelessWidget {
                 state.signedIn
                     ? state.userEmail ??
                           'Your JuChess account is active on this device.'
-                    : 'Sign in to view your rating, registrations, saved analyses, and achievements.',
+                    : 'Sign in to view registrations, saved analyses, and achievements.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Color(0x99111111), height: 1.45),
               ),
+              if (state.signedIn &&
+                  hasExternalRating(
+                    state.externalRating,
+                    state.externalRatingSource,
+                  )) ...[
+                const SizedBox(height: 10),
+                ChipPill(
+                  '${state.externalRating} · ${externalRatingSourceLabel(state.externalRatingSource)}',
+                ),
+              ],
               if (state.signedIn &&
                   (state.chessComUsername != null ||
                       state.lichessUsername != null)) ...[
@@ -8212,6 +8280,7 @@ class LeaderboardScreen extends StatelessWidget {
                     name: player.name,
                     subtitle: player.subtitle,
                     rating: player.rating,
+                    ratingSource: player.ratingSource,
                   ),
                 )
                 .toList(),
@@ -8228,6 +8297,7 @@ class LeaderboardRow extends StatelessWidget {
     required this.name,
     required this.subtitle,
     required this.rating,
+    this.ratingSource,
     super.key,
   });
 
@@ -8235,6 +8305,7 @@ class LeaderboardRow extends StatelessWidget {
   final String name;
   final String subtitle;
   final int rating;
+  final String? ratingSource;
 
   @override
   Widget build(BuildContext context) {
@@ -8279,15 +8350,18 @@ class LeaderboardRow extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            '$rating',
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              color: PrototypeColors.black,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
+          if (hasExternalRating(rating, ratingSource))
+            Text(
+              '$rating',
+              semanticsLabel:
+                  '$rating, ${externalRatingSourceLabel(ratingSource)}',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                color: PrototypeColors.black,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -13193,13 +13267,16 @@ class LeaderboardPreview extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Text(
-                      '${player.rating}',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w800,
+                    if (hasExternalRating(player.rating, player.ratingSource))
+                      Text(
+                        '${player.rating}',
+                        semanticsLabel:
+                            '${player.rating}, ${externalRatingSourceLabel(player.ratingSource)}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -15342,12 +15419,19 @@ class TournamentMediaSeed {
 }
 
 class PlayerSeed {
-  const PlayerSeed(this.rank, this.name, this.rating, this.subtitle);
+  const PlayerSeed(
+    this.rank,
+    this.name,
+    this.rating,
+    this.subtitle, [
+    this.ratingSource,
+  ]);
 
   final int rank;
   final String name;
   final int rating;
   final String subtitle;
+  final String? ratingSource;
 }
 
 class TournamentStandingSeed {
@@ -15356,6 +15440,7 @@ class TournamentStandingSeed {
     required this.rank,
     required this.name,
     required this.rating,
+    this.ratingSource,
     required this.points,
     required this.tieBreak,
     required this.played,
@@ -15368,6 +15453,7 @@ class TournamentStandingSeed {
   final int rank;
   final String name;
   final int rating;
+  final String? ratingSource;
   final double points;
   final double tieBreak;
   final int played;

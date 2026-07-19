@@ -7,6 +7,7 @@ import {
   profileMediaUrl,
   type PublicProfile,
 } from '../lib/auth'
+import { externalRatingSourceLabel } from '../lib/externalRating'
 import './ClubScreens.css'
 
 const podiumOrder = [1, 0, 2] as const
@@ -39,7 +40,7 @@ function LeaderboardPage() {
       <main className="leaderboard-main">
         <section className="club-title-block">
           <h1>Club Leaderboard</h1>
-          <p>Live club ratings from real member profiles.</p>
+          <p>Ratings from linked Chess.com and Lichess player accounts.</p>
         </section>
 
         {loading ? <LeaderboardState icon="loading" title="Loading rankings" body="Reading the latest club ratings..." /> : null}
@@ -74,8 +75,8 @@ function LeaderboardPage() {
                     </div>
                     <h2>{player.displayName}</h2>
                     <p>{player.university || 'University not listed'}</p>
-                    <strong>{player.rating ?? 0}</strong>
-                    <span>{rankLabel(rank)}</span>
+                    <strong>{player.rating}</strong>
+                    <span>{externalRatingSourceLabel(player.ratingSource)}</span>
                   </article>
                 )
               })}
@@ -88,7 +89,7 @@ function LeaderboardPage() {
                     <th>#</th>
                     <th>Player</th>
                     <th>University</th>
-                    <th>Rating</th>
+                    <th>External rating</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -97,7 +98,7 @@ function LeaderboardPage() {
                       <td>{index + 1}</td>
                       <td>{player.displayName}</td>
                       <td>{player.university || 'University not listed'}</td>
-                      <td>{player.rating ?? 0}</td>
+                      <td><strong>{player.rating}</strong><small>{externalRatingSourceLabel(player.ratingSource)}</small></td>
                     </tr>
                   ))}
                 </tbody>
@@ -129,12 +130,6 @@ function LeaderboardState({
       {action}
     </section>
   )
-}
-
-function rankLabel(rank: number) {
-  if (rank === 1) return 'Club leader'
-  if (rank === 2) return '2nd place'
-  return '3rd place'
 }
 
 function initialsFor(name: string) {

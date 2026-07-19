@@ -70,6 +70,8 @@ const PROFILE_SERVER_FIELDS = new Set([
   'accountId',
   'email',
   'rating',
+  'ratingSource',
+  'ratingUpdatedAt',
   'role',
   'status',
   'profileId',
@@ -257,6 +259,8 @@ export function mergeOwnerProfile(profile, identity, user = null) {
     displayName: profile.displayName,
     university: profile.university,
     rating: profile.rating,
+    ratingSource: profile.ratingSource,
+    ratingUpdatedAt: profile.ratingUpdatedAt,
     role: profile.role,
     status: profile.status,
     avatarFileId: profile.avatarFileId,
@@ -529,6 +533,13 @@ export async function saveOwnerProfile(tablesDB, databaseId, user, body, users =
   const profileId = context.profile?.$id ?? context.identity?.$id ?? ID.unique();
   const status = 'active';
   const identityData = buildPrivateProfileData(profileId, user, context.identity, privateData);
+  const externalUsernameChanged = ['chessComUsername', 'lichessUsername'].some((field) => (
+    Object.prototype.hasOwnProperty.call(publicData, field)
+    && String(publicData[field] ?? '') !== String(context.profile?.[field] ?? '')
+  ));
+  const publicWriteData = externalUsernameChanged
+    ? { ...publicData, ratingSource: null, ratingUpdatedAt: null }
+    : publicData;
   assertCompletePlayerProfile({ ...context.profile, ...publicData }, identityData);
   await assertSubmittedIdentityAllowed(tablesDB, databaseId, identityData);
   const reclaimableIdentities = await findReclaimablePrivateIdentities(
@@ -556,7 +567,7 @@ export async function saveOwnerProfile(tablesDB, databaseId, user, body, users =
           databaseId,
           tableId: tableIds.profiles,
           rowId: profileId,
-          data: { ...publicData, status },
+          data: { ...publicWriteData, status },
           permissions: profilePermissions(status, user.$id),
           transactionId: transaction.$id,
         })
@@ -565,7 +576,7 @@ export async function saveOwnerProfile(tablesDB, databaseId, user, body, users =
           tableId: tableIds.profiles,
           rowId: profileId,
           data: {
-            ...publicData,
+            ...publicWriteData,
             rating: 1200,
             role: 'member',
             status,

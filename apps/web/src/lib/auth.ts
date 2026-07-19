@@ -15,6 +15,7 @@ import { sendEmailVerificationChallenge } from './emailVerification'
 import { runHedgedRequest } from './hedgedRequest'
 import { normalizeJordanMobile, validateRequiredPlayerProfile } from './profileValidation'
 import { queuePasswordRecoveryEmail } from './passwordRecovery'
+import { hasExternalRating } from './externalRating'
 
 export type ProfileRole = 'member' | 'organizer' | 'admin'
 export type ProfileStatus = 'active' | 'suspended'
@@ -27,6 +28,8 @@ export type AuthProfile = Models.Row & {
   phone?: string | null
   email: string
   rating?: number
+  ratingSource?: string | null
+  ratingUpdatedAt?: string | null
   role?: ProfileRole
   status?: ProfileStatus
   avatarFileId?: string
@@ -43,6 +46,8 @@ export type PublicProfile = Models.Row & {
   displayName: string
   university?: string | null
   rating?: number
+  ratingSource?: string | null
+  ratingUpdatedAt?: string | null
   status?: ProfileStatus
   avatarFileId?: string
   coverFileId?: string
@@ -320,7 +325,11 @@ export async function loadClubLeaderboard(): Promise<PublicProfile[]> {
   } while (cursor)
 
   return rows
-    .filter((profile) => profile.status === 'active' && !isSeedProfile(profile))
+    .filter((profile) => (
+      profile.status === 'active'
+      && !isSeedProfile(profile)
+      && hasExternalRating(profile.rating, profile.ratingSource)
+    ))
     .sort((left, right) => (
       (right.rating ?? 0) - (left.rating ?? 0)
       || left.displayName.localeCompare(right.displayName)

@@ -98,6 +98,7 @@ type AppwriteProfileRow = Models.Row & {
   displayName?: string
   university?: string
   rating?: number
+  ratingSource?: string
 }
 
 type AppwriteGameRow = Models.Row & {
@@ -149,6 +150,7 @@ export type Member = {
   id: string
   name: string
   rating: number
+  ratingSource?: string
   university: string
 }
 
@@ -239,8 +241,8 @@ export type SampleGame = {
   whiteProfileId?: string
   black: string
   blackProfileId?: string
-  wRating: number
-  bRating: number
+  wRating?: number
+  bRating?: number
   result: string
   date: string
   opening: string
@@ -471,6 +473,7 @@ async function loadProfilesForGame(row: AppwriteGameRow) {
         id: profile.$id,
         name: profile.displayName || profile.$id,
         rating: profile.rating ?? 1200,
+        ratingSource: profile.ratingSource,
         university: profile.university || '',
       })
     } catch {
@@ -511,8 +514,8 @@ function appwriteGameToSampleGame(
     whiteProfileId: row.whiteProfileId,
     black: black.name,
     blackProfileId: row.blackProfileId,
-    wRating: white.rating,
-    bRating: black.rating,
+    wRating: white.ratingSource ? white.rating : undefined,
+    bRating: black.ratingSource ? black.rating : undefined,
     result: row.status === 'live' ? 'Live' : row.result || '*',
     date: formatDate(row.finishedAt || row.startedAt || row.$updatedAt || row.$createdAt),
     opening: tournamentName,
@@ -1087,6 +1090,7 @@ function mapProfiles(rows: AppwriteProfileRow[]) {
       id: row.$id,
       name: row.displayName || row.$id,
       rating: row.rating ?? 1200,
+      ratingSource: row.ratingSource,
       university: row.university || '',
     })
   })

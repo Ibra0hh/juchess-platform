@@ -17,6 +17,7 @@ import {
 import { Link, useParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
+import { externalRatingSourceLabel, hasExternalRating } from '../lib/externalRating'
 import {
   loadTournamentDetail,
   subscribeToTournamentChanges,
@@ -809,6 +810,7 @@ function AttendancePrompt({
 }
 
 function PlayersTab({ players }: { players: Member[] }) {
+  const showRatings = players.some((player) => hasExternalRating(player.rating, player.ratingSource))
   return (
     <section className="detail-tab-panel">
       <div className="players-panel">
@@ -822,7 +824,7 @@ function PlayersTab({ players }: { players: Member[] }) {
               <tr>
                 <th>#</th>
                 <th>Player</th>
-                <th>Rating</th>
+                {showRatings ? <th>External rating</th> : null}
                 <th>Status</th>
               </tr>
             </thead>
@@ -834,7 +836,13 @@ function PlayersTab({ players }: { players: Member[] }) {
                     <strong>{player.name}</strong>
                     <small>{player.university || 'University not listed'}</small>
                   </td>
-                  <td>{player.rating}</td>
+                  {showRatings ? (
+                    <td>
+                      {hasExternalRating(player.rating, player.ratingSource) ? (
+                        <span title={externalRatingSourceLabel(player.ratingSource)}>{player.rating}</span>
+                      ) : null}
+                    </td>
+                  ) : null}
                   <td><span className="table-status registered">Registered</span></td>
                 </tr>
               ))}
@@ -922,12 +930,12 @@ function RoundPairingLink({ game }: { game: RoundPairing }) {
       <span>#{game.board}</span>
       <strong className="round-color-player white-player">
         <span className="tournament-color-chip white">W</span>
-        <span>{game.white.name}<small>{game.white.rating}</small></span>
+        <span>{game.white.name}{hasExternalRating(game.white.rating, game.white.ratingSource) ? <small title={externalRatingSourceLabel(game.white.ratingSource)}>{game.white.rating}</small> : null}</span>
       </strong>
       <em>vs</em>
       <strong className="round-color-player black-player">
         <span className="tournament-color-chip black">B</span>
-        <span>{game.black.name}<small>{game.black.rating}</small></span>
+        <span>{game.black.name}{hasExternalRating(game.black.rating, game.black.ratingSource) ? <small title={externalRatingSourceLabel(game.black.ratingSource)}>{game.black.rating}</small> : null}</span>
       </strong>
     </>
   )
@@ -1013,7 +1021,7 @@ function TableTab({
                 <td>{row.rank}</td>
                 <td>
                   <strong>{row.member.name}</strong>
-                  <small>{row.member.rating}</small>
+                  {hasExternalRating(row.member.rating, row.member.ratingSource) ? <small title={externalRatingSourceLabel(row.member.ratingSource)}>{row.member.rating}</small> : null}
                 </td>
                 <td>{row.points}</td>
                 <td>

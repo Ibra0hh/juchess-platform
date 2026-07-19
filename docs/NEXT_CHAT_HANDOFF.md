@@ -1,11 +1,37 @@
 # JuChess Complete New-Chat Handoff
 
-Last updated: July 18, 2026
+Last updated: July 19, 2026
 
 This file is both a complete project handoff and a copy-paste prompt for a new
 AI chat. It describes the intended product, the actual implementation, the
 backend contract, deployment state, known limitations, and the working rules
 that must not be lost between chats.
+
+## July 19 provider-backed ratings and admin player copying
+
+- The legacy `profiles.rating` value remains available to canonical tournament
+  logic for seeding compatibility, but clients no longer present it as a real
+  player rating by itself. Web, admin, and mobile only render a rating when the
+  profile also has a recognized server-owned `ratingSource`.
+- `profiles.ratingSource` and `profiles.ratingUpdatedAt` are now live schema
+  columns. `admin-actions` refreshes one due linked profile per scheduled run
+  from the public Chess.com and Lichess APIs, with four-second provider
+  deadlines, a 12-hour freshness window, and deterministic pool preference.
+  Provider outages never block signup, signin, or profile updates.
+- Editing or removing a Chess.com/Lichess username clears the old rating proof.
+  `player-actions` rejects client attempts to set rating metadata; only the
+  scheduled backend refresh may certify a displayed external rating.
+- The admin player table hides the Rating column when no loaded player has a
+  sourced external rating. The player profile modal exposes copy buttons for
+  each available detail plus a Copy all details action, with accessible success
+  feedback and a clipboard fallback for older or permission-restricted browsers.
+- Live schema migration completed. Active Function deployments are
+  `6a5c211205fb1977d3e3` for `admin-actions` and
+  `6a5c2111bdb57ec5d2c2` for `player-actions`. Scheduled execution
+  `6a5c21545dc64ea39165` completed with HTTP 200.
+- Validation passed: 79 web tests, 23 admin UI/helper tests plus 89 admin engine
+  tests, 142 Function tests, Flutter analysis, and 39 mobile tests. No Android
+  device was connected, so the mobile change was not installed on hardware.
 
 ## July 18 architecture, correctness, and performance hardening
 

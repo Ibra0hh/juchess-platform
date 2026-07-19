@@ -4040,13 +4040,21 @@ button {
   padding: 20px;
 }
 
-.field-grid div {
-  display: grid;
-  gap: 5px;
+.field-grid > article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   border: 1px solid #f4f0e8;
   border-radius: 9px;
   background: #faf7f1;
   padding: 10px;
+}
+
+.field-grid > article > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
 }
 
 .field-grid span {
@@ -4057,8 +4065,36 @@ button {
 }
 
 .field-grid strong {
+  overflow-wrap: anywhere;
   color: #111111;
   font-size: 13px;
+}
+
+.field-grid > article > button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #ded6c9;
+  border-radius: 8px;
+  background: #fffdf9;
+  color: #7d2434;
+  cursor: pointer;
+}
+
+.field-grid > article > button:hover,
+.field-grid > article > button:focus-visible {
+  border-color: #7d2434;
+  outline: none;
+}
+
+.player-copy-status {
+  min-height: 18px;
+  margin: -8px 20px 4px;
+  color: #2e7d5b;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .modal-actions {
@@ -4079,6 +4115,15 @@ button {
   padding: 0 14px;
   font-size: 12.5px;
   font-weight: 900;
+}
+
+.modal-actions button.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #d7d0c4;
+  background: #fff;
+  color: #111;
 }
 
 .danger-button {

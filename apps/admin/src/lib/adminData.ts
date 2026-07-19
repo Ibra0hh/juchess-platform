@@ -108,6 +108,10 @@ type AppwriteProfileRow = Models.Row & {
   universityId?: string
   phone?: string
   rating?: number
+  ratingSource?: string
+  ratingUpdatedAt?: string
+  chessComUsername?: string
+  lichessUsername?: string
   role?: string
   status?: string
   avatarFileId?: string
@@ -121,6 +125,10 @@ export type RecruitmentApplicant = {
   phone: string
   universityId: string
   rating: number
+  ratingSource?: string
+  ratingUpdatedAt?: string
+  chessComUsername?: string
+  lichessUsername?: string
   status: string
   avatarFileId?: string
   coverFileId?: string
@@ -247,6 +255,7 @@ export type AdminRegistration = {
   email?: string
   universityId?: string
   rating?: number
+  ratingSource?: string
   status: AdminRegistrationStatus
   seed?: number
   attendanceStatus?: AdminAttendanceStatus
@@ -744,6 +753,10 @@ export type ClubPlayer = {
   name: string
   universityId: string
   rating: number
+  ratingSource: string
+  ratingUpdatedAt: string
+  chessComUsername: string
+  lichessUsername: string
   email: string
   phone: string
   role: string
@@ -785,6 +798,10 @@ export async function loadClubPlayers(): Promise<ClubPlayersResult> {
         name: row.displayName || row.$id,
         universityId: row.universityId || '-',
         rating: row.rating ?? 1200,
+        ratingSource: row.ratingSource ?? '',
+        ratingUpdatedAt: row.ratingUpdatedAt ?? '',
+        chessComUsername: row.chessComUsername ?? '',
+        lichessUsername: row.lichessUsername ?? '',
         email: row.email ?? '',
         phone: row.phone ?? '',
         role: row.role ?? 'member',
@@ -1357,6 +1374,7 @@ function mapRegistration(
     email: profile?.email,
     universityId: profile?.universityId,
     rating: profile?.rating,
+    ratingSource: profile?.ratingSource,
     status: row.status ?? 'pending',
     seed: row.seed,
     attendanceStatus: attendance?.status,

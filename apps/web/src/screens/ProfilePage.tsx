@@ -8,6 +8,7 @@ import UniversityField from '../components/UniversityField'
 import { useAuth } from '../context/useAuth'
 import { formatAppwriteError, profileMediaUrl, type ProfileMediaKind } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
+import { externalRatingSourceLabel, hasExternalRating } from '../lib/externalRating'
 import { loadProfileGameHistory, type SampleGame } from '../lib/juchess'
 import './ClubScreens.css'
 import './ProfilePage.css'
@@ -39,7 +40,7 @@ function ProfilePage() {
   } = useAuth()
   const authenticated = Boolean(user || profile)
   const displayName = profile?.displayName || user?.name || profile?.email || 'Club member'
-  const rating = profile?.rating ?? 1200
+  const showRating = hasExternalRating(profile?.rating, profile?.ratingSource)
   const username = profile?.universityId || profile?.email?.split('@')[0] || user?.email.split('@')[0] || 'member'
   const initials = getInitials(displayName)
   const profileId = profile?.$id
@@ -341,8 +342,8 @@ function ProfilePage() {
           <section className="profile-panel season-panel">
             <div className="profile-panel-heading">
               <span>Performance</span>
-              <strong>{rating}</strong>
-              <small>Club rating</small>
+              {showRating ? <strong>{profile?.rating}</strong> : null}
+              {showRating ? <small>{externalRatingSourceLabel(profile?.ratingSource)}</small> : null}
             </div>
             <h2>Tournament record</h2>
             <div className="season-stats">

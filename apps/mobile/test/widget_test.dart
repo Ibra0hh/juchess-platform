@@ -8,6 +8,20 @@ import 'package:juchess_mobile/main.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  test('external player ratings require provider attribution', () {
+    expect(hasExternalRating(1200, null), isFalse);
+    expect(hasExternalRating(1812, 'chess.com:rapid'), isTrue);
+    expect(externalRatingSourceLabel('chess.com:rapid'), 'Chess.com Rapid');
+
+    final profile = PlayerProfileIdentity.fromRow({
+      r'$id': 'profile-1',
+      'rating': 1812,
+      'ratingSource': 'chess.com:rapid',
+    });
+    expect(profile.rating, 1812);
+    expect(profile.ratingSource, 'chess.com:rapid');
+  });
+
   testWidgets('home screen renders the club header and guest banner', (
     WidgetTester tester,
   ) async {
@@ -268,47 +282,52 @@ void main() {
     await tester.pump();
 
     expect(find.text('3.5'), findsOneWidget);
-    expect(find.textContaining('1640 · 3-1-0'), findsOneWidget);
+    expect(find.text('3-1-0'), findsOneWidget);
+    expect(find.textContaining('1640'), findsNothing);
     expect(find.text('0-0-0'), findsNothing);
   });
 
-  testWidgets('mobile auth offers the real link and six-digit recovery methods', (
-    WidgetTester tester,
-  ) async {
-    final state = AppState(AppwriteService(enabled: false));
-    await tester.pumpWidget(
-      _withState(state, const AuthFlowScreen(initialMode: AuthMode.signIn)),
-    );
-    await tester.pump();
+  testWidgets(
+    'mobile auth offers the real link and six-digit recovery methods',
+    (WidgetTester tester) async {
+      final state = AppState(AppwriteService(enabled: false));
+      await tester.pumpWidget(
+        _withState(state, const AuthFlowScreen(initialMode: AuthMode.signIn)),
+      );
+      await tester.pump();
 
-    expect(find.textContaining('Continue with Apple'), findsNothing);
-    expect(find.textContaining('Continue with Google'), findsNothing);
-    await tester.tap(find.text('Forgot password?'));
-    await tester.pump();
+      expect(find.textContaining('Continue with Apple'), findsNothing);
+      expect(find.textContaining('Continue with Google'), findsNothing);
+      await tester.tap(find.text('Forgot password?'));
+      await tester.pump();
 
-    expect(find.textContaining('Enter the email address tied'), findsOneWidget);
-    expect(find.textContaining('six-digit code'), findsOneWidget);
-    expect(find.text('I already have a recovery code'), findsOneWidget);
-    await tester.ensureVisible(find.text('I already have a recovery code'));
-    await tester.tap(find.text('I already have a recovery code'));
-    await tester.pump();
+      expect(
+        find.textContaining('Enter the email address tied'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('six-digit code'), findsOneWidget);
+      expect(find.text('I already have a recovery code'), findsOneWidget);
+      await tester.ensureVisible(find.text('I already have a recovery code'));
+      await tester.tap(find.text('I already have a recovery code'));
+      await tester.pump();
 
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is AuthField && widget.label == 'Six-digit recovery code',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is AuthField && widget.label == 'New password',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Update password'), findsOneWidget);
-    expect(find.text('SMS'), findsNothing);
-  });
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is AuthField && widget.label == 'Six-digit recovery code',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is AuthField && widget.label == 'New password',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Update password'), findsOneWidget);
+      expect(find.text('SMS'), findsNothing);
+    },
+  );
 
   testWidgets('saved analyses never show fabricated account data', (
     WidgetTester tester,

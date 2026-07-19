@@ -209,6 +209,21 @@
   font-weight: 600;
 }
 
+.leaderboard-table td:nth-child(4) strong,
+.leaderboard-table td:nth-child(4) small {
+  display: block;
+}
+
+.leaderboard-table td:nth-child(4) small {
+  margin-top: 2px;
+  color: rgba(17, 17, 17, 0.55);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .leaderboard-table .leader-row {
   background: rgba(169, 138, 63, 0.08);
   font-weight: 600;

@@ -10,6 +10,7 @@ import {
   type RecruitmentStatus,
 } from '../lib/adminData'
 import { csvCell } from '../lib/csv'
+import { externalRatingText, hasExternalRating } from '../lib/externalRating'
 import './RecruitmentScreen.css'
 
 const statusOptions: Array<{ value: RecruitmentStatus; label: string }> = [
@@ -174,6 +175,9 @@ function ReviewModal({ application, onClose, onSaved }: {
   })
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState('')
+  const rating = hasExternalRating(applicant?.rating, applicant?.ratingSource)
+    ? externalRatingText(applicant?.rating, applicant?.ratingSource)
+    : ''
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -201,7 +205,7 @@ function ReviewModal({ application, onClose, onSaved }: {
         </header>
         <div className="review-profile-heading">
           <span className="review-profile-avatar">{avatarUrl ? <img src={avatarUrl} alt="" /> : getInitials(applicant?.displayName || 'Member')}</span>
-          <div><small>Candidate profile</small><h2 id="recruitment-review-title">{applicant?.displayName || 'Profile unavailable'}</h2><p>{applicant?.email} · {applicant?.universityId || 'No university ID'} · Rating {applicant?.rating ?? 1200}</p></div>
+          <div><small>Candidate profile</small><h2 id="recruitment-review-title">{applicant?.displayName || 'Profile unavailable'}</h2><p>{applicant?.email} · {applicant?.universityId || 'No university ID'}{rating ? ` · ${rating}` : ''}</p></div>
           <StatusBadge status={application.status} />
         </div>
 
