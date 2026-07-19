@@ -38,7 +38,7 @@ import {
   type ReviewEngineStrength,
   type ReviewedMove,
 } from '../lib/gameReview'
-import { loadExternalGames } from '../lib/externalGames'
+import { loadExternalGamesPage } from '../lib/externalGames'
 import type { AuthProfile } from '../lib/auth'
 import { useAuth } from '../context/useAuth'
 import { useBoardPreferences } from '../hooks/useBoardPreferences'
@@ -120,6 +120,9 @@ function GamesPage() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [searchNotice, setSearchNotice] = useState('')
+  const [externalGamesCursor, setExternalGamesCursor] = useState<string | null>(null)
+  const [loadMoreLoading, setLoadMoreLoading] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState('')
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false)
   const [workspaceMoves, setWorkspaceMoves] = useState<string[]>([])
   const [workspaceViewedPly, setWorkspaceViewedPly] = useState<number | null>(null)
@@ -570,6 +573,8 @@ function GamesPage() {
     setSelectedKey(null)
     setSearchError('')
     setSearchNotice('')
+    setExternalGamesCursor(null)
+    setLoadMoreError('')
 
     if (targetSource === 'tournament') {
       setStep('list')
@@ -579,8 +584,9 @@ function GamesPage() {
     setSearchLoading(true)
     try {
       const normalizedUsername = targetUsername.trim().toLowerCase()
-      const games = await loadExternalGames(targetSource, normalizedUsername)
-      setSourceGames(games)
+      const page = await loadExternalGamesPage(targetSource, normalizedUsername)
+      setSourceGames(page.games)
+      setExternalGamesCursor(page.nextCursor)
       setStep('list')
 
       if (profile) {
@@ -602,6 +608,30 @@ function GamesPage() {
     }
   }
 
+  const loadMoreSourceGames = async () => {
+    if (!source || source === 'tournament' || !externalGamesCursor || loadMoreLoading) return
+    setLoadMoreError('')
+    setLoadMoreLoading(true)
+
+    try {
+      const page = await loadExternalGamesPage(source, searchText.trim().toLowerCase(), {
+        cursor: externalGamesCursor,
+      })
+      setSourceGames((currentGames) => {
+        const existingKeys = new Set(currentGames.map((currentGame) => currentGame.key))
+        return [
+          ...currentGames,
+          ...page.games.filter((nextGame) => !existingKeys.has(nextGame.key)),
+        ]
+      })
+      setExternalGamesCursor(page.nextCursor)
+    } catch (error) {
+      setLoadMoreError(error instanceof Error ? error.message : `${sourceName(source)} games could not be loaded.`)
+    } finally {
+      setLoadMoreLoading(false)
+    }
+  }
+
   const openSource = (nextSource: GameSource) => {
     const linkedUsername = externalUsernameForSource(profile, nextSource)
     setSource(nextSource)
@@ -611,6 +641,9 @@ function GamesPage() {
     setSearchError('')
     setSearchNotice('')
     setSearchLoading(false)
+    setExternalGamesCursor(null)
+    setLoadMoreError('')
+    setLoadMoreLoading(false)
     setStep('search')
 
     if (linkedUsername && nextSource !== 'tournament') {
@@ -909,6 +942,9 @@ function GamesPage() {
             <ListStep
               games={visiblePool}
               isReviewMode={isReviewMode}
+              canLoadMore={source !== 'tournament' && Boolean(externalGamesCursor)}
+              loadMoreError={loadMoreError}
+              loadMoreLoading={loadMoreLoading}
               notice={searchNotice}
               selectedKey={selectedKey}
               sourceLabel={sourceLabel}
@@ -918,6 +954,7 @@ function GamesPage() {
               }}
               onSelect={setSelectedKey}
               onStart={startSelectedGame}
+              onLoadMore={() => void loadMoreSourceGames()}
             />
           ) : null}
 
@@ -1241,19 +1278,27 @@ function SearchStep({
 }
 
 function ListStep({
+  canLoadMore,
   games,
   isReviewMode,
+  loadMoreError,
+  loadMoreLoading,
   notice,
   onBack,
+  onLoadMore,
   onSelect,
   onStart,
   selectedKey,
   sourceLabel,
 }: {
+  canLoadMore: boolean
   games: SampleGame[]
   isReviewMode: boolean
+  loadMoreError: string
+  loadMoreLoading: boolean
   notice: string
   onBack: () => void
+  onLoadMore: () => void
   onSelect: (key: string) => void
   onStart: () => void
   selectedKey: string | null
@@ -1300,6 +1345,16 @@ function ListStep({
           </div>
         )}
       </div>
+      {canLoadMore || loadMoreLoading || loadMoreError ? (
+        <div className="game-list-more">
+          {loadMoreError ? <p role="alert">{loadMoreError}</p> : null}
+          {canLoadMore || loadMoreLoading ? (
+            <button type="button" disabled={loadMoreLoading} onClick={onLoadMore}>
+              {loadMoreLoading ? 'Loading more games...' : 'Load more games'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {selectedKey ? (
         <div className="game-list-action">
           <button type="button" onClick={onStart}>

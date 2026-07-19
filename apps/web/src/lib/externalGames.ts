@@ -3,6 +3,18 @@ import type { GameSource, SampleGame } from './juchess.ts'
 
 export type ExternalGameSource = Exclude<GameSource, 'tournament'>
 
+export type ExternalGamesPage = {
+  games: SampleGame[]
+  nextCursor: string | null
+}
+
+export type ExternalGamesPageOptions = {
+  cursor?: string | null
+  pageSize?: number
+}
+
+export const externalGamesPageSize = 20
+
 type FetchLike = typeof fetch
 
 type ChessComArchiveResponse = {
@@ -63,17 +75,34 @@ export async function loadExternalGames(
   username: string,
   fetchImpl: FetchLike = fetch,
 ): Promise<SampleGame[]> {
+  const page = await loadExternalGamesPage(source, username, {}, fetchImpl)
+  return page.games
+}
+
+export async function loadExternalGamesPage(
+  source: ExternalGameSource,
+  username: string,
+  options: ExternalGamesPageOptions = {},
+  fetchImpl: FetchLike = fetch,
+): Promise<ExternalGamesPage> {
   const normalizedUsername = username.trim()
   if (!normalizedUsername) {
     throw new ExternalGameImportError(`Enter a ${sourceName(source)} username.`)
   }
 
+  const pageSize = normalizePageSize(options.pageSize)
+
   return source === 'chess.com'
-    ? loadChessComGames(normalizedUsername, fetchImpl)
-    : loadLichessGames(normalizedUsername, fetchImpl)
+    ? loadChessComGames(normalizedUsername, options.cursor, pageSize, fetchImpl)
+    : loadLichessGames(normalizedUsername, options.cursor, pageSize, fetchImpl)
 }
 
-async function loadChessComGames(username: string, fetchImpl: FetchLike) {
+async function loadChessComGames(
+  username: string,
+  cursor: string | null | undefined,
+  pageSize: number,
+  fetchImpl: FetchLike,
+): Promise<ExternalGamesPage> {
   const encodedUsername = encodeURIComponent(username.toLowerCase())
   const archiveResponse = await fetchExternal(
     `https://api.chess.com/pub/player/${encodedUsername}/games/archives`,
@@ -86,11 +115,19 @@ async function loadChessComGames(username: string, fetchImpl: FetchLike) {
     ? archivePayload.archives.filter((value): value is string => typeof value === 'string')
     : []
 
-  if (!archives.length) return []
+  if (!archives.length) return { games: [], nextCursor: null }
 
-  const games: ChessComGame[] = []
-  const recentArchives = archives.slice(-3).reverse()
-  for (const archiveUrl of recentArchives) {
+  const parsedCursor = parseChessComCursor(cursor)
+  let archiveIndex = parsedCursor?.archiveIndex ?? archives.length - 1
+  let gameOffset = parsedCursor?.gameOffset ?? 0
+  if (archiveIndex >= archives.length) {
+    archiveIndex = archives.length - 1
+    gameOffset = 0
+  }
+
+  const pageEntries: Array<{ afterCursor: string | null; game: SampleGame }> = []
+  while (archiveIndex >= 0 && pageEntries.length <= pageSize) {
+    const archiveUrl = archives[archiveIndex]
     const response = await fetchExternal(
       archiveUrl,
       { headers: { Accept: 'application/json' } },
@@ -98,47 +135,114 @@ async function loadChessComGames(username: string, fetchImpl: FetchLike) {
       'Chess.com',
     )
     const payload = await response.json() as { games?: unknown }
-    if (Array.isArray(payload.games)) games.push(...payload.games as ChessComGame[])
-    if (games.length >= 20) break
+    const games = Array.isArray(payload.games) ? payload.games as ChessComGame[] : []
+    const mappedGames = games
+      .filter((game) => game.rules === 'chess' && typeof game.pgn === 'string')
+      .sort((a, b) => (b.end_time ?? 0) - (a.end_time ?? 0))
+      .map((game, index) => sampleGameFromPgn({
+        fallbackBlack: game.black?.username,
+        fallbackBlackRating: game.black?.rating,
+        fallbackDate: game.end_time ? game.end_time * 1000 : undefined,
+        fallbackId: gameIdFromUrl(game.url) || `${username}-${game.end_time ?? `${archiveIndex}-${index + 1}`}`,
+        fallbackOpening: openingFromChessComEco(game.eco)
+          || (game.time_class ? `${titleCase(game.time_class)} game` : undefined),
+        fallbackWhite: game.white?.username,
+        fallbackWhiteRating: game.white?.rating,
+        pgn: game.pgn as string,
+        source: 'chess.com',
+      }))
+      .filter((game): game is SampleGame => Boolean(game))
+
+    for (let index = gameOffset; index < mappedGames.length && pageEntries.length <= pageSize; index += 1) {
+      const afterCursor = index + 1 < mappedGames.length
+        ? chessComCursor(archiveIndex, index + 1)
+        : archiveIndex > 0
+          ? chessComCursor(archiveIndex - 1, 0)
+          : null
+      pageEntries.push({ afterCursor, game: mappedGames[index] })
+    }
+
+    archiveIndex -= 1
+    gameOffset = 0
   }
 
-  return games
-    .filter((game) => game.rules === 'chess' && typeof game.pgn === 'string')
-    .sort((a, b) => (b.end_time ?? 0) - (a.end_time ?? 0))
-    .slice(0, 20)
-    .map((game, index) => sampleGameFromPgn({
-      fallbackBlack: game.black?.username,
-      fallbackBlackRating: game.black?.rating,
-      fallbackDate: game.end_time ? game.end_time * 1000 : undefined,
-      fallbackId: gameIdFromUrl(game.url) || `${username}-${index + 1}`,
-      fallbackOpening: openingFromChessComEco(game.eco)
-        || (game.time_class ? `${titleCase(game.time_class)} game` : undefined),
-      fallbackWhite: game.white?.username,
-      fallbackWhiteRating: game.white?.rating,
-      pgn: game.pgn as string,
-      source: 'chess.com',
-    }))
-    .filter((game): game is SampleGame => Boolean(game))
+  return {
+    games: pageEntries.slice(0, pageSize).map((entry) => entry.game),
+    nextCursor: pageEntries.length > pageSize
+      ? pageEntries[pageSize - 1]?.afterCursor ?? null
+      : null,
+  }
 }
 
-async function loadLichessGames(username: string, fetchImpl: FetchLike) {
-  const query = new URLSearchParams({
-    clocks: 'false',
-    evals: 'false',
-    literate: 'false',
-    max: '20',
-    moves: 'true',
-    opening: 'true',
-    pgnInJson: 'true',
-  })
-  const response = await fetchExternal(
-    `https://lichess.org/api/games/user/${encodeURIComponent(username)}?${query.toString()}`,
-    { headers: { Accept: 'application/x-ndjson' } },
-    fetchImpl,
-    'Lichess',
-  )
-  const body = await response.text()
-  const rows = body
+async function loadLichessGames(
+  username: string,
+  cursor: string | null | undefined,
+  pageSize: number,
+  fetchImpl: FetchLike,
+): Promise<ExternalGamesPage> {
+  const batchSize = Math.max(50, pageSize + 1)
+  let until = parseLichessCursor(cursor)
+  const pageEntries: Array<{ afterCursor: string | null; game: SampleGame }> = []
+
+  while (pageEntries.length <= pageSize) {
+    const query = new URLSearchParams({
+      clocks: 'false',
+      evals: 'false',
+      literate: 'false',
+      max: String(batchSize),
+      moves: 'true',
+      opening: 'true',
+      pgnInJson: 'true',
+      sort: 'dateDesc',
+    })
+    if (until) query.set('until', String(until))
+
+    const response = await fetchExternal(
+      `https://lichess.org/api/games/user/${encodeURIComponent(username)}?${query.toString()}`,
+      { headers: { Accept: 'application/x-ndjson' } },
+      fetchImpl,
+      'Lichess',
+    )
+    const rows = parseLichessRows(await response.text())
+
+    for (let index = 0; index < rows.length && pageEntries.length <= pageSize; index += 1) {
+      const game = rows[index]
+      if (game.variant !== 'standard' || typeof game.pgn !== 'string') continue
+      const mappedGame = sampleGameFromPgn({
+        fallbackBlack: game.players?.black?.user?.name,
+        fallbackBlackRating: game.players?.black?.rating,
+        fallbackDate: game.lastMoveAt ?? game.createdAt,
+        fallbackId: game.id || `${username}-${game.lastMoveAt ?? game.createdAt ?? index + 1}`,
+        fallbackOpening: game.opening?.name,
+        fallbackWhite: game.players?.white?.user?.name,
+        fallbackWhiteRating: game.players?.white?.rating,
+        pgn: game.pgn,
+        source: 'lichess',
+      })
+      if (!mappedGame) continue
+      const timestamp = lichessGameTimestamp(game)
+      pageEntries.push({
+        afterCursor: timestamp ? lichessCursor(timestamp - 1) : null,
+        game: mappedGame,
+      })
+    }
+
+    if (pageEntries.length > pageSize || rows.length < batchSize) break
+    const oldestTimestamp = lichessGameTimestamp(rows.at(-1))
+    if (!oldestTimestamp || oldestTimestamp <= 1 || (until && oldestTimestamp >= until)) break
+    until = oldestTimestamp - 1
+  }
+
+  return {
+    games: pageEntries.slice(0, pageSize).map((entry) => entry.game),
+    nextCursor: pageEntries.length > pageSize
+      ? pageEntries[pageSize - 1]?.afterCursor ?? null
+      : null,
+  }
+}
+
+function parseLichessRows(body: string) {
+  return body
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
@@ -149,22 +253,40 @@ async function loadLichessGames(username: string, fetchImpl: FetchLike) {
         return []
       }
     })
+    .sort((a, b) => lichessGameTimestamp(b) - lichessGameTimestamp(a))
+}
 
-  return rows
-    .filter((game) => game.variant === 'standard' && typeof game.pgn === 'string')
-    .sort((a, b) => (b.lastMoveAt ?? b.createdAt ?? 0) - (a.lastMoveAt ?? a.createdAt ?? 0))
-    .map((game, index) => sampleGameFromPgn({
-      fallbackBlack: game.players?.black?.user?.name,
-      fallbackBlackRating: game.players?.black?.rating,
-      fallbackDate: game.lastMoveAt ?? game.createdAt,
-      fallbackId: game.id || `${username}-${index + 1}`,
-      fallbackOpening: game.opening?.name,
-      fallbackWhite: game.players?.white?.user?.name,
-      fallbackWhiteRating: game.players?.white?.rating,
-      pgn: game.pgn as string,
-      source: 'lichess',
-    }))
-    .filter((game): game is SampleGame => Boolean(game))
+function lichessGameTimestamp(game?: LichessGame) {
+  return game?.lastMoveAt ?? game?.createdAt ?? 0
+}
+
+function chessComCursor(archiveIndex: number, gameOffset: number) {
+  return `chess.com:${archiveIndex}:${gameOffset}`
+}
+
+function parseChessComCursor(cursor?: string | null) {
+  const match = cursor?.match(/^chess\.com:(\d+):(\d+)$/)
+  if (!match) return null
+  return {
+    archiveIndex: Number.parseInt(match[1], 10),
+    gameOffset: Number.parseInt(match[2], 10),
+  }
+}
+
+function lichessCursor(until: number) {
+  return `lichess:${until}`
+}
+
+function parseLichessCursor(cursor?: string | null) {
+  const match = cursor?.match(/^lichess:(\d+)$/)
+  if (!match) return null
+  const until = Number.parseInt(match[1], 10)
+  return Number.isFinite(until) && until > 0 ? until : null
+}
+
+function normalizePageSize(pageSize?: number) {
+  if (!Number.isFinite(pageSize)) return externalGamesPageSize
+  return Math.min(100, Math.max(1, Math.floor(pageSize as number)))
 }
 
 async function fetchExternal(
