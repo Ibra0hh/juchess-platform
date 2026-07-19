@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   classifyReviewMove,
+  defaultReviewEngineStrength,
   estimateGameRating,
   expectedScore,
   isOpeningBookMove,
@@ -13,6 +14,10 @@ import {
   reviewPhaseForPosition,
   reviewGameIdentity,
 } from './gameReview.ts'
+
+test('uses the quick Stockfish preset by default', () => {
+  assert.equal(defaultReviewEngineStrength, 'quick')
+})
 
 test('parses PGN into SAN, UCI, and every board position', () => {
   const parsed = parseReviewGame({

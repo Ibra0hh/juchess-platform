@@ -65,6 +65,9 @@ type SourceDef = {
 }
 
 const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const engineStrengthStorageKey = 'juchess.review.engineStrength'
+const engineDefaultVersionKey = 'juchess.review.engineDefaultVersion'
+const engineDefaultVersion = 'quick-v1'
 
 const sourceDefs: SourceDef[] = [
   { key: 'chess.com', name: 'Chess.com', sub: 'Import by username', image: chessComLogo, tone: 'green' },
@@ -190,7 +193,8 @@ function GamesPage() {
   }
 
   useEffect(() => {
-    window.localStorage.setItem('juchess.review.engineStrength', engineStrength)
+    window.localStorage.setItem(engineStrengthStorageKey, engineStrength)
+    window.localStorage.setItem(engineDefaultVersionKey, engineDefaultVersion)
   }, [engineStrength])
 
   useEffect(() => {
@@ -1815,7 +1819,11 @@ function externalUsernameForSource(profile: AuthProfile | null, source: GameSour
 }
 
 function loadReviewEngineStrength(): ReviewEngineStrength {
-  const saved = window.localStorage.getItem('juchess.review.engineStrength')
+  const saved = window.localStorage.getItem(engineStrengthStorageKey)
+  const appliedDefaultVersion = window.localStorage.getItem(engineDefaultVersionKey)
+  if (saved === 'balanced' && appliedDefaultVersion !== engineDefaultVersion) {
+    return defaultReviewEngineStrength
+  }
   return reviewEnginePresets.some((preset) => preset.id === saved)
     ? saved as ReviewEngineStrength
     : defaultReviewEngineStrength

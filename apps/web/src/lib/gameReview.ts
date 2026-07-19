@@ -30,11 +30,11 @@ export const reviewEnginePresets: ReviewEnginePreset[] = [
   { depth: 24, hashMb: 128, id: 'maximum', label: 'Maximum' },
 ]
 
-export const defaultReviewEngineStrength: ReviewEngineStrength = 'balanced'
+export const defaultReviewEngineStrength: ReviewEngineStrength = 'quick'
 
 export function getReviewEnginePreset(strength: ReviewEngineStrength) {
   return reviewEnginePresets.find((preset) => preset.id === strength)
-    ?? reviewEnginePresets[1]
+    ?? reviewEnginePresets.find((preset) => preset.id === defaultReviewEngineStrength)!
 }
 
 export type ParsedReviewGame = {
