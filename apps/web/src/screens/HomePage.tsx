@@ -51,12 +51,6 @@ const teamMembers = [
     image: teamPhoto('maya-erani.webp'),
   },
   {
-    name: 'Ruba Al Qudah',
-    role: 'Vice President',
-    responsibility: 'HR Manager',
-    image: teamPhoto('ruba-al-qudah.webp'),
-  },
-  {
     name: 'Yazan Shalan',
     role: 'Vice President',
     responsibility: 'Public Relations Manager',
@@ -68,19 +62,9 @@ const teamMembers = [
     image: teamPhoto('lameea-sakhriah.webp'),
   },
   {
-    name: 'Dalya Yousef',
-    role: 'Events and PR Manager',
-    image: teamPhoto('dalya-yousef.jpg'),
-  },
-  {
     name: 'Ibrahim Aladily',
     role: 'Software Developer',
     image: teamPhoto('ibrahim-aladily.webp'),
-  },
-  {
-    name: 'Retal Aljubeh',
-    role: 'Design Manager',
-    image: teamPhoto('retal-aljubeh.jpg'),
   },
 ]
 
