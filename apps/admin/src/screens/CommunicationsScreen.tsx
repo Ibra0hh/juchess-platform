@@ -7,7 +7,9 @@ import {
 import {
   PLAYER_EMAIL_LINK_TEXT_LIMIT,
   PLAYER_EMAIL_LINK_URL_LIMIT,
+  normalizePlayerEmailLinkUrlInput,
   playerEmailLinkPreview,
+  playerEmailLinkValidationMessage,
 } from '../lib/playerEmail'
 import {
   createAnnouncementBroadcast,
@@ -21,6 +23,7 @@ import {
   type AnnouncementCapabilities,
   type AnnouncementChannel,
 } from '../lib/adminData'
+import BrandedEmailPreview from '../components/BrandedEmailPreview'
 
 const unavailableCapabilities: AnnouncementCapabilities = {
   app: { ready: false, reason: 'Publishing status has not loaded yet.' },
@@ -259,6 +262,11 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
     [specificEmailText],
   )
   const previewLink = useMemo(() => playerEmailLinkPreview(linkText, linkUrl), [linkText, linkUrl])
+  const linkValidationMessage = useMemo(
+    () => linkEnabled ? playerEmailLinkValidationMessage(linkText, linkUrl) : null,
+    [linkEnabled, linkText, linkUrl],
+  )
+  const hasEmailChannel = channels.includes('email')
 
   function selectAudience(next: AnnouncementAudience) {
     setAudience(next)
@@ -468,6 +476,8 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
                       onChange={(event) => setLinkText(event.target.value)}
                       placeholder="View tournament details"
                       maxLength={PLAYER_EMAIL_LINK_TEXT_LIMIT}
+                      aria-invalid={Boolean(linkValidationMessage)}
+                      aria-describedby={linkValidationMessage ? 'announcement-link-error' : undefined}
                       required
                     />
                     <small>{linkText.length}/{PLAYER_EMAIL_LINK_TEXT_LIMIT}</small>
@@ -479,15 +489,16 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
                       inputMode="url"
                       value={linkUrl}
                       onChange={(event) => setLinkUrl(event.target.value)}
+                      onBlur={() => setLinkUrl((current) => normalizePlayerEmailLinkUrlInput(current))}
                       placeholder="https://juchess.page/tournaments"
                       maxLength={PLAYER_EMAIL_LINK_URL_LIMIT}
+                      aria-invalid={Boolean(linkValidationMessage)}
+                      aria-describedby={linkValidationMessage ? 'announcement-link-error' : undefined}
                       required
                     />
                   </label>
                 </div>
-                {linkUrl.trim() && !previewLink ? (
-                  <p role="alert">Enter button text and a complete http:// or https:// address without a username or password.</p>
-                ) : null}
+                {linkValidationMessage ? <p id="announcement-link-error" role="alert">{linkValidationMessage}</p> : null}
               </section>
             ) : (
               <button
@@ -504,7 +515,8 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
 
           {!channels.length ? <div className="prototype-note">Select at least one available channel.</div> : null}
           <button type="submit" className="primary-button" disabled={!ready}>
-            <Send size={16} aria-hidden="true" /> Review and send
+            {hasEmailChannel ? <Mail size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
+            {hasEmailChannel ? 'Review email' : 'Review announcement'}
           </button>
         </form>
       </section>
@@ -520,15 +532,40 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget && !submitting) setPendingInput(null)
         }}>
-          <section className="delete-tournament-dialog communication-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="send-announcement-title">
-            <h2 id="send-announcement-title">Send this announcement?</h2>
-            <p><strong>{pendingInput.title}</strong></p>
-            <p>This will {pendingInput.channels.includes('app') ? 'publish immediately to the public feed' : ''}{pendingInput.channels.includes('app') && pendingInput.channels.includes('email') ? ' and ' : ''}{pendingInput.channels.includes('email') ? 'queue a real email to the selected audience' : ''}.</p>
-            {pendingInput.audience === 'specificEmails' ? <p>{pendingInput.emails?.length ?? 0} specific registered email recipient{pendingInput.emails?.length === 1 ? '' : 's'}.</p> : null}
-            {pendingInput.link ? <p>The email includes a <strong>{pendingInput.link.text}</strong> link button.</p> : null}
+          <section
+            className={`communication-review-dialog${pendingInput.channels.includes('email') ? '' : ' website-only'}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="send-announcement-title"
+          >
+            <header className="communication-review-head">
+              <span className="player-email-icon">{pendingInput.channels.includes('email') ? <Mail size={20} aria-hidden="true" /> : <MonitorSmartphone size={20} aria-hidden="true" />}</span>
+              <div>
+                <span>Final review</span>
+                <h2 id="send-announcement-title">{pendingInput.channels.includes('email') ? 'Review email' : 'Review announcement'}</h2>
+              </div>
+            </header>
+            <div className="communication-review-layout">
+              <div className="communication-review-summary">
+                <div><span>Audience</span><strong>{pendingInput.audience === 'allUsers' ? 'All active players' : pendingInput.audience === 'tournamentParticipants' ? 'Tournament participants' : `${pendingInput.emails?.length ?? 0} specific player${pendingInput.emails?.length === 1 ? '' : 's'}`}</strong></div>
+                <div><span>Delivery</span><strong>{pendingInput.channels.includes('app') && pendingInput.channels.includes('email') ? 'Website and email' : pendingInput.channels.includes('email') ? 'Email' : 'Website'}</strong></div>
+                {pendingInput.link ? <div><span>Email button</span><strong>{pendingInput.link.text}</strong><small>{pendingInput.link.url}</small></div> : null}
+                <p>Nothing is sent or published until you use the final button below.</p>
+              </div>
+              {pendingInput.channels.includes('email') ? (
+                <BrandedEmailPreview
+                  subject={pendingInput.title}
+                  message={pendingInput.message}
+                  link={pendingInput.link}
+                  className="communication-review-preview"
+                />
+              ) : null}
+            </div>
             <div className="delete-tournament-actions">
               <button type="button" className="secondary-action" disabled={submitting} onClick={() => setPendingInput(null)}>Cancel</button>
-              <button type="button" className="primary-action" disabled={submitting} onClick={() => void confirmSend()}>{submitting ? 'Sending…' : 'Send announcement'}</button>
+              <button type="button" className="primary-action" disabled={submitting} onClick={() => void confirmSend()}>
+                {submitting ? 'Sending…' : pendingInput.channels.includes('app') && pendingInput.channels.includes('email') ? 'Send email and publish' : pendingInput.channels.includes('email') ? 'Send email' : 'Publish announcement'}
+              </button>
             </div>
           </section>
         </div>

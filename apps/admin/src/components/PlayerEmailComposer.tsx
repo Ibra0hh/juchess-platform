@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link2, Mail, Send, Trash2, X } from 'lucide-react'
-import { compactCrestUrl } from '../lib/brand'
 import {
   PLAYER_EMAIL_LINK_TEXT_LIMIT,
   PLAYER_EMAIL_LINK_URL_LIMIT,
+  normalizePlayerEmailLinkUrlInput,
   playerEmailLinkPreview,
+  playerEmailLinkValidationMessage,
 } from '../lib/playerEmail'
 import {
   formatAdminError,
@@ -13,6 +14,7 @@ import {
   type PlayerEmailSendResult,
   type PlayerEmailStatus,
 } from '../lib/adminData'
+import BrandedEmailPreview from './BrandedEmailPreview'
 
 export type PlayerEmailRecipient = {
   id: string
@@ -43,6 +45,10 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
     recipients.length === 1 ? recipients[0].name : `${recipients.length} selected players`
   ), [recipients])
   const previewLink = useMemo(() => playerEmailLinkPreview(linkText, linkUrl), [linkText, linkUrl])
+  const linkValidationMessage = useMemo(
+    () => linkEnabled ? playerEmailLinkValidationMessage(linkText, linkUrl) : null,
+    [linkEnabled, linkText, linkUrl],
+  )
 
   useEffect(() => {
     sendingRef.current = sending
@@ -195,6 +201,8 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
                       onChange={(event) => setLinkText(event.target.value)}
                       placeholder="View tournament details"
                       maxLength={PLAYER_EMAIL_LINK_TEXT_LIMIT}
+                      aria-invalid={Boolean(linkValidationMessage)}
+                      aria-describedby={linkValidationMessage ? 'player-email-link-error' : undefined}
                       required
                     />
                     <small>{linkText.length}/{PLAYER_EMAIL_LINK_TEXT_LIMIT}</small>
@@ -206,15 +214,16 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
                       inputMode="url"
                       value={linkUrl}
                       onChange={(event) => setLinkUrl(event.target.value)}
+                      onBlur={() => setLinkUrl((current) => normalizePlayerEmailLinkUrlInput(current))}
                       placeholder="https://juchess.page/tournaments"
                       maxLength={PLAYER_EMAIL_LINK_URL_LIMIT}
+                      aria-invalid={Boolean(linkValidationMessage)}
+                      aria-describedby={linkValidationMessage ? 'player-email-link-error' : undefined}
                       required
                     />
                   </label>
                 </div>
-                {linkUrl.trim() && !previewLink ? (
-                  <p role="alert">Enter link text and a complete http:// or https:// address without a username or password.</p>
-                ) : null}
+                {linkValidationMessage ? <p id="player-email-link-error" role="alert">{linkValidationMessage}</p> : null}
               </section>
             ) : (
               <button
@@ -249,30 +258,12 @@ export default function PlayerEmailComposer({ recipients, onClose, onSent }: Pro
             </div>
           </form>
 
-          <aside className="player-email-preview" aria-label="Email preview">
-            <span>Email preview</span>
-            <div className="player-email-preview-card">
-              <div className="player-email-preview-accent" />
-              <div className="player-email-preview-brand">
-                <img src={compactCrestUrl} alt="JuChess" />
-                <strong>JuChess</strong>
-                <small>University of Jordan Chess Club</small>
-              </div>
-              <div className="player-email-preview-copy">
-                <h3>{subject.trim() || 'Your email subject'}</h3>
-                <p>{message.trim() || 'Your message will appear here in the JuChess club email theme.'}</p>
-                {linkEnabled ? (
-                  previewLink ? (
-                    <a href={previewLink.url} target="_blank" rel="noreferrer">{previewLink.text}</a>
-                  ) : (
-                    <span className="player-email-preview-link-placeholder">Your link button will appear here</span>
-                  )
-                ) : null}
-                <div>This message was sent by the JuChess administration team. Reply to this email to contact the club.</div>
-              </div>
-              <footer>JuChess · University of Jordan Chess Club</footer>
-            </div>
-          </aside>
+          <BrandedEmailPreview
+            subject={subject}
+            message={message}
+            link={previewLink}
+            linkPending={linkEnabled && !previewLink}
+          />
         </div>
       </section>
     </div>

@@ -4107,8 +4107,105 @@ button {
   gap: 6px;
 }
 
-.communication-confirm-dialog {
-  width: min(100%, 500px);
+.communication-review-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(100%, 960px);
+  max-height: calc(100dvh - 40px);
+  overflow: hidden;
+  border: 1px solid #ded5c6;
+  border-radius: 16px;
+  background: #fffdf8;
+  box-shadow: 0 34px 90px -34px rgba(17, 17, 17, 0.72);
+}
+
+.communication-review-dialog.website-only {
+  width: min(100%, 520px);
+}
+
+.communication-review-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #ebe3d7;
+  padding: 18px 20px;
+}
+
+.communication-review-head > div {
+  min-width: 0;
+}
+
+.communication-review-head > div > span {
+  color: #8b7e6c;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.communication-review-head h2 {
+  margin: 3px 0 0;
+  color: #171310;
+  font-family: "Source Serif 4", Georgia, serif;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.communication-review-layout {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.72fr) minmax(360px, 1.28fr);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.communication-review-dialog.website-only .communication-review-layout {
+  grid-template-columns: 1fr;
+}
+
+.communication-review-summary {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 20px;
+}
+
+.communication-review-summary > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #ece4d8;
+  border-radius: 9px;
+  background: #faf7f1;
+  padding: 11px 12px;
+}
+
+.communication-review-summary span {
+  color: #8b7e6c;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.communication-review-summary strong {
+  color: #2d2822;
+  font-size: 12px;
+}
+
+.communication-review-summary small {
+  overflow-wrap: anywhere;
+  color: #74695c;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.communication-review-summary > p {
+  margin: 2px 0 0;
+  border-left: 3px solid #a98a3f;
+  background: #f8f2e8;
+  color: #655b4f;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .modal-backdrop {
@@ -4738,6 +4835,7 @@ button {
 }
 
 .player-email-preview-copy > a,
+.player-email-preview-link,
 .player-email-preview-link-placeholder {
   max-width: 100%;
   display: inline-block;
@@ -4988,6 +5086,10 @@ button {
 
 }
 
+.player-email-preview-link {
+  cursor: default;
+}
+
 @media (max-width: 640px) {
   .communication-choice-row {
     grid-template-columns: 1fr;
@@ -5235,6 +5337,19 @@ button {
 }
 
 @media (max-width: 860px) {
+  .communication-review-dialog {
+    max-height: calc(100dvh - 20px);
+  }
+
+  .communication-review-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .communication-review-preview {
+    border-top: 1px solid #e8dfd1;
+    border-left: 0;
+  }
+
   .player-email-dialog {
     max-height: calc(100dvh - 20px);
   }
@@ -5251,6 +5366,28 @@ button {
 }
 
 @media (max-width: 580px) {
+  .communication-review-head {
+    padding: 14px;
+  }
+
+  .communication-review-head h2 {
+    font-size: 19px;
+  }
+
+  .communication-review-summary,
+  .communication-review-preview {
+    padding: 14px;
+  }
+
+  .communication-review-dialog .delete-tournament-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .communication-review-dialog .delete-tournament-actions button {
+    width: 100%;
+  }
+
   .player-email-backdrop {
     padding: 10px;
   }

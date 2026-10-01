@@ -7,6 +7,24 @@ AI chat. It describes the intended product, the actual implementation, the
 backend contract, deployment state, known limitations, and the working rules
 that must not be lost between chats.
 
+## October 1 announcement email review repair
+
+- The Announcements action now says `Review email` whenever Email is selected
+  and opens a real JuChess-branded email preview instead of the former text-only
+  confirmation. The review shows the subject, full message, recipient scope,
+  delivery channels, optional button label and destination, and the actual
+  styled button before the final send action.
+- The preview renderer is shared with Player Management so both email surfaces
+  stay visually consistent. Preview buttons are intentionally non-navigating,
+  preventing an accidental external page launch while an admin is reviewing a
+  message.
+- Link fields now explain empty text, empty destination, malformed/unsafe URLs,
+  and the option to remove the link. A pasted domain such as
+  `juchess.page/tournaments` is normalized to HTTPS in both the preview and the
+  submitted payload. Server-side validation remains authoritative.
+- Admin lint/build passed with 29 UI/helper tests and 99 engine tests. The
+  production Function did not change, and no email was sent during repair QA.
+
 ## October 1 targeted announcement emails and link buttons
 
 - The admin Announcements composer now supports `Specific emails` as a real
