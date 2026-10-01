@@ -47,7 +47,6 @@ const teamMembers = [
   {
     name: 'Maya Erani',
     role: 'President',
-    responsibility: 'Social Media Manager',
     image: teamPhoto('maya-erani.webp'),
   },
   {
