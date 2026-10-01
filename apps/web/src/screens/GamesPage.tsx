@@ -167,6 +167,7 @@ function GamesPage() {
   const workspaceAnalysisRunRef = useRef(0)
   const workspaceAnalysisAbortRef = useRef<AbortController | null>(null)
   const workspaceAnalysisEngineRef = useRef<StockfishReviewEngine | null>(null)
+  const boardColumnRef = useRef<HTMLElement | null>(null)
   const workspaceInitialFen = game?.fen || startFen
   const displayedWorkspacePly = workspaceViewedPly === null
     ? workspaceMoves.length
@@ -192,10 +193,31 @@ function GamesPage() {
     setReviewProgress({ completed: 0, total: 0 })
   }
 
+  const selectMode = (nextMode: GameMode) => {
+    resetReviewState()
+    setMode(nextMode)
+    setStep('source')
+    setGame(null)
+    setSelectedKey(null)
+    setSource(null)
+    setWorkspaceMoves([])
+    setWorkspaceViewedPly(null)
+    setWorkspaceResult('Live')
+    setRan(false)
+  }
+
   useEffect(() => {
     window.localStorage.setItem(engineStrengthStorageKey, engineStrength)
     window.localStorage.setItem(engineDefaultVersionKey, engineDefaultVersion)
   }, [engineStrength])
+
+  useEffect(() => {
+    if (step !== 'workspace' || !window.matchMedia('(max-width: 700px)').matches) return
+    const frame = window.requestAnimationFrame(() => {
+      boardColumnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [step])
 
   useEffect(() => {
     reviewRequestIdentityRef.current = null
@@ -676,7 +698,7 @@ function GamesPage() {
     setWorkspaceViewedPly(null)
     setWorkspaceResult('Live')
     setSaved(false)
-    setRan(true)
+    setRan(false)
     setStep('workspace')
   }
 
@@ -762,7 +784,7 @@ function GamesPage() {
     <div className="club-screen games-screen" data-screen-label="Tools Workspace">
       <SiteHeader active="tools" />
       <main className="games-main">
-        <section className="board-column" aria-label="Board area">
+        <section className="board-column" aria-label="Board area" ref={boardColumnRef}>
           <div className="board-title-row">
             <h1>{inReview ? 'Game review' : inWorkspace ? 'Analysis board' : isReviewMode ? 'Review room' : 'Analysis room'}</h1>
             {boardGame || inReview || (inWorkspace && ran) ? (
@@ -784,6 +806,18 @@ function GamesPage() {
                   ) : null}
                 </span>
               </div>
+            ) : null}
+          </div>
+
+          <div className="mobile-game-entry">
+            <ModeToggle
+              className="mobile-game-mode-toggle"
+              mode={mode}
+              onAnalysis={() => selectMode('analysis')}
+              onReview={() => selectMode('review')}
+            />
+            {step === 'source' && !isReviewMode && !loadingGame ? (
+              <BlankBoardButton className="mobile-blank-board-button" onClick={openBlankBoard} />
             ) : null}
           </div>
 
@@ -870,42 +904,12 @@ function GamesPage() {
         </section>
 
         <aside className="game-rail" aria-label="Game tools">
-          <div className="mode-toggle" role="tablist" aria-label="Games mode">
-            <button
-              type="button"
-              className={isReviewMode ? 'active' : undefined}
-              onClick={() => {
-                resetReviewState()
-                setMode('review')
-                setStep('source')
-                setGame(null)
-                setSelectedKey(null)
-                setSource(null)
-                setWorkspaceMoves([])
-                setWorkspaceViewedPly(null)
-                setWorkspaceResult('Live')
-              }}
-            >
-              Game Review
-            </button>
-            <button
-              type="button"
-              className={!isReviewMode ? 'active' : undefined}
-              onClick={() => {
-                resetReviewState()
-                setMode('analysis')
-                setStep('source')
-                setGame(null)
-                setSelectedKey(null)
-                setSource(null)
-                setWorkspaceMoves([])
-                setWorkspaceViewedPly(null)
-                setWorkspaceResult('Live')
-              }}
-            >
-              New Analysis
-            </button>
-          </div>
+          <ModeToggle
+            className="desktop-game-mode-toggle"
+            mode={mode}
+            onAnalysis={() => selectMode('analysis')}
+            onReview={() => selectMode('review')}
+          />
 
           {loadingGame ? (
             <section className="rail-panel search-panel">
@@ -1030,7 +1034,7 @@ function GamesPage() {
                 setWorkspaceViewedPly(null)
                 setWorkspaceResult('Live')
                 setSaved(false)
-                setRan(true)
+                setRan(false)
                 setWorkspaceError('')
               }}
               onReview={() => {
@@ -1184,14 +1188,7 @@ function SourceStep({
     <>
       {isAnalysis ? (
         <>
-          <button type="button" className="blank-board-button" onClick={onBlank}>
-            <span aria-hidden="true">{'\u2654'}</span>
-            <span>
-              <strong>New Analysis</strong>
-              <small>Open a blank board workspace</small>
-            </span>
-            <em>&rarr;</em>
-          </button>
+          <BlankBoardButton onClick={onBlank} />
           <div className="source-divider">Or import from</div>
         </>
       ) : (
@@ -1219,6 +1216,46 @@ function SourceStep({
         )
       })}
     </>
+  )
+}
+
+function ModeToggle({
+  className,
+  mode,
+  onAnalysis,
+  onReview,
+}: {
+  className?: string
+  mode: GameMode
+  onAnalysis: () => void
+  onReview: () => void
+}) {
+  return (
+    <div className={['mode-toggle', className].filter(Boolean).join(' ')} role="tablist" aria-label="Games mode">
+      <button type="button" className={mode === 'review' ? 'active' : undefined} onClick={onReview}>
+        Game Review
+      </button>
+      <button type="button" className={mode === 'analysis' ? 'active' : undefined} onClick={onAnalysis}>
+        New Analysis
+      </button>
+    </div>
+  )
+}
+
+function BlankBoardButton({ className, onClick }: { className?: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={['blank-board-button', className].filter(Boolean).join(' ')}
+      onClick={onClick}
+    >
+      <span aria-hidden="true">{'\u2654'}</span>
+      <span>
+        <strong>Start a blank board</strong>
+        <small>Open the analysis workspace</small>
+      </span>
+      <em>&rarr;</em>
+    </button>
   )
 }
 

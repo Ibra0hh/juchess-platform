@@ -51,6 +51,8 @@ type PieceDrag = {
   y: number
 }
 
+type TouchAnnotationTool = 'move' | 'mark' | 'arrow'
+
 type BoardSquare = {
   key: Square
   dark: boolean
@@ -120,6 +122,8 @@ export function JuChessBoard({
   const [arrows, setArrows] = useState<BoardArrow[]>([])
   const [markedSquares, setMarkedSquares] = useState<Set<Square>>(() => new Set())
   const [pieceDrag, setPieceDrag] = useState<PieceDrag | null>(null)
+  const [touchAnnotationTool, setTouchAnnotationTool] = useState<TouchAnnotationTool>('move')
+  const [touchArrowStart, setTouchArrowStart] = useState<Square | null>(null)
   const legalMoves = selected ? game.moves({ square: selected, verbose: true }) : []
   const legalTargets = new Set(legalMoves.map((move) => move.to))
   const lastMove = game.history({ verbose: true }).at(-1)
@@ -142,6 +146,8 @@ export function JuChessBoard({
     setArrows([])
     setMarkedSquares(new Set())
     setRightDrag(null)
+    setTouchAnnotationTool('move')
+    setTouchArrowStart(null)
   }, [annotationsEnabled])
 
   function emit(nextGame: Chess, nextMoves: string[], lastMoveSan: string) {
@@ -175,10 +181,59 @@ export function JuChessBoard({
     setArrows([])
     setMarkedSquares(new Set())
     setRightDrag(null)
+    setTouchArrowStart(null)
+  }
+
+  function toggleMarkedSquare(square: Square) {
+    setMarkedSquares((current) => {
+      const next = new Set(current)
+      if (next.has(square)) next.delete(square)
+      else next.add(square)
+      return next
+    })
+  }
+
+  function toggleArrow(from: Square, to: Square, color: JuAnnotationColor) {
+    const nextArrow = { color, from, to }
+    setArrows((current) => {
+      const existing = current.findIndex((arrow) => arrow.from === from && arrow.to === to)
+      if (existing >= 0) {
+        if (current[existing].color === color) {
+          return current.filter((_, index) => index !== existing)
+        }
+        return current.map((arrow, index) => index === existing ? nextArrow : arrow)
+      }
+      return [...current, nextArrow]
+    })
+  }
+
+  function selectTouchAnnotationTool(tool: TouchAnnotationTool) {
+    setTouchAnnotationTool(tool)
+    setTouchArrowStart(null)
+    setSelected(null)
   }
 
   function handleSquareClick(square: Square) {
     if (suppressClickRef.current) return
+
+    if (annotationsEnabled && touchAnnotationTool === 'mark') {
+      toggleMarkedSquare(square)
+      setTouchArrowStart(null)
+      return
+    }
+
+    if (annotationsEnabled && touchAnnotationTool === 'arrow') {
+      if (!touchArrowStart) {
+        setTouchArrowStart(square)
+      } else if (touchArrowStart === square) {
+        setTouchArrowStart(null)
+      } else {
+        toggleArrow(touchArrowStart, square, arrowColor)
+        setTouchArrowStart(null)
+      }
+      return
+    }
+
     clearAnnotations()
     if (!interactive || pendingPromotion) return
     const piece = game.get(square)
@@ -213,6 +268,7 @@ export function JuChessBoard({
 
   function handlePiecePointerDown(event: ReactPointerEvent<HTMLButtonElement>, square: Square) {
     if (event.button !== 0) return
+    if (annotationsEnabled && touchAnnotationTool !== 'move') return
     // A finger swipe that starts on the board must remain a page-scroll gesture.
     // Touch players can still move pieces with the existing tap-to-select flow,
     // while mouse and pen users keep drag-and-drop.
@@ -295,24 +351,9 @@ export function JuChessBoard({
     event.preventDefault()
 
     if (rightDrag.from === square) {
-      setMarkedSquares((current) => {
-        const next = new Set(current)
-        if (next.has(square)) next.delete(square)
-        else next.add(square)
-        return next
-      })
+      toggleMarkedSquare(square)
     } else {
-      const nextArrow = { color: rightDrag.color, from: rightDrag.from, to: square }
-      setArrows((current) => {
-        const existing = current.findIndex((arrow) => arrow.from === nextArrow.from && arrow.to === nextArrow.to)
-        if (existing >= 0) {
-          if (current[existing].color === nextArrow.color) {
-            return current.filter((_, index) => index !== existing)
-          }
-          return current.map((arrow, index) => index === existing ? nextArrow : arrow)
-        }
-        return [...current, nextArrow]
-      })
+      toggleArrow(rightDrag.from, square, rightDrag.color)
     }
 
     setRightDrag(null)
@@ -324,6 +365,32 @@ export function JuChessBoard({
       onContextMenu={annotationsEnabled ? (event) => event.preventDefault() : undefined}
       onMouseLeave={() => setRightDrag(null)}
     >
+      {annotationsEnabled ? (
+        <div className="ju-touch-annotation-toolbar" aria-label="Board drawing tools" role="toolbar">
+          <button
+            type="button"
+            aria-pressed={touchAnnotationTool === 'move'}
+            onClick={() => selectTouchAnnotationTool('move')}
+          >
+            Move
+          </button>
+          <button
+            type="button"
+            aria-pressed={touchAnnotationTool === 'mark'}
+            onClick={() => selectTouchAnnotationTool('mark')}
+          >
+            Mark
+          </button>
+          <button
+            type="button"
+            aria-pressed={touchAnnotationTool === 'arrow'}
+            onClick={() => selectTouchAnnotationTool('arrow')}
+          >
+            Arrow
+          </button>
+          <button type="button" onClick={clearAnnotations}>Clear</button>
+        </div>
+      ) : null}
       {showEvaluation ? (
         <div
           aria-label={`${evaluationName} ${formatEvaluation(evaluationScore)}. Positive values favor White.`}
@@ -364,6 +431,7 @@ export function JuChessBoard({
                 lastMoveSquare ? 'last-move' : '',
                 target ? 'target' : '',
                 check ? 'check' : '',
+                touchArrowStart === square.key ? 'annotation-source' : '',
                 pieceDrag?.from === square.key ? 'dragging-source' : '',
               ].filter(Boolean).join(' ')}
               data-square={square.key}

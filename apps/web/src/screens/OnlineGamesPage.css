@@ -97,6 +97,10 @@
   pointer-events: none;
 }
 
+.online-board-toolbar-mobile {
+  display: none;
+}
+
 .first-move-deadline {
   display: flex;
   align-items: center;
@@ -726,19 +730,24 @@
   }
 
   .online-board-toolbar {
-    top: 50%;
-    right: 8px;
-    width: 44px;
-    height: 96px;
-    transform: translateY(-50%);
+    display: none;
   }
 
-  .online-board-head-actions button[aria-label="Board settings"],
-  .online-board-head-actions button[aria-label="Flip board"] {
+  .online-board-toolbar-mobile {
+    display: block;
+  }
+
+  .online-board-toolbar-mobile .online-board-head-actions {
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  .online-board-toolbar-mobile .online-board-head-actions button[aria-label="Board settings"],
+  .online-board-toolbar-mobile .online-board-head-actions button[aria-label="Flip board"] {
     width: 44px;
     min-height: 44px;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(17, 17, 17, 0.14);
+    border-radius: 9px;
+    box-shadow: none;
   }
 
   .online-games-layout {

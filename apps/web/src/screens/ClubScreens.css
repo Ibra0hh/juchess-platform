@@ -1260,6 +1260,10 @@
   box-shadow: 0 1px 3px rgba(17, 17, 17, 0.25);
 }
 
+.mobile-game-entry {
+  display: none;
+}
+
 .source-help,
 .rail-panel,
 .game-list-panel,
@@ -2433,6 +2437,34 @@
   .board-column {
     container-type: inline-size;
     height: auto;
+    scroll-margin-top: 108px;
+  }
+
+  .mobile-game-entry {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .desktop-game-mode-toggle {
+    display: none;
+  }
+
+  .mobile-game-mode-toggle button {
+    min-height: 44px;
+  }
+
+  .mobile-blank-board-button {
+    min-height: 52px;
+    padding: 10px 14px;
+  }
+
+  .game-rail > .blank-board-button {
+    display: none;
+  }
+
+  .game-rail > .source-divider {
+    margin-top: 0;
   }
 
   .board-player-frame {

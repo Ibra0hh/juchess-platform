@@ -332,27 +332,12 @@ function OnlineGamesPage() {
         <div className="online-games-layout">
           <section className="online-board-station" aria-label="Chess board">
             <div className="online-board-toolbar">
-              <div className="online-board-head-actions">
-                <button
-                  type="button"
-                  aria-expanded={settingsOpen}
-                  aria-label="Board settings"
-                  className={settingsOpen ? 'active' : undefined}
-                  title="Board settings"
-                  onClick={() => setSettingsOpen((current) => !current)}
-                >
-                  <Settings2 size={17} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Flip board"
-                  aria-pressed={flipped}
-                  title="Flip board"
-                  onClick={() => setFlipped((current) => !current)}
-                >
-                  <FlipHorizontal2 size={17} aria-hidden="true" />
-                </button>
-              </div>
+              <BoardToolbar
+                flipped={flipped}
+                settingsOpen={settingsOpen}
+                onFlip={() => setFlipped((current) => !current)}
+                onSettings={() => setSettingsOpen((current) => !current)}
+              />
             </div>
 
             {settingsOpen ? (
@@ -382,7 +367,21 @@ function OnlineGamesPage() {
               </div>
             ) : null}
 
-            <PlayerStrip {...playerFor(topSide)} edge="top" pieceTheme={pieceTheme} />
+            <PlayerStrip
+              {...playerFor(topSide)}
+              edge="top"
+              pieceTheme={pieceTheme}
+              center={(
+                <div className="online-board-toolbar-mobile">
+                  <BoardToolbar
+                    flipped={flipped}
+                    settingsOpen={settingsOpen}
+                    onFlip={() => setFlipped((current) => !current)}
+                    onSettings={() => setSettingsOpen((current) => !current)}
+                  />
+                </div>
+              )}
+            />
             <JuChessBoard
               annotationsEnabled={!playingOnlineTournament}
               arrowColor={arrowColor}
@@ -528,6 +527,42 @@ function onlinePlatformName(tournament: Tournament) {
   if (tournament.onlinePlatform === 'lichess') return 'Lichess'
   if (tournament.onlinePlatform === 'juchess') return 'JuChess'
   return 'Online'
+}
+
+function BoardToolbar({
+  flipped,
+  onFlip,
+  onSettings,
+  settingsOpen,
+}: {
+  flipped: boolean
+  onFlip: () => void
+  onSettings: () => void
+  settingsOpen: boolean
+}) {
+  return (
+    <div className="online-board-head-actions">
+      <button
+        type="button"
+        aria-expanded={settingsOpen}
+        aria-label="Board settings"
+        className={settingsOpen ? 'active' : undefined}
+        title="Board settings"
+        onClick={onSettings}
+      >
+        <Settings2 size={17} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-label="Flip board"
+        aria-pressed={flipped}
+        title="Flip board"
+        onClick={onFlip}
+      >
+        <FlipHorizontal2 size={17} aria-hidden="true" />
+      </button>
+    </div>
+  )
 }
 
 function PlayerStrip({
