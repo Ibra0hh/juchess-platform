@@ -369,7 +369,7 @@ export type AdminProfileLoadResult = {
   error?: unknown
 }
 
-export type AnnouncementAudience = 'allUsers' | 'tournamentParticipants'
+export type AnnouncementAudience = 'allUsers' | 'tournamentParticipants' | 'specificEmails'
 export type AnnouncementChannel = 'app' | 'email' | 'sms'
 
 export type AdminAnnouncement = Models.Row & {
@@ -398,7 +398,9 @@ export type AnnouncementBroadcastInput = {
   message: string
   audience: AnnouncementAudience
   tournamentId?: string
+  emails?: string[]
   channels: AnnouncementChannel[]
+  link?: { text: string; url: string }
 }
 
 export type AnnouncementBroadcastResult = {
@@ -1152,7 +1154,9 @@ export async function createAnnouncementBroadcast(input: AnnouncementBroadcastIn
       message: input.message,
       audience: input.audience,
       tournamentId: input.tournamentId,
+      emails: input.emails,
       channels: input.channels,
+      link: input.link,
     },
   })
 }

@@ -707,7 +707,7 @@ const pageText: Record<Screen, { title: string; sub: string }> = {
   tournaments: { title: 'Tournament Control Center', sub: 'Create, publish and run every event' },
   players: { title: 'Player Management', sub: 'Roster and player records' },
   recruitment: { title: 'Recruitment', sub: 'Review member applications and manage the candidate pipeline' },
-  news: { title: 'News', sub: 'Public posts shown on the app & website' },
+  news: { title: 'News', sub: 'Public posts shown on the website' },
   announcements: { title: 'Announcements', sub: 'Broadcast to players and members' },
   adminAccess: { title: 'Admin access', sub: 'Manage admin-only accounts and permissions' },
 }

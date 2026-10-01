@@ -749,16 +749,33 @@ export async function resolvePlayerEmailRecipients(tablesDB, databaseId, profile
 const ANNOUNCEMENT_TITLE_LIMIT = 120;
 const ANNOUNCEMENT_BODY_LIMIT = 5000;
 const ANNOUNCEMENT_CHANNELS = Object.freeze(['app', 'email', 'sms']);
-const ANNOUNCEMENT_AUDIENCES = Object.freeze(['allUsers', 'tournamentParticipants']);
+const ANNOUNCEMENT_AUDIENCES = Object.freeze(['allUsers', 'tournamentParticipants', 'specificEmails']);
+const ANNOUNCEMENT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeAnnouncementEmails(input) {
+  if (!Array.isArray(input)) return [];
+  const emails = Array.from(new Set(
+    input.map((email) => String(email).trim().toLowerCase()).filter(Boolean),
+  ));
+  if (emails.length > PLAYER_EMAIL_RECIPIENT_LIMIT) {
+    throw new HttpError(400, `Email at most ${PLAYER_EMAIL_RECIPIENT_LIMIT} registered players at a time.`);
+  }
+  if (emails.some((email) => email.length > 254 || !ANNOUNCEMENT_EMAIL_PATTERN.test(email))) {
+    throw new HttpError(400, 'Enter complete email addresses for the specific recipients.');
+  }
+  return emails;
+}
 
 export function normalizeAnnouncementInput(input = {}) {
   const title = String(input.title ?? '').trim().replace(/\s+/g, ' ');
   const message = String(input.message ?? input.body ?? '').replace(/\r\n?/g, '\n').trim();
   const audience = String(input.audience ?? 'allUsers').trim();
   const tournamentId = String(input.tournamentId ?? '').trim();
+  const emails = normalizeAnnouncementEmails(input.emails);
   const channels = Array.isArray(input.channels)
     ? Array.from(new Set(input.channels.map((channel) => String(channel).trim()).filter(Boolean)))
     : ['app'];
+  const link = normalizePlayerEmailLink(input.link);
 
   if (!title) throw new HttpError(400, 'Write an announcement title.');
   if (title.length > ANNOUNCEMENT_TITLE_LIMIT) {
@@ -774,14 +791,29 @@ export function normalizeAnnouncementInput(input = {}) {
   if (audience === 'tournamentParticipants' && !tournamentId) {
     throw new HttpError(400, 'Choose an upcoming or active tournament.');
   }
+  if (audience === 'specificEmails' && !emails.length) {
+    throw new HttpError(400, 'Enter at least one registered JuChess email address.');
+  }
   if (!channels.length) throw new HttpError(400, 'Choose at least one announcement channel.');
   const unsupportedChannel = channels.find((channel) => !ANNOUNCEMENT_CHANNELS.includes(channel));
   if (unsupportedChannel) throw new HttpError(400, 'Choose supported announcement channels.');
-  if (audience === 'tournamentParticipants' && channels.includes('app')) {
-    throw new HttpError(409, 'Targeted website announcement delivery is not configured yet. Use email for tournament participants.');
+  if (audience !== 'allUsers' && channels.includes('app')) {
+    throw new HttpError(409, 'Targeted website announcement delivery is not configured yet. Use email for the selected recipients.');
   }
+  if (audience === 'specificEmails' && !channels.includes('email')) {
+    throw new HttpError(400, 'Specific email recipients require the Email channel.');
+  }
+  if (link && !channels.includes('email')) throw new HttpError(400, 'A link button requires the Email channel.');
 
-  return { title, message, audience, tournamentId, channels };
+  return {
+    title,
+    message,
+    audience,
+    tournamentId,
+    emails: audience === 'specificEmails' ? emails : [],
+    channels,
+    link,
+  };
 }
 
 export function announcementCapabilitiesFromProviders(providers = []) {
@@ -833,6 +865,29 @@ export async function resolveAnnouncementProfileIds(tablesDB, databaseId, input)
       [Query.equal('status', 'active')],
     );
     return Array.from(new Set(profiles.map((profile) => profile.$id).filter(Boolean)));
+  }
+
+  if (input.audience === 'specificEmails') {
+    const requested = new Set(input.emails);
+    const [profiles, privateRows] = await Promise.all([
+      listRowsPaginated(tablesDB, databaseId, tableIds.profiles, [Query.equal('status', 'active')]),
+      listRowsPaginated(tablesDB, databaseId, tableIds.profilePrivate),
+    ]);
+    const privateByProfileId = new Map(privateRows.map((identity) => [identity.$id, identity]));
+    const profileIdByEmail = new Map();
+    for (const profile of profiles) {
+      const identity = privateByProfileId.get(profile.$id) ?? legacyIdentityForProfile(profile);
+      const email = String(identity?.email ?? '').trim().toLowerCase();
+      if (email && requested.has(email) && identity?.accountId) profileIdByEmail.set(email, profile.$id);
+    }
+    const missingCount = input.emails.filter((email) => !profileIdByEmail.has(email)).length;
+    if (missingCount) {
+      throw new HttpError(
+        409,
+        `${missingCount} email address${missingCount === 1 ? ' is' : 'es are'} not connected to an active JuChess player account.`,
+      );
+    }
+    return Array.from(new Set(input.emails.map((email) => profileIdByEmail.get(email)).filter(Boolean)));
   }
 
   let tournament;
@@ -910,7 +965,7 @@ async function createAnnouncementBroadcast({ tablesDB, messaging, databaseId, ac
       email = await messaging.createEmail({
         messageId: ID.unique(),
         subject: input.title,
-        content: buildPlayerEmailHtml({ subject: input.title, message: input.message }),
+        content: buildPlayerEmailHtml({ subject: input.title, message: input.message, link: input.link }),
         users: recipients.map((recipient) => recipient.accountId),
         draft: false,
         html: true,
@@ -933,6 +988,8 @@ async function createAnnouncementBroadcast({ tablesDB, messaging, databaseId, ac
       audience: input.audience,
       tournamentId: input.tournamentId || null,
       channels: input.channels,
+      hasLink: Boolean(input.link),
+      specificRecipientCount: input.audience === 'specificEmails' ? input.emails.length : null,
       emailMessageId: email?.$id || null,
       recipientCount: recipients.length,
       skippedCount: skipped.length,

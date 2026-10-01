@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Mail, MonitorSmartphone, Send, Trash2 } from 'lucide-react'
+import { Link2, Mail, MonitorSmartphone, Send, Trash2 } from 'lucide-react'
+import {
+  ANNOUNCEMENT_EMAIL_RECIPIENT_LIMIT,
+  parseAnnouncementRecipientEmails,
+} from '../lib/announcementEmail'
+import {
+  PLAYER_EMAIL_LINK_TEXT_LIMIT,
+  PLAYER_EMAIL_LINK_URL_LIMIT,
+  playerEmailLinkPreview,
+} from '../lib/playerEmail'
 import {
   createAnnouncementBroadcast,
   deleteAnnouncement,
@@ -235,25 +244,45 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
   const [message, setMessage] = useState('')
   const [audience, setAudience] = useState<AnnouncementAudience>('allUsers')
   const [tournamentId, setTournamentId] = useState('')
+  const [specificEmailText, setSpecificEmailText] = useState('')
   const [channels, setChannels] = useState<AnnouncementChannel[]>(['app'])
+  const [linkEnabled, setLinkEnabled] = useState(false)
+  const [linkText, setLinkText] = useState('')
+  const [linkUrl, setLinkUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [pendingInput, setPendingInput] = useState<AnnouncementBroadcastInput | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AdminAnnouncement | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const parsedSpecificEmails = useMemo(
+    () => parseAnnouncementRecipientEmails(specificEmailText),
+    [specificEmailText],
+  )
+  const previewLink = useMemo(() => playerEmailLinkPreview(linkText, linkUrl), [linkText, linkUrl])
 
   function selectAudience(next: AnnouncementAudience) {
     setAudience(next)
     setNotice(null)
-    if (next === 'tournamentParticipants') {
-      setChannels((current) => current.filter((channel) => channel !== 'app'))
+    if (next !== 'allUsers') {
+      setChannels((current) => {
+        const targeted = current.filter((channel) => channel !== 'app')
+        return center.capabilities.email.ready && !targeted.includes('email')
+          ? [...targeted, 'email']
+          : targeted
+      })
     }
   }
 
   function toggleChannel(channel: AnnouncementChannel) {
     const capability = center.capabilities[channel]
-    if (!capability.ready || (channel === 'app' && audience === 'tournamentParticipants')) return
-    setChannels((current) => current.includes(channel)
+    if (!capability.ready || (channel === 'app' && audience !== 'allUsers')) return
+    const removing = channels.includes(channel)
+    if (removing && channel === 'email') {
+      setLinkEnabled(false)
+      setLinkText('')
+      setLinkUrl('')
+    }
+    setChannels((current) => removing
       ? current.filter((item) => item !== channel)
       : [...current, channel])
   }
@@ -262,7 +291,14 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
     title.trim()
     && message.trim()
     && channels.length
-    && (audience !== 'tournamentParticipants' || tournamentId),
+    && (audience !== 'tournamentParticipants' || tournamentId)
+    && (audience !== 'specificEmails' || (
+      parsedSpecificEmails.emails.length
+      && parsedSpecificEmails.emails.length <= ANNOUNCEMENT_EMAIL_RECIPIENT_LIMIT
+      && !parsedSpecificEmails.invalid.length
+      && channels.includes('email')
+    ))
+    && (!linkEnabled || previewLink),
   ) && !submitting && !center.error
 
   function requestSend(event: FormEvent<HTMLFormElement>) {
@@ -273,7 +309,9 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
       message: message.trim(),
       audience,
       tournamentId: audience === 'tournamentParticipants' ? tournamentId : undefined,
+      emails: audience === 'specificEmails' ? parsedSpecificEmails.emails : undefined,
       channels,
+      link: linkEnabled && previewLink ? previewLink : undefined,
     })
   }
 
@@ -292,7 +330,11 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
       setPendingInput(null)
       setAudience('allUsers')
       setTournamentId('')
+      setSpecificEmailText('')
       setChannels(['app'])
+      setLinkEnabled(false)
+      setLinkText('')
+      setLinkUrl('')
       await center.refresh()
     } catch (error) {
       setNotice(formatAdminError(error))
@@ -332,6 +374,7 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
             <div className="communication-choice-row">
               <button type="button" className={audience === 'allUsers' ? 'selected' : undefined} onClick={() => selectAudience('allUsers')}>All users</button>
               <button type="button" className={audience === 'tournamentParticipants' ? 'selected' : undefined} onClick={() => selectAudience('tournamentParticipants')}>Tournament participants</button>
+              <button type="button" className={audience === 'specificEmails' ? 'selected' : undefined} onClick={() => selectAudience('specificEmails')}>Specific emails</button>
             </div>
           </fieldset>
 
@@ -346,17 +389,40 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
             </label>
           ) : null}
 
+          {audience === 'specificEmails' ? (
+            <label className="communication-recipient-field">
+              Registered player emails
+              <textarea
+                value={specificEmailText}
+                rows={3}
+                onChange={(event) => setSpecificEmailText(event.target.value)}
+                placeholder="player@example.com, second@example.com"
+                aria-describedby="specific-email-help"
+                required
+              />
+              <small id="specific-email-help">
+                Separate addresses with commas, spaces, or new lines. Only active JuChess player accounts can receive Appwrite email.
+                {' '}{parsedSpecificEmails.emails.length}/{ANNOUNCEMENT_EMAIL_RECIPIENT_LIMIT} ready.
+              </small>
+              {parsedSpecificEmails.invalid.length ? (
+                <span className="communication-field-error" role="alert">
+                  Check: {parsedSpecificEmails.invalid.join(', ')}
+                </span>
+              ) : null}
+            </label>
+          ) : null}
+
           <fieldset className="communication-options">
             <legend>Channels</legend>
             <div className="communication-channel-grid">
               <button
                 type="button"
                 className={channels.includes('app') ? 'selected' : undefined}
-                disabled={!center.capabilities.app.ready || audience === 'tournamentParticipants'}
+                disabled={!center.capabilities.app.ready || audience !== 'allUsers'}
                 onClick={() => toggleChannel('app')}
               >
                 <MonitorSmartphone size={18} aria-hidden="true" />
-                <span><strong>Website</strong><small>{audience === 'tournamentParticipants' ? 'Targeted website delivery is not configured' : 'Public JuChess feed'}</small></span>
+                <span><strong>Website</strong><small>{audience !== 'allUsers' ? 'Targeted website delivery is not configured' : 'Public JuChess feed'}</small></span>
               </button>
               <button
                 type="button"
@@ -373,6 +439,68 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
               </button>
             </div>
           </fieldset>
+
+          {channels.includes('email') ? (
+            linkEnabled ? (
+              <section className="player-email-link-fields communication-email-link" aria-label="Announcement email link">
+                <header>
+                  <div>
+                    <Link2 size={16} aria-hidden="true" />
+                    <span><strong>Email link button</strong><small>Add one clear action below the message.</small></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLinkEnabled(false)
+                      setLinkText('')
+                      setLinkUrl('')
+                    }}
+                    disabled={submitting}
+                  >
+                    <Trash2 size={14} aria-hidden="true" /> Remove
+                  </button>
+                </header>
+                <div>
+                  <label>
+                    Text on the button
+                    <input
+                      value={linkText}
+                      onChange={(event) => setLinkText(event.target.value)}
+                      placeholder="View tournament details"
+                      maxLength={PLAYER_EMAIL_LINK_TEXT_LIMIT}
+                      required
+                    />
+                    <small>{linkText.length}/{PLAYER_EMAIL_LINK_TEXT_LIMIT}</small>
+                  </label>
+                  <label>
+                    Link URL
+                    <input
+                      type="url"
+                      inputMode="url"
+                      value={linkUrl}
+                      onChange={(event) => setLinkUrl(event.target.value)}
+                      placeholder="https://juchess.page/tournaments"
+                      maxLength={PLAYER_EMAIL_LINK_URL_LIMIT}
+                      required
+                    />
+                  </label>
+                </div>
+                {linkUrl.trim() && !previewLink ? (
+                  <p role="alert">Enter button text and a complete http:// or https:// address without a username or password.</p>
+                ) : null}
+              </section>
+            ) : (
+              <button
+                type="button"
+                className="player-email-add-link communication-add-link"
+                onClick={() => setLinkEnabled(true)}
+                aria-expanded="false"
+                disabled={submitting}
+              >
+                <Link2 size={16} aria-hidden="true" /> Add email link button
+              </button>
+            )
+          ) : null}
 
           {!channels.length ? <div className="prototype-note">Select at least one available channel.</div> : null}
           <button type="submit" className="primary-button" disabled={!ready}>
@@ -396,6 +524,8 @@ export function AnnouncementsScreen({ tournaments }: { tournaments: AdminTournam
             <h2 id="send-announcement-title">Send this announcement?</h2>
             <p><strong>{pendingInput.title}</strong></p>
             <p>This will {pendingInput.channels.includes('app') ? 'publish immediately to the public feed' : ''}{pendingInput.channels.includes('app') && pendingInput.channels.includes('email') ? ' and ' : ''}{pendingInput.channels.includes('email') ? 'queue a real email to the selected audience' : ''}.</p>
+            {pendingInput.audience === 'specificEmails' ? <p>{pendingInput.emails?.length ?? 0} specific registered email recipient{pendingInput.emails?.length === 1 ? '' : 's'}.</p> : null}
+            {pendingInput.link ? <p>The email includes a <strong>{pendingInput.link.text}</strong> link button.</p> : null}
             <div className="delete-tournament-actions">
               <button type="button" className="secondary-action" disabled={submitting} onClick={() => setPendingInput(null)}>Cancel</button>
               <button type="button" className="primary-action" disabled={submitting} onClick={() => void confirmSend()}>{submitting ? 'Sending…' : 'Send announcement'}</button>

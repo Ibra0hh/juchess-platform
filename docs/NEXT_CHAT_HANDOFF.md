@@ -1,11 +1,37 @@
 # JuChess Complete New-Chat Handoff
 
-Last updated: July 19, 2026
+Last updated: October 1, 2026
 
 This file is both a complete project handoff and a copy-paste prompt for a new
 AI chat. It describes the intended product, the actual implementation, the
 backend contract, deployment state, known limitations, and the working rules
 that must not be lost between chats.
+
+## October 1 targeted announcement emails and link buttons
+
+- The admin Announcements composer now supports `Specific emails` as a real
+  audience. An admin may paste up to 50 comma-, space-, semicolon-, or
+  newline-separated addresses; the UI normalizes and deduplicates them before
+  showing the confirmation dialog.
+- Specific addresses are resolved server-side to active JuChess player
+  profiles and their private Appwrite account identities. Unknown, inactive,
+  or non-player addresses fail the whole request with a clear error instead of
+  causing a misleading partial send. This matches Appwrite Messaging's
+  user/target delivery model and does not turn the admin panel into an
+  unrestricted external-email relay.
+- Targeted announcements are email-only. The composer disables Website for
+  `Single player` and `Specific emails`, while broad audiences can still use
+  the existing website announcement channel.
+- Email announcements may now include an optional branded button with custom
+  text and a complete HTTP/HTTPS URL. The browser preview and Function use the
+  same hardened player-email link validation and escaped HTML template. Audit
+  metadata stores only the recipient count and whether a link exists, never
+  recipient addresses, message content, or link destination.
+- Active `admin-actions` deployment is `6abe3e9ba338fe35120a`. Validation passed:
+  admin lint/build with 27 UI/helper tests and 99 engine tests, Function syntax
+  checks, the complete 152-test Function suite, and 10 focused announcement
+  and branded-email tests. No real email was sent during this change, so inbox
+  delivery was not re-verified.
 
 ## July 19 provider-backed ratings and admin player copying
 
