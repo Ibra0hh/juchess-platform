@@ -57,9 +57,9 @@ const teamMembers = [
     image: teamPhoto('yazan-shalan.webp'),
   },
   {
-    name: 'Lameea Sakhriah',
-    role: 'Design Manager',
-    image: teamPhoto('lameea-sakhriah.webp'),
+    name: 'Ryan Almuhaisen',
+    role: 'Social Media Manager',
+    image: teamPhoto('ryan-almuhaisen.png'),
   },
   {
     name: 'Ibrahim Aladily',
