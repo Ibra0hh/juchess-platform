@@ -369,6 +369,49 @@ export type AdminProfileLoadResult = {
   error?: unknown
 }
 
+export type AnnouncementAudience = 'allUsers' | 'tournamentParticipants'
+export type AnnouncementChannel = 'app' | 'email' | 'sms'
+
+export type AdminAnnouncement = Models.Row & {
+  title: string
+  body: string
+  audience: 'public' | 'members' | 'organizers' | 'admins'
+  status: 'draft' | 'published' | 'archived'
+  publishedAt?: string
+  createdByProfileId: string
+}
+
+export type AnnouncementCapabilities = {
+  app: { ready: boolean; reason?: string }
+  email: { ready: boolean; provider?: string | null; reason?: string }
+  sms: { ready: boolean; provider?: string | null; reason?: string }
+}
+
+export type AnnouncementCenterLoadResult = {
+  announcements: AdminAnnouncement[]
+  capabilities: AnnouncementCapabilities
+  error?: unknown
+}
+
+export type AnnouncementBroadcastInput = {
+  title: string
+  message: string
+  audience: AnnouncementAudience
+  tournamentId?: string
+  channels: AnnouncementChannel[]
+}
+
+export type AnnouncementBroadcastResult = {
+  announcement?: AdminAnnouncement | null
+  channels: AnnouncementChannel[]
+  email?: {
+    messageId: string
+    status: string
+    recipientCount: number
+    skippedCount: number
+  } | null
+}
+
 const adminFunctionId = import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions'
 const adminPanelSessionStorageKey = 'juchess:admin-panel-session'
 const adminJwt = createAdminJwtCache(() => account.createJWT({ duration: 900 }))
@@ -1060,6 +1103,68 @@ export async function updateAdminStatus(adminId: string, status: AdminStatus, ac
   })
 
   return response.row
+}
+
+export async function removeAdminProfile(adminId: string, actorProfileId?: string) {
+  const response = await runAdminAction<{ adminId: string; membershipRemoved: boolean }>(
+    {
+      method: ExecutionMethod.DELETE,
+      path: `/admin/admins/${adminId}`,
+      body: cleanBlockInput({ actorProfileId }),
+    },
+  )
+
+  return response
+}
+
+const unavailableAnnouncementCapabilities: AnnouncementCapabilities = {
+  app: { ready: false, reason: 'Announcement publishing could not be verified.' },
+  email: { ready: false, reason: 'Email delivery could not be verified.' },
+  sms: { ready: false, reason: 'SMS delivery could not be verified.' },
+}
+
+export async function loadAnnouncementCenter(): Promise<AnnouncementCenterLoadResult> {
+  if (!appwriteReady) {
+    return {
+      announcements: [],
+      capabilities: unavailableAnnouncementCapabilities,
+      error: new Error('Cloud connection is not configured for the admin app.'),
+    }
+  }
+
+  try {
+    return await runAdminAction<AnnouncementCenterLoadResult>({
+      method: ExecutionMethod.GET,
+      path: '/announcements',
+      body: {},
+    })
+  } catch (error) {
+    return { announcements: [], capabilities: unavailableAnnouncementCapabilities, error }
+  }
+}
+
+export async function createAnnouncementBroadcast(input: AnnouncementBroadcastInput) {
+  return runAdminAction<AnnouncementBroadcastResult>({
+    method: ExecutionMethod.POST,
+    path: '/announcements',
+    body: {
+      title: input.title,
+      message: input.message,
+      audience: input.audience,
+      tournamentId: input.tournamentId,
+      channels: input.channels,
+    },
+  })
+}
+
+export async function deleteAnnouncement(announcementId: string) {
+  const response = await runAdminAction<{ announcementId: string }>({
+    method: ExecutionMethod.DELETE,
+    path: `/announcements/${announcementId}`,
+    body: {},
+  })
+
+  return response.announcementId
 }
 
 export async function blockIdentity(input: IdentityBlockInput) {

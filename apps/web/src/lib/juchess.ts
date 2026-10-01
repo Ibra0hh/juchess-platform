@@ -1048,6 +1048,7 @@ export async function loadAnnouncements(): Promise<AnnouncementLoadResult> {
         Query.limit(6),
       ],
       total: false,
+      ttl: 0,
     })
 
     return {

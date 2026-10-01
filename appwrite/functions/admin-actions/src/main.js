@@ -746,6 +746,211 @@ export async function resolvePlayerEmailRecipients(tablesDB, databaseId, profile
   return { recipients, skipped };
 }
 
+const ANNOUNCEMENT_TITLE_LIMIT = 120;
+const ANNOUNCEMENT_BODY_LIMIT = 5000;
+const ANNOUNCEMENT_CHANNELS = Object.freeze(['app', 'email', 'sms']);
+const ANNOUNCEMENT_AUDIENCES = Object.freeze(['allUsers', 'tournamentParticipants']);
+
+export function normalizeAnnouncementInput(input = {}) {
+  const title = String(input.title ?? '').trim().replace(/\s+/g, ' ');
+  const message = String(input.message ?? input.body ?? '').replace(/\r\n?/g, '\n').trim();
+  const audience = String(input.audience ?? 'allUsers').trim();
+  const tournamentId = String(input.tournamentId ?? '').trim();
+  const channels = Array.isArray(input.channels)
+    ? Array.from(new Set(input.channels.map((channel) => String(channel).trim()).filter(Boolean)))
+    : ['app'];
+
+  if (!title) throw new HttpError(400, 'Write an announcement title.');
+  if (title.length > ANNOUNCEMENT_TITLE_LIMIT) {
+    throw new HttpError(400, `Announcement titles are limited to ${ANNOUNCEMENT_TITLE_LIMIT} characters.`);
+  }
+  if (!message) throw new HttpError(400, 'Write an announcement message.');
+  if (message.length > ANNOUNCEMENT_BODY_LIMIT) {
+    throw new HttpError(400, `Announcement messages are limited to ${ANNOUNCEMENT_BODY_LIMIT} characters.`);
+  }
+  if (!ANNOUNCEMENT_AUDIENCES.includes(audience)) {
+    throw new HttpError(400, 'Choose a supported announcement audience.');
+  }
+  if (audience === 'tournamentParticipants' && !tournamentId) {
+    throw new HttpError(400, 'Choose an upcoming or active tournament.');
+  }
+  if (!channels.length) throw new HttpError(400, 'Choose at least one announcement channel.');
+  const unsupportedChannel = channels.find((channel) => !ANNOUNCEMENT_CHANNELS.includes(channel));
+  if (unsupportedChannel) throw new HttpError(400, 'Choose supported announcement channels.');
+  if (audience === 'tournamentParticipants' && channels.includes('app')) {
+    throw new HttpError(409, 'Targeted website announcement delivery is not configured yet. Use email for tournament participants.');
+  }
+
+  return { title, message, audience, tournamentId, channels };
+}
+
+export function announcementCapabilitiesFromProviders(providers = []) {
+  const enabled = providers.filter((provider) => provider?.enabled);
+  const emailProvider = enabled.find((provider) => provider.type === 'email') ?? null;
+  const smsProvider = enabled.find((provider) => provider.type === 'sms') ?? null;
+  return {
+    app: { ready: true },
+    email: {
+      ready: Boolean(emailProvider),
+      provider: emailProvider ? (emailProvider.name || emailProvider.provider || 'Email provider') : null,
+      ...(!emailProvider ? { reason: 'No enabled Appwrite email provider is configured.' } : {}),
+    },
+    sms: {
+      // JuChess profiles store contact phone numbers privately, but Appwrite
+      // Messaging requires user/target phone identities. Do not claim SMS is
+      // usable until those targets and a provider are both configured.
+      ready: false,
+      provider: smsProvider ? (smsProvider.name || smsProvider.provider || 'SMS provider') : null,
+      reason: smsProvider
+        ? 'SMS requires verified Appwrite phone targets for JuChess players.'
+        : 'No SMS provider is configured.',
+    },
+  };
+}
+
+async function loadAnnouncementCapabilities(messaging) {
+  try {
+    const response = await messaging.listProviders({
+      queries: [Query.equal('enabled', true), Query.limit(100)],
+      total: false,
+    });
+    return announcementCapabilitiesFromProviders(response.providers);
+  } catch {
+    return {
+      app: { ready: true },
+      email: { ready: false, provider: null, reason: 'Email provider status could not be verified.' },
+      sms: { ready: false, provider: null, reason: 'SMS provider status could not be verified.' },
+    };
+  }
+}
+
+export async function resolveAnnouncementProfileIds(tablesDB, databaseId, input) {
+  if (input.audience === 'allUsers') {
+    const profiles = await listRowsPaginated(
+      tablesDB,
+      databaseId,
+      tableIds.profiles,
+      [Query.equal('status', 'active')],
+    );
+    return Array.from(new Set(profiles.map((profile) => profile.$id).filter(Boolean)));
+  }
+
+  let tournament;
+  try {
+    tournament = await tablesDB.getRow({
+      databaseId,
+      tableId: tableIds.tournaments,
+      rowId: input.tournamentId,
+    });
+  } catch (cause) {
+    if (Number(cause?.code) === 404) throw new HttpError(404, 'That tournament no longer exists.');
+    throw cause;
+  }
+  if (!['upcoming', 'active'].includes(tournament.status)) {
+    throw new HttpError(409, 'Announcements can target participants only in upcoming or active tournaments.');
+  }
+  const registrations = await listRowsByTournament(
+    tablesDB,
+    databaseId,
+    tableIds.registrations,
+    tournament.$id,
+  );
+  return Array.from(new Set(
+    registrations
+      .filter((registration) => registration.status === 'confirmed')
+      .map((registration) => registration.profileId)
+      .filter(Boolean),
+  ));
+}
+
+async function createAnnouncementBroadcast({ tablesDB, messaging, databaseId, actor, input, capabilities }) {
+  if (input.channels.includes('email') && !capabilities.email.ready) {
+    throw new HttpError(503, capabilities.email.reason || 'Announcement email delivery is not configured.');
+  }
+  if (input.channels.includes('sms')) {
+    throw new HttpError(503, capabilities.sms.reason || 'Announcement SMS delivery is not configured.');
+  }
+
+  let announcement = null;
+  let email = null;
+  let recipients = [];
+  let skipped = [];
+  if (input.channels.includes('email')) {
+    const profileIds = await resolveAnnouncementProfileIds(tablesDB, databaseId, input);
+    const resolved = await resolvePlayerEmailRecipients(tablesDB, databaseId, profileIds);
+    recipients = resolved.recipients;
+    skipped = resolved.skipped;
+    if (!recipients.length) {
+      throw new HttpError(409, 'The selected audience has no deliverable JuChess email accounts.');
+    }
+    if (recipients.length > PLAYER_EMAIL_RECIPIENT_LIMIT) {
+      throw new HttpError(409, `This audience has more than ${PLAYER_EMAIL_RECIPIENT_LIMIT} deliverable accounts. Split the announcement before sending.`);
+    }
+  }
+
+  if (input.channels.includes('app')) {
+    announcement = await tablesDB.createRow({
+      databaseId,
+      tableId: tableIds.announcements,
+      rowId: ID.unique(),
+      data: {
+        title: input.title,
+        body: input.message,
+        audience: 'public',
+        status: 'published',
+        publishedAt: new Date().toISOString(),
+        createdByProfileId: actor.$id,
+      },
+      permissions: [Permission.read(Role.any())],
+    });
+  }
+
+  try {
+    if (input.channels.includes('email')) {
+      email = await messaging.createEmail({
+        messageId: ID.unique(),
+        subject: input.title,
+        content: buildPlayerEmailHtml({ subject: input.title, message: input.message }),
+        users: recipients.map((recipient) => recipient.accountId),
+        draft: false,
+        html: true,
+      });
+    }
+  } catch (cause) {
+    if (announcement) {
+      await tablesDB.deleteRow({ databaseId, tableId: tableIds.announcements, rowId: announcement.$id }).catch(() => undefined);
+    }
+    throw cause;
+  }
+
+  await writeAudit(tablesDB, databaseId, {
+    actorProfileId: actor.$id,
+    action: 'announcements.publish',
+    targetTable: tableIds.announcements,
+    targetRowId: announcement?.$id || email?.$id || 'announcement',
+    payload: {
+      title: input.title,
+      audience: input.audience,
+      tournamentId: input.tournamentId || null,
+      channels: input.channels,
+      emailMessageId: email?.$id || null,
+      recipientCount: recipients.length,
+      skippedCount: skipped.length,
+    },
+  });
+
+  return {
+    announcement,
+    channels: input.channels,
+    email: email ? {
+      messageId: email.$id,
+      status: email.status,
+      recipientCount: recipients.length,
+      skippedCount: skipped.length,
+    } : null,
+  };
+}
+
 function isConflict(error) {
   return error?.code === 409 || error?.response?.code === 409;
 }
@@ -4163,6 +4368,74 @@ function requireSuperAdmin(actor) {
   }
 }
 
+export function assertAdminCanBeRemoved(actor, target, admins) {
+  if (target.accountId === actor.accountId || target.$id === actor.$id) {
+    throw new HttpError(409, 'A super admin cannot remove their own admin access.');
+  }
+  if (target.role === 'superAdmin' && target.status === 'active') {
+    const activeSuperAdmins = admins.filter((admin) => admin.role === 'superAdmin' && admin.status === 'active');
+    if (activeSuperAdmins.length <= 1) {
+      throw new HttpError(409, 'The final active super admin cannot be removed.');
+    }
+  }
+}
+
+async function removeAdminAccess(tablesDB, teams, databaseId, actor, target, admins) {
+  assertAdminCanBeRemoved(actor, target, admins);
+
+  if (target.status !== 'suspended') {
+    await tablesDB.updateRow({
+      databaseId,
+      tableId: tableIds.adminProfiles,
+      rowId: target.$id,
+      data: { status: 'suspended' },
+    });
+  }
+
+  const teamId = target.teamId || adminTeamForRole(target.role);
+  let membershipId = target.membershipId;
+  if (!membershipId && teamId && target.accountId) {
+    const memberships = await teams.listMemberships({
+      teamId,
+      queries: [Query.equal('userId', target.accountId), Query.limit(1)],
+      total: false,
+    });
+    membershipId = memberships.memberships[0]?.$id;
+  }
+
+  let membershipRemoved = false;
+  if (teamId && membershipId) {
+    try {
+      await teams.deleteMembership({ teamId, membershipId });
+      membershipRemoved = true;
+    } catch (cause) {
+      if (Number(cause?.code) !== 404) throw cause;
+      membershipRemoved = true;
+    }
+  }
+
+  await tablesDB.deleteRow({
+    databaseId,
+    tableId: tableIds.adminProfiles,
+    rowId: target.$id,
+  });
+
+  await writeAudit(tablesDB, databaseId, {
+    actorProfileId: actor.$id,
+    action: 'removeAdminProfile',
+    targetTable: tableIds.adminProfiles,
+    targetRowId: target.$id,
+    payload: {
+      accountId: target.accountId,
+      role: target.role,
+      teamId,
+      membershipRemoved,
+    },
+  });
+
+  return { adminId: target.$id, membershipRemoved };
+}
+
 const adminAreasByRole = Object.freeze({
   organizer: Object.freeze(['tournaments', 'players']),
   admin: Object.freeze(['dashboard', 'tournaments', 'players', 'recruitment', 'news', 'announcements']),
@@ -4270,6 +4543,7 @@ export default async ({ req, res, log, error }) => {
         'GET /admin/admins',
         'POST /admin/admins',
         'POST /admin/admins/:id/status',
+        'DELETE /admin/admins/:id',
         'GET /blocks',
         'POST /blocks/identity',
         'POST /blocks/identity/:id/unblock',
@@ -4284,6 +4558,8 @@ export default async ({ req, res, log, error }) => {
         'POST /profiles/:id/role',
         'POST /profiles/:id/status',
         'POST /announcements',
+        'GET /announcements',
+        'DELETE /announcements/:id',
         'GET /recruitment/applications',
         'PATCH /recruitment/applications/:id',
       ],
@@ -4592,37 +4868,53 @@ export default async ({ req, res, log, error }) => {
 
       const email = String(body.email).trim().toLowerCase();
       const displayName = String(body.displayName).trim();
+      const requestedAccountId = String(body.accountId ?? '').trim();
+      const existingAdmins = await listAllRows(tablesDB, databaseId, tableIds.adminProfiles);
+      const duplicate = existingAdmins.find((admin) => (
+        String(admin.email ?? '').trim().toLowerCase() === email
+        || (requestedAccountId && admin.accountId === requestedAccountId)
+      ));
+      if (duplicate) {
+        throw new HttpError(409, 'That account already has an admin access record.');
+      }
       const teamId = adminTeamForRole(body.role);
       const membership = await teams.createMembership({
         teamId,
         roles: [body.role],
-        email: body.accountId ? undefined : email,
-        userId: body.accountId || undefined,
+        email: requestedAccountId ? undefined : email,
+        userId: requestedAccountId || undefined,
         name: displayName,
       });
 
-      const accountId = membership.userId || body.accountId;
+      const accountId = membership.userId || requestedAccountId;
       if (!accountId) {
+        await teams.deleteMembership({ teamId, membershipId: membership.$id }).catch(() => undefined);
         throw new HttpError(500, 'Admin membership was created without an account ID.');
       }
 
-      const row = await tablesDB.createRow({
-        databaseId,
-        tableId: tableIds.adminProfiles,
-        rowId: ID.unique(),
-        data: cleanObject({
-          accountId,
-          email,
-          displayName,
-          role: body.role,
-          status: 'active',
-          teamId,
-          membershipId: membership.$id,
-          createdByAdminId: actor.$id,
-          createdAt: new Date().toISOString(),
-          notes: body.notes,
-        }),
-      });
+      let row;
+      try {
+        row = await tablesDB.createRow({
+          databaseId,
+          tableId: tableIds.adminProfiles,
+          rowId: ID.unique(),
+          data: cleanObject({
+            accountId,
+            email,
+            displayName,
+            role: body.role,
+            status: 'active',
+            teamId,
+            membershipId: membership.$id,
+            createdByAdminId: actor.$id,
+            createdAt: new Date().toISOString(),
+            notes: body.notes,
+          }),
+        });
+      } catch (cause) {
+        await teams.deleteMembership({ teamId, membershipId: membership.$id }).catch(() => undefined);
+        throw cause;
+      }
 
       await writeAudit(tablesDB, databaseId, {
         actorProfileId: actor.$id,
@@ -4673,6 +4965,26 @@ export default async ({ req, res, log, error }) => {
       });
 
       return res.json({ ok: true, action: 'updateAdminStatus', row });
+    }
+
+    if (method === 'DELETE' && segments[0] === 'admin' && segments[1] === 'admins' && segments[2] && segments.length === 3) {
+      requireSuperAdmin(actor);
+
+      let target;
+      try {
+        target = await tablesDB.getRow({
+          databaseId,
+          tableId: tableIds.adminProfiles,
+          rowId: segments[2],
+        });
+      } catch (cause) {
+        if (Number(cause?.code) === 404) throw new HttpError(404, 'That admin access record no longer exists.');
+        throw cause;
+      }
+
+      const admins = await listAllRows(tablesDB, databaseId, tableIds.adminProfiles);
+      const result = await removeAdminAccess(tablesDB, teams, databaseId, actor, target, admins);
+      return res.json({ ok: true, action: 'removeAdminProfile', ...result });
     }
 
     if (method === 'GET' && segments[0] === 'blocks' && segments.length === 1) {
@@ -5385,28 +5697,60 @@ export default async ({ req, res, log, error }) => {
       return res.json({ ok: true, action: 'updateProfileStatus', row });
     }
 
+    if (method === 'GET' && segments[0] === 'announcements' && segments.length === 1) {
+      const [announcements, capabilities] = await Promise.all([
+        listRowsPaginated(
+          tablesDB,
+          databaseId,
+          tableIds.announcements,
+          [Query.orderDesc('publishedAt')],
+        ),
+        loadAnnouncementCapabilities(messaging),
+      ]);
+      return res.json({
+        ok: true,
+        action: 'loadAnnouncementCenter',
+        announcements,
+        capabilities,
+      });
+    }
+
     if (method === 'POST' && segments[0] === 'announcements' && segments.length === 1) {
-      const missing = requireFields(body, ['title', 'body']);
-      if (missing.length > 0) {
-        return badRequest(res, 'Missing announcement fields.', { missing });
+      const input = normalizeAnnouncementInput(body);
+      const capabilities = await loadAnnouncementCapabilities(messaging);
+      const result = await createAnnouncementBroadcast({
+        tablesDB,
+        messaging,
+        databaseId,
+        actor,
+        input,
+        capabilities,
+      });
+      return res.json({ ok: true, action: 'createAnnouncementBroadcast', ...result });
+    }
+
+    if (method === 'DELETE' && segments[0] === 'announcements' && segments[1] && segments.length === 2) {
+      let announcement;
+      try {
+        announcement = await tablesDB.getRow({
+          databaseId,
+          tableId: tableIds.announcements,
+          rowId: segments[1],
+        });
+      } catch (cause) {
+        if (Number(cause?.code) === 404) throw new HttpError(404, 'That announcement no longer exists.');
+        throw cause;
       }
 
-      const row = await tablesDB.createRow({
-        databaseId,
-        tableId: tableIds.announcements,
-        rowId: ID.unique(),
-        data: cleanObject({
-          title: body.title,
-          body: body.body,
-          audience: body.audience ?? 'public',
-          status: body.status ?? 'published',
-          publishedAt: body.publishedAt ?? new Date().toISOString(),
-          createdByProfileId: body.createdByProfileId ?? actor.$id,
-        }),
-        permissions: [Permission.read(Role.any())],
+      await tablesDB.deleteRow({ databaseId, tableId: tableIds.announcements, rowId: announcement.$id });
+      await writeAudit(tablesDB, databaseId, {
+        actorProfileId: actor.$id,
+        action: 'announcements.delete',
+        targetTable: tableIds.announcements,
+        targetRowId: announcement.$id,
+        payload: { title: announcement.title },
       });
-
-      return res.json({ ok: true, action: 'createAnnouncement', row });
+      return res.json({ ok: true, action: 'deleteAnnouncement', announcementId: announcement.$id });
     }
 
     return notFound(res, method, path);

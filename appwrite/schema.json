@@ -305,6 +305,9 @@
       }
     },
     "announcements": {
+      "note": "Public website announcements are server-owned. Clients have read-only access; admin publishing and broadcast delivery go through admin-actions.",
+      "permissions": ["read(\"any\")"],
+      "rowSecurity": false,
       "fields": {
         "title": "string|required",
         "body": "string|required",

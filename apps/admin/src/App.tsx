@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent
 import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Clock3, Copy, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
 import RecruitmentScreen from './screens/RecruitmentScreen'
+import { AnnouncementsScreen, NewsScreen } from './screens/CommunicationsScreen'
 import PlayerEmailComposer from './components/PlayerEmailComposer'
 import {
   JuCapturedPieces,
@@ -43,6 +44,7 @@ import {
   loadAdminTournaments,
   listTournamentMedia,
   publishTournamentPairings,
+  removeAdminProfile,
   SYSTEM_BYE_PROFILE_ID,
   signInAdmin,
   signOutAdmin,
@@ -978,7 +980,7 @@ function App() {
       ) : null}
       {activeScreen === 'recruitment' ? <RecruitmentScreen /> : null}
       {activeScreen === 'news' ? <NewsScreen /> : null}
-      {activeScreen === 'announcements' ? <AnnouncementsScreen /> : null}
+      {activeScreen === 'announcements' ? <AnnouncementsScreen tournaments={tournaments} /> : null}
       {activeScreen === 'adminAccess' ? (
         <AdminAccessScreen
           adminProfiles={adminProfiles}
@@ -5210,23 +5212,6 @@ function BlockList<T extends IdentityBlock | IpBlock>({
   )
 }
 
-function NewsScreen() {
-  return (
-    <div className="news-screen">
-      <section className="panel-card">
-        <div className="panel-head">
-          <strong>News publishing</strong>
-          <span>Not connected</span>
-        </div>
-        <p className="muted">Public news publishing is unavailable until it is connected to canonical Appwrite content. Nothing entered here will be presented as published.</p>
-        <div className="post-form">
-          <button type="button" className="primary-button" disabled>Publishing unavailable</button>
-        </div>
-      </section>
-    </div>
-  )
-}
-
 async function writeClipboardText(value: string) {
   if (navigator.clipboard?.writeText) {
     try {
@@ -5248,23 +5233,6 @@ async function writeClipboardText(value: string) {
   const copied = document.execCommand('copy')
   textarea.remove()
   if (!copied) throw new Error('Clipboard access is unavailable in this browser.')
-}
-
-function AnnouncementsScreen() {
-  return (
-    <div className="announcements-screen">
-      <section className="panel-card announcement-card">
-        <div className="panel-head">
-          <strong>Broadcast announcements</strong>
-          <span>Not connected</span>
-        </div>
-        <p className="muted">App, email, and SMS broadcasts are unavailable until delivery, audience resolution, and reporting are backed by Appwrite. No message will be shown as sent without a real delivery result.</p>
-        <div className="post-form">
-          <button type="button" className="primary-button" disabled>Broadcasting unavailable</button>
-        </div>
-      </section>
-    </div>
-  )
 }
 
 function AdminAccessScreen({
@@ -5315,6 +5283,7 @@ function AdminAccessManagement({
   })
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<AdminProfile | null>(null)
   const actorProfileId = session.profile?.$id
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -5354,6 +5323,22 @@ function AdminAccessManagement({
     }
   }
 
+  async function handleRemove() {
+    if (!removeTarget) return
+    setSubmitting(true)
+    setMessage(null)
+    try {
+      await removeAdminProfile(removeTarget.$id, actorProfileId)
+      setMessage(`${removeTarget.displayName}'s admin access was removed. Their player account was not changed.`)
+      setRemoveTarget(null)
+      await onChanged()
+    } catch (error) {
+      setMessage(formatAdminError(error))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <section className="panel-card access-panel">
       <div className="panel-head">
@@ -5369,11 +5354,12 @@ function AdminAccessManagement({
           <label>Role<select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as AdminRole }))}><option value="admin">Admin</option><option value="organizer">Organizer</option><option value="superAdmin">Super admin</option></select></label>
           <label>Account ID<input value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} placeholder="Optional if email exists" /></label>
           <label>Notes<input value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Optional internal note" /></label>
-          <button type="submit" disabled={submitting}>Create admin access</button>
+          <button type="submit" disabled={submitting || Boolean(admins.error)}>Create admin access</button>
         </form>
         <div className="block-list">
           <h3>Admin list</h3>
-          {admins.admins.length === 0 ? <div className="empty-row">No admin profiles yet.</div> : null}
+          {admins.error ? <div className="prototype-note">Admin access records could not be loaded. Changes are disabled until the connection recovers.</div> : null}
+          {!admins.error && admins.admins.length === 0 ? <div className="empty-row">No admin profiles yet.</div> : null}
           {admins.admins.map((admin) => (
             <div className="block-row" key={admin.$id}>
               <span>
@@ -5381,19 +5367,43 @@ function AdminAccessManagement({
                 <StatusPill status={admin.status} />
                 <small>{admin.email} · {adminRoleLabel(admin.role)}</small>
               </span>
-              <button
-                type="button"
-                className="mini-button ghost"
-                disabled={submitting || admin.accountId === session.user.$id}
-                onClick={() => void handleStatus(admin, admin.status === 'active' ? 'suspended' : 'active')}
-              >
-                {admin.status === 'active' ? 'Suspend' : 'Activate'}
-              </button>
+              <div className="admin-access-row-actions">
+                <button
+                  type="button"
+                  className="mini-button ghost"
+                  disabled={submitting || Boolean(admins.error) || admin.accountId === session.user.$id}
+                  onClick={() => void handleStatus(admin, admin.status === 'active' ? 'suspended' : 'active')}
+                >
+                  {admin.status === 'active' ? 'Suspend' : 'Activate'}
+                </button>
+                <button
+                  type="button"
+                  className="mini-button ghost danger"
+                  disabled={submitting || Boolean(admins.error) || admin.accountId === session.user.$id}
+                  onClick={() => setRemoveTarget(admin)}
+                >
+                  <Trash2 size={14} aria-hidden="true" /> Remove
+                </button>
+              </div>
             </div>
           ))}
         </div>
       </div>
       {message ? <div className="prototype-note">{message}</div> : null}
+      {removeTarget ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !submitting) setRemoveTarget(null)
+        }}>
+          <section className="delete-tournament-dialog" role="dialog" aria-modal="true" aria-labelledby="remove-admin-title">
+            <h2 id="remove-admin-title">Remove admin access?</h2>
+            <p><strong>{removeTarget.displayName}</strong> will be removed from the private admin directory and admin team. Their JuChess player account and tournament history will remain unchanged.</p>
+            <div className="delete-tournament-actions">
+              <button type="button" className="secondary-action" disabled={submitting} onClick={() => setRemoveTarget(null)}>Cancel</button>
+              <button type="button" className="delete-action" disabled={submitting} onClick={() => void handleRemove()}>{submitting ? 'Removing…' : 'Remove admin access'}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   )
 }

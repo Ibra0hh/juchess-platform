@@ -3902,6 +3902,193 @@ button {
   font-size: 13px;
 }
 
+.communication-card {
+  align-self: start;
+  overflow: hidden;
+}
+
+.communication-card > .muted {
+  margin: 0;
+  padding: 16px 20px 0;
+}
+
+.communication-form {
+  padding: 18px 20px 20px;
+}
+
+.communication-form textarea {
+  resize: vertical;
+}
+
+.communication-form > .primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  min-width: 170px;
+}
+
+.communication-options {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.communication-options legend {
+  margin-bottom: 8px;
+  color: #8b8577;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+
+.communication-choice-row,
+.communication-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.communication-choice-row button,
+.communication-channel-grid button {
+  border: 1.5px solid #e6dfd3;
+  border-radius: 9px;
+  background: #fff;
+  color: #4a443a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.communication-choice-row button {
+  padding: 10px 12px;
+}
+
+.communication-choice-row button.selected,
+.communication-channel-grid button.selected {
+  border-color: #7d2434;
+  background: #fcf6f3;
+  color: #7d2434;
+  box-shadow: inset 0 0 0 1px rgba(125, 36, 52, 0.08);
+}
+
+.communication-choice-row button:disabled,
+.communication-channel-grid button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.communication-channel-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.communication-channel-grid button {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-height: 74px;
+  padding: 11px;
+  text-align: left;
+}
+
+.communication-channel-grid button > span:not(.communication-sms-icon) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.communication-channel-grid strong {
+  color: inherit;
+  font-size: 12.5px;
+}
+
+.communication-channel-grid small {
+  color: #8b8577;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.communication-sms-icon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  min-width: 28px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  font-size: 8px;
+}
+
+.communication-history-list {
+  display: grid;
+}
+
+.communication-history-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-top: 1px solid #f0eadf;
+}
+
+.communication-history-row:first-child {
+  border-top: 0;
+}
+
+.communication-history-row > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.communication-history-row small {
+  color: #a98a3f;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+}
+
+.communication-history-row strong {
+  color: #171310;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+}
+
+.communication-history-row p {
+  max-width: 55ch;
+  margin: 0;
+  color: #6b6350;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.communication-history-row button,
+.admin-access-row-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.admin-access-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.communication-confirm-dialog {
+  width: min(100%, 500px);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -4769,10 +4956,42 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .communication-channel-grid {
+    grid-template-columns: 1fr;
+  }
+
   .stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+}
+
+@media (max-width: 640px) {
+  .communication-choice-row {
+    grid-template-columns: 1fr;
+  }
+
+  .communication-form > .primary-button {
+    width: 100%;
+  }
+
+  .communication-history-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .communication-history-row button {
+    width: 100%;
+  }
+
+  .admin-access-row-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .admin-access-row-actions button {
+    flex: 1;
+  }
 }
 
 @media (max-width: 1180px) {
