@@ -34,8 +34,8 @@ function clipboardPage({ nativeCopy, fallbackCopy = () => true } = {}) {
 }
 
 test('Mocha replaces Antique Gold in the swatch and copied tokens', () => {
-  assert.doesNotMatch(html, /a98a3f|antique gold|--ju-gold(?!-soft)/i)
-  assert.match(html, /data-copy="#422BAC" aria-label="Copy Mocha color #422BAC"/)
+  assert.doesNotMatch(html, /a98a3f|422bac|violet|antique gold|--ju-gold(?!-soft)/i)
+  assert.match(html, /data-copy="#422B1C" aria-label="Copy Mocha color #422B1C"/)
   const style = html.match(/<style>([\s\S]*?)<\/style>/)[1]
   const tokens = html.match(/<code id="token-code">([\s\S]*?)<\/code>/)[1].replace(/<[^>]+>/g, '')
   for (const [, name, value] of tokens.matchAll(/(--ju-[a-z-]+):\s*(#[a-f\d]{6});/gi)) {
@@ -49,7 +49,7 @@ test('Cream on Mocha example uses the correct WCAG contrast ratio', () => {
       .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
     return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
   }
-  const contrast = (luminance('f5efe3') + 0.05) / (luminance('422bac') + 0.05)
+  const contrast = (luminance('f5efe3') + 0.05) / (luminance('422b1c') + 0.05)
   assert.ok(contrast >= 4.5)
   assert.match(html, new RegExp(`${contrast.toFixed(2)}:1`))
 })
@@ -57,14 +57,14 @@ test('Cream on Mocha example uses the correct WCAG contrast ratio', () => {
 test('Native clipboard copies the requested value', async () => {
   let copied
   const page = clipboardPage({ nativeCopy: async value => { copied = value } })
-  await vm.runInContext("copyText('#422BAC', 'Mocha copied')", page.context)
-  assert.equal(copied, '#422BAC')
+  await vm.runInContext("copyText('#422B1C', 'Mocha copied')", page.context)
+  assert.equal(copied, '#422B1C')
   assert.deepEqual(page.messages, ['Mocha copied'])
 })
 
 test('Fallback copy cleans up and restores keyboard focus', async () => {
   const page = clipboardPage()
-  await vm.runInContext("copyText('#422BAC', 'Mocha copied')", page.context)
+  await vm.runInContext("copyText('#422B1C', 'Mocha copied')", page.context)
   assert.deepEqual(page.messages, ['Mocha copied'])
   assert.ok(page.removed())
   assert.ok(page.focusRestored())
@@ -73,7 +73,7 @@ test('Fallback copy cleans up and restores keyboard focus', async () => {
 for (const fallbackCopy of [() => false, () => { throw new Error('Not allowed') }]) {
   test(`Failed fallback (${fallbackCopy.toString()}) never reports copy success`, async () => {
     const page = clipboardPage({ nativeCopy: async () => { throw new Error('Denied') }, fallbackCopy })
-    await vm.runInContext("copyText('#422BAC', 'Mocha copied')", page.context)
+    await vm.runInContext("copyText('#422B1C', 'Mocha copied')", page.context)
     assert.equal(page.messages.length, 1)
     assert.match(page.messages[0], /^Copy unavailable/)
     assert.ok(page.removed())
