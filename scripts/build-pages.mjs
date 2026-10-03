@@ -12,6 +12,7 @@ import {
 import { execSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import './export-palette.mjs'
 
 const env = { ...process.env, GITHUB_PAGES: 'true' }
 

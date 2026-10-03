@@ -1,82 +1,127 @@
-import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import test from 'node:test'
-import vm from 'node:vm'
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import test from 'node:test';
+import { colors, typography, rgbFromHex, hslFromHex, colorValue, contrastRatio, contrastChecks, readableText, cssTokens, paletteExport } from '../apps/web/public/palette/palette-data.js';
+import { copyText } from '../apps/web/public/palette/clipboard.js';
 
-const html = readFileSync(new URL('../apps/web/public/palette/index.html', import.meta.url), 'utf8')
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1]
+const source = new URL('../apps/web/public/palette/', import.meta.url);
+const expectedHex = ['#FFFCF4', '#F5EFE3', '#5F1B26', '#111111', '#6D625B', '#C9AE6B', '#422B1C', '#7A2431'];
+const expectedRgb = [[255, 252, 244], [245, 239, 227], [95, 27, 38], [17, 17, 17], [109, 98, 91], [201, 174, 107], [66, 43, 28], [122, 36, 49]];
 
-function clipboardPage({ nativeCopy, fallbackCopy = () => true } = {}) {
-  const messages = []
-  let removed = false
-  let focusRestored = false
-  const previousFocus = { focus: () => { focusRestored = true } }
-  const status = { classList: { add() {}, remove() {} } }
-  Object.defineProperty(status, 'textContent', { set: value => messages.push(value) })
-  const context = vm.createContext({
-    navigator: nativeCopy ? { clipboard: { writeText: nativeCopy } } : {},
-    window: { clearTimeout() {}, setTimeout() {} },
-    document: {
-      activeElement: previousFocus,
-      getElementById: id => id === 'copy-status' ? status : { addEventListener() {} },
-      querySelectorAll: () => [],
-      body: { appendChild() {} },
-      execCommand: fallbackCopy,
-      createElement: () => ({
-        style: {}, setAttribute() {},
-        select() { context.document.activeElement = this },
-        remove() { removed = true },
-      }),
-    },
-  })
-  vm.runInContext(script, context)
-  return { context, messages, removed: () => removed, focusRestored: () => focusRestored }
+test('Eight guideline colors preserve source order and primary/secondary grouping', () => {
+  assert.deepEqual(colors.map(color => color.hex), expectedHex);
+  assert.deepEqual(colors.map(color => color.group), [...Array(4).fill('primary'), ...Array(4).fill('secondary')]);
+  assert.equal(new Set(colors.map(color => color.token)).size, 8);
+  assert.equal(colors[6].name, 'Mocha');
+  assert.equal(colors[7].name, 'Soft Burgundy');
+});
+
+test('RGB values are derived from HEX, including both source corrections', () => {
+  assert.deepEqual(colors.map(color => rgbFromHex(color.hex)), expectedRgb);
+  assert.deepEqual(rgbFromHex('#abcdef'), [171, 205, 239]);
+  for (const invalid of ['#fff', '111111', '#GGFFFF', '#11111111']) assert.throws(() => rgbFromHex(invalid), TypeError);
+});
+
+test('HSL handles grayscale, primary colors, and hue wrapping', () => {
+  assert.deepEqual(hslFromHex('#000000'), [0, 0, 0]);
+  assert.deepEqual(hslFromHex('#FFFFFF'), [0, 0, 100]);
+  assert.deepEqual(hslFromHex('#FF0000'), [0, 100, 50]);
+  assert.deepEqual(hslFromHex('#00FF00'), [120, 100, 50]);
+  assert.deepEqual(hslFromHex('#0000FF'), [240, 100, 50]);
+  assert.deepEqual(hslFromHex('#422B1C'), [23.68, 40.43, 18.43]);
+  assert.equal(colorValue('#422B1C', 'rgb'), 'rgb(66, 43, 28)');
+  assert.equal(colorValue('#422B1C', 'hsl'), 'hsl(23.68, 40.43%, 18.43%)');
+});
+
+test('WCAG ratios use linearized sRGB and remain symmetric', () => {
+  assert.equal(contrastRatio('#000000', '#FFFFFF'), 21);
+  assert.equal(contrastRatio('#422B1C', '#422B1C'), 1);
+  assert.equal(contrastRatio('#422B1C', '#F5EFE3').toFixed(2), '11.50');
+  assert.equal(contrastRatio('#C9AE6B', '#F5EFE3').toFixed(2), '1.88');
+  for (const a of colors) for (const b of colors) assert.equal(contrastRatio(a.hex, b.hex), contrastRatio(b.hex, a.hex));
+});
+
+test('Accessibility verdicts use the unrounded ratio at each boundary', () => {
+  assert.equal(contrastChecks(4.49999)[0].passed, false);
+  assert.equal(contrastChecks(4.5)[0].passed, true);
+  assert.equal(contrastChecks(2.99999)[1].passed, false);
+  assert.equal(contrastChecks(3)[1].passed, true);
+  assert.equal(contrastChecks(6.99999)[2].passed, false);
+  assert.equal(contrastChecks(7)[2].passed, true);
+});
+
+test('Every swatch label has AA normal-text contrast', () => {
+  for (const color of colors) assert.ok(contrastRatio(color.hex, readableText(color.hex)) >= 4.5, color.name);
+});
+
+test('CSS and JSON exports contain the exact colors and honest font availability', () => {
+  const css = cssTokens();
+  const exported = JSON.parse(JSON.stringify(paletteExport()));
+  assert.deepEqual(exported.colors.map(color => color.hex), expectedHex);
+  assert.deepEqual(exported.colors.map(color => color.rgb), expectedRgb);
+  for (const color of colors) assert.ok(css.includes(`${color.token}: ${color.hex};`));
+  assert.doesNotMatch(css, /a98a3f|422bac|antique gold/i);
+  assert.match(exported.roleNote, /Suggested web roles/);
+  assert.deepEqual(typography.map(font => font.family), ['Imbue', 'Finland Rounded', 'Kufam']);
+  assert.match(typography[1].status, /required/);
+});
+
+test('Rendered CSS base tokens match the exported data', () => {
+  const css = readFileSync(new URL('palette.css', source), 'utf8');
+  for (const color of colors) assert.ok(css.includes(`${color.token}: ${color.hex};`));
+  assert.match(css, /prefers-reduced-motion/);
+  assert.match(css, /focus-visible/);
+});
+
+test('Static downloads match generated exports and work without JavaScript', () => {
+  assert.equal(readFileSync(new URL('juchess-palette.css', source), 'utf8'), cssTokens());
+  assert.deepEqual(JSON.parse(readFileSync(new URL('juchess-palette.json', source), 'utf8')), paletteExport());
+  const html = readFileSync(new URL('index.html', source), 'utf8');
+  assert.match(html, /href="\.\/juchess-palette.css" download/);
+  assert.match(html, /href="\.\/juchess-palette.json" download/);
+});
+
+function clipboardFixture({ nativeCopy, fallbackCopy = () => true } = {}) {
+  let removed = false, restored = false, selected = false, value;
+  const previous = { focus: () => { restored = true; } };
+  const input = { style: {}, setAttribute() {}, select() { selected = true; }, remove() { removed = true; } };
+  Object.defineProperty(input, 'value', { set: next => { value = next; } });
+  const document = { activeElement: previous, createElement: () => input, body: { appendChild() {} }, execCommand: fallbackCopy };
+  return { environment: { navigator: nativeCopy ? { clipboard: { writeText: nativeCopy } } : {}, document }, state: () => ({ removed, restored, selected, value }) };
 }
 
-test('Mocha replaces Antique Gold in the swatch and copied tokens', () => {
-  assert.doesNotMatch(html, /a98a3f|422bac|violet|antique gold|--ju-gold(?!-soft)/i)
-  assert.match(html, /data-copy="#422B1C" aria-label="Copy Mocha color #422B1C"/)
-  const style = html.match(/<style>([\s\S]*?)<\/style>/)[1]
-  const tokens = html.match(/<code id="token-code">([\s\S]*?)<\/code>/)[1].replace(/<[^>]+>/g, '')
-  for (const [, name, value] of tokens.matchAll(/(--ju-[a-z-]+):\s*(#[a-f\d]{6});/gi)) {
-    assert.ok(style.includes(`${name}: ${value};`), `${name} must match the actual CSS`)
+test('Native clipboard copies exact text without the fallback', async () => {
+  let actual;
+  const fixture = clipboardFixture({ nativeCopy: async text => { actual = text; } });
+  assert.equal(await copyText('#422B1C', fixture.environment), true);
+  assert.equal(actual, '#422B1C');
+  assert.equal(fixture.state().selected, false);
+});
+
+test('Denied native clipboard uses fallback and restores focus', async () => {
+  const fixture = clipboardFixture({ nativeCopy: async () => { throw new Error('Permission denied'); } });
+  assert.equal(await copyText('#422B1C', fixture.environment), true);
+  assert.deepEqual(fixture.state(), { removed: true, restored: true, selected: true, value: '#422B1C' });
+});
+
+test('Failed or throwing fallback never reports success and cleans up', async () => {
+  for (const fallbackCopy of [() => false, () => { throw new Error('Unavailable'); }]) {
+    const fixture = clipboardFixture({ fallbackCopy });
+    assert.equal(await copyText('tokens', fixture.environment), false);
+    assert.equal(fixture.state().removed, true);
+    assert.equal(fixture.state().restored, true);
   }
-})
+});
 
-test('Cream on Mocha example uses the correct WCAG contrast ratio', () => {
-  function luminance(hex) {
-    const channels = hex.match(/../g).map(channel => parseInt(channel, 16) / 255)
-      .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
-    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
+test('Source page and both published paths have byte-identical assets', () => {
+  function verify(directory, relative = '') {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const name = `${relative}${entry.name}`;
+      if (entry.isDirectory()) verify(new URL(`${entry.name}/`, directory), `${name}/`);
+      else for (const target of ['../docs/palette/', '../docs/web/palette/']) {
+        assert.deepEqual(readFileSync(new URL(name, source)), readFileSync(new URL(`${target}${name}`, import.meta.url)), name);
+      }
+    }
   }
-  const contrast = (luminance('f5efe3') + 0.05) / (luminance('422b1c') + 0.05)
-  assert.ok(contrast >= 4.5)
-  assert.match(html, new RegExp(`${contrast.toFixed(2)}:1`))
-})
-
-test('Native clipboard copies the requested value', async () => {
-  let copied
-  const page = clipboardPage({ nativeCopy: async value => { copied = value } })
-  await vm.runInContext("copyText('#422B1C', 'Mocha copied')", page.context)
-  assert.equal(copied, '#422B1C')
-  assert.deepEqual(page.messages, ['Mocha copied'])
-})
-
-test('Fallback copy cleans up and restores keyboard focus', async () => {
-  const page = clipboardPage()
-  await vm.runInContext("copyText('#422B1C', 'Mocha copied')", page.context)
-  assert.deepEqual(page.messages, ['Mocha copied'])
-  assert.ok(page.removed())
-  assert.ok(page.focusRestored())
-})
-
-for (const fallbackCopy of [() => false, () => { throw new Error('Not allowed') }]) {
-  test(`Failed fallback (${fallbackCopy.toString()}) never reports copy success`, async () => {
-    const page = clipboardPage({ nativeCopy: async () => { throw new Error('Denied') }, fallbackCopy })
-    await vm.runInContext("copyText('#422B1C', 'Mocha copied')", page.context)
-    assert.equal(page.messages.length, 1)
-    assert.match(page.messages[0], /^Copy unavailable/)
-    assert.ok(page.removed())
-    assert.ok(page.focusRestored())
-  })
-}
+  verify(source);
+});

@@ -1,0 +1,192 @@
+{
+  "name": "JuChess 2026 Brand Palette",
+  "source": "https://canva.link/t3uq1yb2fuwphok",
+  "roleNote": "Suggested web roles; not additional rules in the source guideline.",
+  "colors": [
+    {
+      "id": "surface",
+      "name": "Ivory Surface",
+      "hex": "#FFFCF4",
+      "group": "primary",
+      "role": "Content surfaces",
+      "token": "--ju-surface",
+      "rgb": [
+        255,
+        252,
+        244
+      ],
+      "hsl": [
+        43.64,
+        100,
+        97.84
+      ]
+    },
+    {
+      "id": "cream",
+      "name": "Cream",
+      "hex": "#F5EFE3",
+      "group": "primary",
+      "role": "Page backgrounds",
+      "token": "--ju-cream",
+      "rgb": [
+        245,
+        239,
+        227
+      ],
+      "hsl": [
+        40,
+        47.37,
+        92.55
+      ]
+    },
+    {
+      "id": "burgundy-dark",
+      "name": "Deep Burgundy",
+      "hex": "#5F1B26",
+      "group": "primary",
+      "role": "Primary brand & actions",
+      "token": "--ju-burgundy-dark",
+      "rgb": [
+        95,
+        27,
+        38
+      ],
+      "hsl": [
+        350.29,
+        55.74,
+        23.92
+      ]
+    },
+    {
+      "id": "ink",
+      "name": "Ink",
+      "hex": "#111111",
+      "group": "primary",
+      "role": "Text & dark surfaces",
+      "token": "--ju-ink",
+      "rgb": [
+        17,
+        17,
+        17
+      ],
+      "hsl": [
+        0,
+        0,
+        6.67
+      ]
+    },
+    {
+      "id": "muted",
+      "name": "Warm Muted",
+      "hex": "#6D625B",
+      "group": "secondary",
+      "role": "Supporting text on light surfaces",
+      "token": "--ju-muted",
+      "rgb": [
+        109,
+        98,
+        91
+      ],
+      "hsl": [
+        23.33,
+        9,
+        39.22
+      ]
+    },
+    {
+      "id": "gold-soft",
+      "name": "Soft Gold",
+      "hex": "#C9AE6B",
+      "group": "secondary",
+      "role": "Decorative accents",
+      "token": "--ju-gold-soft",
+      "rgb": [
+        201,
+        174,
+        107
+      ],
+      "hsl": [
+        42.77,
+        46.53,
+        60.39
+      ]
+    },
+    {
+      "id": "mocha",
+      "name": "Mocha",
+      "hex": "#422B1C",
+      "group": "secondary",
+      "role": "Warm contrasting surfaces",
+      "token": "--ju-mocha",
+      "rgb": [
+        66,
+        43,
+        28
+      ],
+      "hsl": [
+        23.68,
+        40.43,
+        18.43
+      ]
+    },
+    {
+      "id": "burgundy",
+      "name": "Soft Burgundy",
+      "hex": "#7A2431",
+      "group": "secondary",
+      "role": "Supporting brand accent",
+      "token": "--ju-burgundy",
+      "rgb": [
+        122,
+        36,
+        49
+      ],
+      "hsl": [
+        350.93,
+        54.43,
+        30.98
+      ]
+    }
+  ],
+  "typography": [
+    {
+      "family": "Imbue",
+      "role": "English headings and titles",
+      "status": "bundled",
+      "weights": [
+        300,
+        400,
+        700
+      ],
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "family": "Finland Rounded",
+      "role": "English descriptions and details",
+      "status": "licensed webfont required; system fallback in preview",
+      "weights": [
+        100,
+        400,
+        700
+      ],
+      "license": "Commercial web license required"
+    },
+    {
+      "family": "Kufam",
+      "role": "Arabic typography",
+      "status": "bundled",
+      "weights": [
+        400,
+        500,
+        700
+      ],
+      "license": "SIL Open Font License 1.1"
+    }
+  ],
+  "corrections": [
+    "Warm Muted RGB: 109, 98, 91",
+    "Soft Gold RGB: 201, 174, 107",
+    "Moka normalized to Mocha",
+    "Burgundy spelling standardized"
+  ]
+}

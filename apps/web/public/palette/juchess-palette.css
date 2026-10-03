@@ -1,0 +1,20 @@
+/* JuChess 2026 brand palette
+   Source: https://canva.link/t3uq1yb2fuwphok
+   Semantic aliases below are suggested web roles. */
+:root {
+  --ju-surface: #FFFCF4;
+  --ju-cream: #F5EFE3;
+  --ju-burgundy-dark: #5F1B26;
+  --ju-ink: #111111;
+  --ju-muted: #6D625B;
+  --ju-gold-soft: #C9AE6B;
+  --ju-mocha: #422B1C;
+  --ju-burgundy: #7A2431;
+
+  --ju-background: var(--ju-cream);
+  --ju-text: var(--ju-ink);
+  --ju-text-secondary: var(--ju-muted);
+  --ju-action: var(--ju-burgundy-dark);
+  --ju-action-text: var(--ju-surface);
+  --ju-border: var(--ju-muted);
+}
