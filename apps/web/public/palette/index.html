@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="The official JuChess website color palette: burgundy, cream, ink, and restrained antique gold."
+      content="The JuChess website color palette: burgundy, cream, ink, and Mocha accents."
     />
     <meta name="theme-color" content="#f5efe3" />
     <meta name="robots" content="index, follow" />
@@ -54,7 +54,7 @@
         --ju-ink: #111111;
         --ju-burgundy: #7a2431;
         --ju-burgundy-dark: #5f1b26;
-        --ju-gold: #a98a3f;
+        --ju-mocha: #422bac;
         --ju-gold-soft: #c9ae6b;
         --ju-cream: #f5efe3;
         --ju-surface: #fffcf4;
@@ -90,8 +90,9 @@
 
       button:focus-visible,
       a:focus-visible {
-        outline: 3px solid rgba(122, 36, 49, 0.38);
+        outline: 3px solid var(--ju-mocha);
         outline-offset: 4px;
+        box-shadow: 0 0 0 2px var(--ju-cream);
       }
 
       .site-header {
@@ -168,11 +169,12 @@
       }
 
       main {
-        padding: 92px 0 104px;
+        padding: 64px 0 88px;
       }
 
       .hero {
         max-width: 840px;
+        margin-top: 0;
       }
 
       h1,
@@ -189,9 +191,9 @@
       h1 {
         max-width: 780px;
         margin-bottom: 24px;
-        font-size: clamp(52px, 8.2vw, 102px);
+        font-size: 76px;
         font-weight: 700;
-        letter-spacing: -0.045em;
+        letter-spacing: 0;
         line-height: 0.92;
       }
 
@@ -199,7 +201,7 @@
         max-width: 690px;
         margin-bottom: 0;
         color: var(--ju-muted);
-        font-size: clamp(17px, 2vw, 21px);
+        font-size: 21px;
         line-height: 1.6;
       }
 
@@ -207,7 +209,7 @@
         width: 82px;
         height: 3px;
         margin: 42px 0 0;
-        background: var(--ju-gold);
+        background: var(--ju-mocha);
       }
 
       section {
@@ -226,7 +228,7 @@
 
       .section-heading h2 {
         margin-bottom: 0;
-        font-size: clamp(32px, 4vw, 50px);
+        font-size: 40px;
         line-height: 1;
       }
 
@@ -265,7 +267,7 @@
         align-items: flex-end;
         padding: 18px;
         border: 1px solid var(--ju-line);
-        border-radius: 10px;
+        border-radius: 8px;
         box-shadow: var(--ju-shadow);
         transition: transform 160ms ease, box-shadow 160ms ease;
       }
@@ -308,7 +310,7 @@
       .color-ink { background: var(--ju-ink); }
       .color-burgundy { background: var(--ju-burgundy); }
       .color-burgundy-dark { background: var(--ju-burgundy-dark); }
-      .color-gold { background: var(--ju-gold); }
+      .color-mocha { background: var(--ju-mocha); }
       .color-gold-soft { background: var(--ju-gold-soft); }
       .color-cream { background: var(--ju-cream); }
       .color-surface { background: var(--ju-surface); }
@@ -316,7 +318,7 @@
 
       .pairings {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 16px;
       }
 
@@ -327,7 +329,7 @@
         justify-content: space-between;
         padding: 24px;
         border: 1px solid var(--ju-line);
-        border-radius: 10px;
+        border-radius: 8px;
       }
 
       .pairing strong {
@@ -357,6 +359,11 @@
         background: var(--ju-gold-soft);
       }
 
+      .pairing-mocha {
+        color: var(--ju-cream);
+        background: var(--ju-mocha);
+      }
+
       .usage-bar {
         min-height: 88px;
         display: flex;
@@ -379,7 +386,7 @@
       .usage-cream { width: 60%; color: var(--ju-ink); background: var(--ju-cream); }
       .usage-ink { width: 25%; color: var(--ju-cream); background: var(--ju-ink); }
       .usage-burgundy { width: 10%; color: var(--ju-cream); background: var(--ju-burgundy); }
-      .usage-gold { width: 5%; min-width: 56px; color: var(--ju-ink); background: var(--ju-gold-soft); }
+      .usage-mocha { width: 5%; min-width: 56px; color: var(--ju-cream); background: var(--ju-mocha); }
 
       .usage-notes {
         display: grid;
@@ -472,7 +479,7 @@
 
       .design-note::before {
         content: "";
-        background: var(--ju-gold);
+        background: var(--ju-mocha);
       }
 
       .design-note p {
@@ -580,8 +587,11 @@
 
         h1 {
           margin-bottom: 20px;
-          font-size: clamp(48px, 17vw, 68px);
+          font-size: 48px;
+          overflow-wrap: anywhere;
         }
+
+        .section-heading h2 { font-size: 32px; }
 
         .hero p {
           font-size: 16px;
@@ -680,7 +690,7 @@
       <section class="hero" aria-labelledby="page-title">
         <h1 id="page-title">The colors of JuChess.</h1>
         <p>
-          A warm, collegiate system built from club burgundy, cream, near-black ink, and restrained antique gold.
+          A collegiate system built from club burgundy, cream, near-black ink, and a distinctive Mocha accent.
           Designed to feel serious at the board, welcoming on campus, and unmistakably JuChess.
         </p>
         <div class="hero-rule" aria-hidden="true"></div>
@@ -689,7 +699,7 @@
       <section aria-labelledby="core-colors-title">
         <div class="section-heading">
           <h2 id="core-colors-title">Core palette</h2>
-          <p>Choose any swatch to copy its exact production hex value.</p>
+          <p>Choose any swatch to copy its exact palette hex value.</p>
         </div>
 
         <ul class="palette-grid">
@@ -715,10 +725,10 @@
             </button>
           </li>
           <li>
-            <button class="swatch-button" type="button" data-copy="#A98A3F" aria-label="Copy Antique gold color #A98A3F">
-              <span class="color-block color-gold"><span class="hex">#A98A3F</span></span>
-              <span class="swatch-name">Antique gold</span>
-              <span class="swatch-role">Rules, borders, and restrained accents</span>
+            <button class="swatch-button" type="button" data-copy="#422BAC" aria-label="Copy Mocha color #422BAC">
+              <span class="color-block color-mocha"><span class="hex">#422BAC</span></span>
+              <span class="swatch-name">Mocha</span>
+              <span class="swatch-role">Secondary accents and light-surface focus</span>
             </button>
           </li>
           <li>
@@ -770,25 +780,29 @@
             <strong>Ink on soft gold</strong>
             <span>8.77:1 · compact highlights</span>
           </div>
+          <div class="pairing pairing-mocha">
+            <strong>Cream on Mocha</strong>
+            <span>8.44:1 · secondary accents</span>
+          </div>
         </div>
       </section>
 
       <section aria-labelledby="balance-title">
         <div class="section-heading">
           <h2 id="balance-title">Recommended balance</h2>
-          <p>The identity stays premium when burgundy and gold remain purposeful.</p>
+          <p>A starting point, not a strict rule: keep burgundy primary and Mocha restrained.</p>
         </div>
-        <div class="usage-bar" aria-label="Recommended color proportions: 60 percent cream, 25 percent ink and ivory, 10 percent burgundy, 5 percent gold">
+        <div class="usage-bar" aria-label="Suggested color proportions: 60 percent cream, 25 percent ink, 10 percent burgundy, 5 percent Mocha">
           <span class="usage-cream">60% cream</span>
           <span class="usage-ink">25% ink</span>
           <span class="usage-burgundy">10%</span>
-          <span class="usage-gold">5%</span>
+          <span class="usage-mocha">5%</span>
         </div>
         <div class="usage-notes">
           <div><strong>Foundation</strong><span>Let cream carry most page backgrounds and breathing room.</span></div>
           <div><strong>Structure</strong><span>Use ink for typography, navigation, and strong dark sections.</span></div>
           <div><strong>Action</strong><span>Reserve burgundy for calls to action, focus, and selection.</span></div>
-          <div><strong>Prestige</strong><span>Use gold sparingly for winners, rules, and fine highlights.</span></div>
+          <div><strong>Accent</strong><span>Use Mocha on light surfaces; keep soft gold for medals and dark-surface highlights.</span></div>
         </div>
       </section>
 
@@ -806,7 +820,7 @@
   <span class="token-name">--ju-ink</span>: <span class="token-value">#111111</span>;
   <span class="token-name">--ju-burgundy</span>: <span class="token-value">#7a2431</span>;
   <span class="token-name">--ju-burgundy-dark</span>: <span class="token-value">#5f1b26</span>;
-  <span class="token-name">--ju-gold</span>: <span class="token-value">#a98a3f</span>;
+  <span class="token-name">--ju-mocha</span>: <span class="token-value">#422bac</span>;
   <span class="token-name">--ju-gold-soft</span>: <span class="token-value">#c9ae6b</span>;
   <span class="token-name">--ju-cream</span>: <span class="token-value">#f5efe3</span>;
   <span class="token-name">--ju-surface</span>: <span class="token-value">#fffcf4</span>;
@@ -815,8 +829,10 @@
         </div>
         <div class="design-note">
           <p>
-            Antique gold is an accent, not body text. On cream it does not provide enough contrast for normal copy;
-            use ink or burgundy for readable text and keep gold for borders, medals, and small visual details.
+            Mocha is the chosen name for this violet shade. Pair it with cream or ivory, not ink or burgundy.
+            Soft gold remains decorative on cream: it does not meet normal-text contrast there.
+            Cream and ivory are also too close in brightness to distinguish essential controls by fill alone;
+            use a visible border, label, or focus indicator.
           </p>
         </div>
       </section>
@@ -835,11 +851,11 @@
       const status = document.getElementById('copy-status')
       let statusTimer
 
-      function showStatus(message) {
+      function showStatus(message, duration = 1800) {
         status.textContent = message
         status.classList.add('visible')
         window.clearTimeout(statusTimer)
-        statusTimer = window.setTimeout(() => status.classList.remove('visible'), 1800)
+        statusTimer = window.setTimeout(() => status.classList.remove('visible'), duration)
       }
 
       async function copyText(value, message) {
@@ -847,6 +863,7 @@
           await navigator.clipboard.writeText(value)
           showStatus(message)
         } catch {
+          const previousFocus = document.activeElement
           const field = document.createElement('textarea')
           field.value = value
           field.setAttribute('readonly', '')
@@ -854,9 +871,15 @@
           field.style.opacity = '0'
           document.body.appendChild(field)
           field.select()
-          document.execCommand('copy')
-          field.remove()
-          showStatus(message)
+          try {
+            if (!document.execCommand('copy')) throw new Error('Copy unavailable')
+            showStatus(message)
+          } catch {
+            showStatus('Copy unavailable. Select the hex value or CSS tokens and copy manually.', 6000)
+          } finally {
+            field.remove()
+            previousFocus?.focus({ preventScroll: true })
+          }
         }
       }
 
