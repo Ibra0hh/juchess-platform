@@ -9,14 +9,14 @@
   "theme_color": "#7d2434",
   "icons": [
     {
-      "src": "/web/email/juchess-email-logo.png",
-      "sizes": "100x100",
+      "src": "brand/juchess-rook-192.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
-      "src": "/web/prototype/assets/crest.png",
-      "sizes": "1280x1280",
+      "src": "brand/juchess-rook-512.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }

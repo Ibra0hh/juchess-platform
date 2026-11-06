@@ -50,7 +50,7 @@ test('player email template keeps the JuChess theme and escapes admin content', 
     message: 'Hello & welcome\n<script>alert("no")</script>',
   });
 
-  assert.match(html, /juchess-email-logo\.png/);
+  assert.match(html, /src="https:\/\/juchess\.page\/email\/juchess-rook\.png"/);
   assert.match(html, /University of Jordan Chess Club/);
   assert.match(html, /#7d2434/);
   assert.match(html, /Pairings &lt;Final&gt;/);

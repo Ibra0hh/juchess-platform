@@ -10,7 +10,7 @@ const requiredByTemplate = {
   'password-recovery.html': ['{{project}}', '{{user}}', '{{redirect}}'],
 }
 const forbiddenPatterns = [/<script\b/i, /<form\b/i, /javascript:/i, /src=["']data:/i]
-const logoUrl = 'https://juchess.page/email/juchess-email-logo.png'
+const logoUrl = 'https://juchess.page/email/juchess-rook-light.png'
 const responsiveMarkup = [
   '<meta name="viewport" content="width=device-width, initial-scale=1">',
   '@media only screen and (max-width:480px)',

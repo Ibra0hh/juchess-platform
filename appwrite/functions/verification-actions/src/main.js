@@ -141,7 +141,7 @@ export function buildVerificationEmailHtml({ displayName, code, verificationUrl 
           <tr><td style="height:7px;background:#7a2431;font-size:0;line-height:0;">&nbsp;</td></tr>
           <tr>
             <td class="email-header" align="center" style="padding:24px 22px 22px;background:#111111;">
-              <img class="email-logo" src="https://juchess.page/email/juchess-email-logo.png" width="72" height="72" alt="JuChess crest" style="display:block;width:72px;height:72px;margin:0 auto 12px;border:0;">
+              <img class="email-logo" src="https://juchess.page/email/juchess-rook-light.png" width="72" height="72" alt="JuChess logo" style="display:block;width:72px;height:72px;margin:0 auto 12px;border:0;">
               <div class="email-brand" style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:30px;font-weight:bold;color:#f8f3e7;">JuChess</div>
               <div style="padding-top:5px;font-size:10px;line-height:15px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:#cdbf9f;">University of Jordan Chess Club</div>
             </td>

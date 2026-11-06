@@ -2,6 +2,9 @@
 
 Real JuChess application workspace.
 
+[Project structure and release guide](docs/PROJECT_STRUCTURE.md) ·
+[System architecture and data flows](docs/SYSTEM_ARCHITECTURE.md)
+
 ## Apps
 
 - `apps/web`: public web app, React + TypeScript + Vite.

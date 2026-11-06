@@ -55,10 +55,11 @@ Verify the live policy with:
 appwrite -j project get-policy --policy-id session-alert
 ```
 
-The logo is served from:
-
-`https://juchess.page/email/juchess-email-logo.png`
-
-Keep this URL stable because previously delivered emails may load it later.
+New verification/recovery emails use the light mark at
+`https://juchess.page/email/juchess-rook-light.png` for their black header.
+Player Management and email announcements use the burgundy mark at
+`https://juchess.page/email/juchess-rook.png`. The prior URL
+`https://juchess.page/email/juchess-email-logo.png` still serves a small
+contrast-safe badge for already delivered emails and cached clients.
 
 Run `npm run check:email-templates` before deploying template changes.

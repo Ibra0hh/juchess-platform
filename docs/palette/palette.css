@@ -28,8 +28,9 @@ h1 { font-size: 88px; } h2 { font-size: 50px; } h3 { font-size: 32px; }
 .skip-link:focus { top: 12px; }
 .site-header { border-bottom: 1px solid var(--line); background: var(--ju-surface); }
 .header-inner { min-height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.wordmark { text-decoration: none; font-family: Imbue, Georgia, serif; font-size: 36px; line-height: 1; color: var(--ju-burgundy-dark); font-weight: 600; }
-.wordmark span { display: block; margin-top: 6px; font-family: var(--body-font); font-size: 10px; line-height: 1.4; color: var(--ju-muted); }
+.wordmark { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; font-family: Imbue, Georgia, serif; font-size: 36px; line-height: 1; color: var(--ju-burgundy-dark); font-weight: 600; }
+.wordmark img { flex: none; }
+.wordmark small { display: block; margin-top: 6px; font-family: var(--body-font); font-size: 10px; line-height: 1.4; color: var(--ju-muted); }
 nav { display: flex; gap: 30px; }
 nav a { text-decoration: none; font-size: 13px; font-weight: 600; }
 nav a:hover { color: var(--ju-burgundy); text-decoration: underline; }

@@ -23,7 +23,7 @@ function run(command, envOverrides = {}) {
   })
 }
 
-const publicRootFiles = ['manifest.webmanifest', 'robots.txt', 'sitemap.xml']
+const publicRootFiles = ['favicon.svg', 'manifest.webmanifest', 'robots.txt', 'sitemap.xml']
 const staticRoutes = [
   ['home', 'JuChess | University of Jordan Chess Club', 'The University of Jordan Chess Club: campus tournaments, weekly chess activities, live boards, and tools to help every player improve.'],
   ['tournaments', 'Tournaments | JuChess', 'Discover upcoming, active, and completed University of Jordan Chess Club tournaments.'],
@@ -108,9 +108,9 @@ try {
     copyFileSync(join('apps/web/public', fileName), join('docs', fileName))
   }
   cpSync('apps/web/public/palette', 'docs/palette', { force: true, recursive: true })
+  cpSync('apps/web/public/brand', 'docs/brand', { force: true, recursive: true })
+  cpSync('apps/web/public/email', 'docs/email', { force: true, recursive: true })
   writeStaticRoutes()
-  mkdirSync('docs/email', { recursive: true })
-  copyFileSync('apps/web/public/email/juchess-email-logo.png', 'docs/email/juchess-email-logo.png')
   run('npm run build:admin')
 
   for (const [index, assetDir] of assetDirs.entries()) {

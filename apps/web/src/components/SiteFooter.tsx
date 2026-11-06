@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { compactCrestUrl } from '../lib/brand'
+import { lightCrestUrl } from '../lib/brand'
 import './SiteFooter.css'
 
 function SiteFooter() {
@@ -7,7 +7,7 @@ function SiteFooter() {
     <footer className="site-footer">
       <div className="site-footer-inner">
         <Link to="/home" className="site-footer-brand" aria-label="JuChess home">
-          <img src={compactCrestUrl} alt="" />
+          <img src={lightCrestUrl} alt="" />
           <span>
             <strong>JuChess</strong>
             <small>University of Jordan Chess Club</small>

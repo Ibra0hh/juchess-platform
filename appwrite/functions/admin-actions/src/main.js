@@ -670,7 +670,7 @@ export function buildPlayerEmailHtml({ subject, message, link: linkInput }) {
             </tr>
             <tr>
               <td align="center" style="padding:28px 36px 18px;">
-                <img src="https://juchess.page/email/juchess-email-logo.png" width="72" height="72" alt="JuChess" style="display:block;width:72px;height:72px;margin:0 auto 12px;object-fit:contain;">
+                <img src="https://juchess.page/email/juchess-rook.png" width="72" height="72" alt="JuChess" style="display:block;width:72px;height:72px;margin:0 auto 12px;object-fit:contain;">
                 <div style="font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:700;color:#171310;">JuChess</div>
                 <div style="margin-top:5px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8d7d63;">University of Jordan Chess Club</div>
               </td>

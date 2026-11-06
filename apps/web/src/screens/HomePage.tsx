@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
-import { compactCrestUrl } from '../lib/brand'
+import { compactCrestUrl, lightCrestUrl } from '../lib/brand'
 import { loadAnnouncements, loadTournamentSummaries, type Announcement, type Tournament } from '../lib/juchess'
 import { isPublicAnnouncement, isPublicTournament } from '../lib/publicContent'
 import './HomePage.css'
@@ -460,7 +460,7 @@ function AppSection() {
         <div className="app-panel-grid" aria-hidden="true" />
         <div className="app-copy">
           <div className="contact-heading">
-            <img className="contact-logo" src={compactCrestUrl} alt="JuChess crest" />
+            <img className="contact-logo" src={lightCrestUrl} alt="JuChess logo" />
             <div className="contact-heading-copy">
               <span>Contact the club</span>
               <h2 id="contact-title">Get in touch with us.</h2>
