@@ -225,9 +225,7 @@ button {
 .sidebar-brand img {
   width: 38px;
   height: 38px;
-  border-radius: 9px;
-  background: #fff;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .sidebar-brand span,

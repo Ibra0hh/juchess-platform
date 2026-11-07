@@ -18,7 +18,7 @@ import {
   type JuCapturedPiece,
 } from './components/JuChessRules'
 import { appwriteReady } from './lib/appwrite'
-import { compactCrestUrl } from './lib/brand'
+import { compactCrestUrl, lightCrestUrl } from './lib/brand'
 import { createSingleFlightTask, resolveTournamentSnapshot } from './lib/adminTournamentRefresh'
 import { subscribeToAdminTournamentChanges } from './lib/adminTournamentRealtime'
 import {
@@ -1120,7 +1120,7 @@ function AdminAppShell({
     <div className="prototype-admin">
       <aside className="prototype-sidebar">
         <div className="sidebar-brand">
-          <img src={compactCrestUrl} alt="JuChess" />
+          <img src={lightCrestUrl} alt="JuChess" />
           <span>
             <strong>JuChess</strong>
             <small>Control Center</small>
