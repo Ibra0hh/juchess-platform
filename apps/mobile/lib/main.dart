@@ -76,11 +76,11 @@ class _OrientationPolicyState extends State<OrientationPolicy>
 class AppConfig {
   static const endpoint = String.fromEnvironment(
     'APPWRITE_ENDPOINT',
-    defaultValue: 'https://cloud.appwrite.io/v1',
+    defaultValue: 'https://fra.cloud.appwrite.io/v1',
   );
   static const projectId = String.fromEnvironment(
     'APPWRITE_PROJECT_ID',
-    defaultValue: 'juchess-platform',
+    defaultValue: 'juchess-platform-student',
   );
   static const databaseId = String.fromEnvironment(
     'APPWRITE_DATABASE_ID',

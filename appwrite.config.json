@@ -1,8 +1,8 @@
 {
-  "organizationId": "6a11bf3c90fd189a8a37",
-  "projectId": "juchess-platform",
+  "organizationId": "6af0fce6d1dbb79b7475",
+  "projectId": "juchess-platform-student",
   "projectName": "JuChess Platform",
-  "endpoint": "https://cloud.appwrite.io/v1",
+  "endpoint": "https://fra.cloud.appwrite.io/v1",
   "includes": {
     "functions": "./appwrite/functions.json"
   }

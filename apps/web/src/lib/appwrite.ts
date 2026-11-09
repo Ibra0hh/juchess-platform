@@ -8,8 +8,8 @@ export { playerFunctionHeaders } from './functionAuth'
 // not secrets. Keep production-safe defaults so static GitHub Pages builds do
 // not silently lose cloud access when the ignored local .env file is absent.
 const defaultAppwriteConfig = {
-  endpoint: 'https://cloud.appwrite.io/v1',
-  projectId: 'juchess-platform',
+  endpoint: 'https://fra.cloud.appwrite.io/v1',
+  projectId: 'juchess-platform-student',
   databaseId: 'juchess',
 }
 

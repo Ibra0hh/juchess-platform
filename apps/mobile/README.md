@@ -6,8 +6,8 @@ Flutter implementation of the JuChess mobile and tablet prototype.
 
 ```bash
 flutter run \
-  --dart-define=APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 \
-  --dart-define=APPWRITE_PROJECT_ID=juchess-platform \
+  --dart-define=APPWRITE_ENDPOINT=https://fra.cloud.appwrite.io/v1 \
+  --dart-define=APPWRITE_PROJECT_ID=juchess-platform-student \
   --dart-define=APPWRITE_DATABASE_ID=juchess \
   --dart-define=APPWRITE_ACCESS_GUARD_FUNCTION_ID=access-guards
 ```

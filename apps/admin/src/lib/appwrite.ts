@@ -3,8 +3,8 @@ import { Account, Client, Functions, Realtime, Storage, TablesDB } from 'appwrit
 // These client identifiers are public. Defaults keep the static admin build
 // connected when local environment files are intentionally excluded from Git.
 const defaultAppwriteConfig = {
-  endpoint: 'https://cloud.appwrite.io/v1',
-  projectId: 'juchess-platform',
+  endpoint: 'https://fra.cloud.appwrite.io/v1',
+  projectId: 'juchess-platform-student',
   databaseId: 'juchess',
 }
 

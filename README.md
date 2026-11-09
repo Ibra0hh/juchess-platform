@@ -62,22 +62,27 @@ Run Flutter with Appwrite config:
 
 ```bash
 flutter run \
-  --dart-define=APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 \
-  --dart-define=APPWRITE_PROJECT_ID=juchess-platform \
+  --dart-define=APPWRITE_ENDPOINT=https://fra.cloud.appwrite.io/v1 \
+  --dart-define=APPWRITE_PROJECT_ID=juchess-platform-student \
   --dart-define=APPWRITE_DATABASE_ID=juchess
 ```
 
 ## Appwrite Setup
 
-The live Appwrite Cloud project is `juchess-platform` under the JuChess
-organization account. Local web/admin env files should use:
+The live Appwrite Cloud project is `juchess-platform-student` under the
+GitHub Student organization. Local web/admin env files should use:
 
 ```bash
-VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
-VITE_APPWRITE_PROJECT_ID=juchess-platform
+VITE_APPWRITE_ENDPOINT=https://fra.cloud.appwrite.io/v1
+VITE_APPWRITE_PROJECT_ID=juchess-platform-student
 VITE_APPWRITE_DATABASE_ID=juchess
 VITE_APPWRITE_ACCESS_GUARD_FUNCTION_ID=access-guards
 ```
+
+The original `juchess-platform` project is retained for rollback. Older
+Android APKs still target it and must be replaced with a new build. When using
+historical PowerShell migrations, pass `-Endpoint` and `-ProjectId` explicitly;
+their defaults may still refer to the original project.
 
 The admin app also needs:
 
