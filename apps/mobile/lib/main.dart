@@ -114,6 +114,10 @@ class AppConfig {
     'APPWRITE_TOURNAMENT_ASSETS_BUCKET_ID',
     defaultValue: 'tournament-assets',
   );
+  static const profileMediaBucketId = String.fromEnvironment(
+    'APPWRITE_PROFILE_MEDIA_BUCKET_ID',
+    defaultValue: 'avatars',
+  );
   static const accessGuardFunctionId = String.fromEnvironment(
     'APPWRITE_ACCESS_GUARD_FUNCTION_ID',
     defaultValue: 'access-guards',
@@ -199,6 +203,7 @@ class PlayerProfileIdentity {
     this.lichessUsername,
     this.rating,
     this.ratingSource,
+    this.avatarFileId,
   });
 
   factory PlayerProfileIdentity.fromRow(Map<String, dynamic> row) {
@@ -219,6 +224,7 @@ class PlayerProfileIdentity {
       lichessUsername: row['lichessUsername']?.toString(),
       rating: int.tryParse(row['rating']?.toString() ?? ''),
       ratingSource: row['ratingSource']?.toString(),
+      avatarFileId: row['avatarFileId']?.toString(),
     );
   }
 
@@ -232,6 +238,7 @@ class PlayerProfileIdentity {
   final String? lichessUsername;
   final int? rating;
   final String? ratingSource;
+  final String? avatarFileId;
 }
 
 sealed class ProfileIdentityLookup {
@@ -1329,10 +1336,33 @@ class AppwriteService {
   }
 
   Future<List<TournamentSeed>> loadTournaments() async {
-    final cloudDataFuture = _loadTournamentCloudData();
-    final tournamentRowsFuture = _listAllRows(AppConfig.tournamentsTableId);
-    final cloudData = await cloudDataFuture;
-    final tournamentRows = await tournamentRowsFuture;
+    final mediaFuture = _tryListTournamentMedia().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => const _TournamentMediaLoad(files: [], available: false),
+    );
+    final [
+      tournamentRows,
+      registrations,
+      profileRows,
+      games,
+      standings,
+    ] = await Future.wait([
+      _listAllRows(AppConfig.tournamentsTableId),
+      _listAllRows(AppConfig.registrationsTableId),
+      _listAllRows(AppConfig.profilesTableId),
+      _listAllRows(AppConfig.gamesTableId),
+      _listAllRows(AppConfig.standingsTableId),
+    ]);
+    final profiles = _mapProfileRows(profileRows);
+    final media = await mediaFuture;
+    final cloudData = _TournamentCloudData(
+      playerCountsByTournament: _groupRegistrationCounts(registrations),
+      playersByTournament: _groupRegisteredPlayers(registrations, profiles),
+      roundsByTournament: _groupPublishedRounds(games, profiles),
+      standingsByTournament: _groupTournamentStandings(standings, profiles),
+      mediaByTournament: _groupTournamentMedia(media.files),
+      mediaAvailable: media.available,
+    );
 
     final rows =
         uniqueTournamentsByFormat(
@@ -1476,29 +1506,6 @@ class AppwriteService {
         'Tournament game history is unavailable right now.',
       );
     }
-  }
-
-  Future<_TournamentCloudData> _loadTournamentCloudData() async {
-    final registrationsFuture = _listAllRows(AppConfig.registrationsTableId);
-    final profilesFuture = _listAllRows(AppConfig.profilesTableId);
-    final gamesFuture = _listAllRows(AppConfig.gamesTableId);
-    final standingsFuture = _listAllRows(AppConfig.standingsTableId);
-    final mediaFuture = _tryListTournamentMedia();
-
-    final registrations = await registrationsFuture;
-    final profiles = _mapProfileRows(await profilesFuture);
-    final games = await gamesFuture;
-    final standings = await standingsFuture;
-    final media = await mediaFuture;
-
-    return _TournamentCloudData(
-      playerCountsByTournament: _groupRegistrationCounts(registrations),
-      playersByTournament: _groupRegisteredPlayers(registrations, profiles),
-      roundsByTournament: _groupPublishedRounds(games, profiles),
-      standingsByTournament: _groupTournamentStandings(standings, profiles),
-      mediaByTournament: _groupTournamentMedia(media.files),
-      mediaAvailable: media.available,
-    );
   }
 
   Future<_TournamentMediaLoad> _tryListTournamentMedia() async {
@@ -2155,6 +2162,7 @@ class AppState extends ChangeNotifier {
   String? userName = _initialPreviewUserName();
   String? userEmail = _initialPreviewEmail();
   String? profileId;
+  String? avatarFileId;
   String? chessComUsername;
   String? lichessUsername;
   int? externalRating;
@@ -2166,6 +2174,7 @@ class AppState extends ChangeNotifier {
   Map<String, MyRegistrationInfo> myRegistrations = {};
   final Set<String> _registrationMutations = {};
   final Set<String> _attendanceMutations = {};
+  bool _disposed = false;
 
   Set<String> get registeredTournamentRowIds => myRegistrations.keys.toSet();
 
@@ -2244,7 +2253,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> bootstrap() async {
-    await Future.wait([loadCurrentUser(), loadTournaments()]);
+    await Future.wait([loadCurrentUser(), loadTournaments(onStartup: true)]);
   }
 
   Future<void> loadCurrentUser() async {
@@ -2579,6 +2588,7 @@ class AppState extends ChangeNotifier {
           rethrow;
         } catch (caught) {
           profileId = null;
+          avatarFileId = null;
           profileGateState = ProfileGateState.loadFailure;
           profileLoadError = appwriteMessage(caught);
           return;
@@ -2588,6 +2598,7 @@ class AppState extends ChangeNotifier {
         profileLoadError = null;
       case ProfileIdentityMissing():
         profileId = null;
+        avatarFileId = null;
         chessComUsername = null;
         lichessUsername = null;
         externalRating = null;
@@ -2596,6 +2607,7 @@ class AppState extends ChangeNotifier {
         profileLoadError = null;
       case ProfileIdentityFailure(:final cause):
         profileId = null;
+        avatarFileId = null;
         chessComUsername = null;
         lichessUsername = null;
         externalRating = null;
@@ -2612,6 +2624,7 @@ class AppState extends ChangeNotifier {
 
   void _applyProfileIdentity(PlayerProfileIdentity profile) {
     profileId = profile.profileId;
+    avatarFileId = profile.avatarFileId;
     final displayName = profile.displayName?.trim();
     if (displayName != null && displayName.isNotEmpty) userName = displayName;
     chessComUsername = profile.chessComUsername?.trim();
@@ -2624,6 +2637,7 @@ class AppState extends ChangeNotifier {
     userName = null;
     userEmail = null;
     profileId = null;
+    avatarFileId = null;
     chessComUsername = null;
     lichessUsername = null;
     externalRating = null;
@@ -2794,7 +2808,7 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> loadTournaments() async {
+  Future<void> loadTournaments({bool onStartup = false}) async {
     if (!service.ready) {
       tournamentItems = const [];
       return;
@@ -2804,20 +2818,44 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final loaded = await service.loadTournaments();
+      final loaded = onStartup
+          ? await _loadStartupTournaments()
+          : await service.loadTournaments();
+      if (_disposed) return;
       tournamentItems = loaded;
       tournamentDataUnavailable = false;
-      error = null;
+      if (!onStartup) error = null;
     } catch (_) {
       tournamentDataUnavailable = true;
     } finally {
       dataLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<List<TournamentSeed>> _loadStartupTournaments() async {
+    const retryDelays = [Duration(milliseconds: 500), Duration(seconds: 2)];
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await service.loadTournaments().timeout(
+          const Duration(seconds: 8),
+        );
+      } catch (error) {
+        final retryable = switch (error) {
+          TimeoutException() => true,
+          AppwriteException(:final code) =>
+            code == null || const {408, 429, 500, 502, 503, 504}.contains(code),
+          _ => false,
+        };
+        if (!retryable || attempt == retryDelays.length || _disposed) rethrow;
+        await Future<void>.delayed(retryDelays[attempt]);
+        if (_disposed) rethrow;
+      }
     }
   }
 
   Future<void> refreshTournaments() async {
-    if (!service.ready) return;
+    if (!service.ready || dataLoading) return;
 
     try {
       final loaded = await service.loadTournaments();
@@ -2834,6 +2872,12 @@ class AppState extends ChangeNotifier {
     } finally {
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 
@@ -4353,7 +4397,10 @@ class HomeTournamentEmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<AppState>();
+    final state = context.watch<AppState>();
+    final loading = state.dataLoading && state.tournamentItems.isEmpty;
+    final unavailable =
+        state.tournamentDataUnavailable && state.tournamentItems.isEmpty;
 
     return PrototypeCard(
       margin: EdgeInsets.zero,
@@ -4378,20 +4425,27 @@ class HomeTournamentEmptyCard extends StatelessWidget {
           ),
           const Spacer(),
           SerifText(
-            slot.emptyTitle,
+            loading
+                ? 'Loading tournaments'
+                : unavailable
+                ? 'Tournaments unavailable'
+                : slot.emptyTitle,
             size: 17,
             weight: FontWeight.w700,
             height: 1.25,
           ),
           const SizedBox(height: 6),
-          Text(
-            slot.emptyBody,
-            style: const TextStyle(
-              color: Color(0x99111111),
-              fontSize: 12.5,
-              height: 1.35,
+          if (!loading)
+            Text(
+              unavailable
+                  ? 'Check your connection and try again.'
+                  : slot.emptyBody,
+              style: const TextStyle(
+                color: Color(0x99111111),
+                fontSize: 12.5,
+                height: 1.35,
+              ),
             ),
-          ),
           const Spacer(),
           SizedBox(
             width: double.infinity,
@@ -4574,7 +4628,10 @@ class TournamentsScreen extends StatelessWidget {
                       ),
                     ]
                   : state.visibleTournaments.isEmpty
-                  ? [TournamentEmptyState(filter: state.tournamentFilter)]
+                  ? [
+                      if (!state.tournamentDataUnavailable)
+                        TournamentEmptyState(filter: state.tournamentFilter),
+                    ]
                   : state.visibleTournaments
                         .map(
                           (event) => Padding(
@@ -7625,6 +7682,58 @@ class ToolsScreen extends StatelessWidget {
   }
 }
 
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({required this.fileId});
+
+  final String? fileId;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = fileId?.trim();
+    final endpoint = Uri.parse(AppConfig.endpoint);
+    final uri = id == null || id.isEmpty
+        ? null
+        : endpoint.replace(
+            pathSegments: [
+              ...endpoint.pathSegments.where((segment) => segment.isNotEmpty),
+              'storage',
+              'buckets',
+              AppConfig.profileMediaBucketId,
+              'files',
+              id,
+              'view',
+            ],
+            queryParameters: {'project': AppConfig.projectId},
+          );
+    const placeholder = Center(
+      child: Text(
+        '\u265F',
+        style: TextStyle(fontSize: 30, color: Color(0x66111111)),
+      ),
+    );
+    return Container(
+      width: 76,
+      height: 76,
+      decoration: BoxDecoration(
+        color: const Color(0x12111111),
+        border: Border.all(color: const Color(0x33111111)),
+        shape: BoxShape.circle,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: uri == null
+          ? placeholder
+          : Image.network(
+              uri.toString(),
+              fit: BoxFit.cover,
+              semanticLabel: 'Profile picture',
+              frameBuilder: (_, child, frame, _) =>
+                  frame == null ? placeholder : child,
+              errorBuilder: (_, _, _) => placeholder,
+            ),
+    );
+  }
+}
+
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -7639,20 +7748,8 @@ class ProfileScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 26, 16, 0),
           child: Column(
             children: [
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: const Color(0x12111111),
-                  border: Border.all(color: const Color(0x33111111)),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '♟',
-                    style: TextStyle(fontSize: 30, color: Color(0x66111111)),
-                  ),
-                ),
+              _ProfileAvatar(
+                fileId: state.signedIn ? state.avatarFileId : null,
               ),
               const SizedBox(height: 14),
               SerifText(

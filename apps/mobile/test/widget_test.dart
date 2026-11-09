@@ -476,6 +476,51 @@ void main() {
   );
 
   testWidgets(
+    'signed-in profile requests its saved avatar and clears it at sign-out',
+    (tester) async {
+      final service = FakeMobileAuthService(
+        lookup: ProfileIdentityFound(
+          PlayerProfileIdentity.fromRow({
+            r'$id': 'profile-1',
+            'avatarFileId': 'test-avatar',
+          }),
+        ),
+      );
+      final state = AppState(service);
+      await tester.pump();
+      await state.signIn('player@example.com', 'password123');
+      await tester.pumpWidget(_withState(state, const ProfileScreen()));
+
+      final avatar = find.byWidgetPredicate(
+        (widget) =>
+            widget is Image && widget.semanticLabel == 'Profile picture',
+      );
+      final image = tester.widget<Image>(avatar);
+      final uri = Uri.parse((image.image as NetworkImage).url);
+      expect(uri.host, Uri.parse(AppConfig.endpoint).host);
+      expect(
+        uri.path,
+        endsWith(
+          '/storage/buckets/${AppConfig.profileMediaBucketId}/files/test-avatar/view',
+        ),
+      );
+      expect(uri.queryParameters['project'], AppConfig.projectId);
+      expect(image.fit, BoxFit.cover);
+
+      // Flutter's test HTTP client rejects network image requests.
+      await tester.pumpAndSettle();
+      expect(find.text('\u265F'), findsWidgets);
+      expect(tester.takeException(), isNull);
+
+      await state.signOut();
+      await tester.pumpAndSettle();
+      expect(state.avatarFileId, isNull);
+      expect(avatar, findsNothing);
+      expect(find.text('Guest profile'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'verified sign-in with no profile enters durable completion gate',
     (tester) async {
       final service = FakeMobileAuthService(
@@ -577,6 +622,65 @@ void main() {
   });
 
   testWidgets(
+    'startup retries a temporary tournament failure without a manual refresh',
+    (tester) async {
+      final service = FakeMobileAuthService()
+        ..tournamentLoadError = AppwriteException(
+          'Temporarily unavailable',
+          503,
+        )
+        ..tournamentRows = [_seed('upcoming-event', 'upcoming')];
+      final state = AppState(service);
+      await tester.pumpWidget(_withState(state, const TournamentsScreen()));
+      await tester.pump();
+
+      expect(service.tournamentLoadCalls, 1);
+      expect(state.tournamentDataUnavailable, isFalse);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('No upcoming tournaments'), findsNothing);
+
+      service.tournamentLoadError = null;
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+
+      expect(service.tournamentLoadCalls, 2);
+      expect(state.tournamentDataUnavailable, isFalse);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('upcoming-event'), findsOneWidget);
+    },
+  );
+
+  testWidgets('startup stops retrying after three unsuccessful reads', (
+    tester,
+  ) async {
+    final service = FakeMobileAuthService()
+      ..tournamentLoadError = AppwriteException('Temporarily unavailable', 503);
+    final state = AppState(service);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    expect(service.tournamentLoadCalls, 3);
+    expect(state.dataLoading, isFalse);
+    expect(state.tournamentDataUnavailable, isTrue);
+    expect(state.tournamentItems, isEmpty);
+  });
+
+  testWidgets('startup does not retry permanent tournament access errors', (
+    tester,
+  ) async {
+    final service = FakeMobileAuthService()
+      ..tournamentLoadError = AppwriteException('Access denied', 403);
+    final state = AppState(service);
+    await tester.pump();
+
+    expect(service.tournamentLoadCalls, 1);
+    expect(state.dataLoading, isFalse);
+    expect(state.tournamentDataUnavailable, isTrue);
+  });
+
+  testWidgets(
     'failed tournament refresh preserves the last canonical snapshot',
     (tester) async {
       final service = FakeMobileAuthService();
@@ -607,6 +711,8 @@ class FakeMobileAuthService extends AppwriteService {
   bool sessionAvailable = false;
   int profileWrites = 0;
   Object? tournamentLoadError;
+  int tournamentLoadCalls = 0;
+  List<TournamentSeed> tournamentRows = const [];
 
   final models.User user = models.User(
     $id: 'account-1',
@@ -663,6 +769,11 @@ class FakeMobileAuthService extends AppwriteService {
   Future<ProfileIdentityLookup> loadProfileIdentity() async => lookup;
 
   @override
+  Future<List<MobileImportedGame>> loadTournamentGameArchive({
+    String? profileId,
+  }) async => const [];
+
+  @override
   Future<void> assertCurrentUserAllowed(
     models.User user,
     PlayerProfileIdentity profile,
@@ -699,9 +810,10 @@ class FakeMobileAuthService extends AppwriteService {
 
   @override
   Future<List<TournamentSeed>> loadTournaments() async {
+    tournamentLoadCalls++;
     final failure = tournamentLoadError;
     if (failure != null) throw failure;
-    return const [];
+    return tournamentRows;
   }
 }
 
