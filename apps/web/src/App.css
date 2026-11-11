@@ -3,7 +3,7 @@
   height: 100vh;
   display: block;
   border: 0;
-  background: #f5efe3;
+  background: var(--ju-cream);
 }
 
 .prototype-missing {
@@ -12,8 +12,8 @@
   place-items: center;
   align-content: center;
   gap: 12px;
-  background: #f6f0e2;
-  color: #111111;
+  background: var(--ju-cream);
+  color: var(--ju-ink);
   text-align: center;
 }
 
@@ -25,12 +25,12 @@
 
 .prototype-missing h1 {
   margin: 0;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: 32px;
 }
 
 .prototype-missing a {
-  color: #7d2434;
+  color: var(--ju-burgundy);
   font-weight: 700;
 }
 .session-recovery {
@@ -38,7 +38,7 @@
   min-height: 100dvh;
   padding: 32px 20px;
   place-items: center;
-  background: #f5efe3;
+  background: var(--ju-cream);
 }
 
 .session-recovery section {
@@ -59,15 +59,15 @@
   place-items: center;
   border-radius: 50%;
   color: #fff;
-  background: #7a2431;
-  font: 700 24px/1 system-ui, sans-serif;
+  background: var(--ju-burgundy);
+  font: 700 24px/1 var(--font-interface);
 }
 
 .session-recovery-kicker {
   margin: 0 0 8px;
   color: #8b2638 !important;
-  font: 700 12px/1.2 system-ui, sans-serif;
-  letter-spacing: .12em;
+  font: 700 12px/1.2 var(--font-interface);
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -80,7 +80,7 @@
 
 .session-recovery section > p:not(.session-recovery-kicker) {
   margin: 18px auto 0;
-  color: #6d625b;
+  color: var(--ju-muted);
   line-height: 1.65;
 }
 
@@ -97,14 +97,14 @@
   min-height: 44px;
   padding: 0 18px;
   border-radius: 10px;
-  font: 700 14px/44px system-ui, sans-serif;
+  font: 700 14px/44px var(--font-interface);
   text-decoration: none;
 }
 
 .session-recovery button {
-  border: 1px solid #7a2431;
+  border: 1px solid var(--ju-burgundy);
   color: #fff;
-  background: #7a2431;
+  background: var(--ju-burgundy);
   cursor: pointer;
 }
 

@@ -13,11 +13,13 @@ export const recruitmentInterestOptions = [
 ] as const
 
 export type RecruitmentInterest = typeof recruitmentInterestOptions[number]['value']
+export type RecruitmentTrack = 'member' | 'leader'
 export type RecruitmentStatus = 'submitted' | 'reviewing' | 'shortlisted' | 'interview' | 'accepted' | 'rejected' | 'withdrawn'
 
 export type RecruitmentApplication = Models.Row & {
   profileId: string
   accountId: string
+  track?: RecruitmentTrack
   interests: RecruitmentInterest[]
   skills: string
   contribution: string
@@ -30,6 +32,7 @@ export type RecruitmentApplication = Models.Row & {
 }
 
 export type RecruitmentApplicationInput = {
+  track: RecruitmentTrack
   interests: RecruitmentInterest[]
   skills: string
   contribution: string

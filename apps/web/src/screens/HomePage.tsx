@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
 import { compactCrestUrl, lightCrestUrl } from '../lib/brand'
+import teamMembers from '../lib/clubTeam.json'
 import { loadAnnouncements, loadTournamentSummaries, type Announcement, type Tournament } from '../lib/juchess'
 import { isPublicAnnouncement, isPublicTournament } from '../lib/publicContent'
 import './HomePage.css'
@@ -12,16 +13,17 @@ import './HomePage.css'
 const gmailGlyphUrl = `${import.meta.env.BASE_URL}prototype/assets/gmail-glyph-gradient.svg`
 const instagramGlyphUrl = `${import.meta.env.BASE_URL}prototype/assets/instagram-glyph-gradient.svg`
 
-const fallers = [
-  { glyph: '♟', left: 12, size: 28, duration: 12.5, delay: -4.2, opacity: 0.1 },
-  { glyph: '♞', left: 21, size: 42, duration: 17.3, delay: -13.4, opacity: 0.12 },
-  { glyph: '♝', left: 32, size: 24, duration: 10.8, delay: -1.8, opacity: 0.08 },
-  { glyph: '♜', left: 43, size: 38, duration: 18.5, delay: -8.4, opacity: 0.1 },
-  { glyph: '♛', left: 56, size: 52, duration: 20.2, delay: -15.1, opacity: 0.09 },
-  { glyph: '♚', left: 68, size: 34, duration: 14.8, delay: -6.5, opacity: 0.13 },
-  { glyph: '♟', left: 78, size: 26, duration: 11.7, delay: -2.6, opacity: 0.08 },
-  { glyph: '♞', left: 91, size: 48, duration: 19.6, delay: -11.2, opacity: 0.1 },
-]
+const heroRookCount = 40
+const heroPieces = Array.from({ length: heroRookCount }, (_, index) => {
+  const duration = 18 + ((index * 5) % 7)
+  const phase = ((index * 17) % heroRookCount) / heroRookCount
+  return {
+    left: `${(2 + (index * 94) / (heroRookCount - 1)).toFixed(2)}%`,
+    size: `${24 + ((index * 7) % 11)}px`,
+    duration: `${duration}s`,
+    delay: `${(-duration * phase).toFixed(2)}s`,
+  }
+})
 
 const visionCards = [
   {
@@ -38,32 +40,6 @@ const visionCards = [
     number: '03',
     title: 'Sharpen skills',
     body: 'Help every member improve - weekly training, game reviews, and friendly competition that turns casual players into confident competitors.',
-  },
-]
-
-const teamPhoto = (fileName: string) => `${import.meta.env.BASE_URL}team/${fileName}`
-
-const teamMembers = [
-  {
-    name: 'Maya Erani',
-    role: 'President',
-    image: teamPhoto('maya-erani.webp'),
-  },
-  {
-    name: 'Yazan Shalan',
-    role: 'Vice President',
-    responsibility: 'Public Relations Manager',
-    image: teamPhoto('yazan-shalan.webp'),
-  },
-  {
-    name: 'Ryan Almuhaisen',
-    role: 'Social Media Manager',
-    image: teamPhoto('ryan-almuhaisen.png'),
-  },
-  {
-    name: 'Ibrahim Aladily',
-    role: 'Software Developer',
-    image: teamPhoto('ibrahim-aladily.webp'),
   },
 ]
 
@@ -134,21 +110,13 @@ function HomePage() {
       <SiteHeader active="home" />
       <main>
         <section className="home-hero" id="hero" aria-labelledby="home-title">
-          <div className="home-grid-wash" aria-hidden="true" />
-          <div className="home-glow" aria-hidden="true" />
-          <div className="home-fall-layer" aria-hidden="true">
-            {fallers.map((item, index) => (
+          <div className="home-hero-motion" aria-hidden="true">
+            {heroPieces.map(({ left, size, duration, delay }) => (
               <span
-                key={`${item.glyph}-${index}`}
-                style={{
-                  '--fall-left': `${item.left}%`,
-                  '--fall-size': `${item.size}px`,
-                  '--fall-duration': `${item.duration}s`,
-                  '--fall-delay': `${item.delay}s`,
-                  '--fall-opacity': item.opacity,
-                } as CSSProperties}
+                key={left}
+                style={{ left, fontSize: size, animationDuration: duration, animationDelay: delay }}
               >
-                {item.glyph}
+                {'\u265C'}
               </span>
             ))}
           </div>
@@ -433,17 +401,17 @@ function TeamSection() {
       </div>
       <div className="team-grid">
         {teamMembers.map((member) => (
-          <article className="team-card" key={member.name}>
+          <Link className="team-card" key={member.slug} to={`/team/${member.slug}`} aria-label={`View ${member.name}'s profile`}>
             <div className="team-photo-wrap">
-              <img src={member.image} alt={`${member.name}, ${member.role}`} loading="lazy" />
+              <img src={`${import.meta.env.BASE_URL}team/${member.photo}`} alt="" loading="lazy" />
               <span className="team-piece" aria-hidden="true">♞</span>
             </div>
             <div className="team-card-copy">
               <strong>{member.role}</strong>
               <h3>{member.name}</h3>
-              {'responsibility' in member && member.responsibility ? <p>{member.responsibility}</p> : null}
+              {member.responsibility ? <p>{member.responsibility}</p> : null}
             </div>
-          </article>
+          </Link>
         ))}
       </div>
       <div className="team-join-action">

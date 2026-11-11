@@ -22,7 +22,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #111111;
+  color: var(--ju-ink);
   text-decoration: none;
   flex: 0 0 auto;
   min-height: 44px;
@@ -41,17 +41,17 @@
 }
 
 .brand-link strong {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .brand-link small {
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   text-transform: uppercase;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-weight: 500;
 }
 
@@ -68,7 +68,7 @@
 .main-nav .disabled {
   font-size: 13.5px;
   font-weight: 500;
-  color: #111111;
+  color: var(--ju-ink);
   text-decoration: none;
   padding: 8px 12px;
   border-radius: 6px;
@@ -86,8 +86,8 @@
 
 .main-nav a.active {
   font-weight: 600;
-  color: #7a2431;
-  border-bottom: 2px solid #a98a3f;
+  color: var(--ju-action);
+  border-bottom: 2px solid var(--ju-action);
 }
 
 .auth-nav {
@@ -107,30 +107,30 @@
 }
 
 .sign-in-link {
-  color: #f5efe3;
-  background: #7a2431;
+  color: var(--ju-action-text);
+  background: var(--ju-action);
   padding: 9px 18px;
 }
 
 .auth-nav .sign-in-link,
 .auth-nav .profile-link {
-  color: #f5efe3;
+  color: var(--ju-cream);
 }
 
 .sign-in-link:hover {
-  background: #5f1b26;
+  background: var(--ju-burgundy);
 }
 
 .profile-link {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #7a2431;
-  color: #f5efe3;
+  background: var(--ju-burgundy);
+  color: var(--ju-cream);
   display: grid;
   place-items: center;
   text-decoration: none;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 14px;
   font-weight: 700;
   overflow: hidden;
@@ -143,21 +143,21 @@
 }
 
 .profile-link:hover {
-  background: #5f1b26;
+  background: var(--ju-burgundy-dark);
 }
 
 .sign-out-link {
   border: 1px solid rgba(17, 17, 17, 0.24);
   background: transparent;
-  color: #111111;
+  color: var(--ju-ink);
   padding: 8px 12px;
   cursor: pointer;
   font-family: inherit;
 }
 
 .sign-out-link:hover {
-  border-color: #7a2431;
-  color: #7a2431;
+  border-color: var(--ju-burgundy);
+  color: var(--ju-burgundy);
 }
 
 @media (max-width: 960px) {
@@ -186,7 +186,7 @@
 
 @media (max-width: 760px) {
   .site-header {
-    background: #f5efe3;
+    background: var(--ju-cream);
     backdrop-filter: none;
   }
 
@@ -254,7 +254,7 @@
   .main-nav a.active {
     border-bottom: 2px solid #a98a3f;
     background: transparent;
-    color: #7a2431;
+    color: var(--ju-burgundy);
     font-weight: 600;
   }
 

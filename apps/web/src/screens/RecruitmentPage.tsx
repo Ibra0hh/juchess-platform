@@ -19,6 +19,7 @@ import './ClubScreens.css'
 import './RecruitmentPage.css'
 
 const emptyForm: RecruitmentApplicationInput = {
+  track: 'member',
   interests: [],
   skills: '',
   contribution: '',
@@ -61,6 +62,7 @@ function RecruitmentPage() {
   }, [previewMode, profile])
 
   const editable = !application || ['submitted', 'withdrawn', 'rejected'].includes(application.status)
+  const leader = form.track === 'leader'
   const withdrawable = Boolean(application && ['submitted', 'reviewing', 'shortlisted', 'interview'].includes(application.status))
   const displayName = profile?.displayName || user?.name || 'Club member'
   const avatarUrl = profileMediaUrl(profile?.avatarFileId)
@@ -124,7 +126,7 @@ function RecruitmentPage() {
         <section className="recruitment-guest">
           <BriefcaseBusiness aria-hidden="true" />
           <h1>Bring your skills to JuChess</h1>
-          <p>Sign in with your club account to apply for the student team behind our tournaments, media, partnerships, and platform.</p>
+          <p>Apply as a Team Member to contribute to projects, or as a Team Leader to coordinate people and take responsibility for a club area. Sign in to open either application.</p>
           <div>
             <Link to="/sign-in">Sign in to apply <ArrowRight size={16} /></Link>
             <Link to="/sign-up">Create account</Link>
@@ -152,15 +154,30 @@ function RecruitmentPage() {
           <header>
             <div>
               <span>Application</span>
-              <h2>{application ? 'Your contribution profile' : 'Tell us about yourself'}</h2>
+              <h2>{leader ? 'Team Leader application' : 'Team Member application'}</h2>
             </div>
             {application ? <StatusPill status={application.status} /> : null}
           </header>
 
           {loading ? <RecruitmentFormSkeleton /> : (
             <>
+              <fieldset className="recruitment-track" disabled={!editable || saving}>
+                <legend>Application type</legend>
+                <div>
+                  <label>
+                    <input type="radio" name="application-track" checked={!leader}
+                      onChange={() => setForm((current) => ({ ...current, track: 'member' }))} />
+                    <span>Team Member</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="application-track" checked={leader}
+                      onChange={() => setForm((current) => ({ ...current, track: 'leader' }))} />
+                    <span>Team Leader</span>
+                  </label>
+                </div>
+              </fieldset>
               <fieldset disabled={!editable || saving}>
-                <legend>Where would you like to help?</legend>
+                <legend>{leader ? 'Which areas would you like to lead?' : 'Where would you like to help?'}</legend>
                 <p>Choose up to five areas. The HR team can discuss a different fit with you later.</p>
                 <div className="interest-grid">
                   {recruitmentInterestOptions.map((option) => {
@@ -182,15 +199,15 @@ function RecruitmentPage() {
               </fieldset>
 
               <label>
-                <span>Your skills and experience</span>
-                <small>Courses, projects, tools, volunteering, or practical experience all count.</small>
-                <textarea required minLength={20} maxLength={4000} rows={5} disabled={!editable || saving} value={form.skills} onChange={(event) => setForm({ ...form, skills: event.target.value })} placeholder="Example: I design social posts in Figma and helped organize two student events..." />
+                <span>{leader ? 'Your leadership experience' : 'Your skills and experience'}</span>
+                <small>{leader ? 'Describe a team, event, or project you coordinated and what you learned.' : 'Courses, projects, tools, volunteering, or practical experience all count.'}</small>
+                <textarea required minLength={20} maxLength={4000} rows={5} disabled={!editable || saving} value={form.skills} onChange={(event) => setForm({ ...form, skills: event.target.value })} />
               </label>
 
               <label>
-                <span>How would you contribute to JuChess?</span>
-                <small>Describe a problem you could help solve or a responsibility you would enjoy owning.</small>
-                <textarea required minLength={20} maxLength={4000} rows={5} disabled={!editable || saving} value={form.contribution} onChange={(event) => setForm({ ...form, contribution: event.target.value })} placeholder="I can help the club by..." />
+                <span>{leader ? 'What would you lead at JuChess?' : 'How would you contribute to JuChess?'}</span>
+                <small>{leader ? 'Describe your priorities, how you would organize the team, and what success would look like.' : 'Describe a problem you could help solve or a responsibility you would enjoy owning.'}</small>
+                <textarea required minLength={20} maxLength={4000} rows={5} disabled={!editable || saving} value={form.contribution} onChange={(event) => setForm({ ...form, contribution: event.target.value })} />
               </label>
 
               <div className="recruitment-form-row">
@@ -302,6 +319,7 @@ function RecruitmentFormSkeleton() {
 
 function formFromApplication(application: RecruitmentApplication): RecruitmentApplicationInput {
   return {
+    track: application.track === 'leader' ? 'leader' : 'member',
     interests: application.interests || [],
     skills: application.skills || '',
     contribution: application.contribution || '',

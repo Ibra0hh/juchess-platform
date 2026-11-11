@@ -1,3 +1,5 @@
+import teamMembers from './clubTeam.json' with { type: 'json' }
+
 export type PageMetadata = {
   description: string
   index?: boolean
@@ -87,6 +89,10 @@ const routeMetadata: Record<string, PageMetadata> = {
 
 export function metadataForPath(pathname: string): PageMetadata {
   const normalized = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname
+  const member = teamMembers.find(({ slug }) => normalized === `/team/${slug}`)
+  if (member) {
+    return { title: `${member.name} | JuChess`, description: `${member.role} at the University of Jordan Chess Club.` }
+  }
   if (normalized.startsWith('/tournament/')) {
     return {
       title: 'Tournament Details | JuChess',

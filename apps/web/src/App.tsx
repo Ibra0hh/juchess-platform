@@ -23,6 +23,7 @@ const OAuthCallbackPage = lazy(() => import('./screens/OAuthCallbackPage'))
 const CompleteProfilePage = lazy(() => import('./screens/CompleteProfilePage'))
 const ProfilePage = lazy(() => import('./screens/ProfilePage'))
 const RecruitmentPage = lazy(() => import('./screens/RecruitmentPage'))
+const TeamProfilePage = lazy(() => import('./screens/TeamProfilePage'))
 const TournamentDetailPage = lazy(() => import('./screens/TournamentDetailPage'))
 const TournamentsPage = lazy(() => import('./screens/TournamentsPage'))
 const VerifyEmailPage = lazy(() => import('./screens/VerifyEmailPage'))
@@ -80,6 +81,7 @@ function App() {
               <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/join-the-team" element={<RecruitmentPage />} />
+              <Route path="/team/:slug" element={<TeamProfilePage />} />
               <Route path="/privacy" element={<LegalPage kind="privacy" />} />
               <Route path="/terms" element={<LegalPage kind="terms" />} />
               <Route path="*" element={<NotFound />} />

@@ -35,6 +35,7 @@ export default function RecruitmentScreen() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<RecruitmentStatus | 'all'>('all')
   const [interest, setInterest] = useState('all')
+  const [track, setTrack] = useState('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
@@ -59,9 +60,10 @@ export default function RecruitmentScreen() {
       ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery))
       return matchesQuery
         && (status === 'all' || application.status === status)
+        && (track === 'all' || applicationTrack(application) === track)
         && (interest === 'all' || application.interests.includes(interest))
     })
-  }, [applications, interest, query, status])
+  }, [applications, interest, query, status, track])
 
   const selected = applications.find((application) => application.$id === selectedId) || null
   const counts = useMemo(() => ({
@@ -91,6 +93,11 @@ export default function RecruitmentScreen() {
               <Search size={16} />
               <input aria-label="Search applications" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, skills..." />
             </label>
+            <select aria-label="Filter by application type" value={track} onChange={(event) => setTrack(event.target.value)}>
+              <option value="all">All application types</option>
+              <option value="member">Team Member</option>
+              <option value="leader">Team Leader</option>
+            </select>
             <select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value as RecruitmentStatus | 'all')}>
               <option value="all">All statuses</option>
               {statusOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
@@ -109,15 +116,16 @@ export default function RecruitmentScreen() {
 
         <div className="recruitment-table-wrap">
           <table className="recruitment-table">
-            <thead><tr><th>Applicant</th><th>Interests</th><th>Availability</th><th>Submitted</th><th>Status</th><th aria-label="Actions" /></tr></thead>
+            <thead><tr><th>Applicant</th><th>Application type</th><th>Interests</th><th>Availability</th><th>Submitted</th><th>Status</th><th aria-label="Actions" /></tr></thead>
             <tbody>
               {loading ? <RecruitmentTableLoading /> : null}
               {!loading && !visibleApplications.length ? (
-                <tr><td colSpan={6}><div className="recruitment-empty"><BriefcaseBusiness /><strong>No matching applications</strong><span>New member applications will appear here automatically.</span></div></td></tr>
+                <tr><td colSpan={7}><div className="recruitment-empty"><BriefcaseBusiness /><strong>No matching applications</strong><span>New applications will appear here automatically.</span></div></td></tr>
               ) : null}
               {!loading ? visibleApplications.map((application) => (
                 <tr key={application.$id}>
                   <td><ApplicantCell application={application} /></td>
+                  <td>{applicationTrackLabel(application)}</td>
                   <td><div className="recruitment-interest-list">{application.interests.slice(0, 3).map((item) => <span key={item}>{interestLabels[item] || item}</span>)}{application.interests.length > 3 ? <em>+{application.interests.length - 3}</em> : null}</div></td>
                   <td>{application.availability}</td>
                   <td>{formatAdminDate(application.submittedAt)}</td>
@@ -145,6 +153,14 @@ export default function RecruitmentScreen() {
 
 function RecruitmentKpi({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return <article><span>{icon}</span><div><strong>{value}</strong><small>{label}</small></div></article>
+}
+
+function applicationTrack(application: RecruitmentApplication) {
+  return application.track === 'leader' ? 'leader' : 'member'
+}
+
+function applicationTrackLabel(application: RecruitmentApplication) {
+  return applicationTrack(application) === 'leader' ? 'Team Leader' : 'Team Member'
 }
 
 function ApplicantCell({ application }: { application: RecruitmentApplication }) {
@@ -212,8 +228,9 @@ function ReviewModal({ application, onClose, onSaved }: {
         <div className="review-modal-grid">
           <div className="review-application-copy">
             <ReviewSection title="Interests"><div className="recruitment-interest-list large">{application.interests.map((item) => <span key={item}>{interestLabels[item] || item}</span>)}</div></ReviewSection>
-            <ReviewSection title="Skills and experience"><p>{application.skills}</p></ReviewSection>
-            <ReviewSection title="How they would contribute"><p>{application.contribution}</p></ReviewSection>
+            <ReviewSection title="Application type"><p>{applicationTrackLabel(application)}</p></ReviewSection>
+            <ReviewSection title={applicationTrack(application) === 'leader' ? 'Leadership experience' : 'Skills and experience'}><p>{application.skills}</p></ReviewSection>
+            <ReviewSection title={applicationTrack(application) === 'leader' ? 'Leadership plan' : 'How they would contribute'}><p>{application.contribution}</p></ReviewSection>
             <ReviewSection title="Development goals"><p>{application.developmentGoals || 'Not provided.'}</p></ReviewSection>
             <ReviewSection title="Availability"><p>{application.availability}</p></ReviewSection>
             {application.portfolioUrl ? <a className="review-portfolio" href={application.portfolioUrl} target="_blank" rel="noreferrer">Open portfolio <ExternalLink size={14} /></a> : null}
@@ -245,7 +262,7 @@ function StatusBadge({ status }: { status: RecruitmentStatus }) {
 }
 
 function RecruitmentTableLoading() {
-  return <>{[0, 1, 2].map((row) => <tr className="recruitment-loading-row" key={row}><td colSpan={6}><span /></td></tr>)}</>
+  return <>{[0, 1, 2].map((row) => <tr className="recruitment-loading-row" key={row}><td colSpan={7}><span /></td></tr>)}</>
 }
 
 function exportApplicationsCsv(applications: RecruitmentApplication[]) {
@@ -254,6 +271,7 @@ function exportApplicationsCsv(applications: RecruitmentApplication[]) {
     Email: application.applicant?.email || '',
     Phone: application.applicant?.phone || '',
     UniversityId: application.applicant?.universityId || '',
+    ApplicationType: applicationTrackLabel(application),
     Interests: application.interests.map((item) => interestLabels[item] || item).join('; '),
     Availability: application.availability,
     Status: application.status,

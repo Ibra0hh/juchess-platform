@@ -26,7 +26,20 @@ test('crew application validation normalizes interests and content', () => {
   assert.deepEqual(value.interests, ['software', 'design']);
   assert.equal(value.skills, 'I build accessible React applications and APIs.');
   assert.equal(value.portfolioUrl, 'https://example.com/work');
+  assert.equal(value.track, 'member');
   assert.ok(CREW_INTERESTS.includes(value.interests[0]));
+});
+
+test('crew applications persist the selected track and reject unknown types', () => {
+  const application = {
+    interests: ['events'],
+    skills: 'I have organized and led a university event team.',
+    contribution: 'I would coordinate volunteers and set goals for each event.',
+    availability: '3-5 hours per week',
+  };
+  assert.equal(validateCrewApplication({ ...application, track: 'leader' }).track, 'leader');
+  assert.equal(validateCrewApplication({ ...application, track: 'member' }).track, 'member');
+  assert.throws(() => validateCrewApplication({ ...application, track: 'admin' }), /Team Member or Team Leader/);
 });
 
 test('crew application validation rejects unsafe links and empty detail', () => {

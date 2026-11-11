@@ -1,41 +1,30 @@
+@import "../public/palette/juchess-palette.css";
+
 @font-face {
-  font-family: "Droid Serif";
+  font-family: "Imbue";
   font-style: normal;
   font-display: swap;
-  font-weight: 400;
-  src: url("../../../node_modules/connect-fonts-droidserif/fonts/latin/droidserif-regular.woff") format("woff");
+  font-weight: 100 900;
+  src: url("/palette/assets/imbue-variable.ttf") format("truetype");
 }
 
 @font-face {
-  font-family: "Droid Serif";
-  font-style: italic;
-  font-display: swap;
-  font-weight: 400;
-  src: url("../../../node_modules/connect-fonts-droidserif/fonts/latin/droidserif-italic.woff") format("woff");
-}
-
-@font-face {
-  font-family: "Droid Serif";
+  font-family: "Kufam";
   font-style: normal;
   font-display: swap;
-  font-weight: 700;
-  src: url("../../../node_modules/connect-fonts-droidserif/fonts/latin/droidserif-bold.woff") format("woff");
-}
-
-@font-face {
-  font-family: "Droid Serif";
-  font-style: italic;
-  font-display: swap;
-  font-weight: 700;
-  src: url("../../../node_modules/connect-fonts-droidserif/fonts/latin/droidserif-bolditalic.woff") format("woff");
+  font-weight: 400 900;
+  src: url("/palette/assets/kufam-variable.ttf") format("truetype");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-089F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
 :root {
-  --font-interface: "FF Providence Sans", "Droid Serif";
-  --font-heading: "Droid Serif";
+  /* Finland Rounded can be hosted here once licensed webfont files are available. */
+  --font-interface: "Finland Rounded", "Kufam", ui-rounded, system-ui, sans-serif;
+  --font-heading: "Imbue", "Kufam", Georgia, serif;
+  --ju-focus: var(--ju-burgundy-dark);
   font-family: var(--font-interface);
-  color: #111111;
-  background: #f6f0e2;
+  color: var(--ju-text);
+  background: var(--ju-background);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -56,28 +45,26 @@ body {
   min-height: 100vh;
 }
 
-/*
- * JuChess typography system
- *
- * FF Providence Sans is the preferred interface face. Droid Serif is a
- * self-hosted, approved fallback so the site never renders in an unrelated
- * system font while the licensed Providence webfont is unavailable.
- */
-body,
-body * {
-  font-family: var(--font-interface) !important;
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
-body :where(h1, h2, h3, h4, h5, h6) {
-  font-family: var(--font-heading) !important;
-}
-
-body :where(
+body :is(
+  h1, h2, h3, h4, h5, h6,
   .brand-link strong,
   .site-footer-brand strong,
   .route-skeleton-brand strong
 ) {
-  font-family: var(--font-heading) !important;
+  font-family: var(--font-heading);
+}
+
+:lang(ar) {
+  --font-heading: "Kufam", sans-serif;
+  --font-interface: "Kufam", sans-serif;
+  font-family: var(--font-interface);
 }
 
 a,
@@ -87,7 +74,7 @@ button {
 }
 
 :focus-visible {
-  outline: 3px solid rgba(125, 36, 52, 0.45);
+  outline: 3px solid var(--ju-focus);
   outline-offset: 3px;
 }
 

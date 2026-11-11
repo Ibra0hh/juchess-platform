@@ -1,8 +1,8 @@
 .detail-screen {
   min-height: 100vh;
-  background: #f5efe3;
-  color: #111111;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--ju-cream);
+  color: var(--ju-ink);
+  font-family: var(--font-interface);
   overflow-x: clip;
 }
 
@@ -18,9 +18,9 @@
   gap: 9px;
   font-size: 13px;
   font-weight: 600;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   text-decoration: none;
-  background: #fffcf4;
+  background: var(--ju-surface);
   border: 1px solid rgba(122, 36, 49, 0.3);
   border-radius: 999px;
   padding: 8px 18px 8px 12px;
@@ -28,9 +28,9 @@
 }
 
 .detail-back:hover {
-  background: #7a2431;
-  border-color: #7a2431;
-  color: #f8f3e7;
+  background: var(--ju-burgundy);
+  border-color: var(--ju-burgundy);
+  color: var(--ju-cream);
 }
 
 .detail-hero {
@@ -50,7 +50,7 @@
 }
 
 .detail-title-line h1 {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 38px;
   font-weight: 600;
   margin: 0;
@@ -68,7 +68,7 @@
 .detail-round {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 13px;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-weight: 500;
 }
 
@@ -77,7 +77,7 @@
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
   font-weight: 600;
   border-radius: 999px;
@@ -85,15 +85,15 @@
 }
 
 .detail-status.live {
-  color: #f8f3e7;
-  background: #7a2431;
+  color: var(--ju-cream);
+  background: var(--ju-burgundy);
 }
 
 .detail-status.live span {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #f8f3e7;
+  background: var(--ju-cream);
   animation: ju-pulse 1.6s ease-in-out infinite;
 }
 
@@ -130,7 +130,7 @@
   border: none;
   border-bottom: 2px solid transparent;
   color: rgba(17, 17, 17, 0.66);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 14px;
   font-weight: 500;
   padding: 10px 18px;
@@ -140,11 +140,11 @@
 
 .detail-tabs button:hover,
 .detail-tabs button.active {
-  color: #7a2431;
+  color: var(--ju-burgundy);
 }
 
 .detail-tabs button.active {
-  border-bottom-color: #7a2431;
+  border-bottom-color: var(--ju-burgundy);
   font-weight: 600;
 }
 
@@ -153,7 +153,7 @@
 }
 
 .overview-grid {
-  background: #fffcf4;
+  background: var(--ju-surface);
   border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 10px;
   padding: 18px 20px;
@@ -170,7 +170,7 @@
 
 .overview-item span {
   font-size: 10.5px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: rgba(17, 17, 17, 0.5);
   font-weight: 600;
@@ -182,7 +182,7 @@
 }
 
 .overview-item strong.accent {
-  color: #7a2431;
+  color: var(--ju-burgundy);
 }
 
 .overview-item strong.gold {
@@ -203,7 +203,7 @@
   padding: 0 11px;
   border: 1px solid rgba(122, 36, 49, 0.28);
   border-radius: 7px;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   background: rgba(122, 36, 49, 0.045);
   font-size: 12px;
   font-weight: 700;
@@ -213,9 +213,9 @@
 }
 
 .overview-location-link:hover {
-  border-color: #7a2431;
-  color: #fffcf4;
-  background: #7a2431;
+  border-color: var(--ju-burgundy);
+  color: var(--ju-surface);
+  background: var(--ju-burgundy);
 }
 
 .detail-description {
@@ -228,7 +228,7 @@
 
 .register-card {
   margin-top: 26px;
-  background: #fffcf4;
+  background: var(--ju-surface);
   border: 1px solid rgba(169, 138, 63, 0.4);
   border-radius: 12px;
   padding: 22px 24px;
@@ -248,12 +248,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   flex: none;
 }
 
 .register-card h2 {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 21px;
   font-weight: 700;
   margin: 0;
@@ -283,16 +283,16 @@
 }
 
 .primary-action {
-  color: #f8f3e7;
-  background: #7a2431;
+  color: var(--ju-cream);
+  background: var(--ju-burgundy);
 }
 
 .primary-action:hover {
-  background: #5f1b26;
+  background: var(--ju-burgundy-dark);
 }
 
 .secondary-action {
-  color: #111111;
+  color: var(--ju-ink);
   border: 1px solid rgba(17, 17, 17, 0.3);
 }
 
@@ -329,7 +329,7 @@
 }
 
 .register-message {
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-weight: 600;
   margin-top: 8px;
 }
@@ -371,14 +371,14 @@
 }
 
 .attendance-prompt-actions button.selected {
-  color: #fffaf0;
+  color: var(--ju-surface);
   background: #2e7d5b;
   border-color: #2e7d5b !important;
 }
 
 .attendance-prompt-actions button.selected.decline {
-  background: #7a2431;
-  border-color: #7a2431 !important;
+  background: var(--ju-burgundy);
+  border-color: var(--ju-burgundy) !important;
 }
 
 .attendance-note {
@@ -411,7 +411,7 @@
 .rounds-panel,
 .standings-panel,
 .bracket-panel {
-  background: #fffcf4;
+  background: var(--ju-surface);
   border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 10px;
   overflow: hidden;
@@ -430,7 +430,7 @@
 .panel-heading h2,
 .games-toolbar h2,
 .bracket-panel h2 {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 23px;
   font-weight: 700;
   margin: 0;
@@ -445,10 +445,10 @@
 .panel-heading button {
   border: 1px solid rgba(122, 36, 49, 0.32);
   background: transparent;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   border-radius: 999px;
   padding: 7px 12px;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -470,7 +470,7 @@
 }
 
 .game-mini {
-  color: #111111;
+  color: var(--ju-ink);
   text-decoration: none;
 }
 
@@ -510,8 +510,8 @@
 }
 
 .schedule-row.now > span {
-  background: #7a2431;
-  border-color: #7a2431;
+  background: var(--ju-burgundy);
+  border-color: var(--ju-burgundy);
   animation: ju-pulse 1.6s ease-in-out infinite;
 }
 
@@ -536,12 +536,12 @@
 
 .board-preview .light {
   background: #f4dfb9;
-  color: #7a2431;
+  color: var(--ju-burgundy);
 }
 
 .board-preview .dark {
   background: #8b3040;
-  color: #f8f3e7;
+  color: var(--ju-cream);
 }
 
 .games-toolbar {
@@ -622,7 +622,7 @@
 }
 
 .game-status-filter button.active {
-  background: #7a2431;
+  background: var(--ju-burgundy);
   color: #fff;
   box-shadow: 0 3px 9px rgba(122, 36, 49, 0.2);
 }
@@ -650,7 +650,7 @@
 .tournament-game-round > header h3 {
   margin: 0;
   color: #111;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 23px;
 }
 
@@ -679,9 +679,9 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  color: #111111;
+  color: var(--ju-ink);
   text-decoration: none;
-  background: #fffcf4;
+  background: var(--ju-surface);
   border: 1px solid rgba(17, 17, 17, 0.15);
   border-radius: 10px;
   padding: 14px;
@@ -706,7 +706,7 @@
   padding: 5px 8px;
   font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   line-height: 1;
   text-transform: uppercase;
   backdrop-filter: blur(6px);
@@ -788,7 +788,7 @@
 
 .game-card-body span {
   font-size: 11px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: rgba(17, 17, 17, 0.52);
   font-weight: 600;
@@ -796,7 +796,7 @@
 
 .game-card-body strong {
   display: block;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 12px;
   margin-top: 3px;
@@ -847,7 +847,7 @@
   overflow: hidden;
   border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 8px;
-  background: #fffcf4;
+  background: var(--ju-surface);
 }
 
 .tournament-media-panel .panel-heading > div {
@@ -887,7 +887,7 @@
   border: 0;
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  background: #111111;
+  background: var(--ju-ink);
   cursor: zoom-in;
   place-items: center;
 }
@@ -933,7 +933,7 @@
 }
 
 .attendance-status.missed {
-  color: #7a2431;
+  color: var(--ju-burgundy);
   border-color: rgba(122, 36, 49, 0.35);
   background: rgba(122, 36, 49, 0.06);
 }
@@ -945,7 +945,7 @@
 
 .public-media-meta .public-media-tags {
   overflow: hidden;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -958,7 +958,7 @@
   padding: 7px 10px;
   border: 1px solid rgba(122, 36, 49, 0.28);
   border-radius: 6px;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-size: 11.5px;
   font-weight: 700;
   text-decoration: none;
@@ -975,8 +975,8 @@
 }
 
 .public-media-empty strong {
-  color: #111111;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  color: var(--ju-ink);
+  font-family: var(--font-heading);
   font-size: 22px;
 }
 
@@ -1176,12 +1176,12 @@
 
 .tournament-color-chip.white {
   background: #fff;
-  color: #111111;
+  color: var(--ju-ink);
 }
 
 .tournament-color-chip.black {
-  border-color: #111111;
-  background: #111111;
+  border-color: var(--ju-ink);
+  background: var(--ju-ink);
   color: #fff;
 }
 
@@ -1212,7 +1212,7 @@
   min-height: 38px;
   border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 8px;
-  background: #fffaf0;
+  background: var(--ju-surface);
   color: rgba(17, 17, 17, 0.72);
   font: inherit;
   font-size: 13px;
@@ -1222,14 +1222,14 @@
 
 .stage-round-tabs button:hover,
 .stage-round-tabs button.active {
-  border-color: #7a2431;
-  color: #7a2431;
+  border-color: var(--ju-burgundy);
+  color: var(--ju-burgundy);
 }
 
 .stage-round-tabs button.active {
-  background: #111111;
-  border-color: #111111;
-  color: #fffaf0;
+  background: var(--ju-ink);
+  border-color: var(--ju-ink);
+  color: var(--ju-surface);
 }
 
 .round-list {
@@ -1256,7 +1256,7 @@
 }
 
 .unpublished-panel strong {
-  color: #111111;
+  color: var(--ju-ink);
   font-size: 16px;
   font-weight: 900;
 }
@@ -1283,7 +1283,7 @@
   padding: 14px 22px;
   border-bottom: 1px solid #e6dfd3;
   background: #faf7f1;
-  color: #111111;
+  color: var(--ju-ink);
   font-size: 14px;
   font-weight: 900;
 }
@@ -1295,7 +1295,7 @@
 }
 
 .round-admin-panel.live .round-admin-head span {
-  color: #7a2431;
+  color: var(--ju-burgundy);
 }
 
 .round-admin-pairing {
@@ -1326,7 +1326,7 @@
 
 .round-admin-pairing strong {
   min-width: 0;
-  color: #111111;
+  color: var(--ju-ink);
   font-size: 13.5px;
   font-weight: 900;
   overflow-wrap: anywhere;
@@ -1361,7 +1361,7 @@
 }
 
 .round-admin-pairing em {
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-size: 11px;
   font-style: normal;
   font-weight: 900;
@@ -1378,7 +1378,7 @@
 
 .round-card.live {
   border-color: rgba(122, 36, 49, 0.34);
-  border-left-color: #7a2431;
+  border-left-color: var(--ju-burgundy);
   background: #fff7ee;
 }
 
@@ -1397,7 +1397,7 @@
 
 .round-card-heading h3 {
   margin: 0;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 20px;
   font-weight: 700;
 }
@@ -1417,13 +1417,13 @@
   color: rgba(17, 17, 17, 0.62);
   font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .round-card.live .round-card-heading > span {
   background: rgba(122, 36, 49, 0.1);
-  color: #7a2431;
+  color: var(--ju-burgundy);
 }
 
 .round-card.next .round-card-heading > span {
@@ -1453,7 +1453,7 @@
 
 .round-pairing strong {
   min-width: 0;
-  color: #111111;
+  color: var(--ju-ink);
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1461,7 +1461,7 @@
 }
 
 .round-pairing em {
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 12px;
   font-style: normal;
@@ -1478,12 +1478,12 @@
 
 .players-panel th,
 .standings-panel th {
-  background: #111111;
-  color: #f5efe3;
+  background: var(--ju-ink);
+  color: var(--ju-cream);
   text-align: left;
   padding: 10px 14px;
   font-size: 11px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
   font-weight: 600;
 }
@@ -1527,7 +1527,7 @@
 .table-status.playing,
 .table-status.qualified {
   background: rgba(122, 36, 49, 0.1);
-  color: #7a2431;
+  color: var(--ju-burgundy);
 }
 
 .bracket-panel {
@@ -1551,24 +1551,24 @@
 .bracket-switch button {
   height: 38px;
   padding: 0 20px;
-  color: #111111;
+  color: var(--ju-ink);
   background: transparent;
   border: 1px solid rgba(17, 17, 17, 0.28);
   border-radius: 8px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 13px;
   font-weight: 600;
 }
 
 .bracket-switch button:hover {
-  border-color: #7a2431;
+  border-color: var(--ju-burgundy);
 }
 
 .bracket-switch button.active {
-  color: #f5efe3;
-  background: #111111;
-  border-color: #111111;
+  color: var(--ju-cream);
+  background: var(--ju-ink);
+  border-color: var(--ju-ink);
 }
 
 .bracket-round-nav {
@@ -1593,7 +1593,7 @@
   border: 1px solid rgba(17, 17, 17, 0.18);
   border-radius: 8px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
@@ -1601,14 +1601,14 @@
 }
 
 .bracket-round-nav button:hover {
-  color: #7a2431;
+  color: var(--ju-burgundy);
   border-color: rgba(122, 36, 49, 0.4);
 }
 
 .bracket-round-nav button.active {
-  color: #f5efe3;
-  background: #111111;
-  border-color: #111111;
+  color: var(--ju-cream);
+  background: var(--ju-ink);
+  border-color: var(--ju-ink);
   box-shadow: 0 1px 4px rgba(17, 17, 17, 0.14);
 }
 
@@ -1670,7 +1670,7 @@
   font-size: 11px;
   font-weight: 600;
   line-height: 1.25;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-align: center;
   text-transform: uppercase;
   white-space: normal;
@@ -1696,7 +1696,7 @@
   border: 1px solid rgba(17, 17, 17, 0.14);
   border-left: 3px solid rgba(17, 17, 17, 0.2);
   border-radius: 8px;
-  background: #fffcf4;
+  background: var(--ju-surface);
   box-shadow: 0 1px 3px rgba(17, 17, 17, 0.06);
   color: inherit;
   text-decoration: none;
@@ -1714,7 +1714,7 @@
 .bracket-match.rich.live {
   background: #fff7ee;
   border-color: rgba(122, 36, 49, 0.4);
-  border-left-color: #7a2431;
+  border-left-color: var(--ju-burgundy);
 }
 
 .bracket-match.rich.pending {
@@ -1735,7 +1735,7 @@
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 9.5px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -1744,10 +1744,10 @@
   align-items: center;
   gap: 5px;
   margin-bottom: 6px;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-size: 9.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -1759,7 +1759,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #7a2431;
+  background: var(--ju-burgundy);
   animation: ju-pulse 1.6s ease-in-out infinite;
 }
 
@@ -1779,7 +1779,7 @@
 .bracket-player span {
   min-width: 0;
   overflow: hidden;
-  color: #111111;
+  color: var(--ju-ink);
   font-size: 13px;
   font-weight: 400;
   text-overflow: ellipsis;
@@ -1797,7 +1797,7 @@
 
 .bracket-player strong {
   flex: none;
-  color: #111111;
+  color: var(--ju-ink);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 13px;
   font-weight: 600;
@@ -1808,7 +1808,7 @@
   width: 18px;
   height: 18px;
   overflow: visible;
-  color: #111111;
+  color: var(--ju-ink);
   font-size: 9px;
 }
 
@@ -1828,7 +1828,7 @@
 }
 
 .detail-empty h1 {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 30px;
   margin: 0;
 }

@@ -240,6 +240,9 @@ partnerships, finance, and management work.
 Fields:
 - `profileId` and `accountId` strings, required. `profileId` is unique so one
   member has one resumable application record.
+- `track` enum: `member` (default) or `leader`. Existing applications without
+  a track are treated as Member applications. Leader forms use the skills
+  and contribution fields for leadership experience and plans.
 - `interests` string array, required.
 - `skills` and `contribution` text, required.
 - `developmentGoals`, `availability`, and `portfolioUrl` strings.

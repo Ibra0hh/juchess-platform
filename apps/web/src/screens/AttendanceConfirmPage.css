@@ -1,6 +1,6 @@
 .attendance-page-shell {
   min-height: 100vh;
-  background: #f7efe2;
+  background: var(--ju-cream);
 }
 
 .attendance-page {
@@ -19,7 +19,7 @@
   padding: 38px;
   text-align: center;
   color: #111;
-  background: #fffaf0;
+  background: var(--ju-surface);
   border: 1px solid rgba(17, 17, 17, 0.18);
   border-radius: 20px;
   box-shadow: 0 24px 70px rgba(68, 38, 24, 0.12);
@@ -33,7 +33,7 @@
 
 .attendance-card h1 {
   margin: 2px 0 0;
-  font-family: Georgia, serif;
+  font-family: var(--font-heading);
   font-size: clamp(1.8rem, 5vw, 2.5rem);
   line-height: 1.1;
 }
@@ -46,7 +46,7 @@
 }
 
 .attendance-card svg {
-  color: #7a2431;
+  color: var(--ju-burgundy);
 }
 
 .attendance-loader {
@@ -54,10 +54,10 @@
 }
 
 .attendance-eyebrow {
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.11em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -89,9 +89,9 @@
 }
 
 .attendance-yes {
-  color: #fffaf0;
-  background: #7a2431;
-  border: 1px solid #7a2431;
+  color: var(--ju-surface);
+  background: var(--ju-burgundy);
+  border: 1px solid var(--ju-burgundy);
 }
 
 .attendance-no,

@@ -639,6 +639,10 @@ export function crewApplicationRowId(profileId) {
 }
 
 export function validateCrewApplication(input = {}) {
+  const track = input.track ?? 'member';
+  if (track !== 'member' && track !== 'leader') {
+    throw new HttpError(400, 'Choose the Team Member or Team Leader application.');
+  }
   const interests = Array.from(new Set(
     (Array.isArray(input.interests) ? input.interests : [])
       .map((value) => String(value).trim().toLowerCase())
@@ -658,7 +662,7 @@ export function validateCrewApplication(input = {}) {
     throw new HttpError(400, 'Portfolio links must start with http:// or https://.');
   }
 
-  return { interests, skills, contribution, developmentGoals, availability, portfolioUrl };
+  return { track, interests, skills, contribution, developmentGoals, availability, portfolioUrl };
 }
 
 function cleanApplicationText(value, maxLength) {
@@ -808,11 +812,11 @@ export default async ({ req, res, log, error }) => {
       }
 
       if (method === 'POST') {
-        const application = validateCrewApplication(body);
         const existing = await findCrewApplication(tablesDB, databaseId, profile.$id);
         if (existing && !EDITABLE_APPLICATION_STATUSES.includes(existing.status)) {
           throw new HttpError(409, 'This application is already being reviewed and can no longer be edited.');
         }
+        const application = validateCrewApplication({ ...body, track: body.track ?? existing?.track });
 
         const now = new Date().toISOString();
         const data = {

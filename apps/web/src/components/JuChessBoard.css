@@ -24,7 +24,7 @@
   overflow: hidden;
   border: 1px solid rgba(17, 17, 17, 0.26);
   border-radius: 4px;
-  background: #111111;
+  background: var(--ju-ink);
 }
 
 .ju-evaluation-fill {
@@ -32,7 +32,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  background: #f6f0e0;
+  background: var(--ju-cream);
   transition: none;
 }
 
@@ -48,7 +48,7 @@
   border: 1px solid rgba(17, 17, 17, 0.18);
   border-radius: 2px;
   background: rgba(255, 253, 248, 0.94);
-  color: #111111;
+  color: var(--ju-ink);
   font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   font-size: 8px;
   font-weight: 800;
@@ -186,7 +186,7 @@
     border: 1px solid transparent;
     border-radius: 7px;
     background: transparent;
-    color: #111111;
+    color: var(--ju-ink);
     padding: 0 5px;
     font: inherit;
     font-size: 11px;
@@ -195,7 +195,7 @@
 
   .ju-touch-annotation-toolbar button[aria-pressed="true"] {
     border-color: rgba(122, 36, 49, 0.28);
-    background: #7a2431;
+    background: var(--ju-burgundy);
     color: #ffffff;
   }
 }
@@ -285,7 +285,7 @@
   border-radius: 50%;
   box-shadow: 0 2px 6px rgba(17, 17, 17, 0.36);
   color: #ffffff;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: clamp(8px, 2.3cqw, 12px);
   font-weight: 900;
   letter-spacing: 0;
@@ -303,7 +303,7 @@
 .ju-file-label {
   position: absolute;
   z-index: 4;
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   font-size: clamp(8px, 1.6cqw, 11px);
   font-weight: 900;

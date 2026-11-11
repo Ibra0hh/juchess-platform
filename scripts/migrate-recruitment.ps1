@@ -89,6 +89,7 @@ $reviews = 'crew_application_reviews'
 Ensure-Table $applications 'Crew applications'
 Ensure-Varchar $applications profileId 64 $true
 Ensure-Varchar $applications accountId 64 $true
+Ensure-Enum $applications track @('member', 'leader') 'member'
 Ensure-Varchar $applications interests 64 $true $true
 Ensure-Text $applications skills $true
 Ensure-Text $applications contribution $true
@@ -98,7 +99,7 @@ Ensure-Varchar $applications portfolioUrl 1024
 Ensure-Enum $applications status @('submitted', 'reviewing', 'shortlisted', 'interview', 'accepted', 'rejected', 'withdrawn') 'submitted'
 Ensure-Datetime $applications submittedAt $true
 Ensure-Datetime $applications updatedAt $true
-Wait-Columns $applications @('profileId', 'accountId', 'interests', 'status', 'updatedAt')
+Wait-Columns $applications @('profileId', 'accountId', 'track', 'interests', 'status', 'updatedAt')
 Ensure-Index $applications profile_unique unique @('profileId')
 Ensure-Index $applications status_updated key @('status', 'updatedAt')
 

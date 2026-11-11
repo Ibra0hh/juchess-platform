@@ -34,7 +34,7 @@
   border: 1px solid rgba(17, 17, 17, 0.26);
   border-radius: 8px;
   background: #ffffff;
-  color: #111111;
+  color: var(--ju-ink);
   padding: 0 14px;
   font: inherit;
   font-size: 14px;
@@ -43,19 +43,19 @@
 
 .verification-resend-form input:focus,
 .verification-code-form input:focus {
-  border-color: #7a2431;
+  border-color: var(--ju-burgundy);
   box-shadow: 0 0 0 3px rgba(122, 36, 49, 0.12);
 }
 
 .verification-form-heading {
   display: grid;
   gap: 3px;
-  color: #111111;
+  color: var(--ju-ink);
   text-align: left;
 }
 
 .verification-form-heading strong {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: 17px;
   line-height: 1.25;
 }
@@ -72,7 +72,7 @@
   font-family: 'Courier New', monospace;
   font-size: 23px;
   font-weight: 700;
-  letter-spacing: 8px;
+  letter-spacing: 0;
   text-align: center;
 }
 
@@ -83,7 +83,7 @@
   color: rgba(17, 17, 17, 0.54);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-align: center;
   text-transform: uppercase;
 }
@@ -101,7 +101,7 @@
 .verification-method-divider span {
   position: relative;
   padding: 0 10px;
-  background: #fffdf8;
+  background: var(--ju-surface);
 }
 
 @media (max-width: 480px) {
@@ -112,7 +112,7 @@
   .verification-code-form .verification-code-input {
     padding-left: 16px;
     font-size: 21px;
-    letter-spacing: 6px;
+    letter-spacing: 0;
   }
 }
 
@@ -121,8 +121,8 @@
   height: 46px;
   border: none;
   border-radius: 8px;
-  background: #7a2431;
-  color: #f8f3e7;
+  background: var(--ju-burgundy);
+  color: var(--ju-cream);
   font: inherit;
   font-size: 14.5px;
   font-weight: 600;
@@ -130,7 +130,7 @@
 }
 
 .verification-resend-button:hover:not(:disabled) {
-  background: #5f1b26;
+  background: var(--ju-burgundy-dark);
 }
 
 .verification-resend-button:focus-visible {
@@ -151,7 +151,7 @@
   border: 1px solid rgba(122, 36, 49, 0.28);
   border-radius: 8px;
   background: rgba(122, 36, 49, 0.08);
-  color: #7a2431;
+  color: var(--ju-burgundy);
   font-size: 12.5px;
   line-height: 1.45;
   text-align: left;

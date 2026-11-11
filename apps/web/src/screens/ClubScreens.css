@@ -1,17 +1,17 @@
 .club-screen {
-  --ink: #111111;
-  --wine: #7a2431;
-  --wine-dark: #5f1b26;
+  --ink: var(--ju-ink);
+  --wine: var(--ju-burgundy);
+  --wine-dark: var(--ju-burgundy-dark);
   --gold: #a98a3f;
-  --paper: #f5efe3;
-  --surface: #fffcf4;
+  --paper: var(--ju-cream);
+  --surface: var(--ju-surface);
   --line: rgba(17, 17, 17, 0.16);
   --muted: rgba(17, 17, 17, 0.66);
   min-height: 100vh;
   overflow-x: clip;
   background: var(--paper);
   color: var(--ink);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
 }
 
 .club-screen :where(a) {
@@ -25,7 +25,7 @@
 .club-title-block h1,
 .tools-hero h1 {
   margin: 0;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -92,11 +92,11 @@
   place-items: center;
   margin: 0 auto;
   overflow: hidden;
-  color: #c9ae6b;
+  color: var(--ju-gold-soft);
   background: var(--ink);
   border: 2px solid rgba(169, 138, 63, 0.55);
   border-radius: 50%;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 22px;
   font-weight: 700;
 }
@@ -109,13 +109,13 @@
 
 .podium-card.champion .podium-avatar {
   color: var(--ink);
-  background: #c9ae6b;
-  border-color: #c9ae6b;
+  background: var(--ju-gold-soft);
+  border-color: var(--ju-gold-soft);
 }
 
 .podium-card.champion .podium-piece,
 .podium-card.champion strong {
-  color: #c9ae6b;
+  color: var(--ju-gold-soft);
 }
 
 .podium-card.bronze .podium-piece {
@@ -124,7 +124,7 @@
 
 .podium-card h2 {
   margin: 10px 0 0;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 21px;
   line-height: 1.15;
 }
@@ -149,7 +149,7 @@
   margin-top: 4px;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   text-transform: uppercase;
   opacity: 0.6;
 }
@@ -178,7 +178,7 @@
   background: var(--ink);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-align: left;
   text-transform: uppercase;
 }
@@ -217,10 +217,10 @@
 .leaderboard-table td:nth-child(4) small {
   margin-top: 2px;
   color: rgba(17, 17, 17, 0.55);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -253,7 +253,7 @@
 
 .leaderboard-state h2 {
   margin: 4px 0 0;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 24px;
 }
 
@@ -307,10 +307,10 @@
   display: grid;
   place-items: center;
   flex: none;
-  color: #c9ae6b;
+  color: var(--ju-gold-soft);
   background: var(--ink);
   border-radius: 50%;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 30px;
   font-weight: 700;
 }
@@ -329,7 +329,7 @@
 
 .profile-name-line h1 {
   margin: 0;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 30px;
   line-height: 1.1;
 }
@@ -341,7 +341,7 @@
   border-radius: 999px;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -396,7 +396,7 @@
   color: rgba(17, 17, 17, 0.6);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -404,7 +404,7 @@
 .profile-rating-card a,
 .recent-panel a,
 .profile-next-round a {
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-weight: 600;
 }
 
@@ -447,7 +447,7 @@
 
 .profile-panel h2 {
   margin: 0;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 21px;
 }
 
@@ -485,7 +485,7 @@
   color: rgba(17, 17, 17, 0.55);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -642,7 +642,7 @@
 
 .profile-next-round a {
   padding: 10px 20px;
-  color: #f8f3e7;
+  color: var(--ju-cream);
   background: var(--wine);
   border-radius: 8px;
   font-size: 13px;
@@ -742,7 +742,7 @@
 
 .tools-section-head h2 {
   margin: 0;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 32px;
 }
 
@@ -798,7 +798,7 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  color: #f8f3e7;
+  color: var(--ju-cream);
   background: var(--wine);
   border-radius: 8px;
   font-size: 23px;
@@ -876,7 +876,7 @@
 
 .board-title-row h1 {
   margin: 0;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 28px;
   font-weight: 600;
 }
@@ -922,7 +922,7 @@
 
 .board-title-actions > span small {
   color: var(--wine);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 10.5px;
   font-weight: 700;
 }
@@ -939,7 +939,7 @@
   border-radius: 999px;
   background: #fff8f5;
   color: rgba(17, 17, 17, 0.68);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 10.5px;
   line-height: 1;
   text-overflow: ellipsis;
@@ -972,10 +972,10 @@
   padding: 0 9px;
   border: 1px solid rgba(17, 17, 17, 0.2);
   border-radius: 6px;
-  background: #fffdf8;
-  color: #111111;
+  background: var(--ju-surface);
+  color: var(--ju-ink);
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 10.5px;
   font-weight: 700;
 }
@@ -1053,7 +1053,7 @@
   color: rgba(17, 17, 17, 0.56);
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   line-height: 1;
   text-transform: uppercase;
 }
@@ -1075,12 +1075,12 @@
 }
 
 .player-bar i.black {
-  background: #111111;
-  border: 1px solid #111111;
+  background: var(--ju-ink);
+  border: 1px solid var(--ju-ink);
 }
 
 .player-bar i.white {
-  background: #f6f0e0;
+  background: var(--ju-cream);
   border: 1px solid rgba(17, 17, 17, 0.4);
 }
 
@@ -1166,12 +1166,12 @@
 }
 
 .white-piece {
-  color: #fbf6e8;
+  color: var(--ju-cream);
   text-shadow: 0 1px 2px rgba(17, 17, 17, 0.5);
 }
 
 .black-piece {
-  color: #111111;
+  color: var(--ju-ink);
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.2);
 }
 
@@ -1249,7 +1249,7 @@
   border: 0;
   border-radius: 9px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 16px;
   font-weight: 700;
 }
@@ -1290,7 +1290,7 @@
   text-align: left;
   border-radius: 10px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
 }
 
 .blank-board-button {
@@ -1301,11 +1301,11 @@
 }
 
 .blank-board-button:hover {
-  background: #111111;
+  background: var(--ju-ink);
 }
 
 .blank-board-button > span:first-child {
-  color: #c9ae6b;
+  color: var(--ju-gold-soft);
   font-size: 22px;
 }
 
@@ -1326,7 +1326,7 @@
 .blank-board-button em,
 .source-card em {
   margin-left: auto;
-  color: #c9ae6b;
+  color: var(--ju-gold-soft);
   font-style: normal;
 }
 
@@ -1335,7 +1335,7 @@
   color: rgba(17, 17, 17, 0.5);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -1416,7 +1416,7 @@
   background: none;
   border: 0;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 12.5px;
   font-weight: 500;
 }
@@ -1463,7 +1463,7 @@
   border: 1px solid rgba(17, 17, 17, 0.26);
   border-radius: 8px;
   outline: 0;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
 }
 
 .search-panel input {
@@ -1483,12 +1483,12 @@
 .game-list-action button {
   width: 100%;
   height: 42px;
-  color: #f8f3e7;
+  color: var(--ju-cream);
   background: var(--wine);
   border: 0;
   border-radius: 8px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 13.5px;
   font-weight: 600;
 }
@@ -1562,7 +1562,7 @@
   border-top: 1px solid rgba(17, 17, 17, 0.07);
   border-left: 3px solid transparent;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
 }
 
 .game-list-scroll button:hover {
@@ -1649,13 +1649,13 @@
   border: 1px solid rgba(122, 36, 49, 0.42);
   border-radius: 8px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 13px;
   font-weight: 600;
 }
 
 .game-list-more button:hover {
-  color: #f8f3e7;
+  color: var(--ju-cream);
   background: var(--wine);
   border-color: var(--wine);
 }
@@ -1689,7 +1689,7 @@
   color: rgba(17, 17, 17, 0.6);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -1703,7 +1703,7 @@
   background: none;
   border: 0;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 12px;
   font-weight: 500;
 }
@@ -1717,13 +1717,13 @@
   height: 80px;
   display: block;
   margin-top: 12px;
-  background: #111111;
+  background: var(--ju-ink);
   border-radius: 6px;
   cursor: pointer;
 }
 
 .eval-graph path {
-  fill: #f6f0e0;
+  fill: var(--ju-cream);
 }
 
 .eval-graph line {
@@ -1750,14 +1750,14 @@
 }
 
 .eval-graph .eval-point:focus .point {
-  stroke: #c9ae6b;
+  stroke: var(--ju-gold-soft);
   stroke-width: 2.6;
 }
 
 .review-progress {
   margin-top: 14px;
   padding: 14px;
-  background: #fbf6e8;
+  background: var(--ju-cream);
   border: 1px solid rgba(17, 17, 17, 0.15);
   border-radius: 8px;
 }
@@ -1818,7 +1818,7 @@
   margin-top: 10px;
   padding: 11px 12px;
   color: var(--paper);
-  background: #111111;
+  background: var(--ju-ink);
   border: 2px solid transparent;
   border-radius: 7px;
 }
@@ -1834,7 +1834,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #f6f0e0;
+  color: var(--ju-cream);
   font-size: 11px;
   font-weight: 700;
 }
@@ -1882,12 +1882,12 @@
   padding: 10px 12px;
   border: 1px solid rgba(17, 17, 17, 0.15);
   border-radius: 7px;
-  background: #fbf6e8;
+  background: var(--ju-cream);
 }
 
 .review-ready-players > div:last-child {
-  color: #f6f0e0;
-  background: #111111;
+  color: var(--ju-cream);
+  background: var(--ju-ink);
 }
 
 .review-ready-players span {
@@ -1927,19 +1927,19 @@
   padding: 16px;
   border: 1px solid rgba(17, 17, 17, 0.15);
   border-radius: 7px;
-  background: #fbf6e8;
+  background: var(--ju-cream);
 }
 
 .review-engine-cta span {
-  color: #7d2434;
+  color: var(--ju-burgundy);
   font-size: 10px;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .review-engine-cta strong {
-  font-family: "Droid Serif", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 16px;
 }
 
@@ -1969,13 +1969,13 @@
 
 .accuracy-grid div {
   padding: 10px 12px;
-  background: #fbf6e8;
+  background: var(--ju-cream);
   border: 1px solid rgba(17, 17, 17, 0.15);
   border-radius: 8px;
 }
 
 .accuracy-grid div:last-child {
-  background: #111111;
+  background: var(--ju-ink);
 }
 
 .accuracy-grid span {
@@ -1983,7 +1983,7 @@
   color: rgba(17, 17, 17, 0.55);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -2041,7 +2041,7 @@
   border-radius: 50%;
   box-shadow: 0 1px 3px rgba(17, 17, 17, 0.2);
   color: #ffffff;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 11px;
   font-style: normal;
   font-weight: 900;
@@ -2113,7 +2113,7 @@
   box-shadow: inset 0 -2px 0 rgba(17, 17, 17, 0.14);
   color: #ffffff;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 15px;
   font-weight: 900;
 }
@@ -2242,7 +2242,7 @@
   margin-top: 12px;
   padding: 11px 13px;
   color: var(--paper);
-  background: #111111;
+  background: var(--ju-ink);
   border-radius: 8px;
 }
 
@@ -2255,7 +2255,7 @@
 }
 
 .engine-line strong {
-  color: #c9ae6b;
+  color: var(--ju-gold-soft);
   font-family: "IBM Plex Mono", monospace;
   font-size: 15px;
 }
@@ -2265,7 +2265,7 @@
   color: rgba(245, 239, 227, 0.55);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -2305,7 +2305,7 @@
   border: 1px solid rgba(17, 17, 17, 0.26);
   border-radius: 7px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -2317,7 +2317,7 @@
 }
 
 .workspace-actions .run {
-  color: #f8f3e7;
+  color: var(--ju-cream);
   background: var(--wine);
   border-color: var(--wine);
 }

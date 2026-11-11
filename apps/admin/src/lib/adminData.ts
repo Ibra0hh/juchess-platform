@@ -145,6 +145,7 @@ export type RecruitmentReview = Models.Row & {
 }
 
 export type RecruitmentApplication = Models.Row & {
+  track?: 'member' | 'leader'
   profileId: string
   accountId: string
   interests: string[]

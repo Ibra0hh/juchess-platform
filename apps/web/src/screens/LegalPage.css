@@ -39,20 +39,20 @@
 .legal-hero p {
   margin: 0 0 8px;
   color: #8b2d40;
-  font: 600 0.74rem/1.2 "IBM Plex Sans", sans-serif;
-  letter-spacing: 0.16em;
+  font: 600 0.74rem/1.2 var(--font-interface);
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .legal-hero h1 {
   margin: 0 0 10px;
-  font: 700 clamp(3rem, 6vw, 5.2rem)/0.92 "Cormorant Garamond", Georgia, serif;
-  letter-spacing: -0.04em;
+  font: 700 clamp(3rem, 6vw, 5.2rem)/0.92 var(--font-heading);
+  letter-spacing: 0;
 }
 
 .legal-hero > span:last-child {
   color: #766d62;
-  font: 500 0.88rem/1.5 "IBM Plex Sans", sans-serif;
+  font: 500 0.88rem/1.5 var(--font-interface);
 }
 
 .legal-article {
@@ -72,13 +72,13 @@
 .legal-article h2 {
   margin: 0 0 12px;
   color: #211915;
-  font: 700 1.55rem/1.15 "Cormorant Garamond", Georgia, serif;
+  font: 700 1.55rem/1.15 var(--font-heading);
 }
 
 .legal-article p {
   margin: 0;
   color: #5f574e;
-  font: 400 1rem/1.8 "IBM Plex Sans", sans-serif;
+  font: 400 1rem/1.8 var(--font-interface);
 }
 
 .legal-article p + p {
@@ -92,7 +92,7 @@
   margin-top: 22px;
   padding: 22px 24px;
   border-radius: 18px;
-  background: #7d2434;
+  background: var(--ju-burgundy);
   color: #fff8ec;
 }
 
@@ -104,7 +104,7 @@
 .legal-contact strong,
 .legal-contact span {
   display: block;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: var(--font-interface);
 }
 
 .legal-contact span {
@@ -130,7 +130,7 @@
   gap: 8px;
   align-items: center;
   color: #702235;
-  font: 600 0.92rem/1.3 "IBM Plex Sans", sans-serif;
+  font: 600 0.92rem/1.3 var(--font-interface);
   text-underline-offset: 4px;
 }
 

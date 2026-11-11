@@ -1,13 +1,13 @@
 .route-skeleton {
-  --skeleton-ink: #111111;
-  --skeleton-wine: #7a2431;
-  --skeleton-paper: #f5efe3;
-  --skeleton-surface: #fffcf4;
+  --skeleton-ink: var(--ju-ink);
+  --skeleton-wine: var(--ju-burgundy);
+  --skeleton-paper: var(--ju-cream);
+  --skeleton-surface: var(--ju-surface);
   --skeleton-line: rgba(17, 17, 17, 0.14);
   min-height: 100dvh;
   color: var(--skeleton-ink);
   background: var(--skeleton-paper);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
 }
 
 .route-skeleton-header {
@@ -46,7 +46,7 @@
 }
 
 .route-skeleton-brand strong {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 22px;
 }
 
@@ -55,7 +55,7 @@
   color: var(--skeleton-wine);
   font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.13em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 

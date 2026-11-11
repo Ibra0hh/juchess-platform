@@ -12,6 +12,7 @@ import {
 import { execSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import teamMembers from '../apps/web/src/lib/clubTeam.json' with { type: 'json' }
 import './export-palette.mjs'
 
 const env = { ...process.env, GITHUB_PAGES: 'true' }
@@ -41,6 +42,9 @@ const staticRoutes = [
   ['auth/callback', 'Completing Sign In | JuChess', 'Complete your secure JuChess sign-in.', false],
   ['complete-profile', 'Complete Your Profile | JuChess', 'Complete the required details for your JuChess player profile.', false],
   ['attendance-confirm', 'Confirm Tournament Attendance | JuChess', 'Confirm your attendance for a JuChess tournament.', false],
+  ...teamMembers.map(({ slug, name, role }) => [
+    `team/${slug}`, `${name} | JuChess`, `${role} at the University of Jordan Chess Club.`,
+  ]),
 ]
 
 function escapeHtml(value) {
@@ -68,7 +72,7 @@ function renderRouteDocument(template, route, title, description, index = true) 
 }
 
 function writeStaticRoutes() {
-  const template = readFileSync('docs/index.html', 'utf8')
+  const template = readFileSync('docs/index.html', 'utf8').replace(/\r{2,}\n/g, '\r\n')
   for (const [route, title, description, index = true] of staticRoutes) {
     const directory = join('docs', route)
     mkdirSync(directory, { recursive: true })
@@ -77,9 +81,8 @@ function writeStaticRoutes() {
 }
 
 // GitHub Pages clients can retain an older HTML document briefly. Preserve
-// hashed JavaScript and CSS bundles across deployments so those cached
-// documents do not fail while loading a route chunk or its styles after a
-// newer build is published.
+// hashed bundles and their fonts across deployments so cached documents
+// can still load route chunks and styles after a newer build is published.
 const assetDirs = ['docs/web/assets', 'docs/admin/assets']
 const retainedAssetsRoot = mkdtempSync(join(tmpdir(), 'juchess-pages-assets-'))
 
@@ -88,7 +91,7 @@ for (const [index, assetDir] of assetDirs.entries()) {
   mkdirSync(retainedDir)
   if (!existsSync(assetDir)) continue
   for (const name of readdirSync(assetDir)) {
-    if (name.endsWith('.js') || name.endsWith('.css')) {
+    if (/\.(js|css|woff2?|ttf|otf)$/.test(name)) {
       copyFileSync(join(assetDir, name), join(retainedDir, name))
     }
   }

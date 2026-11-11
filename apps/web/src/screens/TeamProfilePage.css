@@ -1,0 +1,60 @@
+.team-profile {
+  width: min(100% - 40px, 900px);
+  min-height: calc(100svh - 240px);
+  margin-inline: auto;
+  padding-block: 32px 60px;
+}
+
+.team-profile-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 18px;
+  color: var(--ju-action);
+  font-weight: 600;
+}
+
+.team-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  align-items: center;
+  gap: 36px;
+}
+
+.team-profile-layout img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: center 28%;
+  border-radius: 8px;
+}
+
+.team-profile-layout h1 {
+  margin: 0 0 14px;
+  font-size: 54px;
+  line-height: 1;
+  color: var(--ju-action);
+  overflow-wrap: anywhere;
+}
+
+.team-profile-layout p {
+  margin: 6px 0;
+  font-size: 17px;
+}
+
+.team-profile-layout .team-profile-club {
+  margin-top: 18px;
+  color: var(--ju-text-secondary);
+}
+
+@media (max-width: 620px) {
+  .team-profile-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .team-profile-layout img { max-width: 280px; }
+  .team-profile-layout h1 { font-size: 42px; }
+}

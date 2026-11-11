@@ -3,8 +3,8 @@
   z-index: 4;
   flex: none;
   color: rgba(245, 239, 227, 0.86);
-  background: #111111;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--ju-ink);
+  font-family: var(--font-interface);
 }
 
 .site-footer-inner {
@@ -39,15 +39,15 @@
 }
 
 .site-footer-brand strong {
-  color: #f5efe3;
-  font-family: "Cormorant Garamond", Georgia, serif;
+  color: var(--ju-cream);
+  font-family: var(--font-heading);
   font-size: 23px;
 }
 
 .site-footer-brand small {
   color: rgba(245, 239, 227, 0.66);
   font-size: 10.5px;
-  letter-spacing: 0.13em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -71,7 +71,7 @@
 
 .site-footer nav a:hover,
 .site-footer nav a:focus-visible {
-  color: #c9ae6b;
+  color: var(--ju-gold-soft);
 }
 
 .site-footer > p {

@@ -18,3 +18,9 @@ test('account, hidden product, and unknown routes are not indexed', () => {
 test('dynamic tournament routes receive tournament metadata', () => {
   assert.equal(metadataForPath('/tournament/summer-open').title, 'Tournament Details | JuChess')
 })
+
+test('only listed club team profiles are public and indexable', () => {
+  assert.equal(metadataForPath('/team/maya-erani/').title, 'Maya Erani | JuChess')
+  assert.notEqual(metadataForPath('/team/maya-erani').index, false)
+  assert.equal(metadataForPath('/team/unknown').index, false)
+})

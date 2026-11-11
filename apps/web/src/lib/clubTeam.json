@@ -1,0 +1,6 @@
+[
+  { "slug": "maya-erani", "name": "Maya Erani", "role": "President", "photo": "maya-erani.webp" },
+  { "slug": "yazan-shalan", "name": "Yazan Shalan", "role": "Vice President", "responsibility": "Public Relations Manager", "photo": "yazan-shalan.webp" },
+  { "slug": "ryan-almuhaisen", "name": "Ryan Almuhaisen", "role": "Social Media Manager", "photo": "ryan-almuhaisen.png" },
+  { "slug": "ibrahim-aladily", "name": "Ibrahim Aladily", "role": "Software Developer", "photo": "ibrahim-aladily.webp" }
+]

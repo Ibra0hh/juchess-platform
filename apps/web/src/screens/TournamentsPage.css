@@ -2,9 +2,9 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f5efe3;
-  color: #111111;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--ju-cream);
+  color: var(--ju-ink);
+  font-family: var(--font-interface);
   overflow-x: clip;
 }
 
@@ -21,7 +21,7 @@
 }
 
 .tournaments-heading h1 {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 40px;
   font-weight: 600;
   margin: 0;
@@ -55,15 +55,15 @@
   padding: 0 16px 0 40px;
   border: 1px solid rgba(17, 17, 17, 0.24);
   border-radius: 10px;
-  background: #fffcf4;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--ju-surface);
+  font-family: var(--font-interface);
   font-size: 14px;
-  color: #111111;
+  color: var(--ju-ink);
   outline: none;
 }
 
 .tournament-search input:focus {
-  border-color: #7a2431;
+  border-color: var(--ju-burgundy);
   box-shadow: 0 0 0 3px rgba(122, 36, 49, 0.1);
 }
 
@@ -91,21 +91,21 @@
   border-radius: 999px;
   border: 1px solid rgba(17, 17, 17, 0.28);
   background: transparent;
-  color: #111111;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  color: var(--ju-ink);
+  font-family: var(--font-interface);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .tournament-filters button:hover {
-  border-color: #7a2431;
+  border-color: var(--ju-burgundy);
 }
 
 .tournament-filters button.active {
-  border-color: #7a2431;
-  background: #7a2431;
-  color: #f8f3e7;
+  border-color: var(--ju-burgundy);
+  background: var(--ju-burgundy);
+  color: var(--ju-cream);
 }
 
 .view-toggle {
@@ -129,15 +129,15 @@
   border-radius: 999px;
   background: transparent;
   color: rgba(17, 17, 17, 0.6);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .view-toggle button.active {
-  background: #7a2431;
-  color: #f8f3e7;
+  background: var(--ju-burgundy);
+  color: var(--ju-cream);
   box-shadow: 0 1px 4px rgba(122, 36, 49, 0.3);
 }
 
@@ -176,8 +176,8 @@
   gap: 16px;
   min-width: 0;
   text-decoration: none;
-  color: #111111;
-  background: #fffcf4;
+  color: var(--ju-ink);
+  background: var(--ju-surface);
   border: 1px solid rgba(17, 17, 17, 0.15);
   border-radius: 10px;
   padding: 14px 18px;
@@ -215,7 +215,7 @@
   border-radius: 9px;
   background: rgba(17, 17, 17, 0.05);
   border: 1px solid rgba(17, 17, 17, 0.14);
-  color: #111111;
+  color: var(--ju-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -224,7 +224,7 @@
 .tournament-icon.active {
   background: rgba(122, 36, 49, 0.08);
   border-color: rgba(122, 36, 49, 0.25);
-  color: #7a2431;
+  color: var(--ju-burgundy);
 }
 
 .tournament-card-main {
@@ -244,7 +244,7 @@
 }
 
 .tournament-name {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 19px;
   font-weight: 700;
   line-height: 1.15;
@@ -265,7 +265,7 @@
   align-items: center;
   gap: 5px;
   font-size: 10px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
   font-weight: 600;
   border-radius: 999px;
@@ -279,7 +279,7 @@
   border: 1px solid rgba(17, 17, 17, 0.24);
   border-radius: 999px;
   padding: 2px 7px;
-  color: #111111;
+  color: var(--ju-ink);
   font-size: 10px;
   font-weight: 700;
   line-height: 1.35;
@@ -288,11 +288,11 @@
 .mode-badge.online {
   border-color: rgba(122, 36, 49, 0.32);
   background: rgba(122, 36, 49, 0.06);
-  color: #7a2431;
+  color: var(--ju-burgundy);
 }
 
 .status-badge.live {
-  color: #7a2431;
+  color: var(--ju-burgundy);
   border: 1px solid rgba(122, 36, 49, 0.35);
 }
 
@@ -300,7 +300,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #7a2431;
+  background: var(--ju-burgundy);
   animation: ju-pulse 1.6s ease-in-out infinite;
 }
 
@@ -349,7 +349,7 @@
 }
 
 .empty-state h2 {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-heading);
   font-size: 20px;
   font-weight: 700;
   margin: 8px 0 0;
@@ -369,12 +369,12 @@
   justify-content: center;
   margin-top: 18px;
   padding: 0 17px;
-  color: #f8f3e7;
-  background: #7a2431;
-  border: 1px solid #7a2431;
+  color: var(--ju-cream);
+  background: var(--ju-burgundy);
+  border: 1px solid var(--ju-burgundy);
   border-radius: 7px;
   cursor: pointer;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--font-interface);
   font-size: 12.5px;
   font-weight: 700;
   text-decoration: none;
@@ -382,8 +382,8 @@
 
 .empty-state button:hover,
 .empty-state-link:hover {
-  background: #5f1b26;
-  border-color: #5f1b26;
+  background: var(--ju-burgundy-dark);
+  border-color: var(--ju-burgundy-dark);
 }
 
 .skeleton {

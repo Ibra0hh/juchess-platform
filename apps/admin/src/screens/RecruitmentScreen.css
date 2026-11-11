@@ -12,7 +12,7 @@
 .recruitment-admin-toolbar > div:first-child strong, .recruitment-admin-toolbar > div:first-child span { display: block; }
 .recruitment-admin-toolbar > div:first-child strong { font-family: "Source Serif 4", Georgia, serif; font-size: 18px; }
 .recruitment-admin-toolbar > div:first-child span { margin-top: 3px; color: #8a7e63; font-size: 10px; }
-.recruitment-admin-filters { display: flex; align-items: center; gap: 8px; }
+.recruitment-admin-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .recruitment-search { display: flex; min-width: 240px; height: 40px; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid #dfd4be; border-radius: 8px; background: white; }
 .recruitment-search svg { color: #8a7e63; }
 .recruitment-search input { min-width: 0; width: 100%; border: 0; outline: 0; font-size: 11px; }

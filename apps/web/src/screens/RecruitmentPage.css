@@ -13,8 +13,8 @@
   gap: 28px;
   overflow: hidden;
   padding: 42px 48px;
-  color: #f7efe2;
-  background: #171717;
+  color: var(--ju-cream);
+  background: var(--ju-ink);
   border-radius: 10px;
 }
 
@@ -28,21 +28,21 @@
 }
 
 .recruitment-intro > div:first-child { position: relative; z-index: 1; max-width: 720px; }
-.recruitment-intro span { color: #c9ad68; font-size: 12px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
-.recruitment-intro h1 { margin: 8px 0 9px; font-family: "Cormorant Garamond", Georgia, serif; font-size: clamp(42px, 6vw, 68px); font-weight: 600; line-height: .95; }
+.recruitment-intro span { color: #c9ad68; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
+.recruitment-intro h1 { margin: 8px 0 9px; font-family: var(--font-heading); font-size: clamp(42px, 6vw, 68px); font-weight: 600; line-height: .95; }
 .recruitment-intro p { max-width: 680px; margin: 0; color: rgba(247, 239, 226, .72); font-size: 15px; line-height: 1.65; }
-.recruitment-intro-mark { position: relative; z-index: 1; color: #7a2431; font-family: Georgia, serif; font-size: 126px; line-height: 1; transform: rotate(-8deg); }
+.recruitment-intro-mark { position: relative; z-index: 1; color: var(--ju-burgundy); font-family: var(--font-heading); font-size: 126px; line-height: 1; transform: rotate(-8deg); }
 
 .recruitment-feedback { margin: 18px 0 0; padding: 13px 16px; border: 1px solid; border-radius: 7px; font-size: 13px; font-weight: 600; }
 .recruitment-feedback.success { color: #23603c; background: #eef8f0; border-color: #a9d2b6; }
-.recruitment-feedback.error { color: #7a2431; background: #fff1f2; border-color: #e8b5bc; }
+.recruitment-feedback.error { color: var(--ju-burgundy); background: #fff1f2; border-color: #e8b5bc; }
 
 .recruitment-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 24px; align-items: start; margin-top: 24px; }
 .recruitment-form, .recruitment-aside > section { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 8px 26px rgba(17, 17, 17, .055); }
 .recruitment-form { padding: 30px; }
 .recruitment-form > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
-.recruitment-form > header span:first-child { color: var(--wine); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.recruitment-form h2, .recruitment-aside h2 { margin: 4px 0 0; font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; }
+.recruitment-form > header span:first-child { color: var(--wine); font-size: 11px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
+.recruitment-form h2, .recruitment-aside h2 { margin: 4px 0 0; font-family: var(--font-heading); font-weight: 600; }
 .recruitment-form h2 { font-size: 30px; }
 
 .recruitment-status { display: inline-flex; min-height: 30px; align-items: center; padding: 0 11px; border-radius: 999px; color: #6b4f12; background: #f5e9c5; font-size: 11px; font-weight: 700; white-space: nowrap; }
@@ -52,16 +52,16 @@
 
 .recruitment-form fieldset { min-width: 0; margin: 25px 0; padding: 0 0 25px; border: 0; border-bottom: 1px solid var(--line); }
 .recruitment-form fieldset:disabled { opacity: .72; }
-.recruitment-form legend, .recruitment-form label > span { display: block; color: #171717; font-size: 13px; font-weight: 700; }
+.recruitment-form legend, .recruitment-form label > span { display: block; color: var(--ju-ink); font-size: 13px; font-weight: 700; }
 .recruitment-form fieldset > p, .recruitment-form label > small { display: block; margin: 5px 0 13px; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; }
 .interest-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
-.interest-grid button { display: flex; min-height: 46px; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid rgba(17,17,17,.18); border-radius: 7px; color: #171717; background: #fffdf7; font-size: 12px; font-weight: 600; text-align: left; }
+.interest-grid button { display: flex; min-height: 46px; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid rgba(17,17,17,.18); border-radius: 7px; color: var(--ju-ink); background: #fffdf7; font-size: 12px; font-weight: 600; text-align: left; }
 .interest-grid button > span { display: grid; width: 19px; height: 19px; flex: 0 0 19px; place-items: center; border: 1px solid rgba(17,17,17,.28); border-radius: 4px; }
 .interest-grid button.selected { color: var(--wine); background: #f8eaec; border-color: var(--wine); }
 .interest-grid button.selected > span { color: white; background: var(--wine); border-color: var(--wine); }
 
 .recruitment-form > label { display: block; margin: 22px 0; }
-.recruitment-form textarea, .recruitment-form input, .recruitment-form select { width: 100%; border: 1px solid rgba(17,17,17,.2); border-radius: 7px; outline: 0; color: #171717; background: white; }
+.recruitment-form textarea, .recruitment-form input, .recruitment-form select { width: 100%; border: 1px solid rgba(17,17,17,.2); border-radius: 7px; outline: 0; color: var(--ju-ink); background: white; }
 .recruitment-form textarea { min-height: 116px; padding: 13px 14px; line-height: 1.55; resize: vertical; }
 .recruitment-form input, .recruitment-form select { height: 46px; padding: 0 13px; }
 .recruitment-form textarea:focus, .recruitment-form input:focus, .recruitment-form select:focus { border-color: var(--wine); box-shadow: 0 0 0 3px rgba(122,36,49,.1); }
@@ -76,26 +76,26 @@
 .recruitment-form-actions p svg { flex: 0 0 auto; color: var(--wine); }
 .recruitment-form-actions > div { display: flex; gap: 9px; }
 .recruitment-form-actions button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 0 17px; border: 0; border-radius: 7px; color: white; background: var(--wine); font-size: 12px; font-weight: 700; }
-.recruitment-form-actions button.secondary { color: #171717; background: transparent; border: 1px solid rgba(17,17,17,.22); }
+.recruitment-form-actions button.secondary { color: var(--ju-ink); background: transparent; border: 1px solid rgba(17,17,17,.22); }
 .recruitment-form-actions button:disabled { cursor: not-allowed; opacity: .56; }
 
 .recruitment-aside { display: grid; gap: 16px; }
 .recruitment-aside > section { padding: 20px; }
 .applicant-summary { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 12px; align-items: center; }
-.applicant-avatar { display: grid; width: 50px; height: 50px; overflow: hidden; place-items: center; border-radius: 50%; color: white; background: var(--wine); font-family: "Cormorant Garamond", Georgia, serif; font-size: 20px; font-weight: 700; }
+.applicant-avatar { display: grid; width: 50px; height: 50px; overflow: hidden; place-items: center; border-radius: 50%; color: white; background: var(--wine); font-family: var(--font-heading); font-size: 20px; font-weight: 700; }
 .applicant-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .applicant-summary span, .applicant-summary small { display: block; color: var(--muted); font-size: 10px; }
-.applicant-summary strong { display: block; margin: 2px 0; font-family: "Cormorant Garamond", Georgia, serif; font-size: 19px; }
+.applicant-summary strong { display: block; margin: 2px 0; font-family: var(--font-heading); font-size: 19px; }
 .applicant-summary > a { grid-column: 1 / -1; color: var(--wine); font-size: 11px; font-weight: 700; text-decoration: none; }
 .aside-heading { display: flex; align-items: center; gap: 8px; color: var(--wine); }
-.aside-heading h2 { color: #171717; font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 13px; font-weight: 700; }
+.aside-heading h2 { color: var(--ju-ink); font-family: var(--font-interface); font-size: 13px; font-weight: 700; }
 .aside-empty, .status-terminal p { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .application-progress > small { display: block; margin-top: 15px; color: var(--muted); font-size: 10px; }
 .status-timeline { display: grid; gap: 0; margin: 18px 0 0; padding: 0; list-style: none; }
 .status-timeline li { position: relative; display: grid; min-height: 40px; grid-template-columns: 25px 1fr; gap: 10px; align-items: start; color: rgba(17,17,17,.4); font-size: 11px; }
 .status-timeline li:not(:last-child)::after { position: absolute; top: 23px; bottom: -1px; left: 11px; width: 1px; content: ""; background: rgba(17,17,17,.14); }
 .status-timeline li > span { position: relative; z-index: 1; display: grid; width: 23px; height: 23px; place-items: center; border: 1px solid rgba(17,17,17,.18); border-radius: 50%; background: var(--surface); font-size: 9px; }
-.status-timeline li.done, .status-timeline li.active { color: #171717; }
+.status-timeline li.done, .status-timeline li.active { color: var(--ju-ink); }
 .status-timeline li.done > span, .status-timeline li.active > span { color: white; background: var(--wine); border-color: var(--wine); }
 .status-timeline li strong { padding-top: 4px; }
 .status-terminal { margin-top: 16px; }
@@ -104,7 +104,7 @@
 
 .recruitment-guest { display: grid; min-height: 480px; place-items: center; align-content: center; padding: 60px 24px; text-align: center; }
 .recruitment-guest > svg { width: 52px; height: 52px; color: var(--wine); }
-.recruitment-guest h1 { margin: 18px 0 8px; font-family: "Cormorant Garamond", Georgia, serif; font-size: 46px; font-weight: 600; }
+.recruitment-guest h1 { margin: 18px 0 8px; font-family: var(--font-heading); font-size: 46px; font-weight: 600; }
 .recruitment-guest p { max-width: 590px; margin: 0; color: var(--muted); line-height: 1.7; }
 .recruitment-guest > div { display: flex; gap: 10px; margin-top: 24px; }
 .recruitment-guest a { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; padding: 0 18px; border: 1px solid var(--wine); border-radius: 7px; color: var(--wine); font-size: 12px; font-weight: 700; text-decoration: none; }
@@ -151,4 +151,40 @@
 
 @media (prefers-reduced-motion: reduce) {
   .recruitment-page-skeleton span, .recruitment-form-skeleton span { animation: none; }
+}
+.recruitment-form .recruitment-track > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recruitment-form .recruitment-track label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--ju-border);
+  border-radius: 8px;
+}
+
+.recruitment-form .recruitment-track input {
+  width: 16px;
+  min-height: 0;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--ju-action);
+}
+
+.recruitment-form .recruitment-track label:has(input:focus-visible) {
+  outline: 2px solid var(--ju-action);
+  outline-offset: 2px;
+}
+
+.recruitment-form .recruitment-track label:has(input:checked) {
+  color: var(--ju-action);
+  border-color: var(--ju-action);
+  background: var(--ju-cream);
 }
