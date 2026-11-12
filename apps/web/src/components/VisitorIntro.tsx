@@ -154,14 +154,14 @@ export default function VisitorIntro() {
     after(reducedMotion() ? 0 : index === rookIndex ? 1120 : 920, () => setLanded((current) => [...current, index]))
   }
 
-  function finish(animate: boolean) {
-    if (leaving) return
+  function finish() {
+    if (!granted || leaving) return
     if (!preview) {
       rememberVisit()
       void networkVisit('/complete').catch(() => {})
     }
     setLeaving(true)
-    after(animate && !reducedMotion() ? 680 : 0, () => {
+    after(reducedMotion() ? 0 : 680, () => {
       setVisible(false)
       dialog.current?.close()
     })
@@ -171,7 +171,7 @@ export default function VisitorIntro() {
 
   return (
     <dialog ref={dialog} className="visitor-intro" data-granted={granted} data-leaving={leaving}
-      aria-labelledby="visitor-intro-title" onCancel={(event) => { event.preventDefault(); finish(false) }}>
+      aria-labelledby="visitor-intro-title" onCancel={(event) => event.preventDefault()}>
       <div className="visitor-intro__stage">
         <header className="visitor-intro__masthead">
           <div className="visitor-intro__brand">
@@ -197,7 +197,7 @@ export default function VisitorIntro() {
             <span>juchess.page</span>
             <i aria-hidden="true" />
           </div>
-          {granted && <button ref={enter} type="button" className="visitor-intro__enter" onClick={() => finish(true)}>
+          {granted && <button ref={enter} type="button" className="visitor-intro__enter" onClick={finish}>
             Enter JuChess <ArrowUpRight aria-hidden="true" />
           </button>}
 
@@ -255,7 +255,6 @@ export default function VisitorIntro() {
         <footer className="visitor-intro__footer">
           <span>JuChess &middot; University of Jordan</span>
           <em>{granted ? 'Welcome to JuChess.' : 'One club. A whole new chapter.'}</em>
-          <button type="button" onClick={() => finish(false)}>Skip intro</button>
         </footer>
       </div>
     </dialog>

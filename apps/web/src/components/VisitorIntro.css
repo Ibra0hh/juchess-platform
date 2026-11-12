@@ -337,19 +337,6 @@ html:has(.visitor-intro[open]) { overflow: hidden; }
 .visitor-intro__callout span { font-size: 0.6rem; }
 .visitor-intro__footer { min-height: 4rem; border-top: 1px solid #7a243126; border-bottom: 0; }
 .visitor-intro__footer em { margin-left: auto; color: var(--reel-muted); text-transform: none; letter-spacing: 0; }
-.visitor-intro__footer button {
-  min-height: 44px;
-  padding: 0 0.3rem;
-  border: 0;
-  background: transparent;
-  color: var(--reel-wine);
-  font: inherit;
-  letter-spacing: 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
 .visitor-intro button:focus-visible { outline: 3px solid var(--reel-wine); outline-offset: 3px; }
 
 @keyframes reel-reveal { from { opacity: 0; } to { opacity: 1; } }
