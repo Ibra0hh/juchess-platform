@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { BadgeCheck, Mail } from 'lucide-react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import GoogleMark from '../components/GoogleMark'
 import UniversityField from '../components/UniversityField'
 import { formatAppwriteError } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
-import { profileCompletionAuthMethod, profileNeedsCompletion } from '../lib/profileCompletion'
+import { applicationReturn, profileCompletionAuthMethod, profileNeedsCompletion, withApplicationReturn } from '../lib/profileCompletion'
 import {
   PROFILE_DISPLAY_NAME_MAX_LENGTH,
   PROFILE_PHONE_INPUT_MAX_LENGTH,
@@ -28,6 +28,8 @@ type CompletionForm = {
 export default function CompleteProfilePage() {
   const { loading, profile, sessionProvider, signOut, updateProfile, user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = applicationReturn(searchParams.get('next'))
   const [form, setForm] = useState<CompletionForm>(() => createForm(profile, user?.name))
   const [saving, setSaving] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -38,8 +40,8 @@ export default function CompleteProfilePage() {
   }, [profile, user?.name])
 
   if (loading) return <CompletionStatus />
-  if (!user) return <Navigate to="/sign-in" replace />
-  if (!profileNeedsCompletion(profile)) return <Navigate to="/profile" replace />
+  if (!user) return <Navigate to={withApplicationReturn('/sign-in', returnTo)} replace />
+  if (!profileNeedsCompletion(profile)) return <Navigate to={returnTo ?? '/profile'} replace />
 
   const authMethod = profileCompletionAuthMethod(sessionProvider)
   const authContent = completionAuthContent(authMethod)
@@ -57,7 +59,7 @@ export default function CompleteProfilePage() {
     setSaving(true)
     try {
       await updateProfile(form)
-      navigate('/profile', { replace: true })
+      navigate(returnTo ?? '/profile', { replace: true })
     } catch (error) {
       setMessage(formatAppwriteError(error))
     } finally {

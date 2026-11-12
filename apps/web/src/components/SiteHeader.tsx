@@ -3,6 +3,7 @@ import { useAuth } from '../context/useAuth'
 import { profileMediaUrl } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
 import { useOnlineTournamentPlayLock } from '../lib/onlineTournamentPlayLock'
+import { type ApplicationReturn, withApplicationReturn } from '../lib/profileCompletion'
 import './SiteHeader.css'
 
 type SiteHeaderProps = {
@@ -13,9 +14,10 @@ type SiteHeaderProps = {
     avatarUrl?: string
   }
   toolsDisabled?: boolean
+  signInReturn?: ApplicationReturn | null
 }
 
-function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeaderProps) {
+function SiteHeader({ active, profilePreview, toolsDisabled = false, signInReturn }: SiteHeaderProps) {
   const { loading, profile, signOut, user } = useAuth()
   const playLock = useOnlineTournamentPlayLock()
   const toolsUnavailable = toolsDisabled || Boolean(playLock)
@@ -78,7 +80,7 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false }: SiteHeade
               </button>
             </>
           ) : (
-            <Link to="/sign-in" className="sign-in-link" aria-disabled={loading}>
+            <Link to={withApplicationReturn('/sign-in', signInReturn)} className="sign-in-link" aria-disabled={loading}>
               {loading ? 'Checking...' : 'Sign in'}
             </Link>
           )}

@@ -3,13 +3,14 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import { formatAppwriteError } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
-import { postAuthenticationDestination } from '../lib/profileCompletion'
+import { applicationReturn, postAuthenticationDestination, withApplicationReturn } from '../lib/profileCompletion'
 import './AuthPage.css'
 
 export default function OAuthCallbackPage() {
   const { completeOAuth, refresh, signOut } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const returnTo = applicationReturn(searchParams.get('next'))
   const started = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
@@ -20,7 +21,7 @@ export default function OAuthCallbackPage() {
 
     const userId = searchParams.get('userId')
     const secret = searchParams.get('secret')
-    navigate('/auth/callback', { replace: true })
+    navigate(withApplicationReturn('/auth/callback', returnTo), { replace: true })
 
     if (!userId || !secret) {
       setError('The Google sign-in response is incomplete. Please start again.')
@@ -29,10 +30,10 @@ export default function OAuthCallbackPage() {
 
     void completeOAuth(userId, secret)
       .then((session) => {
-        navigate(postAuthenticationDestination(session.profile), { replace: true })
+        navigate(postAuthenticationDestination(session.profile, returnTo), { replace: true })
       })
       .catch((caught) => setError(formatAppwriteError(caught)))
-  }, [completeOAuth, navigate, searchParams])
+  }, [completeOAuth, navigate, returnTo, searchParams])
 
   async function retrySessionLoad() {
     if (retrying) return
@@ -40,7 +41,7 @@ export default function OAuthCallbackPage() {
     setError(null)
     const session = await refresh()
     if (session) {
-      navigate(postAuthenticationDestination(session.profile), { replace: true })
+      navigate(postAuthenticationDestination(session.profile, returnTo), { replace: true })
       return
     }
     setError('The JuChess session is not available yet. Start Google sign-in again.')
@@ -49,7 +50,7 @@ export default function OAuthCallbackPage() {
 
   async function restartSignIn() {
     await signOut().catch(() => undefined)
-    navigate('/sign-in', { replace: true })
+    navigate(withApplicationReturn('/sign-in', returnTo), { replace: true })
   }
 
   return (

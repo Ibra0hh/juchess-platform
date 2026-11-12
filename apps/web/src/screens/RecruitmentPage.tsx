@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
 import { profileMediaUrl } from '../lib/auth'
+import { applicationPath, withApplicationReturn } from '../lib/profileCompletion'
 import {
   loadMyRecruitmentApplication,
   recruitmentInterestOptions,
@@ -128,8 +129,8 @@ function RecruitmentPage() {
           <h1>Bring your skills to JuChess</h1>
           <p>Apply as a Team Member to contribute to projects, or as a Team Leader to coordinate people and take responsibility for a club area. Sign in to open either application.</p>
           <div>
-            <Link to="/sign-in">Sign in to apply <ArrowRight size={16} /></Link>
-            <Link to="/sign-up">Create account</Link>
+            <Link to={withApplicationReturn('/sign-in', applicationPath)}>Sign in to apply <ArrowRight size={16} /></Link>
+            <Link to={withApplicationReturn('/sign-up', applicationPath)}>Create account</Link>
           </div>
         </section>
       </RecruitmentShell>
@@ -277,7 +278,7 @@ function RecruitmentPage() {
 function RecruitmentShell({ children, profilePreview }: { children: React.ReactNode; profilePreview?: { avatarUrl?: string; displayName: string; initials: string } }) {
   return (
     <div className="club-screen recruitment-screen" data-screen-label="Join the team">
-      <SiteHeader profilePreview={profilePreview} />
+      <SiteHeader profilePreview={profilePreview} signInReturn={applicationPath} />
       <main className="recruitment-main">{children}</main>
     </div>
   )

@@ -10,7 +10,7 @@ import {
   type SocialAuthProvider,
 } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
-import { postAuthenticationDestination, profileNeedsCompletion } from '../lib/profileCompletion'
+import { applicationReturn, postAuthenticationDestination, rememberApplicationVerification, withApplicationReturn } from '../lib/profileCompletion'
 import {
   ACCOUNT_EMAIL_MAX_LENGTH,
   ACCOUNT_NAME_MAX_LENGTH,
@@ -31,6 +31,7 @@ function AuthPage({ mode }: AuthPageProps) {
   const { loading, profile, ready, signIn, signUp, user } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const returnTo = applicationReturn(searchParams.get('next'))
   const isSignup = mode === 'sign-up'
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -56,7 +57,7 @@ function AuthPage({ mode }: AuthPageProps) {
   const passwordsMatch = confirmPassword.length > 0 && confirmPassword === password
 
   if (!loading && user) {
-    return <Navigate to={profileNeedsCompletion(profile) ? '/complete-profile' : '/profile'} replace />
+    return <Navigate to={postAuthenticationDestination(profile, returnTo)} replace />
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -87,16 +88,18 @@ function AuthPage({ mode }: AuthPageProps) {
           email: normalizedEmail,
           password,
         })
-        navigate('/verify-email?sent=1', {
+        rememberApplicationVerification(returnTo)
+        navigate(withApplicationReturn('/verify-email?sent=1', returnTo), {
           state: { email: normalizedEmail },
         })
       } else {
         const session = await signIn({ email: normalizedEmail, password })
-        navigate(postAuthenticationDestination(session.profile), { replace: true })
+        navigate(postAuthenticationDestination(session.profile, returnTo), { replace: true })
       }
     } catch (error) {
       if (error instanceof EmailVerificationRequiredError) {
-        navigate('/verify-email?sent=1', { state: { email: error.email } })
+        rememberApplicationVerification(returnTo)
+        navigate(withApplicationReturn('/verify-email?sent=1', returnTo), { state: { email: error.email } })
         return
       }
       setMessage(formatAppwriteError(error))
@@ -111,7 +114,7 @@ function AuthPage({ mode }: AuthPageProps) {
     setMessage(null)
     setOauthProvider(provider)
     try {
-      startOAuthSession(provider)
+      startOAuthSession(provider, returnTo)
     } catch (error) {
       setOauthProvider(null)
       setMessage(formatAppwriteError(error))
@@ -228,14 +231,14 @@ function AuthPage({ mode }: AuthPageProps) {
 
             {!isSignup ? (
               <>
-                <Link className="auth-secondary-button" to="/sign-up">Sign Up</Link>
+                <Link className="auth-secondary-button" to={withApplicationReturn('/sign-up', returnTo)}>Sign Up</Link>
                 <Link className="auth-guest-link" to="/home">Enter as guest</Link>
               </>
             ) : null}
           </form>
 
           {isSignup ? (
-            <div className="auth-switch">Do you have an account? <Link to="/sign-in">Sign in</Link></div>
+            <div className="auth-switch">Do you have an account? <Link to={withApplicationReturn('/sign-in', returnTo)}>Sign in</Link></div>
           ) : null}
         </section>
       </main>

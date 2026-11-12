@@ -12,6 +12,7 @@ import {
   validateSignInPassword,
 } from './authValidation'
 import { sendEmailVerificationChallenge } from './emailVerification'
+import { type ApplicationReturn, withApplicationReturn } from './profileCompletion'
 import { runHedgedRequest } from './hedgedRequest'
 import { normalizeJordanMobile, validateRequiredPlayerProfile } from './profileValidation'
 import { queuePasswordRecoveryEmail } from './passwordRecovery'
@@ -245,13 +246,13 @@ export async function signUpWithEmail(input: SignUpInput): Promise<void> {
   }
 }
 
-export function startOAuthSession(provider: SocialAuthProvider) {
+export function startOAuthSession(provider: SocialAuthProvider, destination?: ApplicationReturn | null) {
   requireAppwriteReady()
 
   account.createOAuth2Token({
     provider: provider === 'apple' ? OAuthProvider.Apple : OAuthProvider.Google,
-    success: appUrl('/auth/callback'),
-    failure: appUrl(`/sign-in?oauth=failed&provider=${provider}`),
+    success: appUrl(withApplicationReturn('/auth/callback', destination)),
+    failure: appUrl(withApplicationReturn(`/sign-in?oauth=failed&provider=${provider}`, destination)),
   })
 }
 

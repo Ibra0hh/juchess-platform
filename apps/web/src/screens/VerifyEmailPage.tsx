@@ -3,6 +3,7 @@ import { CheckCircle2, MailCheck } from 'lucide-react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { formatAppwriteError } from '../lib/auth'
+import { applicationReturn, pendingApplicationVerification, rememberApplicationVerification, withApplicationReturn } from '../lib/profileCompletion'
 import {
   confirmEmailVerificationCode,
   confirmEmailVerificationLink,
@@ -38,6 +39,8 @@ export default function VerifyEmailPage() {
   const hasChallengeLink = Boolean(challengeId && challengeToken)
   const hasLegacyLink = Boolean(legacyUserId && legacySecret)
   const hasVerificationToken = hasChallengeLink || hasLegacyLink
+  const returnTo = applicationReturn(searchParams.get('next'))
+    ?? (hasVerificationToken ? pendingApplicationVerification() : null)
   const [status, setStatus] = useState<VerificationStatus>(hasVerificationToken ? 'checking' : 'sent')
   const [message, setMessage] = useState(
     hasVerificationToken
@@ -59,12 +62,12 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     if (!hasVerificationToken || started.current) return
     started.current = true
-    navigate('/verify-email', { replace: true })
+    navigate(withApplicationReturn('/verify-email', returnTo), { replace: true })
 
     if (hasChallengeLink) {
       void confirmEmailVerificationLink(challengeId, challengeToken)
         .then((result) => {
-          navigate('/verify-email?verified=1', { replace: true })
+          navigate(withApplicationReturn('/verify-email?verified=1', returnTo), { replace: true })
           setStatus('verified')
           setVerifiedAction(result.alreadyVerified ? 'home' : 'sign-in')
           setMessage(result.alreadyVerified
@@ -88,7 +91,7 @@ export default function VerifyEmailPage() {
           setMessage('This older verification link is no longer active. Request a fresh two-hour email below.')
           return
         }
-        navigate('/verify-email?verified=1', { replace: true })
+        navigate(withApplicationReturn('/verify-email?verified=1', returnTo), { replace: true })
         setStatus('verified')
         setVerifiedAction('home')
         setMessage('Your email is already verified. Thank you.')
@@ -97,7 +100,7 @@ export default function VerifyEmailPage() {
         setStatus('error')
         setMessage('This older verification link is no longer active. Request a fresh two-hour email below.')
       })
-  }, [challengeId, challengeToken, hasChallengeLink, hasVerificationToken, legacyUserId, navigate])
+  }, [challengeId, challengeToken, hasChallengeLink, hasVerificationToken, legacyUserId, navigate, returnTo])
 
   async function handleCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -111,7 +114,7 @@ export default function VerifyEmailPage() {
         || (/^\d{6}$/.test(verificationCode) ? null : 'Enter the six-digit code from your latest JuChess email.')
       if (validationProblem) throw new Error(validationProblem)
       const result = await confirmEmailVerificationCode(normalizedEmail, verificationCode)
-      navigate('/verify-email?verified=1', { replace: true })
+      navigate(withApplicationReturn('/verify-email?verified=1', returnTo), { replace: true })
       setStatus('verified')
       setVerifiedAction(result.alreadyVerified ? 'home' : 'sign-in')
       setMessage(result.alreadyVerified
@@ -137,7 +140,7 @@ export default function VerifyEmailPage() {
         || validateSignInPassword(resendPassword)
       if (validationProblem) throw new Error(validationProblem)
       const result = await resendEmailVerification(normalizedEmail, resendPassword, legacyUserId)
-      navigate('/verify-email', { replace: true })
+      navigate(withApplicationReturn('/verify-email', returnTo), { replace: true })
       setResendPassword('')
       setCodeEmail(normalizedEmail)
       setVerificationCode('')
@@ -160,12 +163,13 @@ export default function VerifyEmailPage() {
   }
 
   const verified = status === 'verified'
+  const goHomeAfterVerification = verified && verifiedAction === 'home' && !returnTo
   const failed = status === 'error'
   const canEnterCode = status === 'sent' || failed
 
   return (
     <div className="auth-screen" data-screen-label="Verify Email">
-      <SiteHeader active="profile" />
+      <SiteHeader active="profile" signInReturn={returnTo} />
       <main className="auth-main prototype-auth-main signin">
         <section className="auth-panel prototype-auth-panel signin auth-callback-panel" aria-live="polite">
           <span className={`auth-status-icon ${verified ? 'verified' : failed ? 'error' : ''}`} aria-hidden="true">
@@ -254,9 +258,13 @@ export default function VerifyEmailPage() {
             </>
           ) : null}
           {status !== 'checking' ? (
-            <Link className="auth-secondary-button" to={verified && verifiedAction === 'home' ? '/home' : '/sign-in'}>
+            <Link
+              className="auth-secondary-button"
+              to={goHomeAfterVerification ? '/home' : withApplicationReturn('/sign-in', returnTo)}
+              onClick={() => { if (verified && returnTo) rememberApplicationVerification(null) }}
+            >
               {verified
-                ? verifiedAction === 'home' ? 'Go to home' : 'Continue to sign in'
+                ? goHomeAfterVerification ? 'Go to home' : 'Continue to sign in'
                 : 'Return to sign in'}
             </Link>
           ) : null}

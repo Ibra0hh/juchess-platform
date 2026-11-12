@@ -1,17 +1,19 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
-import { routeRequiresAuthenticatedSession, shouldRedirectToProfileCompletion } from '../lib/profileCompletion'
+import { applicationReturn, routeRequiresAuthenticatedSession, shouldRedirectToProfileCompletion, withApplicationReturn } from '../lib/profileCompletion'
 import RouteSkeleton from './RouteSkeleton'
 
 export function ProfileCompletionGuard({ children }: { children: ReactNode }) {
   const { error, loading, profile, refresh, signOut, user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const returnTo = applicationReturn(location.pathname.replace(/\/+$/, ''))
+    ?? applicationReturn(new URLSearchParams(location.search).get('next'))
 
   async function restartSignIn() {
     await signOut().catch(() => undefined)
-    navigate('/sign-in', { replace: true })
+    navigate(withApplicationReturn('/sign-in', returnTo), { replace: true })
   }
 
   const requiresSession = routeRequiresAuthenticatedSession(location.pathname)
@@ -41,7 +43,7 @@ export function ProfileCompletionGuard({ children }: { children: ReactNode }) {
     profile,
     signedIn: Boolean(user),
   })) {
-    return <Navigate to="/complete-profile" replace />
+    return <Navigate to={withApplicationReturn('/complete-profile', returnTo)} replace />
   }
 
   return children
