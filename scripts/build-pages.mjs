@@ -81,7 +81,7 @@ function writeStaticRoutes() {
     mkdirSync(directory, { recursive: true })
     writeFileSync(join(directory, 'index.html'), renderRouteDocument(template, route, title, description, index))
   }
-  const legacyTemplate = readFileSync('docs/web/index.html', 'utf8')
+  const legacyTemplate = readFileSync('docs/web/index.html', 'utf8').replace(/\r+\n/g, '\n')
   mkdirSync('docs/web/tournament', { recursive: true })
   writeFileSync('docs/web/tournament/index.html', renderRouteDocument(legacyTemplate, ...tournamentRoute))
 }

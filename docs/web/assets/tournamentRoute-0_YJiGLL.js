@@ -1,0 +1,1 @@
+function e(e){return`/tournament/?event=${encodeURIComponent(e)}`}export{e as t};
