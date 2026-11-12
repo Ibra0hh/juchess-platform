@@ -1,0 +1,39 @@
+name: JuChess checks
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web-admin-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run install:functions
+      - run: npm run check:functions && npm run test:functions
+      - run: npm run check:web && npm run check:admin
+
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install Flutter
+        run: |
+          git clone --depth 1 --branch 3.41.4 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = ff37bef603469fb030f2b72995ab929ccfc227f0
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - working-directory: apps/mobile
+        run: flutter analyze
+      - working-directory: apps/mobile
+        run: flutter test

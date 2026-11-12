@@ -94,6 +94,22 @@ void main() {
     );
   });
 
+  test('registration closes exactly at the configured deadline', () {
+    final event = _seed(
+      'next-event',
+      'upcoming',
+      deadline: '2026-07-12T12:00:00Z',
+    );
+    expect(
+      isTournamentRegistrationOpen(event, now: DateTime.utc(2026, 7, 12, 11, 59)),
+      isTrue,
+    );
+    expect(
+      isTournamentRegistrationOpen(event, now: DateTime.utc(2026, 7, 12, 12)),
+      isFalse,
+    );
+  });
+
   test('assigned online games expose only the active current round', () {
     final event = TournamentSeed(
       rowId: 'online-event',
@@ -817,7 +833,7 @@ class FakeMobileAuthService extends AppwriteService {
   }
 }
 
-TournamentSeed _seed(String rowId, String status) => TournamentSeed(
+TournamentSeed _seed(String rowId, String status, {String? deadline}) => TournamentSeed(
   rowId: rowId,
   id: rowId,
   name: rowId,
@@ -830,4 +846,5 @@ TournamentSeed _seed(String rowId, String status) => TournamentSeed(
   location: 'Hall B',
   description: '',
   status: status,
+  registrationDeadline: deadline,
 );

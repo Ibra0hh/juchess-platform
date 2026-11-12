@@ -18,6 +18,7 @@ export type Tournament = {
   status: TournamentStatus
   date: string
   startsAt?: string
+  registrationDeadline?: string
   playMode: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location: string
@@ -74,6 +75,7 @@ type AppwriteTournamentRow = Models.Row & {
   currentRound?: number
   startsAt?: string
   endsAt?: string
+  registrationDeadline?: string
   playMode?: 'inPerson' | 'online'
   onlinePlatform?: OnlineTournamentPlatform
   location?: string
@@ -1234,6 +1236,7 @@ function mapAppwriteTournament(
     status,
     date: formatDateRange(row.startsAt, row.endsAt),
     startsAt: row.startsAt,
+    registrationDeadline: row.registrationDeadline,
     playMode: row.playMode === 'online' ? 'online' : 'inPerson',
     onlinePlatform: normalizeOnlinePlatform(row.onlinePlatform),
     location: row.playMode === 'online'

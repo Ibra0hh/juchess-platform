@@ -10,6 +10,7 @@ import {
   findReclaimablePrivateIdentities,
   findReclaimablePhoneIdentity,
   isCompletePlayerProfile,
+  isTournamentRegistrationOpen,
   loadProfileContext,
   mergeOwnerProfile,
   normalizePhone,
@@ -20,6 +21,18 @@ import {
   saveOwnerProfile,
   selectCanonicalRegistration,
 } from '../src/main.js';
+
+test('registration closes at the earlier of the deadline and start time', () => {
+  const deadline = '2026-07-12T12:00:00.000Z';
+  const startsAt = '2026-07-12T13:00:00.000Z';
+  const cutoff = Date.parse(deadline);
+  const tournament = { status: 'upcoming', registrationDeadline: deadline, startsAt };
+  assert.equal(isTournamentRegistrationOpen(tournament, cutoff - 1), true);
+  assert.equal(isTournamentRegistrationOpen(tournament, cutoff), false);
+  assert.equal(isTournamentRegistrationOpen({ ...tournament, registrationDeadline: null }, Date.parse(startsAt)), false);
+  assert.equal(isTournamentRegistrationOpen({ ...tournament, status: 'active' }, cutoff - 1), false);
+  assert.equal(isTournamentRegistrationOpen({ ...tournament, registrationDeadline: 'invalid' }, cutoff - 1), false);
+});
 
 const completePublicProfile = {
   displayName: 'Student Knight',

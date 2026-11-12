@@ -3,8 +3,25 @@ import test from 'node:test';
 import {
   CREW_INTERESTS,
   crewApplicationRowId,
+  updateCrewApplication,
   validateCrewApplication,
 } from '../src/main.js';
+
+test('an applicant edit rolls back if an organizer already began review', async () => {
+  const existing = { $id: 'application', status: 'submitted', $updatedAt: 'old' };
+  const outcomes = [];
+  const tablesDB = {
+    async createTransaction() { return { $id: 'tx' }; },
+    async updateRow(options) { assert.equal(options.transactionId, 'tx'); },
+    async getRow() { return { ...existing, status: 'reviewing', $updatedAt: 'new' }; },
+    async updateTransaction(options) { outcomes.push(options); },
+  };
+  await assert.rejects(
+    updateCrewApplication(tablesDB, 'juchess', existing, { status: 'withdrawn' }),
+    (error) => error.statusCode === 409,
+  );
+  assert.deepEqual(outcomes, [{ transactionId: 'tx', rollback: true }]);
+});
 
 test('crew application row IDs are deterministic and Appwrite-safe', () => {
   const first = crewApplicationRowId('profile-123');

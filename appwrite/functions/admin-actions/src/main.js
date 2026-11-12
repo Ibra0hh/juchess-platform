@@ -245,43 +245,41 @@ async function saveCrewApplicationReview(tablesDB, databaseId, application, body
   }
 
   const now = new Date().toISOString();
-  const row = input.status
-    ? await tablesDB.updateRow({
-      databaseId,
-      tableId: tableIds.crewApplications,
-      rowId: application.$id,
-      data: { status: input.status, updatedAt: now },
-    })
-    : application;
-
+  const { $id: transactionId } = await tablesDB.createTransaction();
+  let row;
   let review = null;
-  if ('internalNotes' in body || 'assignedTo' in body || 'interviewAt' in body) {
-    const reviewId = crewReviewRowId(application.$id);
-    const data = {
-      applicationId: application.$id,
-      internalNotes: input.internalNotes,
-      assignedTo: input.assignedTo,
-      interviewAt: input.interviewAt || null,
-      updatedByAdminId: actor.$id,
-      updatedAt: now,
-    };
-    try {
-      review = await tablesDB.getRow({ databaseId, tableId: tableIds.crewApplicationReviews, rowId: reviewId });
-      review = await tablesDB.updateRow({
+  try {
+    const key = { databaseId, tableId: tableIds.crewApplications, rowId: application.$id };
+    row = await tablesDB.updateRow({
+      ...key,
+      data: cleanObject({ status: input.status || undefined, updatedAt: now }),
+      transactionId,
+    });
+    const current = await tablesDB.getRow(key);
+    if (current.$updatedAt !== application.$updatedAt || current.status !== application.status) {
+      throw new HttpError(409, 'The application changed. Reload it before saving your review.');
+    }
+    if ('internalNotes' in body || 'assignedTo' in body || 'interviewAt' in body) {
+      review = await tablesDB.upsertRow({
         databaseId,
         tableId: tableIds.crewApplicationReviews,
-        rowId: reviewId,
-        data,
-      });
-    } catch (cause) {
-      if (Number(cause?.code) !== 404) throw cause;
-      review = await tablesDB.createRow({
-        databaseId,
-        tableId: tableIds.crewApplicationReviews,
-        rowId: reviewId,
-        data,
+        rowId: crewReviewRowId(application.$id),
+        data: cleanObject({
+          applicationId: application.$id,
+          internalNotes: 'internalNotes' in body ? input.internalNotes : undefined,
+          assignedTo: 'assignedTo' in body ? input.assignedTo : undefined,
+          interviewAt: 'interviewAt' in body ? input.interviewAt || null : undefined,
+          updatedByAdminId: actor.$id,
+          updatedAt: now,
+        }),
+        transactionId,
       });
     }
+    await tablesDB.updateTransaction({ transactionId, commit: true });
+  } catch (cause) {
+    await tablesDB.updateTransaction({ transactionId, rollback: true }).catch(() => undefined);
+    if (isConflict(cause)) throw new HttpError(409, 'The application changed. Reload it before saving your review.');
+    throw cause;
   }
 
   await writeAudit(tablesDB, databaseId, {
@@ -1195,6 +1193,17 @@ function isRoundRobinTournament(tournament) {
 
 function isDoubleRoundRobinTournament(tournament) {
   return normalizeTournamentFormat(tournament.format) === 'double round robin';
+}
+
+export function validateTournamentFormatLimits(format, capacity, { newFormat = false } = {}) {
+  const name = normalizeTournamentFormat(format);
+  if (newFormat && ['team', 'arena'].includes(name)) {
+    throw new HttpError(400, format + ' is not available for new tournaments yet.');
+  }
+  const max = name === 'round robin' ? 14 : name === 'double round robin' ? 10 : null;
+  if (max && Number(capacity) > max) {
+    throw new HttpError(400, format + ' supports at most ' + max + ' players for full schedule publication.');
+  }
 }
 
 function isGameDecided(game) {
@@ -2245,6 +2254,18 @@ function swissRoundsTotal(tournament, playerCount) {
   return Math.max(3, Math.ceil(Math.log2(Math.max(2, playerCount))) + 1);
 }
 
+export function validateTournamentRegistrationDeadline(startsAt, deadline) {
+  if (startsAt && !Number.isFinite(Date.parse(startsAt))) {
+    throw new HttpError(400, 'Enter a valid tournament start time.');
+  }
+  if (!deadline) return;
+  const cutoff = Date.parse(deadline);
+  if (!Number.isFinite(cutoff)) throw new HttpError(400, 'Enter a valid registration deadline.');
+  if (startsAt && cutoff >= Date.parse(startsAt)) {
+    throw new HttpError(400, 'Registration deadline must be before the tournament start time.');
+  }
+}
+
 function validateTournamentRoundCount(format, roundsTotal) {
   if (normalizeTournamentFormat(format) !== 'swiss') return roundsTotal;
 
@@ -2858,6 +2879,34 @@ export function tournamentRowPermissions(status) {
     : [];
 }
 
+function registrationPermissions(tournamentStatus, row, accountId) {
+  const owner = accountId ? Permission.read(Role.user(accountId)) : null;
+  return [...new Set([
+    ...(row.$permissions ?? []).filter((permission) => permission.startsWith('read("user:')),
+    ...(owner ? [owner] : []),
+    ...(row.status === 'confirmed' ? tournamentRowPermissions(tournamentStatus) : []),
+  ])];
+}
+
+async function syncTournamentChildVisibility(tablesDB, databaseId, tournamentId, status) {
+  for (const tableId of [tableIds.registrations, tableIds.games, tableIds.standings]) {
+    const rows = await listRowsByTournament(tablesDB, databaseId, tableId, tournamentId);
+    for (const row of rows) {
+      const isRegistration = tableId === tableIds.registrations;
+      const permissions = isRegistration
+        ? registrationPermissions(status, row)
+        : tournamentRowPermissions(status);
+      const clearLegacy = isRegistration && (row.checkInCode != null || row.checkedIn === true);
+      if (!clearLegacy && permissions.length === (row.$permissions ?? []).length
+        && permissions.every((value) => row.$permissions.includes(value))) continue;
+      await tablesDB.updateRow({
+        databaseId, tableId, rowId: row.$id, permissions,
+        ...(clearLegacy ? { data: { checkInCode: null, checkedIn: false } } : {}),
+      });
+    }
+  }
+}
+
 function assertTournamentStatusTransition(currentStatus, nextStatus) {
   if (!nextStatus || currentStatus === nextStatus) return;
 
@@ -2995,6 +3044,7 @@ function assertParticipantCanBeAdded(tournament, games, registrations, profileId
   }
 
   const participantCount = registrations.filter((row) => row.status === 'confirmed').length;
+  validateTournamentFormatLimits(tournament.format, participantCount + 1);
   const capacity = Number(tournament.capacity) || 0;
   if (capacity > 0 && participantCount >= capacity) {
     throw new HttpError(409, `Tournament capacity is ${capacity}. Increase capacity before adding another participant.`);
@@ -3015,6 +3065,7 @@ async function createTournamentGames(tablesDB, databaseId, tournamentId, games, 
   const rows = [];
   const plannedGames = buildProcedureAssignments(games, physicalBoards);
   let hostedSetup = null;
+  let permissions = [];
   if (typeof tablesDB.getRow === 'function') {
     try {
       const tournament = await tablesDB.getRow({
@@ -3022,6 +3073,7 @@ async function createTournamentGames(tablesDB, databaseId, tournamentId, games, 
         tableId: tableIds.tournaments,
         rowId: tournamentId,
       });
+      permissions = tournamentRowPermissions(tournament.status);
       if (isJuChessHostedTournament(tournament)) {
         const control = parseHostedTimeControl(tournament.timeControl);
         hostedSetup = {
@@ -3040,6 +3092,7 @@ async function createTournamentGames(tablesDB, databaseId, tournamentId, games, 
       databaseId,
       tableId: tableIds.games,
       rowId: ID.unique(),
+      permissions,
       data: cleanObject({
         tournamentId,
         round: Number(game.round),
@@ -3079,7 +3132,7 @@ function atomicTournamentGameRows(tournament, games, physicalBoards = 3) {
     const bye = game.blackProfileId === SYSTEM_BYE_PROFILE_ID;
     return cleanObject({
       $id: ID.unique(),
-      $permissions: [Permission.read(Role.any())],
+      $permissions: tournamentRowPermissions(tournament.status),
       tournamentId: tournament.$id,
       round: Number(game.round),
       board: Number(game.board),
@@ -3326,6 +3379,10 @@ async function recalculateStandings(tablesDB, databaseId, tournamentId) {
     profileA.localeCompare(profileB)
   ));
 
+  const tournament = ranked.length && typeof tablesDB.getRow === 'function'
+    ? await tablesDB.getRow({ databaseId, tableId: tableIds.tournaments, rowId: tournamentId })
+    : null;
+  const permissions = tournamentRowPermissions(tournament?.status);
   for (let index = 0; index < ranked.length; index += 1) {
     const [profileId, rowStats] = ranked[index];
     const existing = existingByProfile.get(profileId);
@@ -3353,6 +3410,7 @@ async function recalculateStandings(tablesDB, databaseId, tournamentId) {
         databaseId,
         tableId: tableIds.standings,
         rowId: ID.unique(),
+        permissions,
         data,
       });
     }
@@ -3690,23 +3748,40 @@ function loadHostedChessGame(pgn) {
   }
 }
 
+async function updateHostedGame(tablesDB, databaseId, game, data) {
+  const key = { databaseId, tableId: tableIds.games, rowId: game.$id };
+  const { $id: transactionId } = await tablesDB.createTransaction();
+  try {
+    const row = await tablesDB.updateRow({ ...key, data, transactionId });
+    // Compare after staging: changes before staging are detected here, and
+    // changes after staging cause Appwrite's commit to fail.
+    const latest = await tablesDB.getRow(key);
+    if (latest.$updatedAt !== game.$updatedAt
+      || latest.moveVersion !== game.moveVersion
+      || latest.status !== game.status) {
+      throw new HttpError(409, 'The board changed. Refresh the position and try again.');
+    }
+    await tablesDB.updateTransaction({ transactionId, commit: true });
+    return row;
+  } catch (error) {
+    await tablesDB.updateTransaction({ transactionId, rollback: true }).catch(() => undefined);
+    if (isConflict(error)) throw new HttpError(409, 'The board changed. Refresh the position and try again.');
+    throw error;
+  }
+}
+
 async function finishHostedGame(tablesDB, databaseId, game, result, data = {}) {
   await assertResultAllowed(tablesDB, databaseId, game, result);
   const { status = 'completed', ...finishData } = data;
-  const row = await tablesDB.updateRow({
-    databaseId,
-    tableId: tableIds.games,
-    rowId: game.$id,
-    data: cleanObject({
-      ...finishData,
-      status,
-      result,
-      startedAt: game.startedAt || new Date().toISOString(),
-      finishedAt: new Date().toISOString(),
-      turnStartedAt: null,
-      clockDeadlineAt: null,
-    }),
-  });
+  const row = await updateHostedGame(tablesDB, databaseId, game, cleanObject({
+    ...finishData,
+    status,
+    result,
+    startedAt: game.startedAt || new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    turnStartedAt: null,
+    clockDeadlineAt: null,
+  }));
   await recalculateStandings(tablesDB, databaseId, row.tournamentId);
   await advanceTournamentIfReady(tablesDB, databaseId, row.tournamentId, row.round);
   return row;
@@ -3737,20 +3812,16 @@ async function syncHostedGameTimeout(tablesDB, databaseId, game, tournament, now
       return { expired: true, reason: 'noShow', row };
     }
 
-    const started = await tablesDB.updateRow({
-      databaseId,
-      tableId: tableIds.games,
-      rowId: game.$id,
-      data: {
-        status: 'live',
-        result: '*',
-        startedAt: game.startedAt || new Date(opensAt).toISOString(),
-        turnStartedAt: new Date(nowMs).toISOString(),
-        clockDeadlineAt: new Date(nowMs + whiteTimeMs).toISOString(),
-        whiteTimeMs: Math.round(whiteTimeMs),
-        blackTimeMs,
-      },
+    await updateHostedGame(tablesDB, databaseId, game, {
+      status: 'live',
+      result: '*',
+      startedAt: game.startedAt || new Date(opensAt).toISOString(),
+      turnStartedAt: new Date(nowMs).toISOString(),
+      clockDeadlineAt: new Date(nowMs + whiteTimeMs).toISOString(),
+      whiteTimeMs: Math.round(whiteTimeMs),
+      blackTimeMs,
     });
+    const started = await tablesDB.getRow({ databaseId, tableId: tableIds.games, rowId: game.$id });
     return { expired: false, started: true, row: started };
   }
 
@@ -3787,6 +3858,7 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
       : 'The clock expired. This game was forfeited.');
   }
   const row = timeout.row;
+  if (row.status !== 'live') throw new HttpError(409, 'The board is not live.');
   const { tournament } = context;
   const currentVersion = Math.max(0, Number(row.moveVersion) || 0);
   const expectedVersion = Number(body.expectedVersion);
@@ -3840,11 +3912,8 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
 
   if (result !== '*') {
     if (result === '1/2-1/2' && knockoutRoundForGame(tournament, row)) {
-      const saved = await tablesDB.updateRow({
-        databaseId,
-        tableId: tableIds.games,
-        rowId: row.$id,
-        data: { ...moveData, status: 'live', result: '*', turnStartedAt: null },
+      const saved = await updateHostedGame(tablesDB, databaseId, row, {
+        ...moveData, status: 'live', result: '*', turnStartedAt: null, clockDeadlineAt: null,
       });
       return {
         row: saved,
@@ -3865,19 +3934,14 @@ async function submitHostedTournamentMove(tablesDB, databaseId, gameId, body, pr
     };
   }
 
-  const updated = await tablesDB.updateRow({
-    databaseId,
-    tableId: tableIds.games,
-    rowId: row.$id,
-    data: {
-      ...moveData,
-      status: 'live',
-      result: '*',
-      turnStartedAt: now.toISOString(),
-      clockDeadlineAt: new Date(now.getTime() + (
-        chess.turn() === 'w' ? moveData.whiteTimeMs : moveData.blackTimeMs
-      )).toISOString(),
-    },
+  const updated = await updateHostedGame(tablesDB, databaseId, row, {
+    ...moveData,
+    status: 'live',
+    result: '*',
+    turnStartedAt: now.toISOString(),
+    clockDeadlineAt: new Date(now.getTime() + (
+      chess.turn() === 'w' ? moveData.whiteTimeMs : moveData.blackTimeMs
+    )).toISOString(),
   });
   return {
     row: updated,
@@ -4157,33 +4221,33 @@ async function sweepHostedGameDeadlines(tablesDB, databaseId, nowMs = Date.now()
     }
     if (!tournament || tournament.status !== 'active' || !isJuChessHostedTournament(tournament)) continue;
 
-    if (game.status === 'scheduled' && (
-      !Number.isFinite(Number(game.whiteTimeMs))
-      || Number(game.whiteTimeMs) <= 0
-      || !Number.isFinite(Number(game.blackTimeMs))
-      || Number(game.blackTimeMs) <= 0
-      || !game.scheduledStartAt
-      || !game.firstMoveDeadlineAt
-    )) {
-      const control = parseHostedTimeControl(tournament.timeControl);
-      const timing = hostedGameSchedule(tournament, nowMs);
-      game = await tablesDB.updateRow({
-        databaseId,
-        tableId: tableIds.games,
-        rowId: game.$id,
-        data: {
+    try {
+      if (game.status === 'scheduled' && (
+        !Number.isFinite(Number(game.whiteTimeMs))
+        || Number(game.whiteTimeMs) <= 0
+        || !Number.isFinite(Number(game.blackTimeMs))
+        || Number(game.blackTimeMs) <= 0
+        || !game.scheduledStartAt
+        || !game.firstMoveDeadlineAt
+      )) {
+        const control = parseHostedTimeControl(tournament.timeControl);
+        const timing = hostedGameSchedule(tournament, nowMs);
+        await updateHostedGame(tablesDB, databaseId, game, {
           whiteTimeMs: initializedHostedClockMs(game.whiteTimeMs, control.initialMs),
           blackTimeMs: initializedHostedClockMs(game.blackTimeMs, control.initialMs),
           scheduledStartAt: game.scheduledStartAt ?? timing.scheduledStartAt,
           firstMoveDeadlineAt: game.firstMoveDeadlineAt ?? timing.firstMoveDeadlineAt,
           clockDeadlineAt: game.clockDeadlineAt ?? game.firstMoveDeadlineAt ?? timing.firstMoveDeadlineAt,
-        },
-      });
-      initialized += 1;
-    }
+        });
+        game = await tablesDB.getRow({ databaseId, tableId: tableIds.games, rowId: game.$id });
+        initialized += 1;
+      }
 
-    const result = await syncHostedGameTimeout(tablesDB, databaseId, game, tournament, nowMs);
-    if (result.expired) finished += 1;
+      const result = await syncHostedGameTimeout(tablesDB, databaseId, game, tournament, nowMs);
+      if (result.expired) finished += 1;
+    } catch (error) {
+      if (error?.statusCode !== 409 && Number(error?.code) !== 404) throw error;
+    }
   }
   return { checked: activeRows.length, finished, initialized };
 }
@@ -5210,6 +5274,8 @@ export default async ({ req, res, log, error }) => {
       const roundsTotal = validateTournamentRoundCount(body.format, body.roundsTotal);
       const playMode = validateTournamentPlayMode(body.playMode ?? 'inPerson');
       const onlinePlatform = validateTournamentOnlinePlatform(playMode, body.onlinePlatform);
+      validateTournamentRegistrationDeadline(body.startsAt, body.registrationDeadline);
+      validateTournamentFormatLimits(body.format, body.capacity, { newFormat: true });
 
       const row = await tablesDB.createRow({
         databaseId,
@@ -5251,7 +5317,18 @@ export default async ({ req, res, log, error }) => {
         tableId: tableIds.tournaments,
         rowId: segments[1],
       });
+      if (body.startsAt !== undefined || body.registrationDeadline !== undefined) {
+        validateTournamentRegistrationDeadline(
+          body.startsAt === undefined ? currentTournament.startsAt : body.startsAt,
+          body.registrationDeadline === undefined ? currentTournament.registrationDeadline : body.registrationDeadline,
+        );
+      }
       const competitionChanges = changedCompetitionFields(currentTournament, body);
+      const changedFormat = body.format !== undefined
+        && normalizeTournamentFormat(body.format) !== normalizeTournamentFormat(currentTournament.format);
+      if (changedFormat || (body.capacity !== undefined && Number(body.capacity) !== Number(currentTournament.capacity))) {
+        validateTournamentFormatLimits(body.format ?? currentTournament.format, body.capacity ?? currentTournament.capacity, { newFormat: changedFormat });
+      }
       if (competitionChanges.length && currentTournament.status !== 'draft') {
         const publishedGames = await listRowsByTournament(
           tablesDB,
@@ -5275,6 +5352,11 @@ export default async ({ req, res, log, error }) => {
         ? await startTournamentIfNeeded(tablesDB, databaseId, segments[1], body, currentTournament)
         : null;
       const lifecycleUpdate = tournamentLifecycleUpdate(currentTournament, body, activation);
+      const visibilityChanged = body.status !== undefined
+        && tournamentRowPermissions(currentTournament.status).length !== tournamentRowPermissions(body.status).length;
+      if (visibilityChanged && !tournamentRowPermissions(body.status).length) {
+        await syncTournamentChildVisibility(tablesDB, databaseId, currentTournament.$id, body.status);
+      }
       const row = await tablesDB.updateRow({
         databaseId,
         tableId: tableIds.tournaments,
@@ -5304,6 +5386,10 @@ export default async ({ req, res, log, error }) => {
         }),
       });
 
+      if (body.status !== undefined && tournamentRowPermissions(row.status).length
+        && (visibilityChanged || currentTournament.status === row.status)) {
+        await syncTournamentChildVisibility(tablesDB, databaseId, row.$id, row.status);
+      }
       let initializedGames = [];
       if (row.status === 'active' && isJuChessHostedTournament(row)) {
         const hostedGames = await listRowsByTournament(tablesDB, databaseId, tableIds.games, row.$id);
@@ -5528,19 +5614,21 @@ export default async ({ req, res, log, error }) => {
       const existing = assertParticipantCanBeAdded(tournament, games, registrations, profile.$id);
       const nextSeed = Math.max(0, ...registrations.map((row) => Number(row.seed) || 0)) + 1;
       const data = { status: 'confirmed', checkedIn: false, seed: nextSeed, checkInCode: null };
+      const permissions = registrationPermissions(tournament.status, { ...existing, ...data }, identity?.accountId);
       const row = existing
         ? await tablesDB.updateRow({
             databaseId,
             tableId: tableIds.registrations,
             rowId: existing.$id,
             data,
+            permissions,
           })
         : await tablesDB.createRow({
             databaseId,
             tableId: tableIds.registrations,
             rowId: ID.unique(),
             data: { tournamentId, profileId: profile.$id, ...data },
-            permissions: identity?.accountId ? [Permission.read(Role.user(identity.accountId))] : [],
+            permissions,
           });
       const attendance = await ensureAttendanceConfirmation(tablesDB, databaseId, row, profile);
       await deleteLegacyCheckIn(tablesDB, databaseId, row);
@@ -5572,18 +5660,16 @@ export default async ({ req, res, log, error }) => {
         tableId: tableIds.registrations,
         rowId: segments[1],
       });
+      const tournament = await tablesDB.getRow({
+        databaseId, tableId: tableIds.tournaments, rowId: existing.tournamentId,
+      });
 
       const wasParticipant = existing.status === 'confirmed';
       const willBeParticipant = nextStatus === 'confirmed';
       const seedChanged = body.seed !== undefined && Number(body.seed) !== Number(existing.seed);
       if (wasParticipant !== willBeParticipant || seedChanged) {
-        const [publishedGames, tournament, tournamentRegistrations] = await Promise.all([
+        const [publishedGames, tournamentRegistrations] = await Promise.all([
           listRowsByTournament(tablesDB, databaseId, tableIds.games, existing.tournamentId),
-          tablesDB.getRow({
-            databaseId,
-            tableId: tableIds.tournaments,
-            rowId: existing.tournamentId,
-          }),
           listRowsByTournament(tablesDB, databaseId, tableIds.registrations, existing.tournamentId),
         ]);
         if (publishedGames.length) {
@@ -5597,6 +5683,7 @@ export default async ({ req, res, log, error }) => {
             row.$id !== existing.$id && row.status === 'confirmed'
           )).length;
           const capacity = Number(tournament.capacity) || 0;
+          validateTournamentFormatLimits(tournament.format, confirmedCount + 1);
           if (capacity > 0 && confirmedCount >= capacity) {
             throw new HttpError(409, `Tournament capacity is ${capacity}. Keep this registration waitlisted or increase capacity.`);
           }
@@ -5607,6 +5694,7 @@ export default async ({ req, res, log, error }) => {
         databaseId,
         tableId: tableIds.registrations,
         rowId: segments[1],
+        permissions: registrationPermissions(tournament.status, { ...existing, status: nextStatus }),
         data: cleanObject({
           status: nextStatus,
           seed: body.seed,

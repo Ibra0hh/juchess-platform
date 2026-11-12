@@ -670,14 +670,16 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
 const tournamentTabs: TournamentTab[] = ['draft', 'upcoming', 'active', 'completed', 'archived']
 const formatOptions = [
   { value: 'Swiss', layout: 'Standings + current pairings' },
-  { value: 'Round robin', layout: 'Standings + schedule' },
-  { value: 'Double round robin', layout: 'Double cycle standings' },
+  { value: 'Round robin', layout: 'Up to 14 players' },
+  { value: 'Double round robin', layout: 'Up to 10 players' },
   { value: 'Single elimination', layout: 'Bracket only' },
   { value: 'Double elimination', layout: 'Winners / Losers / Final' },
   { value: 'Multi-stage', layout: 'Stage tabs + finals bracket' },
-  { value: 'Team', layout: 'Team boards + match points' },
-  { value: 'Arena', layout: 'Leaderboard + streaks' },
+  { value: 'Team', layout: 'Not available for new tournaments' },
+  { value: 'Arena', layout: 'Not available for new tournaments' },
 ] as const
+const roundRobinLimits = new Map([['Round robin', 14], ['Double round robin', 10]])
+const unavailableFormats = new Set(['Team', 'Arena'])
 const timeOptions = [
   { label: 'Classical', minutes: '90', increment: '30' },
   { label: 'Rapid', minutes: '15', increment: '10' },
@@ -1677,6 +1679,16 @@ function TournamentsScreen({
       return
     }
 
+    if (!isEditing && unavailableFormats.has(format)) {
+      setMessage(format + ' is not available for new tournaments yet.')
+      return
+    }
+    const fieldLimit = roundRobinLimits.get(format)
+    if (fieldLimit && Number(form.capacity) > fieldLimit
+      && (!isEditing || format !== editingTournament?.format || Number(form.capacity) !== Number(editingTournament?.capacity))) {
+      setMessage(format + ' supports up to ' + fieldLimit + ' players. Go back to Details to adjust the player count.')
+      return
+    }
     if (format === 'Swiss' && !swissRoundsValid) {
       setMessage('Choose a Swiss round count between 1 and 50.')
       return
@@ -2264,6 +2276,7 @@ function TournamentsScreen({
                           key={option.value}
                           type="button"
                           className={form.format === option.value ? 'active' : undefined}
+                          disabled={unavailableFormats.has(option.value) && form.format !== option.value}
                           onClick={() => update('format', option.value)}
                         >
                           <strong>{option.value}</strong>

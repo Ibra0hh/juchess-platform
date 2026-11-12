@@ -496,17 +496,23 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   const [busy, setBusy] = useState(false)
   const [attendanceBusy, setAttendanceBusy] = useState<AttendanceStatus | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [now, setNow] = useState(Date.now)
   const registrationLockRef = useRef(false)
   const registrationLoadGenerationRef = useRef(0)
 
   const tournamentRowId = tournament.rowId
   const profileId = profile?.$id
   const registrationKey = tournamentRowId && profileId ? `${tournamentRowId}:${profileId}` : null
-  const registrationOpen = tournament.status === 'Upcoming'
+  const cutoffReached = (time?: string) => time ? !(now < Date.parse(time)) : false
+  const started = cutoffReached(tournament.startsAt)
+  const canCancel = tournament.status === 'Upcoming' && !started
+  const registrationOpen = canCancel && !cutoffReached(tournament.registrationDeadline)
   const closedTitle = tournament.status === 'Active' ? 'Tournament is live' : 'Registration closed'
-  const closedMessage = tournament.status === 'Active'
+  const closedMessage = tournament.status === 'Active' || started && tournament.status === 'Upcoming'
     ? 'This tournament has started. New registrations are no longer accepted.'
-    : 'This tournament is completed. Registration is no longer available.'
+    : tournament.status === 'Upcoming'
+      ? 'The registration deadline has passed.'
+      : 'This tournament is completed. Registration is no longer available.'
 
   const refreshRegistration = useCallback(async () => {
     const generation = ++registrationLoadGenerationRef.current
@@ -538,6 +544,24 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   }, [profileId, tournamentRowId])
 
   useEffect(() => {
+    setNow(Date.now())
+    const cutoffs = [tournament.registrationDeadline, tournament.startsAt]
+      .filter((time): time is string => Boolean(time))
+      .map(Date.parse)
+    const timers = cutoffs
+      .filter((cutoff) => cutoff > Date.now() && cutoff - Date.now() < 2_147_483_647)
+      .map((cutoff) => window.setTimeout(() => setNow(Date.now()), Math.max(0, cutoff - Date.now())))
+    const updateTime = () => setNow(Date.now())
+    const interval = window.setInterval(updateTime, 60_000)
+    window.addEventListener('focus', updateTime)
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer)
+      window.clearInterval(interval)
+      window.removeEventListener('focus', updateTime)
+    }
+  }, [tournament.registrationDeadline, tournament.startsAt])
+
+  useEffect(() => {
     void refreshRegistration()
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') void refreshRegistration()
@@ -557,7 +581,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
     return <div className="register-card muted">Checking your club account...</div>
   }
 
-  if (!registrationOpen && !user) {
+  if (!registrationOpen && !profileId) {
     return (
       <div className="register-card muted">
         <div className="register-icon">
@@ -642,7 +666,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
   }
 
   async function handleCancel() {
-    if (!registration || registrationUnavailable) return
+    if (!canCancel || !registration || registrationUnavailable) return
     setBusy(true)
     setMessage(null)
     try {
@@ -730,7 +754,7 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
           <button type="button" className="secondary-action" disabled={registrationLoading} onClick={() => void refreshRegistration()}>
             {registrationLoading ? 'Checking...' : 'Retry'}
           </button>
-        ) : !registrationOpen ? null : !isRegistered ? (
+        ) : !isRegistered && registrationOpen ? (
           <button
             type="button"
             className="primary-action registration-submit"
@@ -741,11 +765,11 @@ function RegistrationActions({ tournament }: { tournament: Tournament }) {
             {busy || registrationChecking ? <LoaderCircle className="registration-spinner" size={16} aria-hidden="true" /> : null}
             {registrationChecking ? 'Checking...' : busy ? 'Registering...' : 'Register'}
           </button>
-        ) : (
+        ) : isRegistered && canCancel ? (
           <button type="button" className="secondary-action" disabled={busy} onClick={handleCancel}>
             {busy ? 'Cancelling...' : 'Cancel registration'}
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   )

@@ -72,6 +72,7 @@ function changedEmailHarness(challenge) {
     async getRow() { return challenge; },
     async listRows() { return { rows: [challenge] }; },
     async updateRow() { return challenge; },
+    async incrementRowColumn() { return { ...challenge, attempts: challenge.attempts + 1 }; },
   };
   const users = {
     async get() { return { $id: 'user-1', email: 'new@example.com', emailVerification: false }; },
@@ -79,6 +80,29 @@ function changedEmailHarness(challenge) {
   };
   return { tablesDB, users, verificationUpdates: () => verificationUpdates };
 }
+
+test('verification code reservations cannot pass the atomic attempt limit', async () => {
+  let row = challengeFixture();
+  const tablesDB = {
+    async listRows() { return { rows: [row] }; },
+    async getRow() { return row; },
+    async incrementRowColumn({ max, value }) {
+      if (row.attempts + value > max) throw new Error('Maximum exceeded');
+      row = { ...row, attempts: row.attempts + value };
+      return row;
+    },
+  };
+  const results = await Promise.allSettled(Array.from({ length: 7 }, () => confirmCode({
+    tablesDB,
+    users: {},
+    databaseId: 'juchess',
+    body: { email: 'old@example.com', code: '654321' },
+    secret,
+  })));
+  assert.equal(row.attempts, 5);
+  assert.equal(row.consumedAt, null);
+  assert.equal(results.filter((result) => result.reason?.statusCode === 429).length, 3);
+});
 
 test('a link sent to an old address cannot verify a subsequently changed email', async () => {
   const challenge = challengeFixture();

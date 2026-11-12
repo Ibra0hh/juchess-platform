@@ -1025,7 +1025,7 @@ test('atomic pairing replacement stages game rows and tournament metadata before
   const result = await engine.replaceTournamentPairingsAtomically(
     tablesDB,
     'juchess',
-    { $id: 't1', format: 'Swiss', timeControl: '5+0', playMode: 'inPerson', physicalBoards: 3 },
+    { $id: 't1', status: 'upcoming', format: 'Swiss', timeControl: '5+0', playMode: 'inPerson', physicalBoards: 3 },
     [{ round: 1, board: 1, whiteProfileId: 'p1', blackProfileId: 'p2' }],
     null,
   )
@@ -1324,6 +1324,49 @@ test('scheduled hosted clocks repair legacy zero values without overwriting posi
   assert.equal(engine.initializedHostedClockMs(452_345.7, 900_000), 452_346)
 })
 
+function hostedBoardStore(initialGame, tournament) {
+  let game = initialGame
+  let nextId = 0
+  const staged = new Map()
+  return {
+    getRow: async ({ tableId }) => tableId === 'games' ? game : tournament,
+    createTransaction: async () => ({ $id: String(++nextId) }),
+    updateRow: async ({ data, transactionId }) => {
+      const row = { ...game, ...data }
+      assert.ok(transactionId)
+      staged.set(transactionId, { base: game, row })
+      return row
+    },
+    updateTransaction: async ({ transactionId, commit }) => {
+      const pending = staged.get(transactionId)
+      if (commit) {
+        if (pending.base !== game) throw Object.assign(new Error('conflict'), { code: 409 })
+        game = pending.row
+      }
+      staged.delete(transactionId)
+    },
+  }
+}
+
+test('only one hosted move from the same board revision can commit', async () => {
+  const now = Date.parse('2026-07-13T10:00:01.000Z')
+  const game = {
+    $id: 'board', tournamentId: 't', whiteProfileId: 'white', blackProfileId: 'black',
+    status: 'live', result: '*', moveVersion: 0, round: 1,
+    turnStartedAt: '2026-07-13T10:00:00.000Z',
+  }
+  const tournament = { status: 'active', playMode: 'online', onlinePlatform: 'juchess', timeControl: '5+0 Blitz' }
+  const store = hostedBoardStore(game, tournament)
+  const results = await Promise.allSettled(['e4', 'd4'].map((san) => (
+    engine.submitHostedTournamentMove(store, 'juchess', game.$id, { san, expectedVersion: 0 }, { $id: 'white' }, now)
+  )))
+  assert.equal(results.filter(({ status }) => status === 'fulfilled').length, 1)
+  assert.equal(results.find(({ status }) => status === 'rejected').reason.statusCode, 409)
+  const stored = await store.getRow({ tableId: 'games' })
+  assert.equal(stored.moveVersion, 1)
+  assert.match(stored.pgn, /1\. [ed]4/)
+})
+
 test('scheduled hosted game starts White clock and exposes a canonical clock snapshot', async () => {
   const game = {
     $id: 'g-start',
@@ -1342,13 +1385,7 @@ test('scheduled hosted game starts White clock and exposes a canonical clock sna
     onlinePlatform: 'juchess',
     timeControl: '5+0 Blitz',
   }
-  let saved = game
-  const tablesDB = {
-    updateRow: async ({ data }) => {
-      saved = { ...saved, ...data }
-      return saved
-    },
-  }
+  const tablesDB = hostedBoardStore(game, tournament)
 
   const now = Date.parse('2026-07-12T10:00:05.000Z')
   const outcome = await engine.syncHostedGameTimeout(tablesDB, 'juchess', game, tournament, now)
@@ -1382,7 +1419,7 @@ test('hosted chess derives decisive and drawn terminal results', () => {
 })
 
 test('hosted move alternates players and clocks while advancing the canonical revision', async () => {
-  let game = {
+  const game = {
     $id: 'g1',
     tournamentId: 't1',
     whiteProfileId: 'white',
@@ -1400,13 +1437,7 @@ test('hosted move alternates players and clocks while advancing the canonical re
     timeControl: '5+3 Blitz',
     format: 'Swiss',
   }
-  const tablesDB = {
-    getRow: async ({ tableId }) => tableId === 'games' ? game : tournament,
-    updateRow: async ({ data }) => {
-      game = { ...game, ...data }
-      return game
-    },
-  }
+  const tablesDB = hostedBoardStore(game, tournament)
 
   const outcome = await engine.submitHostedTournamentMove(
     tablesDB,
@@ -1450,7 +1481,7 @@ test('hosted move alternates players and clocks while advancing the canonical re
 })
 
 test('hosted move stops the mover clock at request receipt before database processing', async () => {
-  let game = {
+  const game = {
     $id: 'g-latency',
     tournamentId: 't-latency',
     whiteProfileId: 'white',
@@ -1471,13 +1502,7 @@ test('hosted move stops the mover clock at request receipt before database proce
     timeControl: '5+0 Blitz',
     format: 'Swiss',
   }
-  const tablesDB = {
-    getRow: async ({ tableId }) => tableId === 'games' ? game : tournament,
-    updateRow: async ({ data }) => {
-      game = { ...game, ...data }
-      return game
-    },
-  }
+  const tablesDB = hostedBoardStore(game, tournament)
 
   const receivedAtMs = Date.parse('2026-07-13T10:00:01.250Z')
   const outcome = await engine.submitHostedTournamentMove(

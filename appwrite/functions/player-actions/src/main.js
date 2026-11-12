@@ -81,7 +81,14 @@ const PROFILE_SERVER_FIELDS = new Set([
   '$updatedAt',
 ]);
 
-const OPEN_TOURNAMENT_STATUSES = ['upcoming'];
+export function isTournamentRegistrationOpen(tournament, now = Date.now()) {
+  return tournament.status === 'upcoming'
+    && [tournament.registrationDeadline, tournament.startsAt].every((value) => {
+      if (!value) return true;
+      const cutoff = Date.parse(value);
+      return Number.isFinite(cutoff) && now < cutoff;
+    });
+}
 export const CREW_INTERESTS = [
   'design',
   'software',
@@ -678,6 +685,24 @@ function isSafeHttpUrl(value) {
   }
 }
 
+export async function updateCrewApplication(tablesDB, databaseId, existing, data) {
+  const key = { databaseId, tableId: tableIds.crewApplications, rowId: existing.$id };
+  const { $id: transactionId } = await tablesDB.createTransaction();
+  try {
+    const row = await tablesDB.updateRow({ ...key, data, transactionId });
+    const current = await tablesDB.getRow(key);
+    if (current.$updatedAt !== existing.$updatedAt || current.status !== existing.status) {
+      throw new HttpError(409, 'Your application changed. Reload it before making changes.');
+    }
+    await tablesDB.updateTransaction({ transactionId, commit: true });
+    return row;
+  } catch (cause) {
+    await tablesDB.updateTransaction({ transactionId, rollback: true }).catch(() => undefined);
+    if (isConflict(cause)) throw new HttpError(409, 'Your application changed. Reload it before making changes.');
+    throw cause;
+  }
+}
+
 async function findCrewApplication(tablesDB, databaseId, profileId) {
   const response = await tablesDB.listRows({
     databaseId,
@@ -826,12 +851,7 @@ export default async ({ req, res, log, error }) => {
           updatedAt: now,
         };
         const row = existing
-          ? await tablesDB.updateRow({
-            databaseId,
-            tableId: tableIds.crewApplications,
-            rowId: existing.$id,
-            data,
-          })
+          ? await updateCrewApplication(tablesDB, databaseId, existing, data)
           : await tablesDB.createRow({
             databaseId,
             tableId: tableIds.crewApplications,
@@ -853,11 +873,8 @@ export default async ({ req, res, log, error }) => {
       if (!WITHDRAWABLE_APPLICATION_STATUSES.includes(existing.status)) {
         throw new HttpError(409, 'This application can no longer be withdrawn.');
       }
-      const row = await tablesDB.updateRow({
-        databaseId,
-        tableId: tableIds.crewApplications,
-        rowId: existing.$id,
-        data: { status: 'withdrawn', updatedAt: new Date().toISOString() },
+      const row = await updateCrewApplication(tablesDB, databaseId, existing, {
+        status: 'withdrawn', updatedAt: new Date().toISOString(),
       });
       return res.json({ ok: true, action: 'withdrawCrewApplication', row });
     }
@@ -878,13 +895,13 @@ export default async ({ req, res, log, error }) => {
         return res.json({ ok: false, error: 'That tournament does not exist.' }, 404);
       }
 
-      if (!OPEN_TOURNAMENT_STATUSES.includes(tournament.status)) {
-        return res.json({ ok: false, error: 'Registration is closed for this tournament.' }, 400);
-      }
-
       const existing = await findRegistration(tablesDB, databaseId, tournamentId, profile.$id);
       if (existing && existing.status !== 'cancelled') {
         return res.json({ ok: true, action: 'registerForTournament', row: existing, unchanged: true });
+      }
+
+      if (!isTournamentRegistrationOpen(tournament)) {
+        return res.json({ ok: false, error: 'Registration is closed for this tournament.' }, 409);
       }
 
       const data = { status: 'pending', checkedIn: false };
@@ -956,7 +973,8 @@ export default async ({ req, res, log, error }) => {
         databaseId,
         tableId: tableIds.registrations,
         rowId: registration.$id,
-        data: { status: 'cancelled', checkedIn: false },
+        data: { status: 'cancelled', checkedIn: false, checkInCode: null },
+        permissions: [Permission.read(Role.user(accountId))],
       });
 
       const attendance = await findAttendance(tablesDB, databaseId, registration.$id);

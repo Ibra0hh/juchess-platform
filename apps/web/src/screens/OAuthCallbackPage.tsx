@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import { formatAppwriteError } from '../lib/auth'
 import { compactCrestUrl } from '../lib/brand'
+import { consumeOAuthAttempt } from '../lib/oauthAttempt'
 import { applicationReturn, postAuthenticationDestination, withApplicationReturn } from '../lib/profileCompletion'
 import './AuthPage.css'
 
@@ -25,6 +26,11 @@ export default function OAuthCallbackPage() {
 
     if (!userId || !secret) {
       setError('The Google sign-in response is incomplete. Please start again.')
+      return
+    }
+
+    if (!consumeOAuthAttempt(window.sessionStorage, searchParams.get('attempt'))) {
+      setError('This sign-in did not start in this tab or has expired. Please start again.')
       return
     }
 

@@ -13,6 +13,7 @@ import {
 } from './authValidation'
 import { sendEmailVerificationChallenge } from './emailVerification'
 import { type ApplicationReturn, withApplicationReturn } from './profileCompletion'
+import { storeOAuthAttempt } from './oauthAttempt'
 import { runHedgedRequest } from './hedgedRequest'
 import { normalizeJordanMobile, validateRequiredPlayerProfile } from './profileValidation'
 import { queuePasswordRecoveryEmail } from './passwordRecovery'
@@ -249,9 +250,12 @@ export async function signUpWithEmail(input: SignUpInput): Promise<void> {
 export function startOAuthSession(provider: SocialAuthProvider, destination?: ApplicationReturn | null) {
   requireAppwriteReady()
 
+  // This SDK preserves query parameters on the success URL but has no state option.
+  const nonce = crypto.randomUUID()
+  storeOAuthAttempt(window.sessionStorage, nonce)
   account.createOAuth2Token({
     provider: provider === 'apple' ? OAuthProvider.Apple : OAuthProvider.Google,
-    success: appUrl(withApplicationReturn('/auth/callback', destination)),
+    success: appUrl(withApplicationReturn('/auth/callback?attempt=' + nonce, destination)),
     failure: appUrl(withApplicationReturn(`/sign-in?oauth=failed&provider=${provider}`, destination)),
   })
 }

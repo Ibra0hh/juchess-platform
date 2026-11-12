@@ -133,8 +133,8 @@
       }
     },
     "registrations": {
-      "note": "World-readable (public players list and participant counts). Rows are created ONLY by the player-actions function; clients have no create permission. Never store a secret here.",
-      "permissions": ["read(\"any\")", "update(\"team:admins\")", "delete(\"team:admins\")", "update(\"team:organizers\")"],
+      "note": "Owner-readable. Confirmed rows are public only for published tournaments; attendance and secrets belong in private tables.",
+      "permissions": ["read(\"team:admins\")", "read(\"team:organizers\")", "read(\"team:admin_super_admins\")", "read(\"team:admin_staff\")", "update(\"team:admins\")", "delete(\"team:admins\")", "update(\"team:organizers\")"],
       "rowSecurity": true,
       "indexes": {
         "tournamentId_key": "key:tournamentId",
@@ -198,6 +198,8 @@
       }
     },
     "games": {
+      "rowSecurity": true,
+      "permissions": ["read(\"team:admins\")", "read(\"team:organizers\")", "read(\"team:admin_super_admins\")", "read(\"team:admin_staff\")", "create(\"team:admins\")", "update(\"team:admins\")", "delete(\"team:admins\")", "create(\"team:organizers\")", "update(\"team:organizers\")"],
       "indexes": {
         "game_status": "key:status",
         "white_profile_status": "key:whiteProfileId,status",
@@ -292,6 +294,8 @@
       }
     },
     "standings": {
+      "rowSecurity": true,
+      "permissions": ["read(\"team:admins\")", "read(\"team:organizers\")", "read(\"team:admin_super_admins\")", "read(\"team:admin_staff\")", "create(\"team:admins\")", "update(\"team:admins\")", "delete(\"team:admins\")", "create(\"team:organizers\")", "update(\"team:organizers\")"],
       "indexes": {
         "tournamentId_key": "key:tournamentId"
       },

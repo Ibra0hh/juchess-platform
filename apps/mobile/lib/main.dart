@@ -1383,6 +1383,59 @@ class AppwriteService {
     return rows;
   }
 
+  Future<TournamentSeed?> refreshTournamentDetails(
+    TournamentSeed previous,
+  ) async {
+    final id = previous.rowId;
+    final models.Row tournament;
+    try {
+      tournament = await tablesDB.getRow(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.tournamentsTableId,
+        rowId: id,
+      );
+    } on AppwriteException catch (error) {
+      if (error.code == 404 || error.code == 401 || error.code == 403) {
+        return null;
+      }
+      rethrow;
+    }
+    final filter = [Query.equal('tournamentId', id)];
+    final [registrations, games, standings] = await Future.wait([
+      _listAllRows(AppConfig.registrationsTableId, queries: filter),
+      _listAllRows(AppConfig.gamesTableId, queries: filter),
+      _listAllRows(AppConfig.standingsTableId, queries: filter),
+    ]);
+    final ids = {
+      for (final row in [...registrations, ...standings])
+        if (row.data['profileId'] is String) row.data['profileId'] as String,
+      for (final row in games)
+        for (final key in ['whiteProfileId', 'blackProfileId'])
+          if (row.data[key] is String) row.data[key] as String,
+    }.toList();
+    final profileBatches = await Future.wait([
+      for (var i = 0; i < ids.length; i += 50)
+        _listAllRows(
+          AppConfig.profilesTableId,
+          queries: [Query.equal(r'$id', ids.skip(i).take(50).toList())],
+        ),
+    ]);
+    final profiles = _mapProfileRows(
+      profileBatches.expand((rows) => rows).toList(),
+    );
+    return _mapTournament(
+      tournament,
+      _TournamentCloudData(
+        playerCountsByTournament: _groupRegistrationCounts(registrations),
+        playersByTournament: _groupRegisteredPlayers(registrations, profiles),
+        roundsByTournament: _groupPublishedRounds(games, profiles),
+        standingsByTournament: _groupTournamentStandings(standings, profiles),
+        mediaByTournament: {id: previous.media},
+        mediaAvailable: previous.mediaAvailable,
+      ),
+    );
+  }
+
   Future<TournamentLiveGameState?> loadTournamentLiveGame(String gameId) async {
     if (!ready || gameId.trim().isEmpty) return null;
 
@@ -1655,6 +1708,7 @@ class AppwriteService {
           data['description']?.toString() ??
           'Tournament details will be published by the club organizers.',
       startsAt: startsAt,
+      registrationDeadline: data['registrationDeadline']?.toString(),
       status: rawStatus,
       registeredPlayers: registeredPlayers,
       publishedRounds: publishedRounds,
@@ -2874,6 +2928,28 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<bool> refreshTournamentDetails(TournamentSeed previous) async {
+    if (!service.ready || dataLoading) return true;
+    try {
+      final refreshed = await service.refreshTournamentDetails(previous);
+      if (_disposed) return false;
+      final index = tournamentItems.indexWhere(
+        (item) => item.rowId == previous.rowId,
+      );
+      if (index < 0) return false;
+      tournamentItems = [...tournamentItems];
+      if (refreshed == null) {
+        tournamentItems.removeAt(index);
+      } else {
+        tournamentItems[index] = refreshed;
+      }
+      notifyListeners();
+      return refreshed?.status == 'active';
+    } catch (_) {
+      return true;
+    }
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -3047,8 +3123,15 @@ int _statusOrder(String status) {
   return 2;
 }
 
-bool isTournamentRegistrationOpen(TournamentSeed event) =>
-    event.status == 'upcoming';
+bool isTournamentRegistrationOpen(TournamentSeed event, {DateTime? now}) {
+  if (event.status != 'upcoming') return false;
+  final current = now ?? DateTime.now();
+  return [event.registrationDeadline, event.startsAt].every((value) {
+    if (value == null || value.isEmpty) return true;
+    final cutoff = DateTime.tryParse(value);
+    return cutoff != null && current.isBefore(cutoff);
+  });
+}
 
 const tournamentFormatOrder = [
   'Swiss',
@@ -4852,9 +4935,11 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen>
     _refreshingTournament = true;
     final state = context.read<AppState>();
     try {
-      await state.refreshTournaments();
+      final stillActive = await state.refreshTournamentDetails(
+        _currentEvent(state),
+      );
       if (!mounted) return;
-      if (_currentEvent(state).status != 'active') {
+      if (!stillActive) {
         _tournamentRefreshTimer?.cancel();
         _tournamentRefreshTimer = null;
       }
@@ -5186,6 +5271,9 @@ class _TournamentOverview extends StatelessWidget {
     final completed = event.status == 'completed';
     final active = event.status == 'active';
     final registrationOpen = isTournamentRegistrationOpen(event);
+    final startsAt = DateTime.tryParse(event.startsAt ?? '');
+    final canCancel = registered && event.status == 'upcoming'
+        && (event.startsAt == null || (startsAt?.isAfter(DateTime.now()) ?? false));
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -5226,11 +5314,11 @@ class _TournamentOverview extends StatelessWidget {
                       : 'Play my game'
                 : active
                 ? 'View live ${_mainTabLabel(event).toLowerCase()}'
-                : !registrationOpen
-                ? 'Registration closed'
-                : registered
+                : canCancel
                 ? 'Cancel registration'
-                : 'Register',
+                : registrationOpen
+                ? 'Register'
+                : 'Registration closed',
             loading: registrationBusy,
             onTap: registrationBusy
                 ? null
@@ -5240,9 +5328,11 @@ class _TournamentOverview extends StatelessWidget {
                     assignedGame!.match,
                     '${event.name} · ${assignedGame!.round.label}',
                   )
-                : registrationOpen
+                : registrationOpen || canCancel
                 ? onRegister
-                : onMain,
+                : active || completed
+                ? onMain
+                : null,
           ),
         ],
       ),
@@ -15436,6 +15526,7 @@ class TournamentSeed {
     this.roundsTotal,
     this.currentRound,
     this.startsAt,
+    this.registrationDeadline,
     this.status = 'active',
     this.registeredPlayers = const [],
     this.publishedRounds = const [],
@@ -15462,6 +15553,7 @@ class TournamentSeed {
   final String? onlinePlatform;
   final String description;
   final String? startsAt;
+  final String? registrationDeadline;
   final String status;
   final List<PlayerSeed> registeredPlayers;
   final List<RoundSeed> publishedRounds;

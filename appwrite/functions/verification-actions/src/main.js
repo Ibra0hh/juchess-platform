@@ -384,32 +384,44 @@ export async function confirmCode({ tablesDB, users, databaseId, body, secret })
   const rows = await listChallenges(tablesDB, databaseId, 'emailHash', hashVerificationEmail(email, secret));
   const challenge = rows.find((row) => !row.consumedAt) ?? rows[0] ?? null;
   if (!challenge) throw new HttpError(400, 'This verification link or code is invalid or expired.');
-  const actualHash = hashVerificationValue('code', challenge.$id, code, secret);
-  if (!secureHashMatches(actualHash, challenge.codeHash)) {
-    if (challenge.consumedAt || isVerificationChallengeExpired(challenge)) {
+  const matches = secureHashMatches(hashVerificationValue('code', challenge.$id, code, secret), challenge.codeHash);
+  if (challenge.consumedAt || isVerificationChallengeExpired(challenge)) {
+    if (!matches) {
       throw new HttpError(400, 'This verification link or code is invalid or expired.');
     }
-    if (Number(challenge.attempts ?? 0) >= MAX_CODE_ATTEMPTS) {
-      throw new HttpError(429, 'Too many incorrect attempts. Request a fresh verification email.');
-    }
-    const attempts = Number(challenge.attempts ?? 0) + 1;
-    await tablesDB.updateRow({
+    const inactive = await activeChallengeOrThrow(tablesDB, users, databaseId, challenge, secret);
+    if (inactive?.alreadyVerified) return { verified: true, alreadyVerified: true };
+  }
+  if (Number(challenge.attempts ?? 0) >= MAX_CODE_ATTEMPTS) {
+    throw new HttpError(429, 'Too many incorrect attempts. Request a fresh verification email.');
+  }
+  let attempted;
+  try {
+    attempted = await tablesDB.incrementRowColumn({
       databaseId,
       tableId,
       rowId: challenge.$id,
-      data: {
-        attempts,
-        consumedAt: attempts >= MAX_CODE_ATTEMPTS ? new Date().toISOString() : null,
-      },
+      column: 'attempts',
+      value: 1,
+      max: MAX_CODE_ATTEMPTS,
     });
-    throw new HttpError(400, attempts >= MAX_CODE_ATTEMPTS
-      ? 'Too many incorrect attempts. Request a fresh verification email.'
-      : 'This verification link or code is invalid or expired.');
+  } catch (error) {
+    const latest = await tablesDB.getRow({ databaseId, tableId, rowId: challenge.$id }).catch(() => null);
+    if (Number(latest?.attempts) >= MAX_CODE_ATTEMPTS) {
+      throw new HttpError(429, 'Too many incorrect attempts. Request a fresh verification email.');
+    }
+    throw error;
+  }
+  if (!matches) {
+    if (Number(attempted.attempts) >= MAX_CODE_ATTEMPTS) {
+      throw new HttpError(429, 'Too many incorrect attempts. Request a fresh verification email.');
+    }
+    throw new HttpError(400, 'This verification link or code is invalid or expired.');
   }
 
-  const inactive = await activeChallengeOrThrow(tablesDB, users, databaseId, challenge, secret);
+  const inactive = await activeChallengeOrThrow(tablesDB, users, databaseId, attempted, secret);
   if (inactive?.alreadyVerified) return { verified: true, alreadyVerified: true };
-  return await completeChallenge(tablesDB, users, databaseId, challenge, secret);
+  return await completeChallenge(tablesDB, users, databaseId, attempted, secret);
 }
 
 export default async ({ req, res, log, error }) => {
