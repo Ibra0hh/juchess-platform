@@ -25,7 +25,7 @@ test('a completed network is remembered and repeats do not create extra rows', a
     },
     createRow: async ({ rowId, data, permissions }) => {
       if (rows.has(rowId)) throw { type: 'row_already_exists' };
-      assert.deepEqual(data, {});
+      assert.deepEqual(data, { completed: true });
       assert.deepEqual(permissions, []);
       rows.set(rowId, data);
     },

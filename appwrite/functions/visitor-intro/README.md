@@ -1,7 +1,7 @@
 # Visitor intro
 
 Create the private `visitor_intro` table in the `juchess` database, with no client
-permissions, row security off, and no custom columns. Deploy this folder as
+permissions, row security off, and a required boolean `completed` column. Deploy this folder as
 `visitor-intro` using Node 22, `src/main.js`, and `npm ci`. Grant execute access
 to `any`, with dynamic key scopes `rows.read` and `rows.write`, and disable
 execution logging. Set `JUCHESS_VISITOR_INTRO_SECRET` as a secret function

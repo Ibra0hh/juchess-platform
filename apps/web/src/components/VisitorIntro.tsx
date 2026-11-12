@@ -44,7 +44,7 @@ async function networkVisit(path: '/status' | '/complete') {
 function checkNetworkVisit() {
   if (!pendingStatus) {
     let timer: number
-    const timeout = new Promise<boolean>((resolve) => { timer = window.setTimeout(resolve, 1800, false) })
+    const timeout = new Promise<boolean>((resolve) => { timer = window.setTimeout(resolve, 4500, false) })
     pendingStatus = Promise.race([networkVisit('/status').catch(() => false), timeout]).finally(() => {
       window.clearTimeout(timer)
       pendingStatus = undefined

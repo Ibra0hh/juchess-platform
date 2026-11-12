@@ -38,7 +38,7 @@ export function createHandler(env, getTables) {
         }
       } else {
         try {
-          await tables.createRow({ ...row, data: {}, permissions: [] });
+          await tables.createRow({ ...row, data: { completed: true }, permissions: [] });
         } catch (failure) {
           if (failure.type !== 'row_already_exists') throw failure;
         }
