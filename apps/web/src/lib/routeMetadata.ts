@@ -93,10 +93,11 @@ export function metadataForPath(pathname: string): PageMetadata {
   if (member) {
     return { title: `${member.name} | JuChess`, description: `${member.role} at the University of Jordan Chess Club.` }
   }
-  if (normalized.startsWith('/tournament/')) {
+  if (normalized === '/tournament' || normalized.startsWith('/tournament/')) {
     return {
       title: 'Tournament Details | JuChess',
       description: 'View tournament details, pairings, standings, live games, and published results from JuChess.',
+      index: false,
     }
   }
   return routeMetadata[normalized] ?? {

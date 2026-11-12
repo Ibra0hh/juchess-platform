@@ -100,6 +100,9 @@
       }
     },
     "tournaments": {
+      "note": "Only published tournament rows grant public read. Admin staff can read drafts; status and row permissions are written together by admin-actions.",
+      "permissions": ["read(\"team:admin_super_admins\")", "read(\"team:admin_staff\")"],
+      "rowSecurity": true,
       "indexes": {
         "status_key": "key:status"
       },

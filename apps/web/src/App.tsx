@@ -69,6 +69,7 @@ function App() {
               <Route path="/home" element={<HomePage />} />
               <Route path="/tournaments" element={<TournamentsPage />} />
               <Route path="/attendance-confirm" element={<AttendanceConfirmPage />} />
+              <Route path="/tournament" element={<TournamentDetailPage />} />
               <Route path="/tournament/:id" element={<TournamentDetailPage />} />
               <Route path="/sign-in" element={<AuthPage key="sign-in" mode="sign-in" />} />
               <Route path="/sign-up" element={<AuthPage key="sign-up" mode="sign-up" />} />

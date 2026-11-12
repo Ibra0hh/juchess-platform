@@ -14,7 +14,7 @@ import {
   Trophy,
   X,
 } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
 import { externalRatingSourceLabel, hasExternalRating } from '../lib/externalRating'
@@ -103,7 +103,9 @@ type BracketConfig =
 const bracketTournamentRouteIds = new Set(['single-elimination', 'double-elimination'])
 
 function TournamentDetailPage() {
-  const { id } = useParams()
+  const { id: legacyId } = useParams()
+  const [search] = useSearchParams()
+  const id = (legacyId ?? search.get('event') ?? '').trim()
   const [tab, setTab] = useState<DetailTab>('registration')
   const [bracketView, setBracketView] = useState<BracketView>('winners')
   const [tournament, setTournament] = useState<Tournament | null>(null)
@@ -111,12 +113,18 @@ function TournamentDetailPage() {
   const [cloudError, setCloudError] = useState(false)
 
   useLayoutEffect(() => {
+    if (!id) {
+      setTournament(null)
+      setCloudError(false)
+      setLoading(false)
+      return
+    }
     let alive = true
     setTournament(null)
     setLoading(true)
     setCloudError(false)
 
-    loadTournamentDetail({ slug: id ?? '' }).then((result) => {
+    loadTournamentDetail({ slug: id }).then((result) => {
       if (!alive) return
       setTournament(result.tournament)
       setCloudError(Boolean(result.error))

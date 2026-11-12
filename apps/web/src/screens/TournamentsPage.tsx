@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { tournamentPath } from '../lib/tournamentRoute'
 import SiteFooter from '../components/SiteFooter'
 import SiteHeader from '../components/SiteHeader'
 import { loadTournamentSummaries, type Tournament, type TournamentStatus } from '../lib/juchess'
@@ -169,7 +170,7 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
   const Icon = getTournamentIcon(tournament)
 
   return (
-    <Link to={`/tournament/${tournament.id}`} className="tournament-card">
+    <Link to={tournamentPath(tournament.id)} className="tournament-card">
       <span className={`tournament-icon ${statusClass(tournament.status)}`}>
         <Icon size={24} aria-hidden="true" />
       </span>

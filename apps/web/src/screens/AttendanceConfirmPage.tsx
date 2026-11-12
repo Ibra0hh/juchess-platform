@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, LoaderCircle, XCircle } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { tournamentPath } from '../lib/tournamentRoute'
 import SiteHeader from '../components/SiteHeader'
 import {
   resolveAttendanceInvitation,
@@ -54,7 +55,7 @@ export default function AttendanceConfirmPage() {
   }
 
   const tournament = invitation?.tournament
-  const tournamentUrl = tournament ? `/tournament/${encodeURIComponent(tournament.slug)}` : '/tournaments'
+  const tournamentUrl = tournament ? tournamentPath(tournament.slug) : '/tournaments'
 
   return (
     <div className="attendance-page-shell">

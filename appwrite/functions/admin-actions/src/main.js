@@ -2458,6 +2458,7 @@ async function completeTournament(tablesDB, databaseId, tournament, finalRound) 
     databaseId,
     tableId: tableIds.tournaments,
     rowId: tournament.$id,
+    permissions: tournamentRowPermissions('completed'),
     data: cleanObject({
       status: 'completed',
       currentRound: Number(finalRound) || tournament.currentRound,
@@ -2849,6 +2850,12 @@ async function listRowsByTournament(tablesDB, databaseId, tableId, tournamentId)
 
 function isDeletableTournamentStatus(status) {
   return status === 'draft' || status === 'archived';
+}
+
+export function tournamentRowPermissions(status) {
+  return ['upcoming', 'active', 'completed'].includes(status)
+    ? [Permission.read(Role.any())]
+    : [];
 }
 
 function assertTournamentStatusTransition(currentStatus, nextStatus) {
@@ -5208,6 +5215,7 @@ export default async ({ req, res, log, error }) => {
         databaseId,
         tableId: tableIds.tournaments,
         rowId: ID.unique(),
+        permissions: tournamentRowPermissions('draft'),
         data: cleanObject({
           slug: body.slug,
           name: body.name,
@@ -5271,6 +5279,7 @@ export default async ({ req, res, log, error }) => {
         databaseId,
         tableId: tableIds.tournaments,
         rowId: segments[1],
+        ...(body.status === undefined ? {} : { permissions: tournamentRowPermissions(body.status) }),
         data: cleanObject({
           slug: body.slug,
           name: body.name,

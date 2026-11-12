@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, FlipHorizontal2, Settings2, ShieldAlert, SkipBack, SkipForward, Trophy, Users } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { tournamentPath } from '../lib/tournamentRoute'
 import { BoardSettingsPanel } from '../components/BoardSettingsPanel'
 import {
   JuCapturedPieces,
@@ -469,7 +470,7 @@ function OnlineGamesPage() {
                         <strong>{tournament.name}</strong>
                         <span>{tournament.status} · {onlinePlatformName(tournament)} · {tournament.format}</span>
                       </div>
-                      <Link to={`/tournament/${tournament.id}`}>Open</Link>
+                      <Link to={tournamentPath(tournament.id)}>Open</Link>
                     </div>
                     <div className="online-event-meta">
                       <span><Users size={13} aria-hidden="true" /> {tournament.participants} players</span>

@@ -13,6 +13,7 @@ import { execSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import teamMembers from '../apps/web/src/lib/clubTeam.json' with { type: 'json' }
+import { renderTournamentFallback } from './tournament-pages.mjs'
 import './export-palette.mjs'
 
 const env = { ...process.env, GITHUB_PAGES: 'true' }
@@ -25,9 +26,11 @@ function run(command, envOverrides = {}) {
 }
 
 const publicRootFiles = ['favicon.svg', 'manifest.webmanifest', 'robots.txt', 'sitemap.xml']
+const tournamentRoute = ['tournament', 'Tournament Details | JuChess', 'View tournament details, pairings, standings, live games, and published results from JuChess.', false]
 const staticRoutes = [
   ['home', 'JuChess | University of Jordan Chess Club', 'The University of Jordan Chess Club: campus tournaments, weekly chess activities, live boards, and tools to help every player improve.'],
   ['tournaments', 'Tournaments | JuChess', 'Discover upcoming, active, and completed University of Jordan Chess Club tournaments.'],
+  tournamentRoute,
   ['tools', 'Chess Tools & Game Review | JuChess', 'Review chess games, import matches, analyze positions, and customize your JuChess board.'],
   ['games', 'Online Tournament Games | JuChess', 'Play assigned JuChess tournament games and watch live boards from active online events.', false],
   ['leaderboard', 'Club Leaderboard | JuChess', 'View active University of Jordan Chess Club player ratings and standings.', false],
@@ -78,6 +81,9 @@ function writeStaticRoutes() {
     mkdirSync(directory, { recursive: true })
     writeFileSync(join(directory, 'index.html'), renderRouteDocument(template, route, title, description, index))
   }
+  const legacyTemplate = readFileSync('docs/web/index.html', 'utf8')
+  mkdirSync('docs/web/tournament', { recursive: true })
+  writeFileSync('docs/web/tournament/index.html', renderRouteDocument(legacyTemplate, ...tournamentRoute))
 }
 
 // GitHub Pages clients can retain an older HTML document briefly. Preserve
@@ -126,8 +132,8 @@ try {
     }
   }
 
-  copyFileSync('docs/index.html', 'docs/404.html')
-  copyFileSync('docs/web/index.html', 'docs/web/404.html')
+  writeFileSync('docs/404.html', renderTournamentFallback(readFileSync('docs/index.html', 'utf8')))
+  writeFileSync('docs/web/404.html', renderTournamentFallback(readFileSync('docs/web/index.html', 'utf8')))
   copyFileSync('docs/admin/index.html', 'docs/admin/404.html')
 } finally {
   rmSync('.pages-root', { force: true, recursive: true })

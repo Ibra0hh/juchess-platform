@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { tournamentPath } from '../lib/tournamentRoute'
 import SiteFooter from '../components/SiteFooter'
 import SiteHeader from '../components/SiteHeader'
 import VisitorIntro from '../components/VisitorIntro'
@@ -100,7 +101,7 @@ function HomePage() {
       title: `${item.name} is ${item.status.toLowerCase()}`,
       body: `${item.format} / ${item.timeControl} / ${playerLabel(item)}.`,
       date: item.date,
-      to: `/tournament/${item.id}`,
+      to: tournamentPath(item.id),
     }))
 
     return [...publishedNews, ...tournamentNews].slice(0, 3)
@@ -250,7 +251,7 @@ function FeaturedTournamentCard({ slot, cloudError }: { slot: FeatureSlot; cloud
   }
 
   return (
-    <Link to={`/tournament/${tournament.id}`} className="home-feature-card">
+    <Link to={tournamentPath(tournament.id)} className="home-feature-card">
       <div className="feature-eyebrow">
         <span className={tournament.status === 'Active' ? 'live' : undefined}>
           {tournament.status === 'Active' ? `Live - ${tournament.round}` : tournament.status}
