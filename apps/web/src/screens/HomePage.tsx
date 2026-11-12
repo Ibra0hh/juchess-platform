@@ -3,6 +3,7 @@ import { ArrowRight, CalendarDays, MapPin, Trophy, Users, Wifi } from 'lucide-re
 import { Link } from 'react-router-dom'
 import SiteFooter from '../components/SiteFooter'
 import SiteHeader from '../components/SiteHeader'
+import VisitorIntro from '../components/VisitorIntro'
 import { useAuth } from '../context/useAuth'
 import { compactCrestUrl, lightCrestUrl } from '../lib/brand'
 import teamMembers from '../lib/clubTeam.json'
@@ -107,6 +108,7 @@ function HomePage() {
 
   return (
     <div className="home-screen" data-screen-label="Home">
+      <VisitorIntro />
       <SiteHeader active="home" />
       <main>
         <section className="home-hero" id="hero" aria-labelledby="home-title">

@@ -53,6 +53,7 @@ function PrivacyContent() {
         <h2>1. What JuChess collects</h2>
         <p>When you create or complete an account, JuChess may collect your name, email address, phone number, university, university ID, chess-platform usernames, rating, profile picture, and cover picture.</p>
         <p>Tournament participation can also create registration, attendance, pairing, game, result, chat, and fair-play records connected to your profile.</p>
+        <p>JuChess remembers when you complete or skip the welcome puzzle using browser storage and a private marker derived from your network address. The intro stores no raw IP address and does not link the marker to your account.</p>
       </section>
 
       <section>

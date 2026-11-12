@@ -1,0 +1,219 @@
+html:has(.visitor-intro[open]) {
+  overflow: hidden;
+}
+
+.visitor-intro {
+  --intro-light: #f7efe2;
+  --intro-dark: #34181c;
+  --intro-accent: #f0c798;
+  box-sizing: border-box;
+  width: min(calc(100% - 1.5rem), 26rem);
+  max-width: none;
+  max-height: calc(100dvh - 1.5rem);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #9b6263;
+  border-radius: 8px;
+  color: var(--intro-light);
+  background: var(--intro-dark);
+  box-shadow: 0 24px 80px #0008;
+  color-scheme: dark;
+}
+
+.visitor-intro[open] {
+  animation: visitor-intro-reveal 300ms ease-out both;
+}
+
+.visitor-intro::backdrop {
+  background: rgb(23 12 13 / 86%);
+}
+
+.visitor-intro__panel {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1rem 0.75rem;
+  text-align: center;
+}
+
+.visitor-intro__brand,
+.visitor-intro__heading,
+.visitor-intro__enter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.visitor-intro__brand {
+  font-weight: 700;
+}
+
+.visitor-intro__brand img {
+  object-fit: contain;
+}
+
+.visitor-intro__heading h2 {
+  margin: 0;
+  color: inherit;
+  font-size: 2.65rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.visitor-intro__badge {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2rem;
+  height: 2rem;
+  color: #ffc9b9;
+  background: #6b2832;
+  border-radius: 50%;
+  animation: visitor-intro-reveal 420ms ease-out both;
+}
+
+.visitor-intro__badge svg,
+.visitor-intro__enter svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.visitor-intro--unlocked .visitor-intro__badge {
+  color: #d9f0d3;
+  background: #34543d;
+}
+
+.visitor-intro__status {
+  margin: 0;
+  min-height: 1.4rem;
+  color: #ebd8ca;
+  font-size: 0.85rem;
+}
+
+.visitor-intro__board {
+  display: grid;
+  grid-template: repeat(4, minmax(0, 1fr)) / repeat(4, minmax(0, 1fr));
+  width: min(100%, 16rem, max(12rem, 46dvh));
+  aspect-ratio: 1;
+  border: 2px solid var(--intro-accent);
+  border-radius: 4px;
+}
+
+.visitor-intro__square {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #e6cdb0;
+}
+
+.visitor-intro__square--dark {
+  background: #865057;
+}
+
+.visitor-intro__square img {
+  display: block;
+  width: 83%;
+  height: 83%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.visitor-intro__target:not([data-placed="true"]),
+.visitor-intro__rook:enabled {
+  cursor: pointer;
+}
+
+.visitor-intro__target:not([data-placed="true"])::after,
+.visitor-intro__rook:enabled::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 2px dashed #34181c;
+  border-radius: 3px;
+}
+
+.visitor-intro__square--dark.visitor-intro__target::after,
+.visitor-intro__square--dark.visitor-intro__rook::after {
+  border-color: var(--intro-light);
+}
+
+.visitor-intro__rook:enabled::after {
+  border-style: solid;
+}
+
+.visitor-intro__ghost {
+  opacity: 0.43;
+}
+
+.visitor-intro__target[data-placed="true"] img {
+  animation: visitor-intro-reveal 220ms ease-out both;
+}
+
+.visitor-intro__actions {
+  display: grid;
+  grid-template-rows: 2.8rem 2.75rem;
+  justify-items: center;
+  gap: 0.15rem;
+}
+
+.visitor-intro__enter,
+.visitor-intro__skip {
+  padding: 0 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.visitor-intro__enter {
+  color: #251518;
+  background: var(--intro-light);
+  font-size: 0.9rem;
+}
+
+.visitor-intro__enter:disabled {
+  color: #ead8d2;
+  background: #58333a;
+  cursor: default;
+}
+
+.visitor-intro__skip {
+  color: #ebd8ca;
+  background: transparent;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.visitor-intro button:focus-visible {
+  z-index: 1;
+  outline: 2px solid #211316;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 5px #fff2db;
+}
+
+@keyframes visitor-intro-reveal {
+  from { opacity: 0; transform: translateY(0.3rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 360px) {
+  .visitor-intro__heading h2 { font-size: 2.25rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visitor-intro[open],
+  .visitor-intro__badge,
+  .visitor-intro__target[data-placed="true"] img { animation: none; }
+}
