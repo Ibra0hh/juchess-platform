@@ -120,9 +120,15 @@ export default function VisitorIntro() {
   useEffect(() => {
     const element = dialog.current
     if ((!visible && !preview) || !element) return
+    const preventDismissal = (event: Event) => event.preventDefault()
+    element.setAttribute('closedby', 'none')
+    element.addEventListener('cancel', preventDismissal)
     element.showModal()
     heading.current?.focus({ preventScroll: true })
-    return () => { element.close() }
+    return () => {
+      element.removeEventListener('cancel', preventDismissal)
+      element.close()
+    }
   }, [visible, preview])
 
   useEffect(() => {
@@ -171,7 +177,7 @@ export default function VisitorIntro() {
 
   return (
     <dialog ref={dialog} className="visitor-intro" data-granted={granted} data-leaving={leaving}
-      aria-labelledby="visitor-intro-title" onCancel={(event) => event.preventDefault()}>
+      aria-labelledby="visitor-intro-title">
       <div className="visitor-intro__stage">
         <header className="visitor-intro__masthead">
           <div className="visitor-intro__brand">
