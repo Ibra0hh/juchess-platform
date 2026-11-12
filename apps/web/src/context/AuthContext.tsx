@@ -12,6 +12,7 @@ import {
   completeOAuthTokenSession,
   formatAppwriteError,
   getCurrentSession,
+  recordWebsiteVisit,
   deleteProfileMedia,
   saveBoardAppearance,
   saveExternalGameUsername,
@@ -106,6 +107,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  const activeProfileId = profile?.status === 'active' ? profile.$id : null
+  useEffect(() => {
+    if (!activeProfileId || previewSession) return
+    let pending = false
+    function recordIfVisible() {
+      if (pending || document.visibilityState !== 'visible') return
+      const key = `juchess:visit:${activeProfileId}`
+      const today = new Date().toISOString().slice(0, 10)
+      try { if (sessionStorage.getItem(key) === today) return } catch { /* Storage is optional. */ }
+      pending = true
+      void recordWebsiteVisit()
+        .then(() => { try { sessionStorage.setItem(key, today) } catch { /* Storage is optional. */ } })
+        .catch(() => undefined)
+        .finally(() => { pending = false })
+    }
+    recordIfVisible()
+    document.addEventListener('visibilitychange', recordIfVisible)
+    return () => document.removeEventListener('visibilitychange', recordIfVisible)
+  }, [activeProfileId, previewSession])
 
   const signIn = useCallback(async (input: SignInInput) => {
     invalidateRefresh()

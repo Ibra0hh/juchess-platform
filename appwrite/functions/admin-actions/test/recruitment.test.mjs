@@ -1,5 +1,36 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { adminAreaForRoute, getRecruitmentSettings, requireAdminArea, setRecruitmentSettings } from '../src/main.js';
+
+test('Recruitment admins can open and close leader applications without editing application rows', async () => {
+  const area = adminAreaForRoute(['recruitment', 'settings']);
+  assert.throws(() => requireAdminArea({ role: 'organizer' }, area), (error) => error.statusCode === 403);
+  assert.doesNotThrow(() => requireAdminArea({ role: 'admin' }, area));
+  assert.doesNotThrow(() => requireAdminArea({ role: 'superAdmin' }, area));
+
+  let leaderOpen = true;
+  const writes = [];
+  const tablesDB = {
+    async getRow({ tableId, rowId }) {
+      assert.equal(tableId, 'recruitment_settings');
+      assert.equal(rowId, 'applications');
+      return { leaderOpen };
+    },
+    async updateRow({ tableId, rowId, data }) {
+      assert.equal(tableId, 'recruitment_settings');
+      assert.equal(rowId, 'applications');
+      writes.push(data);
+      leaderOpen = data.leaderOpen;
+      return { leaderOpen };
+    },
+  };
+  assert.deepEqual(await getRecruitmentSettings(tablesDB, 'juchess'), { leaderOpen: true });
+  await assert.rejects(setRecruitmentSettings(tablesDB, 'juchess', 'false'), (error) => error.statusCode === 400);
+  assert.deepEqual(await setRecruitmentSettings(tablesDB, 'juchess', false), { leaderOpen: false });
+  assert.deepEqual(await getRecruitmentSettings(tablesDB, 'juchess'), { leaderOpen: false });
+  assert.deepEqual(await setRecruitmentSettings(tablesDB, 'juchess', true), { leaderOpen: true });
+  assert.deepEqual(writes, [{ leaderOpen: false }, { leaderOpen: true }]);
+});
 import {
   CREW_APPLICATION_STATUSES,
   loadCrewApplications,

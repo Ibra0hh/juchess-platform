@@ -28,6 +28,7 @@
         "ratingUpdatedAt": "datetime",
         "role": "enum:member,organizer,admin",
         "status": "enum:active,suspended|default:active",
+        "deletedAt": "datetime",
         "avatarFileId": "string",
         "coverFileId": "string",
         "chessComUsername": "string|unique",
@@ -324,6 +325,23 @@
         "createdByProfileId": "string|required"
       }
     },
+    "player_website_activity": {
+      "note": "Private website visit summary keyed by profile row ID. One date per signed-in UTC day, rolling 30 days. No IP or device data.",
+      "permissions": [],
+      "rowSecurity": false,
+      "fields": {
+        "lastVisitedAt": "datetime|required",
+        "visitDates": "string[]|required|max:10"
+      }
+    },
+    "recruitment_settings": {
+      "note": "Server-only recruitment controls. Seed row applications with leaderOpen set to true on a new installation.",
+      "permissions": [],
+      "rowSecurity": false,
+      "fields": {
+        "leaderOpen": "boolean|required"
+      }
+    },
     "crew_applications": {
       "note": "Private member applications to join the JuChess working team. Members can read only their own row; all writes go through player-actions so applicants cannot approve themselves.",
       "permissions": [],
@@ -335,10 +353,12 @@
       "fields": {
         "profileId": "string|required|unique",
         "accountId": "string|required",
+        "track": "enum:member,leader|default:member",
         "interests": "string[]|required",
         "skills": "string|required|max:4000",
         "contribution": "string|required|max:4000",
         "developmentGoals": "string|max:2000",
+        "additionalNotes": "string|max:2000",
         "availability": "string|required|max:512",
         "portfolioUrl": "string|max:1024",
         "status": "enum:submitted,reviewing,shortlisted,interview,accepted,rejected,withdrawn|default:submitted",

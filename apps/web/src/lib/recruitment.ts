@@ -24,6 +24,7 @@ export type RecruitmentApplication = Models.Row & {
   skills: string
   contribution: string
   developmentGoals?: string
+  additionalNotes?: string
   availability: string
   portfolioUrl?: string
   status: RecruitmentStatus
@@ -37,6 +38,7 @@ export type RecruitmentApplicationInput = {
   skills: string
   contribution: string
   developmentGoals: string
+  additionalNotes: string
   availability: string
   portfolioUrl: string
 }
@@ -63,9 +65,14 @@ export async function submitRecruitmentApplication(input: RecruitmentApplication
   const payload = await runRecruitmentAction<{ row: RecruitmentApplication }>(
     ExecutionMethod.POST,
     '/recruitment/application',
-    input,
+    input.track === 'leader' ? { ...input, contribution: '' } : input,
   )
   return payload.row
+}
+
+export async function loadLeaderApplicationsOpen() {
+  const payload = await runRecruitmentAction<{ leaderOpen: boolean }>(ExecutionMethod.GET, '/recruitment/settings')
+  return payload.leaderOpen === true
 }
 
 export async function withdrawRecruitmentApplication() {

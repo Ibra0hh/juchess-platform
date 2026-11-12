@@ -6,6 +6,7 @@ import { useAuth } from '../context/useAuth'
 import { profileMediaUrl } from '../lib/auth'
 import { applicationPath, withApplicationReturn } from '../lib/profileCompletion'
 import {
+  loadLeaderApplicationsOpen,
   loadMyRecruitmentApplication,
   recruitmentInterestOptions,
   recruitmentStatusLabels,
@@ -25,6 +26,7 @@ const emptyForm: RecruitmentApplicationInput = {
   skills: '',
   contribution: '',
   developmentGoals: '',
+  additionalNotes: '',
   availability: '',
   portfolioUrl: '',
 }
@@ -37,6 +39,7 @@ function RecruitmentPage() {
   const [form, setForm] = useState<RecruitmentApplicationInput>(emptyForm)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [leaderStatus, setLeaderStatus] = useState<'checking' | 'open' | 'closed' | 'unavailable'>('checking')
   const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
   const previewMode = Boolean(profile?.$id.startsWith('preview-'))
 
@@ -47,6 +50,9 @@ function RecruitmentPage() {
     }
     let active = true
     setLoading(true)
+    void loadLeaderApplicationsOpen()
+      .then((open) => { if (active) setLeaderStatus(open ? 'open' : 'closed') })
+      .catch(() => { if (active) setLeaderStatus('unavailable') })
     void loadMyRecruitmentApplication()
       .then((row) => {
         if (!active) return
@@ -64,6 +70,8 @@ function RecruitmentPage() {
 
   const editable = !application || ['submitted', 'withdrawn', 'rejected'].includes(application.status)
   const leader = form.track === 'leader'
+  const canSubmitTrack = !leader || previewMode || leaderStatus === 'open'
+  const fieldsDisabled = !editable || saving || !canSubmitTrack
   const withdrawable = Boolean(application && ['submitted', 'reviewing', 'shortlisted', 'interview'].includes(application.status))
   const displayName = profile?.displayName || user?.name || 'Club member'
   const avatarUrl = profileMediaUrl(profile?.avatarFileId)
@@ -84,6 +92,7 @@ function RecruitmentPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (fieldsDisabled) return
     setSaving(true)
     setFeedback(null)
     try {
@@ -95,6 +104,11 @@ function RecruitmentPage() {
       setFeedback({ tone: 'success', text: 'Your application was submitted to the JuChess HR team.' })
     } catch (error) {
       setFeedback({ tone: 'error', text: error instanceof Error ? error.message : 'Could not submit your application.' })
+      if (leader && !previewMode) {
+        void loadLeaderApplicationsOpen()
+          .then((open) => setLeaderStatus(open ? 'open' : 'closed'))
+          .catch(() => setLeaderStatus('unavailable'))
+      }
     } finally {
       setSaving(false)
     }
@@ -127,7 +141,7 @@ function RecruitmentPage() {
         <section className="recruitment-guest">
           <BriefcaseBusiness aria-hidden="true" />
           <h1>Bring your skills to JuChess</h1>
-          <p>Apply as a Team Member to contribute to projects, or as a Team Leader to coordinate people and take responsibility for a club area. Sign in to open either application.</p>
+          <p>Apply as a Team Member to contribute to projects, or as a Team Leader to coordinate people and take responsibility for a club area. Sign in to see which applications are open.</p>
           <div>
             <Link to={withApplicationReturn('/sign-in', applicationPath)}>Sign in to apply <ArrowRight size={16} /></Link>
             <Link to={withApplicationReturn('/sign-up', applicationPath)}>Create account</Link>
@@ -136,6 +150,13 @@ function RecruitmentPage() {
       </RecruitmentShell>
     )
   }
+
+  const developmentGoalsField = (
+    <label>
+      <span>What do you want to improve?</span>
+      <textarea maxLength={2000} rows={4} disabled={fieldsDisabled} value={form.developmentGoals} onChange={(event) => setForm({ ...form, developmentGoals: event.target.value })} placeholder="Skills you want to develop with the team" />
+    </label>
+  )
 
   return (
     <RecruitmentShell profilePreview={{ avatarUrl, displayName, initials }}>
@@ -177,7 +198,14 @@ function RecruitmentPage() {
                   </label>
                 </div>
               </fieldset>
-              <fieldset disabled={!editable || saving}>
+              {!canSubmitTrack ? (
+                <p className="recruitment-feedback error" role="status">
+                  {leaderStatus === 'checking' ? 'Checking Team Leader application status…' : leaderStatus === 'closed'
+                    ? 'Team Leader applications are currently closed. Team Member applications are still open.'
+                    : 'Could not check Team Leader availability. Refresh the page to try again.'}
+                </p>
+              ) : null}
+              <fieldset disabled={fieldsDisabled}>
                 <legend>{leader ? 'Which areas would you like to lead?' : 'Where would you like to help?'}</legend>
                 <p>Choose up to five areas. The HR team can discuss a different fit with you later.</p>
                 <div className="interest-grid">
@@ -202,23 +230,30 @@ function RecruitmentPage() {
               <label>
                 <span>{leader ? 'Your leadership experience' : 'Your skills and experience'}</span>
                 <small>{leader ? 'Describe a team, event, or project you coordinated and what you learned.' : 'Courses, projects, tools, volunteering, or practical experience all count.'}</small>
-                <textarea required minLength={20} maxLength={4000} rows={5} disabled={!editable || saving} value={form.skills} onChange={(event) => setForm({ ...form, skills: event.target.value })} />
+                <textarea required minLength={20} maxLength={4000} rows={5} disabled={fieldsDisabled} value={form.skills} onChange={(event) => setForm({ ...form, skills: event.target.value })} />
               </label>
 
-              <label>
-                <span>{leader ? 'What would you lead at JuChess?' : 'How would you contribute to JuChess?'}</span>
-                <small>{leader ? 'Describe your priorities, how you would organize the team, and what success would look like.' : 'Describe a problem you could help solve or a responsibility you would enjoy owning.'}</small>
-                <textarea required minLength={20} maxLength={4000} rows={5} disabled={!editable || saving} value={form.contribution} onChange={(event) => setForm({ ...form, contribution: event.target.value })} />
-              </label>
+              {!leader ? (
+                <label>
+                  <span>How would you contribute to JuChess?</span>
+                  <small>Describe a problem you could help solve or a responsibility you would enjoy owning.</small>
+                  <textarea required minLength={20} maxLength={4000} rows={5} disabled={fieldsDisabled} value={form.contribution} onChange={(event) => setForm({ ...form, contribution: event.target.value })} />
+                </label>
+              ) : null}
 
               <div className="recruitment-form-row">
-                <label>
-                  <span>What do you want to improve?</span>
-                  <textarea maxLength={2000} rows={4} disabled={!editable || saving} value={form.developmentGoals} onChange={(event) => setForm({ ...form, developmentGoals: event.target.value })} placeholder="Skills you want to develop with the team" />
-                </label>
+                {leader ? (
+                  <div>
+                    {developmentGoalsField}
+                    <label>
+                      <span className="portfolio-label">Anything else you’d like us to know? <em>Optional</em></span>
+                      <textarea maxLength={2000} rows={4} disabled={fieldsDisabled} value={form.additionalNotes} onChange={(event) => setForm({ ...form, additionalNotes: event.target.value })} />
+                    </label>
+                  </div>
+                ) : developmentGoalsField}
                 <label>
                   <span>Weekly availability</span>
-                  <select required disabled={!editable || saving} value={form.availability} onChange={(event) => setForm({ ...form, availability: event.target.value })}>
+                  <select required disabled={fieldsDisabled} value={form.availability} onChange={(event) => setForm({ ...form, availability: event.target.value })}>
                     <option value="">Choose availability</option>
                     <option>1-2 hours per week</option>
                     <option>3-5 hours per week</option>
@@ -227,7 +262,7 @@ function RecruitmentPage() {
                     <option>Project-based / flexible</option>
                   </select>
                   <span className="portfolio-label">Portfolio or profile link <em>Optional</em></span>
-                  <input type="url" maxLength={1024} disabled={!editable || saving} value={form.portfolioUrl} onChange={(event) => setForm({ ...form, portfolioUrl: event.target.value })} placeholder="https://github.com/you" />
+                  <input type="url" maxLength={1024} disabled={fieldsDisabled} value={form.portfolioUrl} onChange={(event) => setForm({ ...form, portfolioUrl: event.target.value })} placeholder="https://github.com/you" />
                 </label>
               </div>
 
@@ -235,7 +270,7 @@ function RecruitmentPage() {
                 <p><ShieldCheck size={17} /> Your private application is visible only to authorized club administrators.</p>
                 <div>
                   {withdrawable ? <button type="button" className="secondary" disabled={saving} onClick={() => void handleWithdraw()}>Withdraw</button> : null}
-                  {editable ? <button type="submit" disabled={saving || !form.interests.length}><Send size={16} /> {saving ? 'Submitting...' : application ? 'Save & resubmit' : 'Submit application'}</button> : null}
+                  {editable ? <button type="submit" disabled={fieldsDisabled || !form.interests.length}><Send size={16} /> {saving ? 'Submitting...' : application ? 'Save & resubmit' : 'Submit application'}</button> : null}
                 </div>
               </div>
             </>
@@ -264,7 +299,7 @@ function RecruitmentPage() {
             <ul>
               <li>Your profile contact details</li>
               <li>{selectedLabels.length ? selectedLabels.join(', ') : 'Your selected interests'}</li>
-              <li>Your skills, contribution, and availability</li>
+              <li>{leader ? 'Your leadership experience, availability, and optional notes' : 'Your skills, contribution, and availability'}</li>
               <li>Your optional portfolio link</li>
             </ul>
             {form.portfolioUrl ? <a href={form.portfolioUrl} target="_blank" rel="noreferrer">Open portfolio <ExternalLink size={14} /></a> : null}
@@ -325,6 +360,7 @@ function formFromApplication(application: RecruitmentApplication): RecruitmentAp
     skills: application.skills || '',
     contribution: application.contribution || '',
     developmentGoals: application.developmentGoals || '',
+    additionalNotes: application.additionalNotes || '',
     availability: application.availability || '',
     portfolioUrl: application.portfolioUrl || '',
   }

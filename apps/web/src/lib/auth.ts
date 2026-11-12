@@ -464,6 +464,20 @@ async function updateOwnerProfile(data: Record<string, unknown>) {
   return profile
 }
 
+export async function recordWebsiteVisit() {
+  const headers = await createPlayerFunctionHeaders()
+  const execution = await functions.createExecution({
+    functionId: appwriteConfig.playerFunctionId,
+    xpath: '/activity/website-visit',
+    method: ExecutionMethod.POST,
+    async: false,
+    headers,
+  })
+  if (execution.status === 'failed' || execution.responseStatusCode >= 400) {
+    throw new Error('Could not record the site visit.')
+  }
+}
+
 async function runProfileAction(
   method: ExecutionMethod,
   body: Record<string, unknown>,

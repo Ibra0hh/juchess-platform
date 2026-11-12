@@ -17,6 +17,8 @@ const tableIds = {
   standings: 'standings',
   announcements: 'announcements',
   crewApplications: 'crew_applications',
+  recruitmentSettings: 'recruitment_settings',
+  playerWebsiteActivity: 'player_website_activity',
   crewApplicationReviews: 'crew_application_reviews',
   adminAudit: 'admin_audit',
   identityBlocks: 'identity_blocks',
@@ -200,6 +202,22 @@ export function normalizeCrewReviewInput(input = {}) {
 function crewReviewRowId(applicationId) {
   const digest = createHash('sha256').update(String(applicationId)).digest('hex').slice(0, 32);
   return `review_${digest}`;
+}
+
+export async function getRecruitmentSettings(tablesDB, databaseId) {
+  const row = await tablesDB.getRow({
+    databaseId, tableId: tableIds.recruitmentSettings, rowId: 'applications', ttl: 0,
+  });
+  if (typeof row.leaderOpen !== 'boolean') throw new HttpError(503, 'Recruitment settings are unavailable.');
+  return { leaderOpen: row.leaderOpen };
+}
+
+export async function setRecruitmentSettings(tablesDB, databaseId, leaderOpen) {
+  if (typeof leaderOpen !== 'boolean') throw new HttpError(400, 'Choose whether Team Leader applications are open.');
+  const row = await tablesDB.updateRow({
+    databaseId, tableId: tableIds.recruitmentSettings, rowId: 'applications', data: { leaderOpen },
+  });
+  return { leaderOpen: row.leaderOpen };
 }
 
 export async function loadCrewApplications(tablesDB, databaseId) {
@@ -464,6 +482,42 @@ async function joinProfilesWithPrivate(tablesDB, databaseId, profiles) {
     profile,
     byProfileId.get(profile.$id) ?? legacyIdentityForProfile(profile),
   ));
+}
+
+export function summarizePlayedTournaments(games) {
+  const tournamentsByProfile = new Map();
+  for (const game of games) {
+    if (!game.tournamentId || !game.whiteProfileId || !game.blackProfileId
+        || game.whiteProfileId === SYSTEM_BYE_PROFILE_ID || game.blackProfileId === SYSTEM_BYE_PROFILE_ID
+        || !['1-0', '0-1', '1/2-1/2'].includes(game.result)) continue;
+    for (const profileId of [game.whiteProfileId, game.blackProfileId]) {
+      if (!tournamentsByProfile.has(profileId)) tournamentsByProfile.set(profileId, new Set());
+      tournamentsByProfile.get(profileId).add(game.tournamentId);
+    }
+  }
+  return new Map([...tournamentsByProfile].map(([profileId, tournaments]) => [profileId, tournaments.size]));
+}
+
+async function loadPlayerDirectoryActivity(tablesDB, databaseId, profiles) {
+  const [visits, games] = await Promise.all([
+    listRowsPaginated(tablesDB, databaseId, tableIds.playerWebsiteActivity),
+    listRowsPaginated(tablesDB, databaseId, tableIds.games, [
+      Query.equal('status', 'completed'),
+      Query.select(['$id', 'tournamentId', 'whiteProfileId', 'blackProfileId', 'result']),
+    ]),
+  ]);
+  const visitsByProfile = new Map(visits.map((row) => [row.$id, row]));
+  const playedByProfile = summarizePlayedTournaments(games);
+  const firstDay = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+  return profiles.map((profile) => {
+    const visit = visitsByProfile.get(profile.$id);
+    return {
+      ...profile,
+      lastVisitedAt: visit?.lastVisitedAt ?? null,
+      visitDays: new Set((visit?.visitDates ?? []).filter((date) => date >= firstDay)).size,
+      tournamentsPlayed: playedByProfile.get(profile.$id) ?? 0,
+    };
+  });
 }
 
 function actorProfileId(req, body, actor) {
@@ -2990,13 +3044,13 @@ async function listRowsPaginated(tablesDB, databaseId, tableId, queries = [], pa
   }
 }
 
-function assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles, privateProfiles = []) {
+function assertPlayersCanBeDeleted(profileIds, profiles, adminProfiles, privateProfiles = []) {
   if (profileIds.includes(SYSTEM_BYE_PROFILE_ID)) {
     throw new HttpError(409, 'The system bye profile cannot be deleted.');
   }
 
   const profileById = new Map(profiles.map((profile) => [profile.$id, profile]));
-  const missingId = profileIds.find((profileId) => !profileById.has(profileId));
+  const missingId = profileIds.find((profileId) => !profileById.has(profileId) || profileById.get(profileId).deletedAt);
   if (missingId) throw new HttpError(404, `Player ${missingId} was not found.`);
 
   const adminAccountIds = new Set(adminProfiles.map((profile) => profile.accountId).filter(Boolean));
@@ -3009,25 +3063,95 @@ function assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles, p
     throw new HttpError(409, `${protectedProfile.displayName || 'This player'} has admin access. Remove that access before deleting the player.`);
   }
 
-  const profileIdSet = new Set(profileIds);
-  const referencedGame = games.find((game) => (
-    profileIdSet.has(game.whiteProfileId) || profileIdSet.has(game.blackProfileId)
+}
+
+export function retainedTournamentHistory(profileIds, games, standings = []) {
+  const history = new Map(profileIds.map((id) => [id, new Set()]));
+  for (const game of games) {
+    if (!game.tournamentId) continue;
+    history.get(game.whiteProfileId)?.add(game.tournamentId);
+    history.get(game.blackProfileId)?.add(game.tournamentId);
+  }
+  for (const standing of standings) {
+    if (standing.tournamentId) history.get(standing.profileId)?.add(standing.tournamentId);
+  }
+  return history;
+}
+
+export function tournamentPlayerPlaceholder(now = new Date()) {
+  return {
+    displayName: 'Deleted player',
+    status: 'suspended',
+    role: 'member',
+    university: null,
+    avatarFileId: null,
+    coverFileId: null,
+    chessComUsername: null,
+    lichessUsername: null,
+    ratingSource: null,
+    ratingUpdatedAt: null,
+    deletedAt: now.toISOString(),
+  };
+}
+
+async function deleteProfileRows(tablesDB, databaseId, tableId, rows, profileIdSet, retainedHistory = new Map()) {
+  const matchingRows = rows.filter((row) => (
+    profileIdSet.has(row.profileId) && !retainedHistory.get(row.profileId)?.has(row.tournamentId)
   ));
-  if (referencedGame) {
-    const profileId = profileIdSet.has(referencedGame.whiteProfileId)
-      ? referencedGame.whiteProfileId
-      : referencedGame.blackProfileId;
-    const profile = profileById.get(profileId);
-    throw new HttpError(409, `${profile?.displayName || 'This player'} has tournament game history and cannot be deleted. Suspend the player instead.`);
+  for (const row of matchingRows) {
+    await deleteRowIfPresent(tablesDB, databaseId, tableId, row.$id);
+  }
+  return matchingRows.length;
+}
+
+async function deleteRowIfPresent(tablesDB, databaseId, tableId, rowId) {
+  try {
+    await tablesDB.deleteRow({ databaseId, tableId, rowId });
+  } catch (cause) {
+    if (cause?.type !== 'row_not_found') throw cause;
   }
 }
 
-async function deleteProfileRows(tablesDB, databaseId, tableId, rows, profileIdSet) {
-  const matchingRows = rows.filter((row) => profileIdSet.has(row.profileId));
-  for (const row of matchingRows) {
-    await tablesDB.deleteRow({ databaseId, tableId, rowId: row.$id });
+export async function deletePlayerAccounts(tablesDB, databaseId, users, { profileIds, profiles, privateProfiles, games, standings, registrations, checkIns, attendance, adminProfiles }) {
+  assertPlayersCanBeDeleted(profileIds, profiles, adminProfiles, privateProfiles.filter(Boolean));
+
+  const profileIdSet = new Set(profileIds);
+  const retainedHistory = retainedTournamentHistory(profileIds, games, standings);
+  for (const identity of privateProfiles) {
+    if (!identity?.accountId) continue;
+    try {
+      await users.delete({ userId: identity.accountId });
+    } catch (cause) {
+      if (Number(cause?.code) !== 404) throw cause;
+    }
   }
-  return matchingRows.length;
+
+  const deletedRows = {
+    registrations: await deleteProfileRows(tablesDB, databaseId, tableIds.registrations, registrations, profileIdSet, retainedHistory),
+    checkIns: await deleteProfileRows(tablesDB, databaseId, tableIds.checkIns, checkIns, profileIdSet),
+    attendance: await deleteProfileRows(tablesDB, databaseId, tableIds.attendance, attendance, profileIdSet),
+  };
+
+  for (const identity of privateProfiles) {
+    if (identity?.$id && !identity.$legacy) await deleteRowIfPresent(tablesDB, databaseId, tableIds.profilePrivate, identity.$id);
+  }
+
+  for (const profile of profiles) {
+    await deleteRowIfPresent(tablesDB, databaseId, tableIds.playerWebsiteActivity, profile.$id);
+    if (retainedHistory.get(profile.$id)?.size) {
+      const legacyFields = Object.fromEntries(
+        ['accountId', 'email', 'phone', 'universityId'].filter((key) => profile[key] != null).map((key) => [key, null]),
+      );
+      await tablesDB.updateRow({
+        databaseId, tableId: tableIds.profiles, rowId: profile.$id,
+        data: { ...tournamentPlayerPlaceholder(), ...legacyFields },
+        permissions: (profile.$permissions ?? []).filter((permission) => permission === Permission.read(Role.any())),
+      });
+    } else {
+      await tablesDB.deleteRow({ databaseId, tableId: tableIds.profiles, rowId: profile.$id });
+    }
+  }
+  return deletedRows;
 }
 
 function assertParticipantCanBeAdded(tournament, games, registrations, profileId) {
@@ -4689,7 +4813,10 @@ export default async ({ req, res, log, error }) => {
         'GET /announcements',
         'DELETE /announcements/:id',
         'GET /recruitment/applications',
+        'GET /players/directory',
         'PATCH /recruitment/applications/:id',
+        'GET /recruitment/settings',
+        'PATCH /recruitment/settings',
       ],
     });
   }
@@ -4782,6 +4909,11 @@ export default async ({ req, res, log, error }) => {
     }
 
     requireAdminArea(actor, adminAreaForRoute(segments));
+
+    if (segments[0] === 'recruitment' && segments[1] === 'settings' && segments.length === 2) {
+      if (method === 'GET') return res.json({ ok: true, ...await getRecruitmentSettings(tablesDB, databaseId) });
+      if (method === 'PATCH') return res.json({ ok: true, ...await setRecruitmentSettings(tablesDB, databaseId, body.leaderOpen) });
+    }
 
     if (method === 'GET' && segments[0] === 'recruitment' && segments[1] === 'applications' && segments.length === 2) {
       const applications = await loadCrewApplications(tablesDB, databaseId);
@@ -4906,37 +5038,9 @@ export default async ({ req, res, log, error }) => {
         loadPrivateIdentityForProfile(tablesDB, databaseId, profile)
       )));
 
-      assertPlayersCanBeDeleted(profileIds, profiles, games, adminProfiles, privateProfiles.filter(Boolean));
-
-      const profileIdSet = new Set(profileIds);
-      const deletedRows = {
-        registrations: await deleteProfileRows(tablesDB, databaseId, tableIds.registrations, registrations, profileIdSet),
-        checkIns: await deleteProfileRows(tablesDB, databaseId, tableIds.checkIns, checkIns, profileIdSet),
-        attendance: await deleteProfileRows(tablesDB, databaseId, tableIds.attendance, attendance, profileIdSet),
-        standings: await deleteProfileRows(tablesDB, databaseId, tableIds.standings, standings, profileIdSet),
-      };
-
-      for (const identity of privateProfiles) {
-        if (!identity?.$id) continue;
-        try {
-          await tablesDB.deleteRow({ databaseId, tableId: tableIds.profilePrivate, rowId: identity.$id });
-        } catch (cause) {
-          if (Number(cause?.code) !== 404) throw cause;
-        }
-      }
-
-      for (const profile of profiles) {
-        await tablesDB.deleteRow({ databaseId, tableId: tableIds.profiles, rowId: profile.$id });
-      }
-
-      for (const identity of privateProfiles) {
-        if (!identity?.accountId) continue;
-        try {
-          await users.delete({ userId: identity.accountId });
-        } catch (cause) {
-          if (Number(cause?.code) !== 404) throw cause;
-        }
-      }
+      const deletedRows = await deletePlayerAccounts(tablesDB, databaseId, users, {
+        profileIds, profiles, privateProfiles, games, standings, registrations, checkIns, attendance, adminProfiles,
+      });
 
       const deleted = profiles.map((profile) => ({
         profileId: profile.$id,
@@ -4948,16 +5052,18 @@ export default async ({ req, res, log, error }) => {
         action: 'deletePlayers',
         targetTable: tableIds.profiles,
         targetRowId: profileIds.join(','),
-        payload: { deleted, deletedRows },
+        payload: { profileIds, deletedRows },
       });
 
       return res.json({ ok: true, action: 'deletePlayers', deleted, deletedRows });
     }
 
-    if (method === 'GET' && segments[0] === 'players' && segments.length === 1) {
-      const profiles = await listAllRows(tablesDB, databaseId, tableIds.profiles);
+    if (method === 'GET' && segments[0] === 'players'
+        && (segments.length === 1 || (segments.length === 2 && segments[1] === 'directory'))) {
+      const profiles = (await listAllRows(tablesDB, databaseId, tableIds.profiles)).filter((profile) => !profile.deletedAt);
       const rows = await joinProfilesWithPrivate(tablesDB, databaseId, profiles);
-      return res.json({ ok: true, rows });
+      const result = segments[1] === 'directory' ? await loadPlayerDirectoryActivity(tablesDB, databaseId, rows) : rows;
+      return res.json({ ok: true, rows: result });
     }
 
     if (method === 'POST' && segments[0] === 'profiles' && segments[1] === 'lookup') {

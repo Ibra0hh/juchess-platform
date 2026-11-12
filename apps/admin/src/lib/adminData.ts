@@ -117,6 +117,9 @@ type AppwriteProfileRow = Models.Row & {
   status?: string
   avatarFileId?: string
   coverFileId?: string
+  lastVisitedAt?: string | null
+  visitDays?: number
+  tournamentsPlayed?: number
 }
 
 export type RecruitmentApplicant = {
@@ -152,6 +155,7 @@ export type RecruitmentApplication = Models.Row & {
   skills: string
   contribution: string
   developmentGoals?: string
+  additionalNotes?: string
   availability: string
   portfolioUrl?: string
   status: RecruitmentStatus
@@ -810,6 +814,10 @@ export type ClubPlayer = {
   status: string
   avatarUrl: string
   coverUrl: string
+  joinedAt: string
+  lastVisitedAt: string
+  visitDays: number
+  tournamentsPlayed: number
 }
 
 export type ClubPlayersResult = {
@@ -829,13 +837,13 @@ export type PlayerEmailSendResult = {
   skipped: Array<{ profileId: string; name: string; reason: string }>
 }
 
-export async function loadClubPlayers(): Promise<ClubPlayersResult> {
+export async function loadClubPlayers(includeActivity = false): Promise<ClubPlayersResult> {
   if (!appwriteReady) return { players: [] }
 
   try {
     const response = await runAdminAction<{ rows: AppwriteProfileRow[] }>({
       method: ExecutionMethod.GET,
-      path: '/players',
+      path: includeActivity ? '/players/directory' : '/players',
     })
 
     const players = response.rows
@@ -855,6 +863,10 @@ export async function loadClubPlayers(): Promise<ClubPlayersResult> {
         status: row.status ?? 'active',
         avatarUrl: profileMediaUrl(row.avatarFileId),
         coverUrl: profileMediaUrl(row.coverFileId),
+        joinedAt: row.$createdAt,
+        lastVisitedAt: row.lastVisitedAt ?? '',
+        visitDays: row.visitDays ?? 0,
+        tournamentsPlayed: row.tournamentsPlayed ?? 0,
       }))
       .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))
 
@@ -891,6 +903,21 @@ export async function updateRecruitmentApplication(applicationId: string, input:
     body: input,
   })
   return response
+}
+
+export async function loadRecruitmentSettings() {
+  return runAdminAction<{ leaderOpen: boolean }>({
+    method: ExecutionMethod.GET,
+    path: '/recruitment/settings',
+  })
+}
+
+export async function updateRecruitmentSettings(leaderOpen: boolean) {
+  return runAdminAction<{ leaderOpen: boolean }>({
+    method: ExecutionMethod.PATCH,
+    path: '/recruitment/settings',
+    body: { leaderOpen },
+  })
 }
 
 export async function deleteClubPlayers(profileIds: string[]) {

@@ -3,8 +3,10 @@ import { BriefcaseBusiness, CalendarClock, Download, ExternalLink, Search, UserC
 import {
   formatAdminError,
   loadRecruitmentApplications,
+  loadRecruitmentSettings,
   profileMediaUrl,
   updateRecruitmentApplication,
+  updateRecruitmentSettings,
   type RecruitmentApplication,
   type RecruitmentReviewInput,
   type RecruitmentStatus,
@@ -82,6 +84,8 @@ export default function RecruitmentScreen() {
         <RecruitmentKpi icon={<UserCheck />} label="Accepted" value={counts.accepted} />
       </div>
 
+      <RecruitmentControls />
+
       <div className="recruitment-admin-panel">
         <header className="recruitment-admin-toolbar">
           <div>
@@ -147,6 +151,61 @@ export default function RecruitmentScreen() {
           }}
         />
       ) : null}
+    </section>
+  )
+}
+
+function RecruitmentControls() {
+  const [leaderOpen, setLeaderOpen] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(true)
+  const [error, setError] = useState('')
+
+  const loadSettings = useCallback(async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const settings = await loadRecruitmentSettings()
+      setLeaderOpen(settings.leaderOpen)
+    } catch (cause) {
+      setError(formatAdminError(cause))
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  useEffect(() => { void loadSettings() }, [loadSettings])
+
+  async function toggle() {
+    if (busy || leaderOpen === null) return
+    setBusy(true)
+    setError('')
+    try {
+      const settings = await updateRecruitmentSettings(!leaderOpen)
+      setLeaderOpen(settings.leaderOpen)
+    } catch (cause) {
+      setError(formatAdminError(cause))
+      setLeaderOpen(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="recruitment-admin-panel" aria-label="Recruitment controls">
+      <div className="recruitment-admin-toolbar">
+        <div>
+          <strong>Team Leader applications</strong>
+          <span role="status">{leaderOpen === null ? busy ? 'Checking status…' : 'Status unavailable' : leaderOpen ? 'Open' : 'Closed'}</span>
+        </div>
+        <div className="recruitment-admin-filters">
+          {leaderOpen !== null ? (
+            <button type="button" role="switch" aria-label="Team Leader applications" aria-checked={leaderOpen} disabled={busy} onClick={() => void toggle()}>
+              {busy ? 'Saving…' : leaderOpen ? 'Close applications' : 'Open applications'}
+            </button>
+          ) : error ? <button type="button" disabled={busy} onClick={() => void loadSettings()}>Retry</button> : null}
+        </div>
+      </div>
+      {error ? <p className="recruitment-admin-error" role="alert">{error}</p> : null}
     </section>
   )
 }
@@ -230,8 +289,11 @@ function ReviewModal({ application, onClose, onSaved }: {
             <ReviewSection title="Interests"><div className="recruitment-interest-list large">{application.interests.map((item) => <span key={item}>{interestLabels[item] || item}</span>)}</div></ReviewSection>
             <ReviewSection title="Application type"><p>{applicationTrackLabel(application)}</p></ReviewSection>
             <ReviewSection title={applicationTrack(application) === 'leader' ? 'Leadership experience' : 'Skills and experience'}><p>{application.skills}</p></ReviewSection>
-            <ReviewSection title={applicationTrack(application) === 'leader' ? 'Leadership plan' : 'How they would contribute'}><p>{application.contribution}</p></ReviewSection>
+            {applicationTrack(application) === 'member' || application.contribution ? (
+              <ReviewSection title={applicationTrack(application) === 'leader' ? 'Leadership plan' : 'How they would contribute'}><p>{application.contribution}</p></ReviewSection>
+            ) : null}
             <ReviewSection title="Development goals"><p>{application.developmentGoals || 'Not provided.'}</p></ReviewSection>
+            {applicationTrack(application) === 'leader' && application.additionalNotes ? <ReviewSection title="Additional notes"><p>{application.additionalNotes}</p></ReviewSection> : null}
             <ReviewSection title="Availability"><p>{application.availability}</p></ReviewSection>
             {application.portfolioUrl ? <a className="review-portfolio" href={application.portfolioUrl} target="_blank" rel="noreferrer">Open portfolio <ExternalLink size={14} /></a> : null}
           </div>

@@ -13,6 +13,8 @@ const tableIds = {
   checkIns: 'check_ins',
   attendance: 'attendance_confirmations',
   crewApplications: 'crew_applications',
+  recruitmentSettings: 'recruitment_settings',
+  playerWebsiteActivity: 'player_website_activity',
   identityBlocks: 'identity_blocks',
 };
 
@@ -663,13 +665,50 @@ export function validateCrewApplication(input = {}) {
 
   if (!interests.length) throw new HttpError(400, 'Choose at least one area you are interested in.');
   if (skills.length < 20) throw new HttpError(400, 'Tell us a little more about your skills.');
-  if (contribution.length < 20) throw new HttpError(400, 'Tell us how you would contribute to JuChess.');
+  if (track === 'member' && contribution.length < 20) throw new HttpError(400, 'Tell us how you would contribute to JuChess.');
   if (!availability) throw new HttpError(400, 'Choose your weekly availability.');
   if (portfolioUrl && !isSafeHttpUrl(portfolioUrl)) {
     throw new HttpError(400, 'Portfolio links must start with http:// or https://.');
   }
 
-  return { track, interests, skills, contribution, developmentGoals, availability, portfolioUrl };
+  const application = { track, interests, skills, contribution, developmentGoals, availability, portfolioUrl };
+  if (track === 'leader' && 'additionalNotes' in input) {
+    application.additionalNotes = cleanApplicationText(input.additionalNotes, 2000);
+  }
+  return application;
+}
+
+export async function loadLeaderApplicationsOpen(tablesDB, databaseId) {
+  const row = await tablesDB.getRow({
+    databaseId, tableId: tableIds.recruitmentSettings, rowId: 'applications', ttl: 0,
+  });
+  return row.leaderOpen === true;
+}
+
+export async function recordPlayerWebsiteVisit(tablesDB, databaseId, profileId, now = new Date()) {
+  const key = { databaseId, tableId: tableIds.playerWebsiteActivity, rowId: profileId };
+  const lastVisitedAt = now.toISOString();
+  const today = lastVisitedAt.slice(0, 10);
+  const firstDay = new Date(now.getTime() - 29 * 86400000).toISOString().slice(0, 10);
+  let existing;
+  try {
+    existing = await tablesDB.getRow(key);
+  } catch (cause) {
+    if (cause?.type !== 'row_not_found') throw cause;
+    try {
+      await tablesDB.createRow({ ...key, data: { lastVisitedAt, visitDates: [today] }, permissions: [] });
+      return;
+    } catch (race) {
+      if (!isConflict(race)) throw race;
+      existing = await tablesDB.getRow(key);
+    }
+  }
+  const visitDates = existing.visitDates ?? [];
+  if (visitDates.includes(today) || existing.lastVisitedAt >= lastVisitedAt) return;
+  await tablesDB.updateRow({
+    ...key,
+    data: { lastVisitedAt, visitDates: [...visitDates.filter((day) => day >= firstDay && day < today), today] },
+  });
 }
 
 function cleanApplicationText(value, maxLength) {
@@ -712,6 +751,34 @@ async function findCrewApplication(tablesDB, databaseId, profileId) {
     ttl: 0,
   });
   return response.rows[0] ?? null;
+}
+
+export async function submitCrewApplication(tablesDB, databaseId, accountId, profileId, body) {
+  const existing = await findCrewApplication(tablesDB, databaseId, profileId);
+  if (existing && !EDITABLE_APPLICATION_STATUSES.includes(existing.status)) {
+    throw new HttpError(409, 'This application is already being reviewed and can no longer be edited.');
+  }
+  const application = validateCrewApplication({ ...body, track: body.track ?? existing?.track });
+  if (application.track === 'leader') {
+    if (!await loadLeaderApplicationsOpen(tablesDB, databaseId)) {
+      throw new HttpError(409, 'Team Leader applications are currently closed.');
+    }
+    if (!application.contribution && existing?.track === 'leader') {
+      application.contribution = existing.contribution ?? '';
+    }
+  }
+  const now = new Date().toISOString();
+  const data = { ...application, status: 'submitted', submittedAt: now, updatedAt: now };
+  const row = existing
+    ? await updateCrewApplication(tablesDB, databaseId, existing, data)
+    : await tablesDB.createRow({
+      databaseId,
+      tableId: tableIds.crewApplications,
+      rowId: crewApplicationRowId(profileId),
+      data: { profileId, accountId, ...data },
+      permissions: [Permission.read(Role.user(accountId))],
+    });
+  return { row, action: existing ? 'resubmitCrewApplication' : 'submitCrewApplication' };
 }
 
 export function attendanceWindowState(startsAtValue, nowMs = Date.now()) {
@@ -798,10 +865,12 @@ export default async ({ req, res, log, error }) => {
       routes: [
         'GET /profile',
         'POST /profile',
+        'POST /activity/website-visit',
         'POST /registrations',
         'POST /registrations/:id/cancel',
         'POST /registrations/:id/attendance',
         'GET /recruitment/application',
+        'GET /recruitment/settings',
         'POST /recruitment/application',
         'POST /recruitment/application/withdraw',
       ],
@@ -830,6 +899,15 @@ export default async ({ req, res, log, error }) => {
 
     const { accountId, profile } = await requirePlayer(req, tablesDB, databaseId);
 
+    if (method === 'POST' && segments[0] === 'activity' && segments[1] === 'website-visit' && segments.length === 2) {
+      await recordPlayerWebsiteVisit(tablesDB, databaseId, profile.$id);
+      return res.json({ ok: true });
+    }
+
+    if (method === 'GET' && segments[0] === 'recruitment' && segments[1] === 'settings' && segments.length === 2) {
+      return res.json({ ok: true, leaderOpen: await loadLeaderApplicationsOpen(tablesDB, databaseId) });
+    }
+
     if (segments[0] === 'recruitment' && segments[1] === 'application' && segments.length === 2) {
       if (method === 'GET') {
         const row = await findCrewApplication(tablesDB, databaseId, profile.$id);
@@ -837,33 +915,8 @@ export default async ({ req, res, log, error }) => {
       }
 
       if (method === 'POST') {
-        const existing = await findCrewApplication(tablesDB, databaseId, profile.$id);
-        if (existing && !EDITABLE_APPLICATION_STATUSES.includes(existing.status)) {
-          throw new HttpError(409, 'This application is already being reviewed and can no longer be edited.');
-        }
-        const application = validateCrewApplication({ ...body, track: body.track ?? existing?.track });
-
-        const now = new Date().toISOString();
-        const data = {
-          ...application,
-          status: 'submitted',
-          submittedAt: now,
-          updatedAt: now,
-        };
-        const row = existing
-          ? await updateCrewApplication(tablesDB, databaseId, existing, data)
-          : await tablesDB.createRow({
-            databaseId,
-            tableId: tableIds.crewApplications,
-            rowId: crewApplicationRowId(profile.$id),
-            data: {
-              profileId: profile.$id,
-              accountId,
-              ...data,
-            },
-            permissions: [Permission.read(Role.user(accountId))],
-          });
-        return res.json({ ok: true, action: existing ? 'resubmitCrewApplication' : 'submitCrewApplication', row });
+        const result = await submitCrewApplication(tablesDB, databaseId, accountId, profile.$id, body);
+        return res.json({ ok: true, ...result });
       }
     }
 

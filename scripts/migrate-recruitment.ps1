@@ -32,9 +32,9 @@ function Get-Columns([string]$TableId) {
   return @(($json | ConvertFrom-Json).columns)
 }
 
-function Ensure-Table([string]$TableId, [string]$Name) {
+function Ensure-Table([string]$TableId, [string]$Name, [bool]$RowSecurity = $true) {
   if ((Get-Tables).'$id' -contains $TableId) { Write-Host "$TableId already exists."; return }
-  & appwrite tables-db create-table --database-id $DatabaseId --table-id $TableId --name $Name --row-security true | Out-Null
+  & appwrite tables-db create-table --database-id $DatabaseId --table-id $TableId --name $Name --row-security (ConvertTo-CliBoolean $RowSecurity) | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Could not create $TableId." }
   Write-Host "Created $TableId."
 }
@@ -85,6 +85,7 @@ function Ensure-Index([string]$TableId, [string]$Key, [string]$Type, [string[]]$
 
 $applications = 'crew_applications'
 $reviews = 'crew_application_reviews'
+$settings = 'recruitment_settings'
 
 Ensure-Table $applications 'Crew applications'
 Ensure-Varchar $applications profileId 64 $true
@@ -94,12 +95,13 @@ Ensure-Varchar $applications interests 64 $true $true
 Ensure-Text $applications skills $true
 Ensure-Text $applications contribution $true
 Ensure-Text $applications developmentGoals
+Ensure-Text $applications additionalNotes
 Ensure-Varchar $applications availability 512 $true
 Ensure-Varchar $applications portfolioUrl 1024
 Ensure-Enum $applications status @('submitted', 'reviewing', 'shortlisted', 'interview', 'accepted', 'rejected', 'withdrawn') 'submitted'
 Ensure-Datetime $applications submittedAt $true
 Ensure-Datetime $applications updatedAt $true
-Wait-Columns $applications @('profileId', 'accountId', 'track', 'interests', 'status', 'updatedAt')
+Wait-Columns $applications @('profileId', 'accountId', 'track', 'interests', 'additionalNotes', 'status', 'updatedAt')
 Ensure-Index $applications profile_unique unique @('profileId')
 Ensure-Index $applications status_updated key @('status', 'updatedAt')
 
@@ -112,5 +114,20 @@ Ensure-Varchar $reviews updatedByAdminId 64 $true
 Ensure-Datetime $reviews updatedAt $true
 Wait-Columns $reviews @('applicationId', 'updatedByAdminId', 'updatedAt')
 Ensure-Index $reviews application_unique unique @('applicationId')
+
+Ensure-Table $settings 'Recruitment settings' $false
+if ((Get-Columns $settings).key -notcontains 'leaderOpen') {
+  & appwrite tables-db create-boolean-column --database-id $DatabaseId --table-id $settings --key leaderOpen --required true | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw 'Could not create recruitment_settings.leaderOpen.' }
+}
+Wait-Columns $settings @('leaderOpen')
+$settingsRows = & appwrite tables-db list-rows --database-id $DatabaseId --table-id $settings --json
+if ($LASTEXITCODE -ne 0) { throw 'Could not read recruitment settings.' }
+if (@(($settingsRows | ConvertFrom-Json).rows).'$id' -notcontains 'applications') {
+  $initialSettings = '{"leaderOpen":true}'
+  if ($PSVersionTable.PSVersion.Major -lt 7) { $initialSettings = $initialSettings.Replace('"', '\"') }
+  & appwrite tables-db create-row --database-id $DatabaseId --table-id $settings --row-id applications --data $initialSettings | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw 'Could not initialize Team Leader application settings.' }
+}
 
 Write-Host 'Recruitment schema migration submitted.'

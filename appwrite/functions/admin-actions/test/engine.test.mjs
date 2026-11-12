@@ -281,7 +281,7 @@ test('tournament deletion removes every dependent row across repeated batches', 
   assert.deepEqual(rows, [{ $id: 'other-game', tournamentId: 'other' }])
 })
 
-test('player deletion protects tournament history and admin accounts', () => {
+test('player deletion allows game history but protects admin accounts', () => {
   const players = [
     { $id: 'p1', displayName: 'Player One' },
     { $id: 'p2', displayName: 'Player Two' },
@@ -291,22 +291,11 @@ test('player deletion protects tournament history and admin accounts', () => {
     { $id: 'p2', accountId: 'user-2', email: 'two@example.com' },
   ]
 
-  assert.equal(engine.assertPlayersCanBeDeleted(['p1'], players, [], [], privatePlayers), undefined)
-  assert.throws(
-    () => engine.assertPlayersCanBeDeleted(
-      ['p1'],
-      players,
-      [{ $id: 'game-1', whiteProfileId: 'p1', blackProfileId: 'p2' }],
-      [],
-      privatePlayers,
-    ),
-    (error) => error.statusCode === 409 && /game history/i.test(error.message),
-  )
+  assert.equal(engine.assertPlayersCanBeDeleted(['p1'], players, [], privatePlayers), undefined)
   assert.throws(
     () => engine.assertPlayersCanBeDeleted(
       ['p2'],
       players,
-      [],
       [{ $id: 'admin-1', accountId: 'user-2' }],
       privatePlayers,
     ),

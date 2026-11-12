@@ -101,6 +101,7 @@ import {
 } from './lib/adminPermissions'
 import { externalRatingSourceLabel, hasExternalRating } from './lib/externalRating'
 import { playerDetailFields, playerDetailsText } from './lib/playerDetails'
+import { playerSortOptions, sortPlayers, type PlayerSort } from './lib/playerSorting'
 
 type Screen = AdminScreen
 type TournamentTab = TournamentStatus
@@ -125,6 +126,9 @@ type Player = {
   avatarUrl?: string
   coverUrl?: string
   tournaments: number
+  joinedAt?: string
+  lastVisitedAt?: string
+  visitDays?: number
   blocked?: boolean
 }
 
@@ -4750,6 +4754,11 @@ function TournamentMiniTable({ tournaments }: { tournaments: AdminTournament[] }
   )
 }
 
+function formatPlayerActivityDate(value?: string) {
+  if (!value || !Number.isFinite(Date.parse(value))) return 'Not recorded'
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(value))
+}
+
 function PlayersScreen({
   blocks,
   onBlocksChanged,
@@ -4763,6 +4772,7 @@ function PlayersScreen({
   const [playersLoading, setPlayersLoading] = useState(true)
   const [playersError, setPlayersError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<PlayerSort>('rating')
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [editPlayer, setEditPlayer] = useState<Player | null>(null)
   const [deleteTargets, setDeleteTargets] = useState<Player[]>([])
@@ -4773,7 +4783,7 @@ function PlayersScreen({
   useEffect(() => {
     let alive = true
     void (async () => {
-      const result = await loadClubPlayers()
+      const result = await loadClubPlayers(true)
       if (!alive) return
       if (result.error) {
         setPlayersError(result.error)
@@ -4802,7 +4812,10 @@ function PlayersScreen({
         avatarColor: avatarColorFor(player.id),
         avatarUrl: player.avatarUrl,
         coverUrl: player.coverUrl,
-        tournaments: 0,
+        tournaments: player.tournamentsPlayed,
+        joinedAt: player.joinedAt,
+        lastVisitedAt: player.lastVisitedAt,
+        visitDays: player.visitDays,
         blocked: player.status === 'suspended',
       })))
       setPlayersLoading(false)
@@ -4811,10 +4824,12 @@ function PlayersScreen({
       alive = false
     }
   }, [])
-  const visiblePlayers = players.filter((player) => {
-    const needle = search.trim().toLowerCase()
-    return !needle || player.name.toLowerCase().includes(needle) || player.universityId.toLowerCase().includes(needle)
-  })
+  const needle = search.trim().toLowerCase()
+  const visiblePlayers = sortPlayers(players.filter((player) => (
+    !needle || player.name.toLowerCase().includes(needle) || player.universityId.toLowerCase().includes(needle)
+  )), sort)
+  const metric = sort === 'frequent' ? 'Visit days (30 days)' : sort === 'recent' ? 'Last recorded visit'
+    : sort === 'tournaments' ? 'Tournaments played' : sort === 'joined' ? 'Joined' : null
   const selectedCount = Object.values(selected).filter(Boolean).length
   const showExternalRatings = visiblePlayers.some((player) => hasExternalRating(player.rating, player.ratingSource))
 
@@ -4865,6 +4880,9 @@ function PlayersScreen({
       <div className="table-toolbar">
         <div className="filter-row">
           <label className="inline-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filter by name or ID..." /></label>
+          <select aria-label="Sort players" value={sort} onChange={(event) => setSort(event.target.value as PlayerSort)}>
+            {playerSortOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
           <span>
             {playersLoading
               ? 'Loading players...'
@@ -4907,6 +4925,7 @@ function PlayersScreen({
                 <th>Name</th>
                 <th>University ID</th>
                 {showExternalRatings ? <th>External rating</th> : null}
+                {metric ? <th>{metric}</th> : null}
                 <th className="right">Actions</th>
               </tr>
             </thead>
@@ -4937,6 +4956,10 @@ function PlayersScreen({
                         <strong title={externalRatingSourceLabel(player.ratingSource)}>{player.rating}</strong>
                       ) : null}
                     </td>
+                  ) : null}
+                  {metric ? (
+                    <td className="mono">{sort === 'frequent' ? player.visitDays : sort === 'tournaments' ? player.tournaments
+                      : formatPlayerActivityDate(sort === 'joined' ? player.joinedAt : player.lastVisitedAt)}</td>
                   ) : null}
                   <td className="right">
                     <div className="tournament-action-row">
@@ -4981,7 +5004,7 @@ function PlayersScreen({
               <span>Permanent action</span>
               <h2 id="delete-player-title">Delete {deleteTargets.length === 1 ? 'player' : `${deleteTargets.length} players`}?</h2>
               <p id="delete-player-description">
-                This removes the selected player accounts, registrations, attendance responses, and standings. Players with tournament game history or admin access cannot be deleted.
+                This permanently removes the selected player accounts. Tournament games and standings are kept under “Deleted player.” Resolve any pending pairings separately. Players with admin access must have that access removed first.
               </p>
               <strong className="delete-player-names">{deleteTargets.map((player) => player.name).join(', ')}</strong>
             </div>

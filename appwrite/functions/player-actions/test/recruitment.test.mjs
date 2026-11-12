@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   CREW_INTERESTS,
   crewApplicationRowId,
+  submitCrewApplication,
   updateCrewApplication,
   validateCrewApplication,
 } from '../src/main.js';
@@ -57,6 +58,53 @@ test('crew applications persist the selected track and reject unknown types', ()
   assert.equal(validateCrewApplication({ ...application, track: 'leader' }).track, 'leader');
   assert.equal(validateCrewApplication({ ...application, track: 'member' }).track, 'member');
   assert.throws(() => validateCrewApplication({ ...application, track: 'admin' }), /Team Member or Team Leader/);
+});
+
+test('closing recruitment blocks only Team Leader submissions, including existing applicants, and reopening restores access', async () => {
+  const prior = { $id: 'legacy', track: 'leader', contribution: 'Preserve the original leadership plan.', status: 'submitted', $updatedAt: 'old' };
+  let existing = prior;
+  let leaderOpen = false;
+  let settingsReads = 0;
+  const writes = [];
+  const tablesDB = {
+    async listRows() { return { rows: existing ? [existing] : [] }; },
+    async getRow({ tableId, rowId }) {
+      if (tableId === 'crew_applications') return existing;
+      assert.equal(tableId, 'recruitment_settings');
+      assert.equal(rowId, 'applications');
+      settingsReads++;
+      return { leaderOpen };
+    },
+    async createTransaction() { return { $id: 'tx' }; },
+    async updateTransaction() {},
+    async updateRow({ data }) { writes.push(data); return { ...existing, ...data }; },
+    async createRow({ data }) { writes.push(data); return data; },
+  };
+  const common = {
+    interests: ['events'],
+    skills: 'I have led university events and coordinated volunteers.',
+    availability: '3-5 hours per week',
+  };
+  const submit = (input) => submitCrewApplication(tablesDB, 'juchess', 'account', 'profile', { ...common, ...input });
+
+  await assert.rejects(submit({}), /Team Leader applications are currently closed/);
+  assert.deepEqual(writes, []);
+  assert.equal(existing, prior);
+  existing = null;
+  await assert.rejects(submit({ track: 'leader' }), /Team Leader applications are currently closed/);
+  const member = await submit({ track: 'member', contribution: 'I can help run and schedule club events.' });
+  assert.equal(member.row.track, 'member');
+  assert.equal(settingsReads, 2, 'Team Member submissions must not read recruitment settings');
+  await assert.rejects(submit({ track: 'member' }), /how you would contribute/);
+
+  leaderOpen = true;
+  const leader = await submit({ track: 'leader', additionalNotes: '  I can help on weekends. ' });
+  assert.equal(leader.row.additionalNotes, 'I can help on weekends.');
+  assert.equal(leader.row.contribution, '');
+  existing = prior;
+  const updated = await submit({ track: 'leader', additionalNotes: '' });
+  assert.equal(updated.row.contribution, prior.contribution);
+  assert.equal(updated.row.additionalNotes, '');
 });
 
 test('crew application validation rejects unsafe links and empty detail', () => {
