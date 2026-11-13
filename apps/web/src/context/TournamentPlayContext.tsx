@@ -15,7 +15,7 @@ import {
 
 const ACTIVE_GAME_POLL_MS = 15_000
 
-export function TournamentPlayProvider({ children }: { children: ReactNode }) {
+export function TournamentPlayProvider({ children, analyticsPreview = false }: { children: ReactNode; analyticsPreview?: boolean }) {
   const { loading: authLoading, profile, user } = useAuth()
   const accountId = user?.$id ?? null
   const profileId = profile?.$id ?? null
@@ -40,7 +40,7 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
       setActiveTournament(null)
       setChecking(false)
       setError(null)
-      clearOnlineTournamentPlayLock()
+      if (!analyticsPreview) clearOnlineTournamentPlayLock()
       return
     }
     if (requestRef.current && requestKeyRef.current === assignmentKey) return requestRef.current
@@ -73,7 +73,7 @@ export function TournamentPlayProvider({ children }: { children: ReactNode }) {
     })()
     requestRef.current = request
     return request
-  }, [assignmentKey, canCheckAssignments])
+  }, [analyticsPreview, assignmentKey, canCheckAssignments])
 
   useEffect(() => {
     if (authLoading) return

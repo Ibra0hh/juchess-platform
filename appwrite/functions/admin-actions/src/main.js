@@ -4912,7 +4912,7 @@ export default async ({ req, res, log, error }) => {
     requireAdminArea(actor, adminAreaForRoute(segments));
 
     if (method === 'POST' && segments.length === 1 && segments[0] === 'analytics') {
-      const days = [1, 7, 30].includes(body.days) ? body.days : 7;
+      const days = [1, 2, 7, 30].includes(body.days) ? body.days : 7;
       return res.json({ ok: true, report: await loadSiteAnalytics(tablesDB, databaseId, days) });
     }
 

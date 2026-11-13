@@ -56,14 +56,15 @@ function ScrollToTop() {
 }
 
 function App() {
+  const analyticsPreview = window.self !== window.top && new URLSearchParams(window.location.search).get('heatmapPreview') === '1'
   return (
-    <AuthProvider>
+    <AuthProvider analyticsPreview={analyticsPreview}>
       <ScrollToTop />
       <ProfileCompletionGuard>
-        <TournamentPlayProvider>
+        <TournamentPlayProvider analyticsPreview={analyticsPreview}>
           <TournamentPlayGuard>
             <RouteMetadata />
-            <SiteAnalytics />
+            {!analyticsPreview ? <SiteAnalytics /> : null}
             <RouteErrorBoundary>
               <Suspense fallback={<RouteSkeleton />}>
                 <Routes>

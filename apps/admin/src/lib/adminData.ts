@@ -936,7 +936,7 @@ export type SiteAnalyticsReport = {
   }[]
 }
 
-export async function loadSiteAnalytics(days: 1 | 7 | 30) {
+export async function loadSiteAnalytics(days: 1 | 2 | 7 | 30) {
   const payload = await runAdminAction<{ report: SiteAnalyticsReport }>({
     method: ExecutionMethod.POST, path: '/analytics', body: { days },
   })

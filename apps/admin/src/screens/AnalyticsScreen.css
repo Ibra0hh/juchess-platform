@@ -10,6 +10,11 @@
 .site-analytics-list li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid #e4dac5; }
 .site-analytics-heat { margin: 10px 0; }
 .site-analytics-heat figcaption { font-size: .78rem; margin-bottom: 8px; }
+.site-analytics-preview-scroll { margin: 0 auto; overflow-y: auto; overflow-x: hidden; outline-offset: 3px; background: #f5efdf; box-shadow: 0 0 0 1px #e4dac5; }
+.site-analytics-preview-stage { position: sticky; top: 0; overflow: hidden; }
+.site-analytics-preview-stage iframe { position: absolute; inset: 0 auto auto 0; border: 0; transform-origin: top left; pointer-events: none; }
+.site-analytics-hotspots { position: absolute; inset-inline: 0; }
+.site-analytics-hotspots span { position: absolute; width: calc(100% / 12); height: calc(100% / 16); display: grid; place-items: center; color: #fff; background: #a01433; border: 1px solid #fff; font: bold 11px system-ui, sans-serif; }
 .site-analytics-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: minmax(7px, 1fr); gap: 2px; height: 220px; }
 .site-analytics-grid span { background: #eee6d7; border-radius: 2px; }
 @media (max-width: 760px) {

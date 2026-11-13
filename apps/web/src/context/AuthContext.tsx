@@ -33,12 +33,12 @@ import type { Models } from 'appwrite'
 
 type PreviewAuthSession = AuthSession & { profile: AuthProfile }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, analyticsPreview = false }: { children: ReactNode; analyticsPreview?: boolean }) {
   const previewSession = useMemo(() => createPreviewSessionFromUrl(), [])
   const [user, setUser] = useState<Models.User | null>(previewSession?.user ?? null)
   const [profile, setProfile] = useState<AuthProfile | null>(previewSession?.profile ?? null)
   const [sessionProvider, setSessionProvider] = useState<string | null>(previewSession?.sessionProvider ?? null)
-  const [loading, setLoading] = useState(!previewSession)
+  const [loading, setLoading] = useState(!previewSession && !analyticsPreview)
   const [error, setError] = useState<string | null>(null)
   const refreshGeneration = useRef(0)
   const refreshInFlight = useRef<Promise<AuthSession | null> | null>(null)
@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refresh = useCallback(async () => {
+    if (analyticsPreview) return null
     const generation = ++refreshGeneration.current
     if (previewSession) {
       if (generation === refreshGeneration.current) {
@@ -102,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       if (generation === refreshGeneration.current) setLoading(false)
     }
-  }, [previewSession])
+  }, [analyticsPreview, previewSession])
 
   useEffect(() => {
     void refresh()

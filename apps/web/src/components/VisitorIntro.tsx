@@ -102,11 +102,12 @@ export default function VisitorIntro() {
   const [granted, setGranted] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const preview = new URLSearchParams(window.location.search).get('intro') === 'preview'
+  const heatmapPreview = window.self !== window.top && new URLSearchParams(window.location.search).get('heatmapPreview') === '1'
   const rookReady = collected.length >= rookIndex
   const lastLanding = landed.at(-1)
 
   useEffect(() => {
-    if (preview) return
+    if (preview || heatmapPreview) return
     if (wasSeen()) return
     let mounted = true
     void checkNetworkVisit().then((seen) => {
@@ -115,7 +116,7 @@ export default function VisitorIntro() {
       else setVisible(true)
     })
     return () => { mounted = false }
-  }, [preview])
+  }, [preview, heatmapPreview])
 
   useEffect(() => {
     const element = dialog.current

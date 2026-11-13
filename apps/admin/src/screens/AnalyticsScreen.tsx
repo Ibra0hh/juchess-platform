@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { formatAdminError, loadSiteAnalytics, type SiteAnalyticsReport } from '../lib/adminData'
+import AnalyticsHeatmap from './AnalyticsHeatmap'
 import './AnalyticsScreen.css'
 
 const pageLabels: Record<string, string> = {
@@ -7,7 +8,6 @@ const pageLabels: Record<string, string> = {
   'join-the-team': 'Join the team', team: 'Team profiles', leaderboard: 'Leaderboard',
   privacy: 'Privacy', terms: 'Terms', welcome: 'Welcome reel',
 }
-
 const controlLabels: Record<string, string> = {
   'nav-home': 'Home · navigation', 'nav-tournaments': 'Tournaments · navigation',
   'nav-tools': 'Tools · navigation', 'nav-profile': 'Profile · navigation', 'nav-sign-in': 'Sign in · header',
@@ -26,10 +26,11 @@ const number = new Intl.NumberFormat('en')
 type Layout = 'narrow' | 'wide'
 
 export default function AnalyticsScreen() {
-  const [days, setDays] = useState<1 | 7 | 30>(7)
+  const [days, setDays] = useState<1 | 2 | 7 | 30>(7)
   const [refresh, setRefresh] = useState(0)
   const [layout, setLayout] = useState<Layout>('wide')
   const [page, setPage] = useState('all')
+  const [previewPage, setPreviewPage] = useState('home')
   const [report, setReport] = useState<SiteAnalyticsReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -51,7 +52,8 @@ export default function AnalyticsScreen() {
   }, [days, refresh])
 
   const selectedPage = report?.pages.find((item) => item.page === page)
-  const heatPage = selectedPage ?? report?.pages.find((item) => item.page === 'home') ?? report?.pages[0]
+  const heatPageKey = selectedPage?.page ?? previewPage
+  const heatPage = report?.pages.find((item) => item.page === heatPageKey)
   const ranking = useMemo(() => {
     const counts = new Map<string, number>()
     for (const row of selectedPage ? [selectedPage] : report?.pages ?? []) {
@@ -63,8 +65,8 @@ export default function AnalyticsScreen() {
   return (
     <section className="site-analytics" aria-label="Website analytics" aria-busy={loading}>
       <div className="filter-row site-analytics-filters">
-        <label>Period <select aria-label="Period" value={days} onChange={(event) => setDays(Number(event.target.value) as 1 | 7 | 30)}>
-          <option value={1}>Last 24 hours</option><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option>
+        <label>Period <select aria-label="Period" value={days} onChange={(event) => setDays(Number(event.target.value) as 1 | 2 | 7 | 30)}>
+          <option value={1}>Last 24 hours</option><option value={2}>Last 2 days</option><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option>
         </select></label>
         <label>Page <select aria-label="Page" value={selectedPage ? page : 'all'} onChange={(event) => setPage(event.target.value)}>
           <option value="all">All public pages</option>
@@ -91,12 +93,16 @@ export default function AnalyticsScreen() {
             </ol> : <p className="muted">No named controls have been clicked in this period yet.</p>}
           </section>
           <section className="panel-card">
-            <div className="panel-head"><strong>Click heatmap</strong><span>{heatPage ? pageLabels[heatPage.page] : 'No activity yet'}</span></div>
-            <label className="filter-row">Layout <select aria-label="Heatmap layout" value={layout} onChange={(event) => setLayout(event.target.value as Layout)}>
+            <div className="panel-head"><strong>Click heatmap</strong><span>{pageLabels[heatPageKey]}</span></div>
+            <div className="filter-row site-analytics-filters">
+              {!selectedPage ? <label>Preview <select aria-label="Heatmap page" value={previewPage} onChange={(event) => setPreviewPage(event.target.value)}>
+                {Object.entries(pageLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </select></label> : null}
+              <label>Layout <select aria-label="Heatmap layout" value={layout} onChange={(event) => setLayout(event.target.value as Layout)}>
               <option value="wide">Wide (desktop)</option><option value="narrow">Narrow (mobile)</option>
-            </select></label>
-            <Heatmap heat={heatPage?.heat[layout] ?? []} />
-            <p className="muted">Top to bottom of the page, including below the fold. Darker zones received more clicks. Keyboard clicks appear only in the ranking.</p>
+              </select></label>
+            </div>
+            <AnalyticsHeatmap key={`${heatPageKey}:${layout}`} page={heatPageKey} layout={layout} heat={heatPage?.heat[layout] ?? []} />
           </section>
         </div>
         {!report.pages.length ? <p className="prototype-note">Analytics start collecting when the tracking code is published. Past traffic cannot be recovered.</p> : null}
@@ -108,23 +114,5 @@ export default function AnalyticsScreen() {
         </section> : null}
       </> : null}
     </section>
-  )
-}
-
-function Heatmap({ heat }: { heat: [number, number][] }) {
-  const counts = new Map(heat)
-  const max = Math.max(1, ...counts.values())
-  const total = heat.reduce((sum, [, count]) => sum + count, 0)
-  return (
-    <figure className="site-analytics-heat">
-      <figcaption>{number.format(total)} pointer {total === 1 ? 'click' : 'clicks'} · {heat.length} active {heat.length === 1 ? 'zone' : 'zones'}</figcaption>
-      <div className="site-analytics-grid" role="img" aria-label={`Click heatmap: ${total} clicks in ${heat.length} zones from the top to the bottom of the page`}>
-        {Array.from({ length: 192 }, (_, cell) => {
-          const count = counts.get(cell) ?? 0
-          return <span key={cell} title={`Row ${Math.floor(cell / 12) + 1}, column ${cell % 12 + 1}: ${count} clicks`}
-            style={count ? { backgroundColor: `rgba(125, 36, 52, ${0.23 + 0.77 * Math.sqrt(count / max)})` } : undefined} />
-        })}
-      </div>
-    </figure>
   )
 }
