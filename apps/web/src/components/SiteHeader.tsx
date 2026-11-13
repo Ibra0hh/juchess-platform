@@ -45,10 +45,10 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false, signInRetur
         </Link>
 
         <nav className="main-nav" aria-label="Primary navigation">
-          <Link to="/home" className={active === 'home' ? 'active' : undefined} aria-current={active === 'home' ? 'page' : undefined}>
+          <Link data-analytics-control="nav-home" to="/home" className={active === 'home' ? 'active' : undefined} aria-current={active === 'home' ? 'page' : undefined}>
             Home
           </Link>
-          <Link to="/tournaments" className={active === 'tournaments' ? 'active' : undefined} aria-current={active === 'tournaments' ? 'page' : undefined}>
+          <Link data-analytics-control="nav-tournaments" to="/tournaments" className={active === 'tournaments' ? 'active' : undefined} aria-current={active === 'tournaments' ? 'page' : undefined}>
             Tournaments
           </Link>
           {toolsUnavailable ? (
@@ -56,11 +56,11 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false, signInRetur
               Tools
             </span>
           ) : (
-            <Link to="/tools" className={toolsActive ? 'active' : undefined} aria-current={toolsActive ? 'page' : undefined}>
+            <Link data-analytics-control="nav-tools" to="/tools" className={toolsActive ? 'active' : undefined} aria-current={toolsActive ? 'page' : undefined}>
               Tools
             </Link>
           )}
-          <Link to="/profile" className={active === 'profile' ? 'active' : undefined} aria-current={active === 'profile' ? 'page' : undefined}>
+          <Link data-analytics-control="nav-profile" to="/profile" className={active === 'profile' ? 'active' : undefined} aria-current={active === 'profile' ? 'page' : undefined}>
             Profile
           </Link>
         </nav>
@@ -80,7 +80,7 @@ function SiteHeader({ active, profilePreview, toolsDisabled = false, signInRetur
               </button>
             </>
           ) : (
-            <Link to={withApplicationReturn('/sign-in', signInReturn)} className="sign-in-link" aria-disabled={loading}>
+            <Link data-analytics-control="nav-sign-in" to={withApplicationReturn('/sign-in', signInReturn)} className="sign-in-link" aria-disabled={loading}>
               {loading ? 'Checking...' : 'Sign in'}
             </Link>
           )}

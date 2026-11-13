@@ -1232,10 +1232,10 @@ function ModeToggle({
 }) {
   return (
     <div className={['mode-toggle', className].filter(Boolean).join(' ')} role="tablist" aria-label="Games mode">
-      <button type="button" className={mode === 'review' ? 'active' : undefined} onClick={onReview}>
+      <button type="button" data-analytics-control="tools-review" className={mode === 'review' ? 'active' : undefined} onClick={onReview}>
         Game Review
       </button>
-      <button type="button" className={mode === 'analysis' ? 'active' : undefined} onClick={onAnalysis}>
+      <button type="button" data-analytics-control="tools-analysis" className={mode === 'analysis' ? 'active' : undefined} onClick={onAnalysis}>
         New Analysis
       </button>
     </div>
@@ -1247,6 +1247,7 @@ function BlankBoardButton({ className, onClick }: { className?: string; onClick:
     <button
       type="button"
       className={['blank-board-button', className].filter(Boolean).join(' ')}
+      data-analytics-control="tools-blank"
       onClick={onClick}
     >
       <span aria-hidden="true">{'\u2654'}</span>
@@ -1313,7 +1314,7 @@ function SearchStep({
       />
       {error ? <p className="search-error" role="alert">{error}</p> : null}
       {notice ? <p className="search-notice" role="status">{notice}</p> : null}
-      <button type="button" className="primary-rail-button" disabled={loading} onClick={onSearch}>
+      <button type="button" data-analytics-control="tools-find-games" className="primary-rail-button" disabled={loading} onClick={onSearch}>
         {loading ? 'Loading games...' : 'Search games'}
       </button>
     </section>
@@ -1392,7 +1393,7 @@ function ListStep({
         <div className="game-list-more">
           {loadMoreError ? <p role="alert">{loadMoreError}</p> : null}
           {canLoadMore || loadMoreLoading ? (
-            <button type="button" disabled={loadMoreLoading} onClick={onLoadMore}>
+            <button type="button" data-analytics-control="tools-load-more" disabled={loadMoreLoading} onClick={onLoadMore}>
               {loadMoreLoading ? 'Loading more games...' : 'Load more games'}
             </button>
           ) : null}
@@ -1488,7 +1489,7 @@ function ReviewPanel({
             <span>Engine review</span>
             <strong>Analyze this completed game when you are ready.</strong>
             <small>Stockfish loads only after you start.</small>
-            <button type="button" className="review-start-button" onClick={onAnalyze}>
+            <button type="button" data-analytics-control="tools-start-review" className="review-start-button" onClick={onAnalyze}>
               {error ? 'Try engine review again' : 'Start engine review'}
             </button>
           </div>

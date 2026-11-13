@@ -99,6 +99,7 @@ function TournamentsPage() {
               <button
                 key={label}
                 type="button"
+                data-analytics-control="tournament-filter"
                 className={filter === label ? 'active' : undefined}
                 onClick={() => setFilter(label)}
               >
@@ -111,6 +112,7 @@ function TournamentsPage() {
             <div className="view-toggle" aria-label="Tournament view">
               <button
                 type="button"
+                data-analytics-control="tournament-list"
                 className={view === 'list' ? 'active' : undefined}
                 onClick={() => setView('list')}
                 aria-label="List view"
@@ -121,6 +123,7 @@ function TournamentsPage() {
               </button>
               <button
                 type="button"
+                data-analytics-control="tournament-grid"
                 className={view === 'grid' ? 'active' : undefined}
                 onClick={() => setView('grid')}
                 aria-label="Grid view"
@@ -170,7 +173,7 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
   const Icon = getTournamentIcon(tournament)
 
   return (
-    <Link to={tournamentPath(tournament.id)} className="tournament-card">
+    <Link data-analytics-control="tournament-card" to={tournamentPath(tournament.id)} className="tournament-card">
       <span className={`tournament-icon ${statusClass(tournament.status)}`}>
         <Icon size={24} aria-hidden="true" />
       </span>

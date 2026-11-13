@@ -920,6 +920,29 @@ export async function updateRecruitmentSettings(leaderOpen: boolean) {
   })
 }
 
+export type SiteAnalyticsReport = {
+  days: number
+  visits: number
+  views: number
+  clicks: number
+  truncated: boolean
+  pages: {
+    page: string
+    views: number
+    visits: number
+    clicks: number
+    controls: [string, number][]
+    heat: { narrow: [number, number][]; wide: [number, number][] }
+  }[]
+}
+
+export async function loadSiteAnalytics(days: 1 | 7 | 30) {
+  const payload = await runAdminAction<{ report: SiteAnalyticsReport }>({
+    method: ExecutionMethod.POST, path: '/analytics', body: { days },
+  })
+  return payload.report
+}
+
 export async function deleteClubPlayers(profileIds: string[]) {
   const response = await runAdminAction<{ deleted: Array<{ profileId: string; name: string }> }>({
     method: ExecutionMethod.DELETE,

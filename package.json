@@ -44,6 +44,7 @@
     "install:functions": "node scripts/install-function-dependencies.mjs",
     "test:functions": "node --test appwrite/functions/admin-actions/test/*.test.mjs appwrite/functions/player-actions/test/*.test.mjs appwrite/functions/attendance-actions/test/*.test.mjs appwrite/functions/access-guards/test/*.test.mjs appwrite/functions/verification-actions/test/*.test.mjs appwrite/functions/visitor-intro/test/*.test.mjs",
     "check:functions": "node --check appwrite/functions/admin-actions/src/main.js && node --check appwrite/functions/player-actions/src/main.js && node --check appwrite/functions/attendance-actions/src/main.js && node --check appwrite/functions/access-guards/src/main.js && node --check appwrite/functions/verification-actions/src/main.js && node --check appwrite/functions/visitor-intro/src/main.js",
+    "test:site-analytics": "node --test appwrite/functions/site-analytics/test/*.test.mjs",
     "check:web": "npm run lint:web && npm run build:web && npm run test:web-review && node --experimental-strip-types --test apps/web/src/lib/oauthAttempt.test.ts && node --test scripts/tournament-pages.test.mjs",
     "check:admin": "npm run lint:admin && npm run build:admin && npm run test:admin-wizard && npm run test:engine",
     "check:all": "npm run install:functions && npm run check:functions && npm run test:functions && npm run check:web && npm run check:admin && npm run mobile:analyze && npm run mobile:test"

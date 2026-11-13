@@ -144,19 +144,19 @@ function HomePage() {
               </p>
               <div className="hero-actions">
                 {!authLoading && !user ? (
-                  <Link to="/sign-in" className="primary-action">
+                  <Link data-analytics-control="home-join" to="/sign-in" className="primary-action">
                     <span aria-hidden="true">♞</span>
                     Join the Club
                   </Link>
                 ) : null}
-                <a href="#vision" className="secondary-action">Our Vision <span aria-hidden="true">↓</span></a>
+                <a data-analytics-control="home-vision" href="#vision" className="secondary-action">Our Vision <span aria-hidden="true">↓</span></a>
               </div>
             </div>
 
             <FeaturedTournamentCarousel slots={featureSlots} loading={loading} cloudError={cloudError} />
           </div>
 
-          <a href="#news" className="home-scroll-hint" aria-label="Scroll to news">↓</a>
+          <a data-analytics-control="home-news" href="#news" className="home-scroll-hint" aria-label="Scroll to news">↓</a>
         </section>
 
         <MarqueeStrip />
@@ -251,7 +251,7 @@ function FeaturedTournamentCard({ slot, cloudError }: { slot: FeatureSlot; cloud
   }
 
   return (
-    <Link to={tournamentPath(tournament.id)} className="home-feature-card">
+    <Link data-analytics-control="home-feature" to={tournamentPath(tournament.id)} className="home-feature-card">
       <div className="feature-eyebrow">
         <span className={tournament.status === 'Active' ? 'live' : undefined}>
           {tournament.status === 'Active' ? `Live - ${tournament.round}` : tournament.status}
@@ -404,7 +404,7 @@ function TeamSection() {
       </div>
       <div className="team-grid">
         {teamMembers.map((member) => (
-          <Link className="team-card" key={member.slug} to={`/team/${member.slug}`} aria-label={`View ${member.name}'s profile`}>
+          <Link data-analytics-control="home-team" className="team-card" key={member.slug} to={`/team/${member.slug}`} aria-label={`View ${member.name}'s profile`}>
             <div className="team-photo-wrap">
               <img src={`${import.meta.env.BASE_URL}team/${member.photo}`} alt="" loading="lazy" />
               <span className="team-piece" aria-hidden="true">♞</span>
@@ -418,7 +418,7 @@ function TeamSection() {
         ))}
       </div>
       <div className="team-join-action">
-        <Link to="/join-the-team" className="team-join-link">Join the working team <ArrowRight size={16} /></Link>
+        <Link data-analytics-control="home-apply" to="/join-the-team" className="team-join-link">Join the working team <ArrowRight size={16} /></Link>
       </div>
     </section>
   )

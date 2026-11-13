@@ -203,7 +203,7 @@ export default function VisitorIntro() {
             <span>juchess.page</span>
             <i aria-hidden="true" />
           </div>
-          {granted && <button ref={enter} type="button" className="visitor-intro__enter" onClick={finish}>
+          {granted && <button ref={enter} type="button" data-analytics-control="intro-enter" className="visitor-intro__enter" onClick={finish}>
             Enter JuChess <ArrowUpRight aria-hidden="true" />
           </button>}
 
@@ -218,7 +218,7 @@ export default function VisitorIntro() {
                 const flying = used && !landed.includes(index)
                 return (
                   <div className="visitor-intro__slot" key={name} data-rook={index === rookIndex}>
-                    <button type="button" className="visitor-intro__token" data-used={used}
+                    <button type="button" data-analytics-control="intro-piece" className="visitor-intro__token" data-used={used}
                       disabled={index === rookIndex && !rookReady} aria-disabled={used || undefined} tabIndex={used ? -1 : 0}
                       aria-label={used ? `${name} collected` : `Collect ${name.toLowerCase()} for ${square}`}
                       onClick={() => collect(index)}>

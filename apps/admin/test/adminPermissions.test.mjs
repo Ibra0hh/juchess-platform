@@ -10,6 +10,7 @@ test('organizers see only tournament and player management', () => {
   assert.deepEqual(adminScreensForRole('organizer'), ['tournaments', 'players'])
   assert.equal(canAccessAdminScreen('organizer', 'dashboard'), false)
   assert.equal(canAccessAdminScreen('organizer', 'recruitment'), false)
+  assert.equal(canAccessAdminScreen('organizer', 'analytics'), false)
   assert.equal(canAccessAdminScreen('organizer', 'announcements'), false)
   assert.equal(canAccessAdminScreen('organizer', 'adminAccess'), false)
 })
@@ -20,6 +21,7 @@ test('admins see operational sections but never admin access', () => {
     'tournaments',
     'players',
     'recruitment',
+    'analytics',
     'news',
     'announcements',
   ])
@@ -27,7 +29,7 @@ test('admins see operational sections but never admin access', () => {
 })
 
 test('super admins can reach every admin section', () => {
-  assert.equal(adminScreensForRole('superAdmin').length, 7)
+  assert.equal(adminScreensForRole('superAdmin').length, 8)
   assert.equal(canAccessAdminScreen('superAdmin', 'adminAccess'), true)
 })
 

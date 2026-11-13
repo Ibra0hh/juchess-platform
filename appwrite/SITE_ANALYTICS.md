@@ -1,0 +1,7 @@
+# JuChess website analytics
+
+Open **Analytics** from the admin sidebar. Admins and super admins can view the aggregate report; organizers cannot. The report uses a rolling 24-hour, 7-day or 30-day window. A visit is the first tracked page in a browser-tab session, not a deduplicated person. The ranking includes explicitly tagged buttons and links. The heatmap includes other public-page pointer clicks too, grouped into a 12 × 16 grid and separated by narrow and wide browser layouts. Zones are relative to each page's full height, not an exact overlay; changing content can move the same control between zones.
+
+Tracking is best effort. Account routes, live games, form input, and recruitment form interactions are excluded. The collector receives only allowlisted public page categories and control IDs, a layout category, coarse click zones, and a first-visit flag. It receives no visitor ID or raw URL, sends requests without cookies or referrers, and respects Global Privacy Control, Do Not Track, and the opt-out on the Privacy page.
+
+For a new Appwrite environment, create `site_analytics_batches` from `schema.json` with no client permissions, deploy `site-analytics` from `functions.json`, and deploy the updated `admin-actions`. The collector's daily scheduled run removes batches older than 30 days. Leave execution logging disabled on the public collector. Report processing is capped at the most recent 20,000 batches and flags truncated results.

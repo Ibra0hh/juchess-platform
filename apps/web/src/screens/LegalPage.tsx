@@ -1,5 +1,7 @@
 import { ArrowLeft, Mail, Scale, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { analyticsDisabled, browserDisablesAnalytics, setAnalyticsDisabled } from '../lib/siteAnalytics'
 import SiteHeader from '../components/SiteHeader'
 import './LegalPage.css'
 
@@ -47,6 +49,7 @@ export default function LegalPage({ kind }: LegalPageProps) {
 }
 
 function PrivacyContent() {
+  const [analyticsOff, setAnalyticsOff] = useState(analyticsDisabled)
   return (
     <>
       <section>
@@ -54,6 +57,13 @@ function PrivacyContent() {
         <p>When you create or complete an account, JuChess may collect your name, email address, phone number, university, university ID, chess-platform usernames, rating, profile picture, and cover picture.</p>
         <p>Tournament participation can also create registration, attendance, pairing, game, result, chat, and fair-play records connected to your profile.</p>
         <p>JuChess records one visit date per day when you use the website while signed in, plus your latest recorded visit. Authorized club administrators use this information to understand member activity. The visit counter does not record browsing paths, IP addresses, or device details.</p>
+        <p>Separate website analytics count anonymous browser-tab visits, public page categories, named controls, and approximate click zones. They do not store account IDs, full URLs, form entries, IP addresses, or recordings. Anonymous analytics batches are retained for about 30 days. Your browser’s Do Not Track or Global Privacy Control preference is respected.</p>
+        <label data-no-analytics>
+          <input type="checkbox" checked={analyticsOff} disabled={browserDisablesAnalytics()} onChange={(event) => {
+            setAnalyticsDisabled(event.target.checked)
+            setAnalyticsOff(analyticsDisabled())
+          }} /> Disable anonymous website analytics in this browser
+        </label>
         <p>JuChess remembers when you complete the welcome puzzle using browser storage and a private marker derived from your network address. The intro stores no raw IP address and does not link the marker to your account.</p>
       </section>
 

@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { Account, Client, ID, Messaging, Permission, Query, Role, TablesDB, Teams, Users } from 'node-appwrite';
 import { Chess } from 'chess.js';
+import { loadSiteAnalytics } from './siteAnalytics.js';
 
 const tableIds = {
   adminProfiles: 'admin_profiles',
@@ -4690,8 +4691,8 @@ async function removeAdminAccess(tablesDB, teams, databaseId, actor, target, adm
 
 const adminAreasByRole = Object.freeze({
   organizer: Object.freeze(['tournaments', 'players']),
-  admin: Object.freeze(['dashboard', 'tournaments', 'players', 'recruitment', 'news', 'announcements']),
-  superAdmin: Object.freeze(['dashboard', 'tournaments', 'players', 'recruitment', 'news', 'announcements', 'adminAccess']),
+  admin: Object.freeze(['dashboard', 'tournaments', 'players', 'recruitment', 'analytics', 'news', 'announcements']),
+  superAdmin: Object.freeze(['dashboard', 'tournaments', 'players', 'recruitment', 'analytics', 'news', 'announcements', 'adminAccess']),
 });
 
 export function adminRoleCanAccess(role, area) {
@@ -4701,7 +4702,7 @@ export function adminRoleCanAccess(role, area) {
 export function adminAreaForRoute(segments) {
   const root = segments[0];
   if (root === 'admin' && segments[1] === 'admins') return 'adminAccess';
-  if (['recruitment', 'news', 'announcements'].includes(root)) return root;
+  if (['recruitment', 'analytics', 'news', 'announcements'].includes(root)) return root;
   if (['tournaments', 'registrations', 'games', 'fair-play'].includes(root)) return 'tournaments';
   if (['players', 'profiles', 'blocks'].includes(root)) return 'players';
   return null;
@@ -4909,6 +4910,11 @@ export default async ({ req, res, log, error }) => {
     }
 
     requireAdminArea(actor, adminAreaForRoute(segments));
+
+    if (method === 'POST' && segments.length === 1 && segments[0] === 'analytics') {
+      const days = [1, 7, 30].includes(body.days) ? body.days : 7;
+      return res.json({ ok: true, report: await loadSiteAnalytics(tablesDB, databaseId, days) });
+    }
 
     if (segments[0] === 'recruitment' && segments[1] === 'settings' && segments.length === 2) {
       if (method === 'GET') return res.json({ ok: true, ...await getRecruitmentSettings(tablesDB, databaseId) });

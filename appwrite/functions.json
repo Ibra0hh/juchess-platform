@@ -1,5 +1,21 @@
 [
   {
+    "$id": "site-analytics",
+    "name": "JuChess Site Analytics",
+    "runtime": "node-22",
+    "path": "functions/site-analytics",
+    "entrypoint": "src/main.js",
+    "commands": "npm ci",
+    "execute": ["any"],
+    "events": [],
+    "interval": 86400,
+    "timeout": 30,
+    "enabled": true,
+    "logging": false,
+    "ignore": ["node_modules", ".git"],
+    "scopes": ["rows.write"]
+  },
+  {
     "$id": "admin-actions",
     "name": "JuChess Admin Actions",
     "runtime": "node-22",

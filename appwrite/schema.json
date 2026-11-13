@@ -325,6 +325,12 @@
         "createdByProfileId": "string|required"
       }
     },
+    "site_analytics_batches": {
+      "note": "Server-only anonymous public page and click batches; no visitor identifiers. Expired batches are deleted by site-analytics.",
+      "permissions": [],
+      "rowSecurity": false,
+      "fields": { "events": "text|required" }
+    },
     "player_website_activity": {
       "note": "Private website visit summary keyed by profile row ID. One date per signed-in UTC day, rolling 30 days. No IP or device data.",
       "permissions": [],

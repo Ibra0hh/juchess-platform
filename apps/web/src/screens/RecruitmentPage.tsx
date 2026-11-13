@@ -172,7 +172,7 @@ function RecruitmentPage() {
       {feedback ? <div className={`recruitment-feedback ${feedback.tone}`} role="status">{feedback.text}</div> : null}
 
       <div className="recruitment-layout">
-        <form className="recruitment-form" onSubmit={(event) => void handleSubmit(event)}>
+        <form data-no-analytics className="recruitment-form" onSubmit={(event) => void handleSubmit(event)}>
           <header>
             <div>
               <span>Application</span>

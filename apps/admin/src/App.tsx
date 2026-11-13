@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent
 import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, Clock3, Copy, Download, FlipHorizontal2, Image as ImageIcon, Plus, Search, Tag, Trash2, Upload, Video, X } from 'lucide-react'
 import './App.css'
 import RecruitmentScreen from './screens/RecruitmentScreen'
+import AnalyticsScreen from './screens/AnalyticsScreen'
 import { AnnouncementsScreen, NewsScreen } from './screens/CommunicationsScreen'
 import PlayerEmailComposer from './components/PlayerEmailComposer'
 import {
@@ -666,6 +667,7 @@ const navItems: Array<{ key: Screen; label: string; icon: string }> = [
   { key: 'tournaments', label: 'Tournaments', icon: '♞' },
   { key: 'players', label: 'Players', icon: '◍' },
   { key: 'recruitment', label: 'Recruitment', icon: '◇' },
+  { key: 'analytics', label: 'Analytics', icon: '▥' },
   { key: 'news', label: 'News', icon: '◫' },
   { key: 'announcements', label: 'Announcements', icon: '◈' },
   { key: 'adminAccess', label: 'Admin access', icon: '▣' },
@@ -713,6 +715,7 @@ const pageText: Record<Screen, { title: string; sub: string }> = {
   tournaments: { title: 'Tournament Control Center', sub: 'Create, publish and run every event' },
   players: { title: 'Player Management', sub: 'Roster and player records' },
   recruitment: { title: 'Recruitment', sub: 'Review member applications and manage the candidate pipeline' },
+  analytics: { title: 'Website Analytics', sub: 'See how people visit and interact with JuChess' },
   news: { title: 'News', sub: 'Public posts shown on the website' },
   announcements: { title: 'Announcements', sub: 'Broadcast to players and members' },
   adminAccess: { title: 'Admin access', sub: 'Manage admin-only accounts and permissions' },
@@ -985,6 +988,7 @@ function App() {
         <PlayersScreen blocks={blocks} session={session} onBlocksChanged={refreshBlocks} />
       ) : null}
       {activeScreen === 'recruitment' ? <RecruitmentScreen /> : null}
+      {activeScreen === 'analytics' ? <AnalyticsScreen /> : null}
       {activeScreen === 'news' ? <NewsScreen /> : null}
       {activeScreen === 'announcements' ? <AnnouncementsScreen tournaments={tournaments} /> : null}
       {activeScreen === 'adminAccess' ? (

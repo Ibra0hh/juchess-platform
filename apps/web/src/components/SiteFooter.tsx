@@ -14,10 +14,10 @@ function SiteFooter() {
           </span>
         </Link>
         <nav aria-label="Footer navigation">
-          <Link to="/tournaments">Tournaments</Link>
-          <Link to="/tools">Tools</Link>
-          <Link to="/sign-up">Join the club</Link>
-          <Link to="/join-the-team">Join the team</Link>
+          <Link data-analytics-control="footer-tournaments" to="/tournaments">Tournaments</Link>
+          <Link data-analytics-control="footer-tools" to="/tools">Tools</Link>
+          <Link data-analytics-control="footer-join" to="/sign-up">Join the club</Link>
+          <Link data-analytics-control="footer-apply" to="/join-the-team">Join the team</Link>
         </nav>
       </div>
       <p>© 2026 JuChess / University of Jordan Chess Club / Amman</p>

@@ -93,6 +93,7 @@ function loadEngine() {
   const rewritten = source
     .replace(importLine, SDK_STUB)
     .replace(chessImport, `import { Chess } from '${chessModule}';`)
+    .replace("import { loadSiteAnalytics } from './siteAnalytics.js';", 'const loadSiteAnalytics = stub;')
     + `\nexport { ${EXPORTED.join(', ')} };\n`
   const file = join(mkdtempSync(join(tmpdir(), 'juchess-engine-')), 'engine.mjs')
   writeFileSync(file, rewritten)

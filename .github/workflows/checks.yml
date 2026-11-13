@@ -20,7 +20,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run install:functions
-      - run: npm run check:functions && npm run test:functions
+      - run: npm run check:functions && npm run test:functions && npm run test:site-analytics
       - run: npm run check:web && npm run check:admin
 
   mobile:

@@ -5,14 +5,15 @@ export type AdminScreen =
   | 'tournaments'
   | 'players'
   | 'recruitment'
+  | 'analytics'
   | 'news'
   | 'announcements'
   | 'adminAccess'
 
 const screensByRole: Record<AdminRole, readonly AdminScreen[]> = {
   organizer: ['tournaments', 'players'],
-  admin: ['dashboard', 'tournaments', 'players', 'recruitment', 'news', 'announcements'],
-  superAdmin: ['dashboard', 'tournaments', 'players', 'recruitment', 'news', 'announcements', 'adminAccess'],
+  admin: ['dashboard', 'tournaments', 'players', 'recruitment', 'analytics', 'news', 'announcements'],
+  superAdmin: ['dashboard', 'tournaments', 'players', 'recruitment', 'analytics', 'news', 'announcements', 'adminAccess'],
 }
 
 export function adminScreensForRole(role: AdminRole) {
