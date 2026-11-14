@@ -644,7 +644,7 @@ export function attendanceRowId(registrationId) {
 
 export function crewApplicationRowId(profileId) {
   const digest = createHash('sha256').update(String(profileId)).digest('hex').slice(0, 32);
-  return `crew_${digest}`;
+  return `app_${digest}`;
 }
 
 export function validateCrewApplication(input = {}) {

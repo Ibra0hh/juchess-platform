@@ -202,7 +202,7 @@ export function normalizeCrewReviewInput(input = {}) {
 
 function crewReviewRowId(applicationId) {
   const digest = createHash('sha256').update(String(applicationId)).digest('hex').slice(0, 32);
-  return `review_${digest}`;
+  return `rev_${digest}`;
 }
 
 export async function getRecruitmentSettings(tablesDB, databaseId) {
@@ -257,7 +257,7 @@ export async function loadCrewApplications(tablesDB, databaseId) {
     .toSorted((left, right) => String(right.updatedAt || right.$updatedAt || '').localeCompare(String(left.updatedAt || left.$updatedAt || '')));
 }
 
-async function saveCrewApplicationReview(tablesDB, databaseId, application, body, actor) {
+export async function saveCrewApplicationReview(tablesDB, databaseId, application, body, actor) {
   const input = normalizeCrewReviewInput(body);
   if (!input.status && !('internalNotes' in body) && !('assignedTo' in body) && !('interviewAt' in body)) {
     throw new HttpError(400, 'No application changes were provided.');

@@ -27,7 +27,7 @@ test('an applicant edit rolls back if an organizer already began review', async 
 test('crew application row IDs are deterministic and Appwrite-safe', () => {
   const first = crewApplicationRowId('profile-123');
   assert.equal(first, crewApplicationRowId('profile-123'));
-  assert.match(first, /^crew_[a-f0-9]{32}$/);
+  assert.match(first, /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/);
   assert.notEqual(first, crewApplicationRowId('profile-456'));
 });
 
@@ -78,7 +78,13 @@ test('closing recruitment blocks only Team Leader submissions, including existin
     async createTransaction() { return { $id: 'tx' }; },
     async updateTransaction() {},
     async updateRow({ data }) { writes.push(data); return { ...existing, ...data }; },
-    async createRow({ data }) { writes.push(data); return data; },
+    async createRow({ tableId, rowId, permissions, data }) {
+      assert.equal(tableId, 'crew_applications');
+      assert.match(rowId, /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/);
+      assert.deepEqual(permissions, ['read("user:account")']);
+      writes.push(data);
+      return { $id: rowId, ...data };
+    },
   };
   const common = {
     interests: ['events'],
@@ -93,6 +99,8 @@ test('closing recruitment blocks only Team Leader submissions, including existin
   existing = null;
   await assert.rejects(submit({ track: 'leader' }), /Team Leader applications are currently closed/);
   const member = await submit({ track: 'member', contribution: 'I can help run and schedule club events.' });
+  assert.equal(member.action, 'submitCrewApplication');
+  assert.equal(member.row.status, 'submitted');
   assert.equal(member.row.track, 'member');
   assert.equal(settingsReads, 2, 'Team Member submissions must not read recruitment settings');
   await assert.rejects(submit({ track: 'member' }), /how you would contribute/);

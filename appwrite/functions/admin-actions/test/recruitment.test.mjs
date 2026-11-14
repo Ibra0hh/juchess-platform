@@ -35,7 +35,34 @@ import {
   CREW_APPLICATION_STATUSES,
   loadCrewApplications,
   normalizeCrewReviewInput,
+  saveCrewApplicationReview,
 } from '../src/main.js';
+
+test('saving an application decision and private notes uses a valid review ID and commits together', async () => {
+  const application = { $id: 'application-1', status: 'reviewing', $updatedAt: 'before' };
+  const transactions = [];
+  const result = await saveCrewApplicationReview({
+    async createTransaction() { return { $id: 'tx' }; },
+    async getRow() { return application; },
+    async updateRow({ transactionId, data }) {
+      assert.equal(transactionId, 'tx');
+      return { ...application, ...data };
+    },
+    async upsertRow({ tableId, rowId, transactionId, data }) {
+      assert.equal(tableId, 'crew_application_reviews');
+      assert.match(rowId, /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/);
+      assert.equal(transactionId, 'tx');
+      assert.equal(data.applicationId, application.$id);
+      return { $id: rowId, ...data };
+    },
+    async updateTransaction(input) { transactions.push(input); },
+    async createRow() {},
+  }, 'juchess', application, { status: 'accepted', internalNotes: 'Private note' }, { $id: 'reviewer' });
+  assert.equal(result.row.status, 'accepted');
+  assert.equal(result.row.internalNotes, undefined);
+  assert.equal(result.review.internalNotes, 'Private note');
+  assert.deepEqual(transactions, [{ transactionId: 'tx', commit: true }]);
+});
 
 test('crew review input accepts the complete workflow', () => {
   for (const status of CREW_APPLICATION_STATUSES) {

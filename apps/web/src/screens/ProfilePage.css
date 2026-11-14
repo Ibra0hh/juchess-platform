@@ -410,6 +410,10 @@
 }
 
 .profile-crew-cta > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   flex: 0 0 auto;
   padding: 11px 14px;
   border: 1px solid rgba(245, 239, 227, .35);
@@ -418,6 +422,35 @@
   font-size: 11px;
   font-weight: 700;
   text-decoration: none;
+}
+
+.profile-application-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.profile-application-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #f5e9c5;
+  color: #5b410e;
+}
+
+.profile-application-status:is([data-status="reviewing"], [data-status="shortlisted"], [data-status="interview"]) {
+  background: #e6eff8;
+  color: #284a70;
+}
+
+.profile-application-status[data-status="accepted"] {
+  background: #e5f4e9;
+  color: #23603c;
+}
+
+.profile-application-status:is([data-status="rejected"], [data-status="withdrawn"]) {
+  background: #ece9ed;
+  color: #534959;
 }
 
 .profile-panel-heading {

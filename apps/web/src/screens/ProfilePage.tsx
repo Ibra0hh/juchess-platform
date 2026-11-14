@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
-import { BookOpen, Camera, Edit3, History, ImagePlus, LogOut, ShieldCheck, Trash2, X } from 'lucide-react'
+import { ArrowRight, BookOpen, Camera, Edit3, History, ImagePlus, LogOut, ShieldCheck, Trash2, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import ProfileImageEditor from '../components/ProfileImageEditor'
 import SiteFooter from '../components/SiteFooter'
@@ -10,6 +10,8 @@ import { formatAppwriteError, profileMediaUrl, type ProfileMediaKind } from '../
 import { compactCrestUrl } from '../lib/brand'
 import { externalRatingSourceLabel, hasExternalRating } from '../lib/externalRating'
 import { loadProfileGameHistory, type SampleGame } from '../lib/juchess'
+import { applicationPath } from '../lib/profileCompletion'
+import { loadMyRecruitmentApplication, recruitmentStatusLabels, type RecruitmentApplication } from '../lib/recruitment'
 import './ClubScreens.css'
 import './ProfilePage.css'
 
@@ -25,6 +27,60 @@ type ProfileForm = {
 type PendingProfileImage = {
   file: File
   kind: ProfileMediaKind
+}
+
+function ProfileApplication() {
+  const [result, setResult] = useState<
+    { state: 'loading' | 'error' } | { state: 'ready'; application: RecruitmentApplication | null }
+  >({ state: 'loading' })
+
+  useEffect(() => {
+    let active = true
+    let request = 0
+    function refresh() {
+      const current = ++request
+      void loadMyRecruitmentApplication()
+        .then((application) => {
+          if (active && current === request) setResult({ state: 'ready', application })
+        })
+        .catch(() => {
+          if (active && current === request) setResult({ state: 'error' })
+        })
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
+
+  const application = result.state === 'ready' ? result.application : null
+  const status = application?.status
+  const label = status === 'rejected' ? 'Declined' : status ? recruitmentStatusLabels[status] : null
+
+  return (
+    <section className="profile-crew-cta" aria-labelledby="my-application-title">
+      <div>
+        <span>Club involvement</span>
+        <h2 id="my-application-title">My application</h2>
+        {application && label ? (
+          <p className="profile-application-summary" role="status">
+            {application.track === 'leader' ? 'Team Leader' : 'Team Member'}
+            <strong className="profile-application-status" data-status={status}>{label}</strong>
+          </p>
+        ) : (
+          <p role="status">{result.state === 'loading' ? 'Checking application status...'
+            : result.state === 'error' ? 'Application status is unavailable right now.'
+              : 'You haven’t submitted a team application yet.'}</p>
+        )}
+      </div>
+      <Link to={applicationPath}>
+        {result.state === 'ready' && !application ? 'Apply to join the team' : 'View application'}
+        <ArrowRight size={15} aria-hidden="true" />
+      </Link>
+    </section>
+  )
 }
 
 function ProfilePage() {
@@ -329,14 +385,9 @@ function ProfilePage() {
           </section>
         ) : null}
 
-        <section className="profile-crew-cta">
-          <div>
-            <span>Club involvement</span>
-            <h2>Want to help build JuChess?</h2>
-            <p>Share your skills and interests with the HR team, then follow your application from your account.</p>
-          </div>
-          <Link to="/join-the-team">Join the working team &rarr;</Link>
-        </section>
+        {user && profileId && !profileId.startsWith('preview-') ? (
+          <ProfileApplication key={user.$id + ':' + profileId} />
+        ) : null}
 
         <div className="member-profile-grid">
           <section className="profile-panel season-panel">
