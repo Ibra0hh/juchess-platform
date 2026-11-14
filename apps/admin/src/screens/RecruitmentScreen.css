@@ -42,6 +42,16 @@
 .recruitment-admin-status.rejected, .recruitment-admin-status.withdrawn { color: #6d6570; background: #ece9ed; }
 .review-row-button { min-height: 32px; padding: 0 11px; border: 1px solid #7d2434; border-radius: 6px; color: #7d2434; background: transparent; font-size: 10px; font-weight: 700; }
 .review-row-button:hover { color: white; background: #7d2434; }
+.pipeline-answers-button { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; margin: 5px 0 0 46px; padding: 0 8px; border: 1px solid #dfd4be; border-radius: 6px; color: #352f25; background: transparent; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.pipeline-answers-button:hover, .pipeline-answers-button[aria-expanded="true"] { background: #f5eddf; }
+.pipeline-answers-button[aria-expanded="true"] svg { transform: rotate(180deg); }
+.recruitment-table .pipeline-answers-row td { background: #f7f0e4; padding: 18px 20px; }
+.pipeline-answers-row section { width: min(100%, 680px); }
+.pipeline-answers-row h3, .review-application-copy > h3 { margin: 0 0 12px; color: #111; font-family: "Source Serif 4", Georgia, serif; font-size: 17px; }
+.recruitment-answer-list { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; }
+.recruitment-answer-list > div { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid #e4dac5; }
+.recruitment-answer-list dt { color: #7d2434; font-size: 12px; font-weight: 700; }
+.recruitment-answer-list dd { margin: 0; color: #3e382e; font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .recruitment-empty { display: grid; min-height: 230px; place-items: center; align-content: center; color: #8a7e63; text-align: center; }
 .recruitment-empty svg { width: 34px; height: 34px; margin-bottom: 10px; }
 .recruitment-empty strong { color: #111; font-family: "Source Serif 4", Georgia, serif; font-size: 17px; }
@@ -50,8 +60,8 @@
 @keyframes recruitment-admin-shimmer { to { background-position: -220% 0; } }
 
 .recruitment-review-backdrop { position: fixed; z-index: 140; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(17,17,17,.62); backdrop-filter: blur(4px); }
-.recruitment-review-modal { width: min(100%, 1020px); max-height: min(90vh, 880px); overflow: auto; background: #fdfaf1; border: 1px solid rgba(255,255,255,.25); border-radius: 14px; box-shadow: 0 32px 90px rgba(17,17,17,.45); }
-.review-profile-cover { position: relative; height: 150px; background-color: #171717; background-image: linear-gradient(rgba(245,239,227,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(245,239,227,.05) 1px,transparent 1px); background-position: center; background-size: cover, 42px 42px; }
+.recruitment-review-modal { width: min(100%, 1040px); max-height: min(calc(100dvh - 48px), 880px); overflow: auto; background: #fdfaf1; border: 1px solid rgba(255,255,255,.25); border-radius: 14px; box-shadow: 0 32px 90px rgba(17,17,17,.45); }
+.review-profile-cover { position: relative; height: 70px; background-color: #171717; background-image: linear-gradient(rgba(245,239,227,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(245,239,227,.05) 1px,transparent 1px); background-position: center; background-size: cover, 42px 42px; }
 .review-profile-cover button { position: absolute; top: 14px; right: 14px; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(255,255,255,.25); border-radius: 8px; color: white; background: rgba(17,17,17,.75); }
 .review-profile-cover svg { width: 18px; }
 .review-profile-heading { display: grid; grid-template-columns: 82px minmax(0,1fr) auto; align-items: end; gap: 16px; padding: 0 26px 20px; border-bottom: 1px solid #e4dac5; }
@@ -60,19 +70,15 @@
 .review-profile-heading small { color: #7d2434; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .review-profile-heading h2 { margin: 2px 0; font-family: "Source Serif 4", Georgia, serif; font-size: 25px; }
 .review-profile-heading p { margin: 0; color: #8a7e63; font-size: 10px; }
-.review-modal-grid { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(300px,.75fr); }
-.review-application-copy { display: grid; gap: 18px; padding: 26px; border-right: 1px solid #e4dac5; }
-.review-application-copy section { padding-bottom: 18px; border-bottom: 1px solid #ece2d0; }
-.review-application-copy section:last-of-type { padding-bottom: 0; border: 0; }
-.review-application-copy h3, .review-decision-form h3 { margin: 0 0 8px; color: #7d2434; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
-.review-application-copy p { margin: 0; color: #3e382e; font-size: 12px; line-height: 1.65; white-space: pre-wrap; }
+.review-modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.review-application-copy { grid-column: 1 / -1; padding: 20px 26px; border-top: 1px solid #e4dac5; }
 .review-portfolio { display: inline-flex; align-items: center; gap: 5px; color: #7d2434; font-size: 11px; font-weight: 700; text-decoration: none; }
-.review-decision-form { display: grid; align-content: start; gap: 15px; padding: 26px; background: #f7f0e4; }
-.review-decision-form > h3 { color: #111; font-family: "Source Serif 4", Georgia, serif; font-size: 17px; letter-spacing: 0; text-transform: none; }
+.review-decision-form { display: grid; min-width: 0; align-content: start; gap: 12px; padding: 20px 26px; background: #f7f0e4; }
+.review-decision-form > h3, .recruitment-decision-email > h3 { margin: 0; color: #111; font-family: "Source Serif 4", Georgia, serif; font-size: 17px; }
 .review-decision-form label { display: grid; gap: 6px; color: #111; font-size: 10px; font-weight: 700; }
 .review-decision-form input, .review-decision-form select, .review-decision-form textarea { width: 100%; border: 1px solid #dcd0bb; border-radius: 7px; background: white; outline: 0; font-size: 11px; }
 .review-decision-form input, .review-decision-form select { height: 41px; padding: 0 10px; }
-.review-decision-form textarea { min-height: 150px; padding: 10px; line-height: 1.5; resize: vertical; }
+.review-decision-form textarea { min-height: 80px; padding: 10px; line-height: 1.5; resize: vertical; }
 .review-decision-form :focus { border-color: #7d2434; box-shadow: 0 0 0 3px rgba(125,36,52,.1); }
 .review-security-note { margin: -4px 0 0; color: #8a7e63; font-size: 9px; }
 .review-feedback { padding: 9px 10px; color: #5f1b26; background: #fff; border: 1px solid #decdb2; border-radius: 6px; font-size: 10px; }
@@ -80,10 +86,18 @@
 .review-decision-actions button { min-height: 40px; padding: 0 14px; border: 1px solid #cfc2ab; border-radius: 7px; color: #111; background: transparent; font-size: 10px; font-weight: 700; }
 .review-decision-actions button:last-child { color: white; background: #7d2434; border-color: #7d2434; }
 .review-decision-actions button:disabled { cursor: not-allowed; opacity: .55; }
-.recruitment-decision-email { display: grid; min-width: 0; gap: 10px; padding-top: 16px; border-top: 1px solid #decdb2; }
+.recruitment-decision-email { display: grid; align-content: start; min-width: 0; gap: 8px; padding: 20px 26px; border-left: 1px solid #decdb2; background: #eee8dc; }
 .recruitment-decision-email > h3, .recruitment-decision-email > p { margin: 0; }
 .recruitment-decision-email > p { color: #3e382e; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .recruitment-decision-email .player-email-preview { min-width: 0; padding: 0; background: transparent; border: 0; }
+.recruitment-decision-email .player-email-preview > span { display: none; }
+.recruitment-decision-email .player-email-preview-card { margin: 0; border-radius: 8px; }
+.recruitment-decision-email .player-email-preview-brand { padding: 12px 14px 9px; }
+.recruitment-decision-email .player-email-preview-brand img { width: 38px; height: 38px; margin-bottom: 4px; }
+.recruitment-decision-email .player-email-preview-copy { margin-inline: 16px; padding-block: 12px; overflow-wrap: anywhere; }
+.recruitment-decision-email .player-email-preview-copy h3 { margin-bottom: 8px; font-size: 17px; }
+.recruitment-decision-email .player-email-preview-copy > :is(div, .player-email-preview-link) { margin-top: 10px; }
+.recruitment-decision-email .player-email-preview-card footer { padding: 8px; }
 .recruitment-decision-email .review-decision-actions button { display: inline-flex; align-items: center; gap: 6px; }
 
 @media (max-width: 1100px) {
@@ -96,7 +110,8 @@
   .recruitment-kpis { grid-template-columns: 1fr 1fr; }
   .recruitment-admin-filters > * { flex: 1 1 150px; }
   .review-modal-grid { grid-template-columns: 1fr; }
-  .review-application-copy { border-right: 0; border-bottom: 1px solid #e4dac5; }
+  .pipeline-answers-row section { max-width: calc(100vw - 68px); }
+  .recruitment-decision-email { border-left: 0; border-top: 1px solid #e4dac5; }
   .review-profile-heading { grid-template-columns: 70px minmax(0,1fr); }
   .review-profile-heading > .recruitment-admin-status { grid-column: 1 / -1; justify-self: start; }
   .review-profile-avatar { width: 70px; height: 70px; }
@@ -106,7 +121,7 @@
   .recruitment-kpis { grid-template-columns: 1fr; }
   .recruitment-review-backdrop { padding: 0; place-items: stretch; }
   .recruitment-review-modal { max-height: 100vh; border-radius: 0; }
-  .review-profile-heading, .review-application-copy, .review-decision-form { padding-inline: 18px; }
+  .review-profile-heading, .review-application-copy, .review-decision-form, .recruitment-decision-email { padding-inline: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) { .recruitment-loading-row span { animation: none; } }

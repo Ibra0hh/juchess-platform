@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { BriefcaseBusiness, CalendarClock, Download, ExternalLink, Mail, Search, UserCheck, UsersRound, X } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { BriefcaseBusiness, CalendarClock, ChevronDown, Download, ExternalLink, Mail, Search, UserCheck, UsersRound, X } from 'lucide-react'
 import BrandedEmailPreview from '../components/BrandedEmailPreview'
 import {
   formatAdminError,
@@ -30,7 +30,7 @@ const statusOptions: Array<{ value: RecruitmentStatus; label: string }> = [
 ]
 
 const interestLabels: Record<string, string> = {
-  design: 'Design', software: 'Software', events: 'Events', media: 'Media', hr: 'People & HR',
+  design: 'Design', software: 'Software', events: 'Events', media: 'Media & content', hr: 'People & HR',
   partnerships: 'Partnerships', finance: 'Finance', management: 'Management',
 }
 
@@ -43,6 +43,7 @@ export default function RecruitmentScreen() {
   const [interest, setInterest] = useState('all')
   const [track, setTrack] = useState('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -62,7 +63,7 @@ export default function RecruitmentScreen() {
         applicant?.displayName,
         applicant?.email,
         applicant?.universityId,
-        application.skills,
+        ...applicationAnswers(application).map(({ answer }) => answer),
       ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery))
       return matchesQuery
         && (status === 'all' || application.status === status)
@@ -99,7 +100,7 @@ export default function RecruitmentScreen() {
           <div className="recruitment-admin-filters">
             <label className="recruitment-search">
               <Search size={16} />
-              <input aria-label="Search applications" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, skills..." />
+              <input aria-label="Search applications" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, or answers..." />
             </label>
             <select aria-label="Filter by application type" value={track} onChange={(event) => setTrack(event.target.value)}>
               <option value="all">All application types</option>
@@ -130,17 +131,38 @@ export default function RecruitmentScreen() {
               {!loading && !visibleApplications.length ? (
                 <tr><td colSpan={7}><div className="recruitment-empty"><BriefcaseBusiness /><strong>No matching applications</strong><span>New applications will appear here automatically.</span></div></td></tr>
               ) : null}
-              {!loading ? visibleApplications.map((application) => (
-                <tr key={application.$id}>
-                  <td><ApplicantCell application={application} /></td>
-                  <td>{applicationTrackLabel(application)}</td>
-                  <td><div className="recruitment-interest-list">{application.interests.slice(0, 3).map((item) => <span key={item}>{interestLabels[item] || item}</span>)}{application.interests.length > 3 ? <em>+{application.interests.length - 3}</em> : null}</div></td>
-                  <td>{application.availability}</td>
-                  <td>{formatAdminDate(application.submittedAt)}</td>
-                  <td><StatusBadge status={application.status} /></td>
-                  <td><button type="button" className="review-row-button" onClick={() => setSelectedId(application.$id)}>Review</button></td>
-                </tr>
-              )) : null}
+              {!loading ? visibleApplications.map((application) => {
+                const expanded = expandedId === application.$id
+                const answersId = 'pipeline-answers-' + application.$id
+                return (
+                  <Fragment key={application.$id}>
+                    <tr>
+                      <td>
+                        <ApplicantCell application={application} />
+                        <button type="button" className="pipeline-answers-button" aria-expanded={expanded} aria-controls={expanded ? answersId : undefined} onClick={() => setExpandedId(expanded ? null : application.$id)}>
+                          {expanded ? 'Hide answers' : 'View answers'} <ChevronDown size={14} aria-hidden="true" />
+                        </button>
+                      </td>
+                      <td>{applicationTrackLabel(application)}</td>
+                      <td><div className="recruitment-interest-list">{application.interests.map((item) => <span key={item}>{interestLabels[item] || item}</span>)}</div></td>
+                      <td>{application.availability}</td>
+                      <td>{formatAdminDate(application.submittedAt)}</td>
+                      <td><StatusBadge status={application.status} /></td>
+                      <td><button type="button" className="review-row-button" onClick={() => setSelectedId(application.$id)}>Review</button></td>
+                    </tr>
+                    {expanded ? (
+                      <tr className="pipeline-answers-row">
+                        <td colSpan={7}>
+                          <section id={answersId} aria-label="Application answers">
+                            <h3>Application answers</h3>
+                            <ApplicationAnswers application={application} />
+                          </section>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                )
+              }) : null}
             </tbody>
           </table>
         </div>
@@ -227,6 +249,38 @@ function applicationTrackLabel(application: RecruitmentApplication) {
   return applicationTrack(application) === 'leader' ? 'Team Leader' : 'Team Member'
 }
 
+function applicationAnswers(application: RecruitmentApplication) {
+  const leader = applicationTrack(application) === 'leader'
+  return [
+    { question: 'Application type', answer: applicationTrackLabel(application) },
+    { question: 'Areas of interest', answer: application.interests.map((item) => interestLabels[item] || item).join(', ') },
+    { question: 'Weekly availability', answer: application.availability },
+    { question: leader ? 'Your leadership experience' : 'Your skills and experience', answer: application.skills },
+    ...(!leader || application.contribution ? [{
+      question: leader ? 'Leadership plan' : 'How would you contribute to JuChess?',
+      answer: application.contribution,
+    }] : []),
+    { question: 'What do you want to improve?', answer: application.developmentGoals },
+    ...(leader ? [{ question: 'Anything else you\u2019d like us to know?', answer: application.additionalNotes }] : []),
+    { question: 'Portfolio or profile link', answer: application.portfolioUrl, link: true },
+  ]
+}
+
+function ApplicationAnswers({ application }: { application: RecruitmentApplication }) {
+  return (
+    <dl className="recruitment-answer-list">
+      {applicationAnswers(application).map(({ question, answer, link }) => (
+        <div key={question}>
+          <dt>{question}</dt>
+          <dd>{link && answer && /^https?:\/\//i.test(answer) ? (
+            <a className="review-portfolio" href={answer} target="_blank" rel="noreferrer">Open portfolio <ExternalLink size={14} aria-hidden="true" /></a>
+          ) : (answer || 'Not provided.')}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
 function ApplicantCell({ application }: { application: RecruitmentApplication }) {
   const applicant = application.applicant
   const name = applicant?.displayName || 'Profile unavailable'
@@ -291,37 +345,28 @@ function ReviewModal({ application, onClose, onSaved }: {
         </div>
 
         <div className="review-modal-grid">
-          <div className="review-application-copy">
-            <ReviewSection title="Interests"><div className="recruitment-interest-list large">{application.interests.map((item) => <span key={item}>{interestLabels[item] || item}</span>)}</div></ReviewSection>
-            <ReviewSection title="Application type"><p>{applicationTrackLabel(application)}</p></ReviewSection>
-            <ReviewSection title={applicationTrack(application) === 'leader' ? 'Leadership experience' : 'Skills and experience'}><p>{application.skills}</p></ReviewSection>
-            {applicationTrack(application) === 'member' || application.contribution ? (
-              <ReviewSection title={applicationTrack(application) === 'leader' ? 'Leadership plan' : 'How they would contribute'}><p>{application.contribution}</p></ReviewSection>
-            ) : null}
-            <ReviewSection title="Development goals"><p>{application.developmentGoals || 'Not provided.'}</p></ReviewSection>
-            {applicationTrack(application) === 'leader' && application.additionalNotes ? <ReviewSection title="Additional notes"><p>{application.additionalNotes}</p></ReviewSection> : null}
-            <ReviewSection title="Availability"><p>{application.availability}</p></ReviewSection>
-            {application.portfolioUrl ? <a className="review-portfolio" href={application.portfolioUrl} target="_blank" rel="noreferrer">Open portfolio <ExternalLink size={14} /></a> : null}
-          </div>
-
           <form className="review-decision-form" onSubmit={(event) => void handleSave(event)}>
             <h3>HR review</h3>
             <label><span>Status</span><select disabled={saving || sending} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as RecruitmentStatus })}>{statusOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
             <label><span>Assigned to</span><input maxLength={128} value={form.assignedTo} onChange={(event) => setForm({ ...form, assignedTo: event.target.value })} placeholder="HR lead or interviewer" /></label>
             <label><span>Interview date (your local time)</span><input type="datetime-local" disabled={saving || sending} value={form.interviewAt} onChange={(event) => setForm({ ...form, interviewAt: event.target.value })} /></label>
-            <label><span>Private HR notes</span><textarea maxLength={4000} rows={8} value={form.internalNotes} onChange={(event) => setForm({ ...form, internalNotes: event.target.value })} placeholder="Interview notes, fit, follow-up questions..." /></label>
+            <label><span>Private HR notes</span><textarea maxLength={4000} rows={4} value={form.internalNotes} onChange={(event) => setForm({ ...form, internalNotes: event.target.value })} placeholder="Interview notes, fit, follow-up questions..." /></label>
             <p className="review-security-note">These notes are never visible to the applicant.</p>
             {feedback ? <div className="review-feedback" role="status">{feedback}</div> : null}
             <div className="review-decision-actions"><button type="button" disabled={saving || sending} onClick={onClose}>Close</button><button type="submit" disabled={saving || sending}>{saving ? 'Saving...' : 'Save review'}</button></div>
-            <RecruitmentDecisionEmail
-              application={application}
-              status={form.status}
-              interviewAt={form.interviewAt}
-              saving={saving}
-              sending={sending}
-              setSending={setSending}
-            />
           </form>
+          <RecruitmentDecisionEmail
+            application={application}
+            status={form.status}
+            interviewAt={form.interviewAt}
+            saving={saving}
+            sending={sending}
+            setSending={setSending}
+          />
+          <section className="review-application-copy" aria-labelledby="review-answers-title">
+            <h3 id="review-answers-title">Application answers</h3>
+            <ApplicationAnswers application={application} />
+          </section>
         </div>
       </section>
     </div>
@@ -378,11 +423,11 @@ function RecruitmentDecisionEmail({ application, status, interviewAt, saving, se
     }
   }
 
-  if (!available) return null
   return (
     <section className="recruitment-decision-email" aria-label="Applicant email">
       <h3>Applicant email</h3>
-      {!draftKey ? <p role="status">Choose an interview date and time to preview the invitation.</p> : null}
+      {!available ? <p>Select Interview, Accepted, or Rejected to preview the email.</p> : null}
+      {interview && !draftKey ? <p role="status">Choose an interview date and time to preview the invitation.</p> : null}
       {error ? (
         <div className="review-feedback" role="status">
           {error} <button type="button" onClick={() => { setDraft(undefined); setAttempt(attempt + 1) }}>Retry preview</button>
@@ -410,10 +455,6 @@ function RecruitmentDecisionEmail({ application, status, interviewAt, saving, se
       ) : null}
     </section>
   )
-}
-
-function ReviewSection({ children, title }: { children: React.ReactNode; title: string }) {
-  return <section><h3>{title}</h3>{children}</section>
 }
 
 function StatusBadge({ status }: { status: RecruitmentStatus }) {
