@@ -905,6 +905,30 @@ export async function updateRecruitmentApplication(applicationId: string, input:
   return response
 }
 
+export type RecruitmentEmailPreview = {
+  to: string
+  subject: string
+  message: string
+  link: { text: string; url: string }
+  previewId: string
+}
+
+export function previewRecruitmentEmail(applicationId: string, status: RecruitmentStatus, interviewAt: string) {
+  return runAdminAction<RecruitmentEmailPreview>({
+    method: ExecutionMethod.POST,
+    path: '/recruitment/applications/' + encodeURIComponent(applicationId) + '/email/preview',
+    body: { status, interviewAt },
+  })
+}
+
+export function sendRecruitmentEmail(applicationId: string, status: RecruitmentStatus, previewId: string) {
+  return runAdminAction<{ messageId: string; deliveryStatus: string }>({
+    method: ExecutionMethod.POST,
+    path: '/recruitment/applications/' + encodeURIComponent(applicationId) + '/email/send',
+    body: { status, previewId },
+  })
+}
+
 export async function loadRecruitmentSettings() {
   return runAdminAction<{ leaderOpen: boolean }>({
     method: ExecutionMethod.GET,

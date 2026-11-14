@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { BriefcaseBusiness, CalendarClock, Download, ExternalLink, Search, UserCheck, UsersRound, X } from 'lucide-react'
+import { BriefcaseBusiness, CalendarClock, Download, ExternalLink, Mail, Search, UserCheck, UsersRound, X } from 'lucide-react'
+import BrandedEmailPreview from '../components/BrandedEmailPreview'
 import {
   formatAdminError,
   loadRecruitmentApplications,
   loadRecruitmentSettings,
+  previewRecruitmentEmail,
   profileMediaUrl,
+  sendRecruitmentEmail,
   updateRecruitmentApplication,
   updateRecruitmentSettings,
   type RecruitmentApplication,
+  type RecruitmentEmailPreview,
   type RecruitmentReviewInput,
   type RecruitmentStatus,
 } from '../lib/adminData'
@@ -144,6 +148,7 @@ export default function RecruitmentScreen() {
 
       {selected ? (
         <ReviewModal
+          key={selected.$id}
           application={selected}
           onClose={() => setSelectedId(null)}
           onSaved={(row, review) => {
@@ -249,6 +254,7 @@ function ReviewModal({ application, onClose, onSaved }: {
     interviewAt: toDatetimeLocal(application.review?.interviewAt),
   })
   const [saving, setSaving] = useState(false)
+  const [sending, setSending] = useState(false)
   const [feedback, setFeedback] = useState('')
   const rating = hasExternalRating(applicant?.rating, applicant?.ratingSource)
     ? externalRatingText(applicant?.rating, applicant?.ratingSource)
@@ -276,7 +282,7 @@ function ReviewModal({ application, onClose, onSaved }: {
     <div className="recruitment-review-backdrop" role="presentation">
       <section className="recruitment-review-modal" role="dialog" aria-modal="true" aria-labelledby="recruitment-review-title">
         <header className="review-profile-cover" style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}>
-          <button type="button" aria-label="Close application review" onClick={onClose}><X /></button>
+          <button type="button" aria-label="Close application review" disabled={saving || sending} onClick={onClose}><X /></button>
         </header>
         <div className="review-profile-heading">
           <span className="review-profile-avatar">{avatarUrl ? <img src={avatarUrl} alt="" /> : getInitials(applicant?.displayName || 'Member')}</span>
@@ -300,17 +306,109 @@ function ReviewModal({ application, onClose, onSaved }: {
 
           <form className="review-decision-form" onSubmit={(event) => void handleSave(event)}>
             <h3>HR review</h3>
-            <label><span>Status</span><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as RecruitmentStatus })}>{statusOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+            <label><span>Status</span><select disabled={saving || sending} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as RecruitmentStatus })}>{statusOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
             <label><span>Assigned to</span><input maxLength={128} value={form.assignedTo} onChange={(event) => setForm({ ...form, assignedTo: event.target.value })} placeholder="HR lead or interviewer" /></label>
-            <label><span>Interview date</span><input type="datetime-local" value={form.interviewAt} onChange={(event) => setForm({ ...form, interviewAt: event.target.value })} /></label>
+            <label><span>Interview date (your local time)</span><input type="datetime-local" disabled={saving || sending} value={form.interviewAt} onChange={(event) => setForm({ ...form, interviewAt: event.target.value })} /></label>
             <label><span>Private HR notes</span><textarea maxLength={4000} rows={8} value={form.internalNotes} onChange={(event) => setForm({ ...form, internalNotes: event.target.value })} placeholder="Interview notes, fit, follow-up questions..." /></label>
             <p className="review-security-note">These notes are never visible to the applicant.</p>
             {feedback ? <div className="review-feedback" role="status">{feedback}</div> : null}
-            <div className="review-decision-actions"><button type="button" onClick={onClose}>Close</button><button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save review'}</button></div>
+            <div className="review-decision-actions"><button type="button" disabled={saving || sending} onClick={onClose}>Close</button><button type="submit" disabled={saving || sending}>{saving ? 'Saving...' : 'Save review'}</button></div>
+            <RecruitmentDecisionEmail
+              application={application}
+              status={form.status}
+              interviewAt={form.interviewAt}
+              saving={saving}
+              sending={sending}
+              setSending={setSending}
+            />
           </form>
         </div>
       </section>
     </div>
+  )
+}
+
+function RecruitmentDecisionEmail({ application, status, interviewAt, saving, sending, setSending }: {
+  application: RecruitmentApplication
+  status: RecruitmentStatus
+  interviewAt: string
+  saving: boolean
+  sending: boolean
+  setSending: (value: boolean) => void
+}) {
+  const applicationId = application.$id
+  const interview = status === 'interview'
+  const available = interview || status === 'accepted' || status === 'rejected'
+  const selectedDate = Date.parse(interviewAt)
+  const dateIso = interview && Number.isFinite(selectedDate) ? new Date(selectedDate).toISOString() : ''
+  const draftKey = available && (!interview || dateIso) ? status + ':' + dateIso : ''
+  const saved = application.status === status
+    && (!interview || Date.parse(application.review?.interviewAt || '') === selectedDate)
+  const [draft, setDraft] = useState<{ key: string; value?: RecruitmentEmailPreview; error?: string }>()
+  const [confirmed, setConfirmed] = useState('')
+  const [notice, setNotice] = useState<{ id: string; text: string; sent: boolean }>()
+  const [attempt, setAttempt] = useState(0)
+  const preview = draftKey && draft?.key === draftKey ? draft.value : undefined
+  const error = draftKey && draft?.key === draftKey ? draft.error : undefined
+  const sent = Boolean(preview && notice?.id === preview.previewId && notice.sent)
+  const canSend = Boolean(preview && saved && !saving && !sending && !sent && (!interview || selectedDate > Date.now()))
+
+  useEffect(() => {
+    if (!draftKey) return
+    let active = true
+    const timer = window.setTimeout(() => {
+      void previewRecruitmentEmail(applicationId, status, dateIso)
+        .then((value) => { if (active) setDraft({ key: draftKey, value }) })
+        .catch((cause) => { if (active) setDraft({ key: draftKey, error: formatAdminError(cause) }) })
+    }, 250)
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [applicationId, application.$updatedAt, attempt, dateIso, draftKey, status])
+
+  async function handleSend() {
+    if (!preview || !canSend || confirmed !== preview.previewId) return
+    setSending(true)
+    try {
+      const result = await sendRecruitmentEmail(applicationId, status, preview.previewId)
+      setNotice({ id: preview.previewId, text: 'Submitted to Appwrite for delivery (' + result.deliveryStatus + ').', sent: true })
+    } catch (cause) {
+      setNotice({ id: preview.previewId, text: formatAdminError(cause), sent: false })
+    } finally {
+      setConfirmed('')
+      setSending(false)
+    }
+  }
+
+  if (!available) return null
+  return (
+    <section className="recruitment-decision-email" aria-label="Applicant email">
+      <h3>Applicant email</h3>
+      {!draftKey ? <p role="status">Choose an interview date and time to preview the invitation.</p> : null}
+      {error ? (
+        <div className="review-feedback" role="status">
+          {error} <button type="button" onClick={() => { setDraft(undefined); setAttempt(attempt + 1) }}>Retry preview</button>
+        </div>
+      ) : null}
+      {draftKey && !preview && !error ? <p role="status">Loading email preview...</p> : null}
+      {preview ? (
+        <>
+          <p className="decision-email-recipient"><strong>To:</strong> {preview.to}</p>
+          <BrandedEmailPreview subject={preview.subject} message={preview.message} link={preview.link} />
+          {!saved ? <p role="status">Save the review before sending this email.</p> : null}
+          {interview && selectedDate <= Date.now() ? <p role="status">Choose a future date to send the invitation.</p> : null}
+          {notice?.id === preview.previewId ? <div className="review-feedback" role="status">{notice.text}</div> : null}
+          {confirmed === preview.previewId && !sent ? (
+            <div className="review-decision-actions">
+              <button type="button" disabled={sending} onClick={() => setConfirmed('')}>Cancel</button>
+              <button type="button" disabled={!canSend} onClick={() => void handleSend()}>{sending ? 'Sending...' : 'Confirm send'}</button>
+            </div>
+          ) : (
+            <div className="review-decision-actions">
+              <button type="button" disabled={!canSend} onClick={() => setConfirmed(preview.previewId)}><Mail size={15} aria-hidden="true" /> Send email</button>
+            </div>
+          )}
+        </>
+      ) : null}
+    </section>
   )
 }
 

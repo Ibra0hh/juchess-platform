@@ -80,6 +80,11 @@
 .review-decision-actions button { min-height: 40px; padding: 0 14px; border: 1px solid #cfc2ab; border-radius: 7px; color: #111; background: transparent; font-size: 10px; font-weight: 700; }
 .review-decision-actions button:last-child { color: white; background: #7d2434; border-color: #7d2434; }
 .review-decision-actions button:disabled { cursor: not-allowed; opacity: .55; }
+.recruitment-decision-email { display: grid; min-width: 0; gap: 10px; padding-top: 16px; border-top: 1px solid #decdb2; }
+.recruitment-decision-email > h3, .recruitment-decision-email > p { margin: 0; }
+.recruitment-decision-email > p { color: #3e382e; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.recruitment-decision-email .player-email-preview { min-width: 0; padding: 0; background: transparent; border: 0; }
+.recruitment-decision-email .review-decision-actions button { display: inline-flex; align-items: center; gap: 6px; }
 
 @media (max-width: 1100px) {
   .recruitment-admin-toolbar { align-items: flex-start; flex-direction: column; }

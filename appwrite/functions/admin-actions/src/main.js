@@ -205,6 +205,105 @@ function crewReviewRowId(applicationId) {
   return `rev_${digest}`;
 }
 
+const recruitmentEmailStatuses = ['interview', 'accepted', 'rejected'];
+
+export function buildRecruitmentEmail({ status, interviewAt, track, name }) {
+  if (!recruitmentEmailStatuses.includes(status)) {
+    throw new HttpError(400, 'Choose Interview, Accepted, or Rejected to prepare an email.');
+  }
+  const position = track === 'leader' ? 'Team Leader' : 'Team Member';
+  const greeting = 'Hi ' + (name || 'there') + ',\n\n';
+  const signature = '\n\nJuChess Recruitment Team';
+  const link = { text: 'View my application', url: 'https://juchess.page/profile/' };
+  if (status === 'interview') {
+    const date = new Date(interviewAt || '');
+    if (!Number.isFinite(date.getTime())) throw new HttpError(400, 'Choose an interview date and time first.');
+    const time = new Intl.DateTimeFormat('en-GB', {
+      dateStyle: 'full', timeStyle: 'short', hour12: true, timeZone: 'Asia/Amman',
+    }).format(date);
+    return {
+      subject: 'JuChess interview invitation',
+      message: greeting + 'We would like to invite you to an interview for the JuChess ' + position
+        + ' role.\n\nInterview: ' + time + ' (Amman time).\n\nPlease reply to confirm your availability or ask to reschedule.' + signature,
+      link,
+    };
+  }
+  if (status === 'accepted') {
+    return {
+      subject: 'Welcome to the JuChess team',
+      message: greeting + 'Congratulations! Your application for the JuChess ' + position
+        + ' role has been accepted.\n\nPlease reply to confirm that you would like to join. We will follow up with next steps.' + signature,
+      link,
+    };
+  }
+  return {
+    subject: 'Update on your JuChess application',
+    message: greeting + 'Thank you for applying for the JuChess ' + position
+      + ' role. We will not be moving forward with your application this round.\n\nWe appreciate the time you put into applying and hope to see you at future club events.' + signature,
+    link,
+  };
+}
+
+export async function recruitmentEmailAction({ tablesDB, databaseId, users, messaging, application, body, actor, send }) {
+  let interviewAt = body.interviewAt;
+  if (send) {
+    if (application.status !== body.status) throw new HttpError(409, 'Save this decision before sending the email.');
+    if (body.status === 'interview') {
+      const review = await tablesDB.getRow({
+        databaseId, tableId: tableIds.crewApplicationReviews, rowId: crewReviewRowId(application.$id),
+      }).catch((cause) => {
+        if (Number(cause?.code) === 404) return null;
+        throw cause;
+      });
+      interviewAt = review?.interviewAt;
+      if (!interviewAt) throw new HttpError(409, 'Save the interview date before sending the email.');
+      if (Date.parse(interviewAt) <= Date.now()) throw new HttpError(400, 'Choose a future interview date and time.');
+    }
+  }
+
+  const { recipients: [recipient] } = await resolvePlayerEmailRecipients(tablesDB, databaseId, [application.profileId]);
+  if (!recipient || recipient.accountId !== application.accountId) {
+    throw new HttpError(409, 'The application no longer matches a deliverable account.');
+  }
+  const user = await users.get({ userId: recipient.accountId });
+  if (!user.email || !user.emailVerification || user.status === false) {
+    throw new HttpError(409, 'The applicant does not have an active, verified email address.');
+  }
+  const { targets } = await users.listTargets({
+    userId: user.$id,
+    queries: [Query.equal('providerType', 'email'), Query.equal('identifier', user.email)],
+    total: false,
+  });
+  const target = targets.find((entry) => entry.identifier === user.email && !entry.expired);
+  if (!target) throw new HttpError(409, 'The applicant has no delivery target for this email address.');
+  const email = buildRecruitmentEmail({
+    status: body.status, interviewAt, track: application.track, name: recipient.name,
+  });
+  const previewId = createHash('sha256').update(JSON.stringify([application.$id, user.$id, target.$id, user.email, email])).digest('hex');
+  if (!send) return { ...email, to: user.email, previewId };
+  if (previewId !== body.previewId) throw new HttpError(409, 'The email details changed. Refresh the preview before sending.');
+  if (!(await playerEmailProviderStatus(messaging)).ready) {
+    throw new HttpError(503, 'Email delivery is not configured yet.');
+  }
+  const messageId = 'rec_' + previewId.slice(0, 32);
+  let message;
+  try {
+    message = await messaging.createEmail({
+      messageId, subject: email.subject, content: buildPlayerEmailHtml(email),
+      targets: [target.$id], draft: false, html: true,
+    });
+  } catch (cause) {
+    if (isConflict(cause)) throw new HttpError(409, 'This email was already submitted to Appwrite. Check Messaging for its delivery status.');
+    throw cause;
+  }
+  await writeAudit(tablesDB, databaseId, {
+    actorProfileId: actor.$id, action: 'recruitment.application.email',
+    targetTable: tableIds.crewApplications, targetRowId: application.$id,
+    payload: { messageId: message.$id, status: body.status },
+  });
+  return { messageId: message.$id, deliveryStatus: message.status };
+}
+
 export async function getRecruitmentSettings(tablesDB, databaseId) {
   const row = await tablesDB.getRow({
     databaseId, tableId: tableIds.recruitmentSettings, rowId: 'applications', ttl: 0,
@@ -4926,7 +5025,10 @@ export default async ({ req, res, log, error }) => {
       return res.json({ ok: true, action: 'loadCrewApplications', applications });
     }
 
-    if (method === 'PATCH' && segments[0] === 'recruitment' && segments[1] === 'applications' && segments[2]) {
+    if (segments[0] === 'recruitment' && segments[1] === 'applications' && segments[2] && (
+      (method === 'PATCH' && segments.length === 3)
+      || (method === 'POST' && segments.length === 5 && segments[3] === 'email' && ['preview', 'send'].includes(segments[4]))
+    )) {
       let application;
       try {
         application = await tablesDB.getRow({
@@ -4937,6 +5039,12 @@ export default async ({ req, res, log, error }) => {
       } catch (cause) {
         if (Number(cause?.code) === 404) throw new HttpError(404, 'That application no longer exists.');
         throw cause;
+      }
+      if (method === 'POST') {
+        const result = await recruitmentEmailAction({
+          tablesDB, databaseId, users, messaging, application, body, actor, send: segments[4] === 'send',
+        });
+        return res.json({ ok: true, ...result });
       }
       const result = await saveCrewApplicationReview(tablesDB, databaseId, application, body, actor);
       return res.json({ ok: true, action: 'reviewCrewApplication', ...result });
