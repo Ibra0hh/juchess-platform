@@ -33,7 +33,7 @@ import {
   deleteTournamentMedia,
   deleteTournament,
   formatAdminError,
-  getAdminSession,
+  restoreAdminSignIn,
   isAdminPanelSessionReplacedError,
   loadAdminProfiles,
   countPendingRegistrations,
@@ -48,6 +48,7 @@ import {
   removeAdminProfile,
   SYSTEM_BYE_PROFILE_ID,
   signInAdmin,
+  startAdminGoogleSignIn,
   signOutAdmin,
   submitTournamentGameResult,
   startTournamentGame,
@@ -782,8 +783,8 @@ function App() {
     let alive = true
 
     async function boot() {
-      const [loadedSession, tournamentResult] = await Promise.all([
-        getAdminSession(),
+      const [{ session: loadedSession, notice }, tournamentResult] = await Promise.all([
+        restoreAdminSignIn(),
         loadTournamentsSingleFlight(),
       ])
       const [blockResult, adminProfileResult] = loadedSession?.allowed
@@ -801,6 +802,7 @@ function App() {
       if (!alive) return
       const tournamentSnapshot = resolveTournamentSnapshot([], tournamentResult)
       setSession(loadedSession)
+      if (notice) setSessionNotice(notice)
       setTournaments(tournamentSnapshot.tournaments)
       setBlocks(blockResult)
       setAdminProfiles(adminProfileResult)
@@ -1005,12 +1007,13 @@ function App() {
 function LoginScreen({ notice, onLogin }: { notice?: string | null; onLogin: (session: AdminSession) => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [submitting, setSubmitting] = useState<'password' | 'google' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setSubmitting(true)
+    if (submitting) return
+    setSubmitting('password')
     setError(null)
 
     try {
@@ -1019,7 +1022,19 @@ function LoginScreen({ notice, onLogin }: { notice?: string | null; onLogin: (se
     } catch (caught) {
       setError(formatAdminError(caught))
     } finally {
-      setSubmitting(false)
+      setSubmitting(null)
+    }
+  }
+
+  function handleGoogleSignIn() {
+    if (submitting) return
+    setSubmitting('google')
+    setError(null)
+    try {
+      startAdminGoogleSignIn()
+    } catch (caught) {
+      setError(formatAdminError(caught))
+      setSubmitting(null)
     }
   }
 
@@ -1059,8 +1074,11 @@ function LoginScreen({ notice, onLogin }: { notice?: string | null; onLogin: (se
             />
           </label>
           {error ? <div className="auth-error" role="alert">{error}</div> : null}
-          <button type="submit" disabled={submitting}>
-            {submitting ? 'Checking...' : 'Sign in'}
+          <button type="submit" disabled={Boolean(submitting)}>
+            {submitting === 'password' ? 'Checking...' : 'Sign in'}
+          </button>
+          <button type="button" className="admin-google-button" disabled={Boolean(submitting)} onClick={handleGoogleSignIn}>
+            {submitting === 'google' ? 'Opening Google…' : 'Continue with Google'}
           </button>
         </form>
       </section>

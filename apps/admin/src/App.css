@@ -179,6 +179,13 @@ button {
   opacity: 0.62;
 }
 
+.prototype-login-card .admin-google-button {
+  background: #fff;
+  color: #24201b;
+  border: 1.5px solid #e4dac5;
+  box-shadow: none;
+}
+
 .primary-button:disabled {
   background: #b98b95;
   box-shadow: none;

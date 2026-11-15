@@ -1,6 +1,7 @@
-import { ExecutionMethod, ID, Query, type Models } from 'appwrite'
+import { ExecutionMethod, ID, OAuthProvider, Query, type Models } from 'appwrite'
 import { account, appwriteConfig, appwriteReady, functions, storage, tablesDB } from './appwrite'
 import { createAdminJwtCache } from './adminJwt'
+import { consumeAdminGoogleReturn, createAdminGoogleAttempt } from './adminGoogleAttempt'
 import { tableIds, type TournamentStatus } from './juchess'
 import type { PlayerEmailLink } from './playerEmail'
 
@@ -422,19 +423,64 @@ export type AnnouncementBroadcastResult = {
 const adminFunctionId = import.meta.env.VITE_APPWRITE_ADMIN_FUNCTION_ID ?? 'admin-actions'
 const adminPanelSessionStorageKey = 'juchess:admin-panel-session'
 const adminJwt = createAdminJwtCache(() => account.createJWT({ duration: 900 }))
+let adminBoot: Promise<{ session: AdminSession | null; notice?: string }> | undefined
+
+export function startAdminGoogleSignIn() {
+  requireAppwriteReady()
+  const urls = createAdminGoogleAttempt(window.sessionStorage, new URL(import.meta.env.BASE_URL, window.location.origin), crypto.randomUUID())
+  // Token flow creates an explicit session on return rather than relying on a cross-site cookie.
+  account.createOAuth2Token({ provider: OAuthProvider.Google, ...urls })
+}
+
+export function restoreAdminSignIn() {
+  return adminBoot ??= restoreAdminSignInOnce()
+}
+
+async function restoreAdminSignInOnce(): Promise<{ session: AdminSession | null; notice?: string }> {
+  const params = new URLSearchParams(window.location.search)
+  if (!params.has('adminGoogle')) return { session: await getAdminSession() }
+
+  window.history.replaceState(window.history.state, '', import.meta.env.BASE_URL)
+  const result = consumeAdminGoogleReturn(params, window.sessionStorage)
+  if (!result) return { session: null }
+  if ('error' in result) return { session: null, notice: result.error }
+
+  let created = false
+  try {
+    await clearCurrentSession()
+    await account.createSession({ userId: result.userId, secret: result.secret })
+    created = true
+    adminJwt.clear()
+    const user = await account.get()
+    if (user.$id !== result.userId || !user.emailVerification) {
+      throw new Error('Google sign-in requires a verified email address for this account.')
+    }
+    // No account enrollment or role changes: the existing server verifies the account and team membership.
+    return { session: await requireAllowedAdminSession(await loadAdminSessionForUser(user)) }
+  } catch (error) {
+    if (created) await signOutAdmin().catch(() => undefined)
+    return { session: null, notice: formatAdminError(error) }
+  }
+}
+
+function requireAllowedAdminSession(session: AdminSession | null) {
+  if (!session?.allowed) {
+    throw new Error(session?.reason || 'This account is not registered for the admin panel.')
+  }
+  return session
+}
 
 export async function signInAdmin(email: string, password: string) {
   requireAppwriteReady()
   await clearCurrentSession()
   await account.createEmailPasswordSession({ email, password })
   adminJwt.clear()
-  const session = await getAdminSession()
-  if (!session?.allowed) {
+  try {
+    return requireAllowedAdminSession(await getAdminSession())
+  } catch (error) {
     await signOutAdmin().catch(() => undefined)
-    throw new Error(session?.reason || 'This account is not registered for the admin panel.')
+    throw error
   }
-
-  return session
 }
 
 export async function signOutAdmin() {
@@ -454,38 +500,31 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   if (!appwriteReady) return null
 
   try {
-    const user = await account.get()
-    try {
-      const response = await runAdminAction<{ profile: AdminProfile; allowed: boolean; reason?: string }>({
-        method: ExecutionMethod.GET,
-        path: '/admin/session',
-        body: {},
-      })
-
-      if (response.allowed) {
-        await runAdminAction({
-          method: ExecutionMethod.POST,
-          path: '/admin/session/claim',
-          body: {},
-        })
-      }
-
-      return {
-        user,
-        profile: response.profile,
-        allowed: response.allowed,
-        reason: response.reason,
-      }
-    } catch (error) {
-      return {
-        user,
-        profile: null,
-        allowed: false,
-        reason: formatAdminError(error),
-      }
-    }
+    return await loadAdminSessionForUser(await account.get())
   } catch {
     return null
+  }
+}
+
+async function loadAdminSessionForUser(user: Models.User): Promise<AdminSession> {
+  try {
+    const response = await runAdminAction<{ profile: AdminProfile; allowed: boolean; reason?: string }>({
+      method: ExecutionMethod.GET,
+      path: '/admin/session',
+      body: {},
+    })
+
+    if (response.allowed) {
+      await runAdminAction({
+        method: ExecutionMethod.POST,
+        path: '/admin/session/claim',
+        body: {},
+      })
+    }
+
+    return { user, profile: response.profile, allowed: response.allowed, reason: response.reason }
+  } catch (error) {
+    return { user, profile: null, allowed: false, reason: formatAdminError(error) }
   }
 }
 
