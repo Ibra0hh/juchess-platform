@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ArrowRight, BriefcaseBusiness, Check, Clock3, ExternalLink, Send, ShieldCheck, UserRoundCheck } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, Check, CircleCheck, Clock3, ExternalLink, Send, ShieldCheck, UserRoundCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import { useAuth } from '../context/useAuth'
@@ -40,7 +40,10 @@ function RecruitmentPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [leaderStatus, setLeaderStatus] = useState<'checking' | 'open' | 'closed' | 'unavailable'>('checking')
-  const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
+  const [loadError, setLoadError] = useState('')
+  const [feedback, setFeedback] = useState<
+    { kind: 'submitted' | 'withdrawn' | 'error'; text: string } | null
+  >(null)
   const previewMode = Boolean(profile?.$id.startsWith('preview-'))
 
   useEffect(() => {
@@ -50,6 +53,7 @@ function RecruitmentPage() {
     }
     let active = true
     setLoading(true)
+    setLoadError('')
     void loadLeaderApplicationsOpen()
       .then((open) => { if (active) setLeaderStatus(open ? 'open' : 'closed') })
       .catch(() => { if (active) setLeaderStatus('unavailable') })
@@ -60,7 +64,7 @@ function RecruitmentPage() {
         if (row) setForm(formFromApplication(row))
       })
       .catch((error: unknown) => {
-        if (active) setFeedback({ tone: 'error', text: error instanceof Error ? error.message : 'Could not load your application.' })
+        if (active) setLoadError(error instanceof Error ? error.message : 'Could not load your application.')
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -101,9 +105,14 @@ function RecruitmentPage() {
         : await submitRecruitmentApplication(form)
       setApplication(row)
       setForm(formFromApplication(row))
-      setFeedback({ tone: 'success', text: 'Your application was submitted to the JuChess HR team.' })
+      setFeedback({
+        kind: 'submitted',
+        text: previewMode
+          ? 'Preview only. No application was sent.'
+          : `The JuChess team received your ${row.track === 'leader' ? 'Team Leader' : 'Team Member'} application. You can check its status in your profile.`,
+      })
     } catch (error) {
-      setFeedback({ tone: 'error', text: error instanceof Error ? error.message : 'Could not submit your application.' })
+      setFeedback({ kind: 'error', text: error instanceof Error ? error.message : 'Could not submit your application.' })
       if (leader && !previewMode) {
         void loadLeaderApplicationsOpen()
           .then((open) => setLeaderStatus(open ? 'open' : 'closed'))
@@ -123,9 +132,9 @@ function RecruitmentPage() {
         ? { ...application, status: 'withdrawn' as const, updatedAt: new Date().toISOString() }
         : await withdrawRecruitmentApplication()
       setApplication(row)
-      setFeedback({ tone: 'success', text: 'Your application was withdrawn. You can update and resubmit it later.' })
+      setFeedback({ kind: 'withdrawn', text: 'Your application was withdrawn. You can update and resubmit it later.' })
     } catch (error) {
-      setFeedback({ tone: 'error', text: error instanceof Error ? error.message : 'Could not withdraw your application.' })
+      setFeedback({ kind: 'error', text: error instanceof Error ? error.message : 'Could not withdraw your application.' })
     } finally {
       setSaving(false)
     }
@@ -169,7 +178,7 @@ function RecruitmentPage() {
         <div className="recruitment-intro-mark" aria-hidden="true">♞</div>
       </section>
 
-      {feedback ? <div className={`recruitment-feedback ${feedback.tone}`} role="status">{feedback.text}</div> : null}
+      {loadError ? <div className="recruitment-feedback error" role="status">{loadError}</div> : null}
 
       <div className="recruitment-layout">
         <form data-no-analytics className="recruitment-form" onSubmit={(event) => void handleSubmit(event)}>
@@ -264,6 +273,22 @@ function RecruitmentPage() {
                   <span className="portfolio-label">Portfolio or profile link <em>Optional</em></span>
                   <input type="url" maxLength={1024} disabled={fieldsDisabled} value={form.portfolioUrl} onChange={(event) => setForm({ ...form, portfolioUrl: event.target.value })} placeholder="https://github.com/you" />
                 </label>
+              </div>
+
+              <div className="recruitment-action-feedback" role="status" aria-atomic="true">
+                {feedback ? (
+                  <div className={`recruitment-feedback ${feedback.kind === 'error' ? 'error' : 'success'}`}>
+                    {feedback.kind === 'submitted' ? (
+                      <div className="recruitment-receipt">
+                        <CircleCheck size={20} aria-hidden="true" />
+                        <div>
+                          <strong>{previewMode ? 'Submission preview' : 'Application submitted'}</strong>
+                          <p>{feedback.text}</p>
+                        </div>
+                      </div>
+                    ) : feedback.text}
+                  </div>
+                ) : null}
               </div>
 
               <div className="recruitment-form-actions">

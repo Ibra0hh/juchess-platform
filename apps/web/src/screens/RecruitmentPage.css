@@ -78,6 +78,11 @@
 .recruitment-form-actions button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 0 17px; border: 0; border-radius: 7px; color: white; background: var(--wine); font-size: 12px; font-weight: 700; }
 .recruitment-form-actions button.secondary { color: var(--ju-ink); background: transparent; border: 1px solid rgba(17,17,17,.22); }
 .recruitment-form-actions button:disabled { cursor: not-allowed; opacity: .56; }
+.recruitment-action-feedback .recruitment-feedback { margin-top: 22px; }
+.recruitment-receipt { display: flex; align-items: flex-start; gap: 10px; }
+.recruitment-receipt svg { flex: 0 0 auto; }
+.recruitment-receipt strong { font-size: 14px; }
+.recruitment-receipt p { margin: 3px 0 0; font-weight: 500; line-height: 1.45; }
 
 .recruitment-aside { display: grid; gap: 16px; }
 .recruitment-aside > section { padding: 20px; }
